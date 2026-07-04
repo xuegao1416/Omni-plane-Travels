@@ -19,5 +19,12 @@ export {
   restoreEngineState,
   getEngineState,
   saveEngineState,
+  setSimApiOverride,
+  // 快照 API
+  createSimulationSnapshot,
+  restoreSimulationSnapshot,
+  deleteSimulationSnapshot,
+  getSimulationSnapshots,
+  clearAllSimulationSnapshots,
 } from './SimulationApi';
 export { extractWorldContext } from './worldContext';

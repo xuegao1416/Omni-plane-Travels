@@ -13,10 +13,13 @@ import { EventsTab } from './worldDynamics/EventsTab';
 import { StorylinesTab } from './worldDynamics/StorylinesTab';
 import { InteractionsTab } from './worldDynamics/InteractionsTab';
 import { SimSettings } from './worldDynamics/SimSettings';
+import { EffectLogTab } from './worldDynamics/EffectLogTab';
+
+type TabId = 'events' | 'storylines' | 'interactions' | 'effectlog' | 'settings';
 
 export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulating }: WorldDynamicsPanelProps) {
   const { simState } = useSimulationStore();
-  const [activeTab, setActiveTab] = useState<'events' | 'storylines' | 'interactions' | 'settings'>('events');
+  const [activeTab, setActiveTab] = useState<TabId>('events');
 
   const eventsMap = simState.events ?? {};
   const activeEvents = Object.values(eventsMap).filter(
@@ -29,6 +32,17 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
         .filter(([, npc]) => (npc.人物分类 === '离场' || npc.人物分类 === '重点') && npc.重要NPC)
         .slice(0, 10)
     : [];
+
+  // 获取 effectLog
+  const effectLog = gameState?.simulationRuntime?.effectLog ?? [];
+
+  const tabs: { id: TabId; label: string; badge?: number }[] = [
+    { id: 'events', label: '事件' },
+    { id: 'storylines', label: '暗线' },
+    { id: 'interactions', label: '交互', badge: (simState.pendingInteractions ?? []).length },
+    { id: 'effectlog', label: '日志', badge: effectLog.length },
+    { id: 'settings', label: '设置' },
+  ];
 
   return (
     <div style={{
@@ -47,17 +61,17 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
           </span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
-          {(['events', 'storylines', 'interactions', 'settings'] as const).map(tab => (
+          {tabs.map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={activeTab === tab ? 'btn-primary btn-xs' : 'btn-ghost btn-xs'}
-              style={tab === 'interactions' ? { position: 'relative' } : undefined}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={activeTab === tab.id ? 'btn-primary btn-xs' : 'btn-ghost btn-xs'}
+              style={tab.badge ? { position: 'relative' } : undefined}
             >
-              {tab === 'events' ? '事件' : tab === 'storylines' ? '暗线' : tab === 'interactions' ? '交互' : '设置'}
-              {tab === 'interactions' && (simState.pendingInteractions ?? []).length > 0 && (
+              {tab.label}
+              {tab.badge !== undefined && tab.badge > 0 && (
                 <span className="notification-dot">
-                  {simState.pendingInteractions.length}
+                  {tab.badge}
                 </span>
               )}
             </button>
@@ -83,6 +97,10 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
 
         {activeTab === 'interactions' && (
           <InteractionsTab interactions={simState.pendingInteractions ?? []} />
+        )}
+
+        {activeTab === 'effectlog' && (
+          <EffectLogTab effectLog={effectLog} />
         )}
 
         {activeTab === 'settings' && (

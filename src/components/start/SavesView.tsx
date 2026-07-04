@@ -4,6 +4,13 @@ import EmptyState from '../shared/EmptyState';
 import type { SaveMeta, GameSave } from '../../storage/db';
 import { loadGame as loadGameFromDb } from '../../storage/db';
 
+/** 格式化字节数为可读字符串 */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 interface SavesViewProps {
   allSaves: SaveMeta[];
   locale: string;
@@ -152,9 +159,21 @@ export default function SavesView({
                     )}
                   </div>
 
-                  {/* 时间 */}
-                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-                    {new Date(meta.timestamp).toLocaleString(locale)}
+                  {/* 时间 + 存档大小 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                    <span>{new Date(meta.timestamp).toLocaleString(locale)}</span>
+                    {meta.estBytes && meta.estBytes > 50 * 1024 * 1024 && (
+                      <span style={{
+                        display: 'flex', alignItems: 'center', gap: '2px',
+                        color: 'var(--danger, #e74c3c)', fontWeight: 600,
+                      }}>
+                        <AlertTriangle size={11} />
+                        {formatBytes(meta.estBytes)}
+                      </span>
+                    )}
+                    {meta.messageCount && (
+                      <span>{meta.messageCount} 条消息</span>
+                    )}
                   </div>
                 </div>
               );

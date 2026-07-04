@@ -1,12 +1,15 @@
 // 生存资源卡片
-import { useState, memo } from 'react';
-import { Leaf, AlertTriangle, Hammer, Plus, Trash2, ChevronRight, Loader, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef, memo } from 'react';
+import { Leaf, AlertTriangle, Hammer, Plus, Trash2, ChevronRight, Loader, Sparkles, Sparkle } from 'lucide-react';
 import type { SurvivalModuleSchema, SurvivalRecipe } from '../../../../modules/schema';
+import type { ResourceChangeLog } from '../../gameScreen/hooks/useSurvivalSettlement';
 import { Collapsible } from '../../../shared/Collapsible';
 
 interface SurvivalCardProps {
   data: SurvivalModuleSchema;
   title?: string;
+  /** 当前运行时资源数量（来自变量系统，用于覆盖 data.resources 中的 amount） */
+  runtimeResources?: Record<string, { 数量: number }>;
   /** 生成配方回调（玩家需求 → AI生成） */
   onGenerateRecipe?: (request: string) => Promise<void>;
   /** 制作回调（消耗资源+产出） */
@@ -15,10 +18,14 @@ interface SurvivalCardProps {
   onDeleteRecipe?: (recipeId: string) => void;
   /** 是否正在生成配方 */
   isGeneratingRecipe?: boolean;
+  /** 打开详情覆盖层 */
+  onOpenOverlay?: () => void;
+  /** 最近的资源变更日志（用于在卡片上显示最近一次变化） */
+  recentChanges?: ResourceChangeLog[];
 }
 
 export default memo(function SurvivalCard({
-  data, title, onGenerateRecipe, onCraft, onDeleteRecipe, isGeneratingRecipe,
+  data, title, runtimeResources, onGenerateRecipe, onCraft, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
 }: SurvivalCardProps) {
   const displayTitle = title || '生存资源';
   const threshold = data.rules?.criticalThreshold ?? 2;
@@ -26,6 +33,48 @@ export default memo(function SurvivalCard({
 
   const [showRecipeInput, setShowRecipeInput] = useState(false);
   const [recipeRequest, setRecipeRequest] = useState('');
+  const [newlyDiscovered, setNewlyDiscovered] = useState<Set<string>>(new Set());
+  const prevResourceIdsRef = useRef<Set<string>>(new Set());
+
+  // 合并静态资源定义和运行时资源数量
+  // 运行时可能包含演化新增的资源（不在 data.resources 中）
+  const mergedResources = (() => {
+    const base = data.resources.map(res => ({
+      ...res,
+      amount: runtimeResources?.[res.id]?.数量 ?? res.amount,
+    }));
+    // 追加运行时存在但静态定义中没有的资源（演化新增）
+    if (runtimeResources) {
+      for (const [id, rt] of Object.entries(runtimeResources)) {
+        if (!base.some(r => r.id === id)) {
+          base.push({
+            id, name: id, symbol: '❓',
+            amount: rt.数量, max: 99, scarce: false,
+            description: '新发现的资源',
+          });
+        }
+      }
+    }
+    return base;
+  })();
+
+  // 检测新发现的资源
+  useEffect(() => {
+    const currentIds = new Set(mergedResources.map(r => r.id));
+    const prevIds = prevResourceIdsRef.current;
+    if (prevIds.size > 0) {
+      const newIds = new Set<string>();
+      for (const id of currentIds) {
+        if (!prevIds.has(id)) newIds.add(id);
+      }
+      if (newIds.size > 0) {
+        setNewlyDiscovered(newIds);
+        const timer = setTimeout(() => setNewlyDiscovered(new Set()), 3000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevResourceIdsRef.current = currentIds;
+  }, [mergedResources.map(r => r.id).join(',')]);
 
   const handleGenerate = async () => {
     if (!recipeRequest.trim() || !onGenerateRecipe) return;
@@ -37,7 +86,7 @@ export default memo(function SurvivalCard({
   // 检查是否可以制作（资源是否足够）
   const canCraft = (recipe: SurvivalRecipe): boolean => {
     for (const [resId, need] of Object.entries(recipe.inputs)) {
-      const res = data.resources.find(r => r.id === resId);
+      const res = mergedResources.find(r => r.id === resId);
       if (!res || res.amount < need) return false;
     }
     return true;
@@ -64,27 +113,36 @@ export default memo(function SurvivalCard({
       )}
 
       {/* ── 资源列表 ── */}
-      {data.resources.length === 0 ? (
+      {mergedResources.length === 0 ? (
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
           暂无资源
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {data.resources.map(res => {
+          {mergedResources.map(res => {
             const pct = res.max > 0 ? Math.round((res.amount / res.max) * 100) : 0;
             const isCritical = res.amount > 0 && res.amount <= threshold;
             const isEmpty = res.amount === 0;
+            const isNew = newlyDiscovered.has(res.id);
             const barColor = isEmpty ? 'var(--text-muted)' : isCritical ? '#ef4444' : res.scarce ? '#f59e0b' : '#22c55e';
 
             return (
-              <div key={res.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div key={res.id} style={{
+                display: 'flex', flexDirection: 'column', gap: '2px',
+                animation: isNew ? 'survival-discover 0.6s ease-out' : undefined,
+                background: isNew ? 'rgba(34, 197, 94, 0.08)' : undefined,
+                borderRadius: isNew ? '6px' : undefined,
+                padding: isNew ? '4px 6px' : undefined,
+                margin: isNew ? '-4px -6px' : undefined,
+              }}>
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   fontSize: 'var(--font-size-sm)',
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>{res.symbol}</span>
-                    <span style={{ color: isCritical ? '#ef4444' : 'var(--text-muted)' }}>{res.name}</span>
+                    <span style={{ color: isCritical ? '#ef4444' : isNew ? '#22c55e' : 'var(--text-muted)' }}>{res.name}</span>
+                    {isNew && <Sparkle size={12} color="#22c55e" />}
                     {res.scarce && (
                       <span style={{
                         fontSize: '10px', padding: '0 4px', borderRadius: '6px',
@@ -196,7 +254,7 @@ export default memo(function SurvivalCard({
           const craftable = canCraft(recipe);
           const inputStr = Object.entries(recipe.inputs)
             .map(([k, v]) => {
-              const res = data.resources.find(r => r.id === k);
+              const res = mergedResources.find(r => r.id === k);
               const name = res?.name || k;
               const has = res?.amount ?? 0;
               const enough = has >= v;
@@ -274,6 +332,49 @@ export default memo(function SurvivalCard({
           );
         })}
       </div>
+
+      {/* ── 最近变更摘要 ── */}
+      {recentChanges && recentChanges.length > 0 && (() => {
+        const lastEntry = recentChanges[recentChanges.length - 1];
+        const significantChanges = lastEntry.changes.filter(c => c.before !== c.after);
+        if (significantChanges.length === 0) return null;
+        return (
+          <div style={{
+            marginTop: '8px', padding: '6px 8px', borderRadius: '6px',
+            background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-xs)',
+          }}>
+            <div style={{ color: 'var(--text-muted)', marginBottom: '3px' }}>最近变化</div>
+            {significantChanges.map((c, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                color: c.after < c.before ? '#ef4444' : '#22c55e',
+              }}>
+                <span>{c.symbol}</span>
+                <span>{c.resourceName}</span>
+                <span style={{ fontWeight: 600 }}>{c.before}→{c.after}</span>
+                <span style={{ color: 'var(--text-muted)', marginLeft: '2px' }}>{c.reason}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* ── 详情入口 ── */}
+      {onOpenOverlay && (
+        <div
+          onClick={onOpenOverlay}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+            marginTop: '8px', padding: '6px 12px',
+            background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)', cursor: 'pointer',
+            color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)',
+          }}
+        >
+          查看详情
+          <ChevronRight size={12} />
+        </div>
+      )}
     </Collapsible>
   );
 });

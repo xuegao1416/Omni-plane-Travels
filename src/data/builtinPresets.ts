@@ -392,6 +392,31 @@ const PROMPT_EXPRESSION_RULES = `<ExpressionRules>
 ["精致人偶","如石子投入心湖","荡起涟漪","像一根针","一丝不易察觉","不容置疑的","精密仪器","磨人的小妖精","要我的命"]
 </ExpressionRules>`;
 
+/** 防八股规范 — 解决 AI 输出重复、模式化问题 */
+const PROMPT_ANTI_FORMULA = `<AntiFormula>
+核心原则：创造与历史毫无相似度的新鲜内容，任何形式的重复都不可接受。
+
+一、禁止重复句式
+- 绝不使用已出现过的句子结构、修辞手法、描写方式
+- 即使描写相似场景，也必须用全新的句式和角度
+- 跳过重复的情节部分，创造新的语言模式填补空白
+
+二、禁止重复情节
+- 绝不输出已出现过的结构和情节
+- 每个场景都应有独特的推进方式，避免套路化
+- 角色反应应根据当前情境动态变化，不能照搬历史
+
+三、追求新鲜感
+- 用词独特且产生视觉效果，保持文字的新颖性
+- 长短句交错，避免形成固定的节奏模式
+- 从不同感官维度切入，避免单一的描写角度
+
+四、自检要求
+- 输出前检查：这个句式是否在历史中出现过？
+- 输出前检查：这个情节结构是否与历史雷同？
+- 如果有相似性，必须重写，用完全不同的方式表达
+</AntiFormula>`;
+
 /** NSFW 内容规范 */
 const PROMPT_NSFW_CONTENT = `<NSFWContent>
 进入亲密场景后，严格遵循以下规范：
@@ -653,6 +678,7 @@ const DEFAULT_PROMPTS: PresetPromptEntry[] = [
   { identifier: 'perspective_boundary', name: '视角边界规范', role: 'system', content: PROMPT_PERSPECTIVE_BOUNDARY, enabled: true, order: 800, triggerMode: 'blue' },
   { identifier: 'dialogue_balance',  name: '对话互动规范',   role: 'system', content: PROMPT_DIALOGUE_BALANCE,  enabled: true, order: 900, triggerMode: 'blue' },
   { identifier: 'expression_rules',  name: '表达规范与禁用词', role: 'system', content: PROMPT_EXPRESSION_RULES, enabled: true, order: 1000, triggerMode: 'blue' },
+  { identifier: 'anti_formula',      name: '防八股规范',    role: 'system', content: PROMPT_ANTI_FORMULA,      enabled: true, order: 1050, triggerMode: 'blue' },
 
   // 第四组：特殊内容
   { identifier: 'nsfw_content',      name: 'NSFW内容规范',   role: 'system', content: PROMPT_NSFW_CONTENT,     enabled: true, order: 1100, triggerMode: 'blue' },

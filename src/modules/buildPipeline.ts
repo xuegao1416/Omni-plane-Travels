@@ -363,6 +363,11 @@ function extractProgressionConfig(progData: ProgressionModuleSchema): Progressio
     };
   }
 
+  // 叙事风格（可选）
+  if (progData.narrativeStyle) {
+    (config as any).narrativeStyle = progData.narrativeStyle;
+  }
+
   return config;
 }
 
@@ -384,6 +389,17 @@ function extractSurvivalConfig(survData: SurvivalModuleSchema): SurvivalConfig {
       description: r.description,
     })) : [],
     rules: survData.rules || { cycleName: '一天', consumePerCycle: '', criticalThreshold: 2 },
+    resourceEvolution: Array.isArray(survData.resourceEvolution) ? survData.resourceEvolution.map(evo => ({
+      id: evo.id,
+      trigger: { keywords: evo.trigger?.keywords ?? [] },
+      add: evo.add?.map(r => ({
+        id: r.id, name: r.name, symbol: r.symbol,
+        amount: r.amount ?? 0, max: r.max, scarce: r.scarce,
+        gatherRate: r.gatherRate, usage: r.usage, description: r.description,
+      })),
+      remove: evo.remove,
+      narrateHint: evo.narrateHint,
+    })) : undefined,
   };
 }
 
@@ -535,6 +551,12 @@ export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[]
       progressionContent += `\n\n─── 段位体系 ───\n${tierList}`;
     }
 
+    // 叙事风格指引（避免游戏化表述）
+    if (progData.narrativeStyle) {
+      const ns = progData.narrativeStyle;
+      progressionContent += `\n\n─── 叙事风格 ───\n角色成长时的表现：${ns.upgradeDesc || ''}\n成长相关关键词：${(ns.keywords || []).join('、')}\n注意：在正文中描述角色成长时，使用上述自然语言风格，不要出现"升级""经验值""叮"等游戏化词汇。`;
+    }
+
     if (progressionKeywords.length > 0) {
       entries.push({
         uid: -5004,
@@ -551,16 +573,32 @@ export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[]
   // ─── 生存资源模块（绿灯：关键词触发）───
   if (ctx.survivalData) {
     const survivalData = ctx.survivalData;
-    const survivalKeywords = [
-      ...(Array.isArray(survivalData.resources) ? survivalData.resources.map(r => r.name) : []),
-      '生存', '资源', '采集', '制作', '消耗', '食物', '水',
-    ].filter(k => k && k.length > 0);
 
     // 把 AI 生成的资源列表写入内容
     const resourceList = Array.isArray(survivalData.resources)
       ? survivalData.resources.map(r => `${r.symbol || ''}${r.name}：${r.description || ''}${r.scarce ? '（稀缺）' : ''}`).join('\n')
       : '';
-    const survContent = `${SURVIVAL_UPDATE_RULES}${resourceList ? `\n\n─── 资源清单 ───\n${resourceList}` : ''}`;
+
+    // 演化蓝图写入世界书
+    const evolutionSteps = Array.isArray(survivalData.resourceEvolution) ? survivalData.resourceEvolution : [];
+    const evolutionContent = evolutionSteps.length > 0
+      ? '\n\n─── 资源演化蓝图 ───\n' + evolutionSteps.map(evo => {
+        const addList = evo.add?.map(r => `${r.symbol || ''}${r.name}`).join('、') || '无';
+        const removeList = evo.remove?.length ? evo.remove.join('、') : '无';
+        return `- ${evo.id}：当叙事中出现关键词「${evo.trigger.keywords.join('、')}」时解锁\n  新增：${addList}，淘汰：${removeList}${evo.narrateHint ? `\n  叙事提示：${evo.narrateHint}` : ''}`;
+      }).join('\n')
+      : '';
+
+    // 收集演化关键词加入触发词
+    const evolutionKeywords = evolutionSteps.flatMap(evo => evo.trigger?.keywords ?? []);
+
+    const survivalKeywords = [
+      ...(Array.isArray(survivalData.resources) ? survivalData.resources.map(r => r.name) : []),
+      '生存', '资源', '采集', '制作', '消耗', '食物', '水',
+      ...evolutionKeywords,
+    ].filter(k => k && k.length > 0);
+
+    const survContent = `${SURVIVAL_UPDATE_RULES}${resourceList ? `\n\n─── 资源清单 ───\n${resourceList}` : ''}${evolutionContent}`;
 
     entries.push({
       uid: -5006,

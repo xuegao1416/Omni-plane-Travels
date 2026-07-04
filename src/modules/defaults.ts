@@ -11,6 +11,7 @@ import type {
   DiceModuleSchema,
   TalentModuleSchema,
   WorldSystemData,
+  SimulationRules,
 } from './schema';
 
 /** 数值属性模块默认值 */
@@ -123,6 +124,76 @@ export function createDefaultTalentModule(): TalentModuleSchema {
   };
 }
 
+/** 创建默认的世界演化规则（通用兜底规则） */
+export function createDefaultSimulationRules(): SimulationRules {
+  return {
+    eventEffects: [
+      // 通用：发现资源
+      {
+        id: 'default_resource_discovery',
+        priority: 10,
+        stackStrategy: 'add',
+        trigger: {
+          tags: ['resource', 'discovery'],
+          keywords: ['发现', '找到', '获得资源'],
+        },
+        effects: {
+          survival: {
+            resources: {}, // 具体资源由 AI 声明
+          },
+        },
+      },
+      // 通用：贸易事件
+      {
+        id: 'default_trade',
+        priority: 5,
+        stackStrategy: 'add',
+        trigger: {
+          tags: ['trade', 'caravan'],
+          keywords: ['商队', '贸易', '交易'],
+        },
+        effects: {
+          business: {
+            fundsDelta: 50,
+          },
+        },
+      },
+      // 通用：战斗事件
+      {
+        id: 'default_combat',
+        priority: 15,
+        stackStrategy: 'add',
+        trigger: {
+          tags: ['combat', 'battle'],
+          keywords: ['战斗', '交战', '遇敌'],
+        },
+        effects: {
+          stats: {
+            changes: {
+              hp: { delta: -10, min: 0 },
+            },
+          },
+        },
+      },
+    ],
+    periodicEvents: [],
+    worldStateRules: [],
+    worldStateAxes: {
+      '社会环境': ['权力结构', '社会氛围'],
+    },
+    narrativeGuardrails: {
+      maxDeltaPerStat: {
+        hp: 30,
+        mp: 30,
+      },
+      maxDeltaPerResource: {},
+      setAllowedVars: [],
+      allowCreateResources: true, // 允许 AI 动态创建新资源（如发现铁矿）
+      newResourceDefaultMax: 100,
+    },
+  };
+}
+
 /** 创建默认的世界系统数据 */
 export function createDefaultWorldSystem(): WorldSystemData {
   return {};
@@ -175,6 +246,8 @@ export function createFallbackModule(moduleId: string, name: string): import('..
       return { ...base, moduleConfig: createDefaultDiceModule() as unknown as Record<string, unknown> };
     case 'talent':
       return { ...base, moduleConfig: createDefaultTalentModule() as unknown as Record<string, unknown> };
+    case 'simulation':
+      return { ...base, moduleConfig: createDefaultSimulationRules() as unknown as Record<string, unknown> };
     default:
       return base;
   }

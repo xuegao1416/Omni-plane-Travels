@@ -10,15 +10,13 @@ export interface WorldModuleRuntime {
 export interface WorldState {
   时间系统: { 当前时间: string; 当前天气: string };
   空间定位: { 当前位置: string };
-  社会环境: { 权力结构: string; 社会氛围: string };
-  信息层级: {
-    全局重大事件: string;
-    势力动态: string;
-    区域事件: string;
-    本地消息: string;
-    圈内传闻: string;
-  };
-  // 世界系统已移除 — 模块配置只存世界书，运行时数据在 玩家.生存状态
+  /**
+   * 泛化世界状态（由世界演化系统动态更新）
+   * 结构：轴名 → 字段 → 值
+   * 例如：{ "社会环境": { "权力结构": "王朝统治", "社会氛围": "紧张" } }
+   * 不同世界观有不同的状态轴，由世界生成时定义
+   */
+  状态轴?: Record<string, Record<string, string>>;
 }
 
 /**
@@ -139,7 +137,6 @@ export interface NPCData {
   短期目标?: string;
   长期目标?: string;
   内心想法?: string;
-  属性?: Record<string, number | string>;
   // 成长体系（当世界启用成长体系模块时填充）
   成长状态?: {
     当前段位索引?: number;
@@ -160,6 +157,8 @@ export interface GameState {
   memoryRuntime?: Record<string, unknown>;
   /** 记忆系统配置（可选） */
   memoryConfig?: Record<string, unknown>;
+  /** 世界演化运行时状态（可选，由世界演化引擎管理） */
+  simulationRuntime?: import('../modules/schema').SimulationRuntimeState;
 }
 
 // 默认空状态
@@ -168,8 +167,6 @@ export function createDefaultGameState(): GameState {
     世界: {
       时间系统: { 当前时间: '', 当前天气: '' },
       空间定位: { 当前位置: '' },
-      社会环境: { 权力结构: '', 社会氛围: '' },
-      信息层级: { 全局重大事件: '', 势力动态: '', 区域事件: '', 本地消息: '', 圈内传闻: '' },
     },
     玩家: {
       生存状态: { 血量: 100, 体力值: 100 },

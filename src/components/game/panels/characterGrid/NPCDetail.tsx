@@ -153,8 +153,8 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                     <div style={{ padding: '8px 10px', background: 'var(--accent-dim)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-base)', lineHeight: '1.5' }}>{ext.特殊能力}</div>
                   </Section>
                 )}
-                {ext.属性 && Object.keys(ext.属性).length > 0 && (
-                  <Section icon={BarChart3} title="属性"><RecordGrid data={ext.属性} /></Section>
+                {ext.生存状态 && Object.keys(ext.生存状态).length > 0 && (
+                  <Section icon={BarChart3} title="属性"><RecordGrid data={ext.生存状态} /></Section>
                 )}
                 {ext.天赋 && ext.天赋.length > 0 && (
                   <Section icon={Star} title="天赋"><TagList items={ext.天赋} accent /></Section>
@@ -162,7 +162,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                 {ext.技能列表 && (
                   <Section icon={Zap} title="技能列表"><ListOrRecord data={ext.技能列表} emptyText="暂无技能" /></Section>
                 )}
-                {!ext.特殊能力 && !ext.属性 && !ext.天赋 && !ext.技能列表 && (
+                {!ext.特殊能力 && !ext.生存状态 && !ext.天赋 && !ext.技能列表 && (
                   <EmptyState icon={Swords} message="暂无技能数据" />
                 )}
               </div>

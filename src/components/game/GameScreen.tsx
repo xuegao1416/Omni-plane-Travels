@@ -11,6 +11,7 @@ import VariableSnapshotPanel from './panels/VariableSnapshotPanel';
 import WorldBookPanel from './panels/WorldBookPanel';
 import RightPanel from './panels/RightPanel';
 import BusinessOverlay from './panels/BusinessOverlay';
+import SurvivalOverlay from './panels/SurvivalOverlay';
 import { MemorySettingsOverlay } from '../settings/memory/MemorySettingsOverlay';
 import WorldDynamicsPanel from './panels/WorldDynamicsPanel';
 import { findWorldDef } from '../../data/worldLoader';
@@ -22,6 +23,7 @@ import DesktopLayout from './gameScreen/DesktopLayout';
 import MobileLayout from './gameScreen/MobileLayout';
 import { useSimulation } from './gameScreen/hooks/useSimulation';
 import { useSurvivalCraft } from './gameScreen/hooks/useSurvivalCraft';
+import { useSurvivalSettlement } from './gameScreen/hooks/useSurvivalSettlement';
 import { useBusinessSettlement } from './gameScreen/hooks/useBusinessSettlement';
 
 export default function GameScreen() {
@@ -32,6 +34,7 @@ export default function GameScreen() {
   // ── State ──
   const [overlay, setOverlay] = useState<OverlayPanel>(null);
   const [businessOverlayOpen, setBusinessOverlayOpen] = useState(false);
+  const [survivalOverlayOpen, setSurvivalOverlayOpen] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showLeftOverlay, setShowLeftOverlay] = useState(false);
@@ -68,6 +71,7 @@ export default function GameScreen() {
     try { return findWorldDef(state.selectedWorld); } catch { return undefined; }
   }, [state.selectedWorld]);
   const hasBusinessModule = !!worldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
+  const hasSurvivalModule = !!worldDef?.modules?.some(m => m.moduleId === 'survival' && m.enabled);
   const worldSystem = useMemo((): WorldSystemData => {
     if (!worldDef?.modules) return {};
     const keyMap: Record<string, string> = {
@@ -90,6 +94,7 @@ export default function GameScreen() {
     handleSurvivalCraft, handleSurvivalGenerateRecipe, handleSurvivalDeleteRecipe,
   } = useSurvivalCraft(engine, apiConfig, worldDef, setNotification, bumpVersion);
   useBusinessSettlement(engine, worldDef, bumpVersion);
+  const { getChangeLog: getSurvivalChangeLog, clearChangeLog: clearSurvivalChangeLog } = useSurvivalSettlement(engine, worldDef, bumpVersion);
   // ── Event effects ──
   useEffect(() => {
     const onUpdate = () => setStateVersion(v => v + 1);
@@ -143,6 +148,8 @@ export default function GameScreen() {
       onSurvivalDeleteRecipe={handleSurvivalDeleteRecipe}
       isGeneratingRecipe={isGeneratingRecipe} runtimeRecipes={runtimeRecipes}
       onOpenBusinessOverlay={() => setBusinessOverlayOpen(true)}
+      onOpenSurvivalOverlay={() => setSurvivalOverlayOpen(true)}
+      survivalChangeLog={getSurvivalChangeLog()}
     />
   );
 
@@ -176,6 +183,10 @@ export default function GameScreen() {
       })),
     } as BusinessModuleSchema;
   })();
+  // 生存资源数据（供 SurvivalOverlay 使用）
+  const survivalData = (() => {
+    return worldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled)?.moduleConfig as import('../../modules/schema').SurvivalModuleSchema | undefined;
+  })();
   // ── Render ──
   return (
     <>
@@ -203,6 +214,12 @@ export default function GameScreen() {
         >{chatPanelEl}</DesktopLayout>
       )}
       {bizData && <BusinessOverlay open={businessOverlayOpen} data={bizData} onClose={() => setBusinessOverlayOpen(false)} />}
+      {survivalData && <SurvivalOverlay
+        open={survivalOverlayOpen} data={survivalData}
+        runtimeResources={gameState.玩家?.生存资源 as any}
+        changeLog={getSurvivalChangeLog()}
+        onClose={() => setSurvivalOverlayOpen(false)}
+      />}
       {notification && (
         <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 200, animation: 'fadeIn 0.2s ease' }}>
           {notification}

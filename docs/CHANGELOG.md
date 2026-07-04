@@ -1,5 +1,31 @@
 # 更新日志
 
+## v1.9.9 — 世界演化规则系统 + 变量提取联动重构 (2026-07-04)
+
+### ✨ 新增
+
+- **世界演化规则系统**：SimulationRules 类型定义、机械层结算器、统一应用器
+- **世界状态泛化更新**：worldStateAxes 替代写死的社会环境/信息层级字段
+- **AI 生成规则提示词**：buildSimulationRulesPrompt + validateSimulationRules
+- **叙事层护栏**：validateNarrativeEffects 校验 AI 越界声明
+- **可观测性**：EffectLogTab 面板展示变量变化日志
+- **性能索引**：tag→rule/keyword→rule 索引优化匹配速度
+- **快照系统**：世界演化快照 + 变量/记忆/世界演化三系统联动回滚
+
+### 🔧 改进
+
+- **变量提取联动**：世界演化输出 mechanicalEffects，变量提取统一处理
+- **前端数据源修复**：SurvivalCard 从 GameState 读取运行时值
+- **NPC 属性结构统一**：属性字段改为生存状态，与玩家一致
+- **hasProgression 支持等级制**：levelData 判断生效
+- **移除社会环境/信息层级**：精简 WorldState 结构
+
+### 🐛 修复
+
+- **NPC survivalStats 写入**：useStartScreen.ts 正确写入生存状态
+- **npcHelpers.ts 字段引用**：ext.属性 → ext.生存状态
+- **NPCDetail.tsx 字段引用**：ext.属性 → ext.生存状态
+
 ## v1.9.8 — 变量瘦身与 UI 去重 (2026-07-03)
 
 ### 🔧 改进

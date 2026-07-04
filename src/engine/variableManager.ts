@@ -349,6 +349,389 @@ export class VariableManager {
     return false;
   }
 
+  /**
+   * 校验 AI 叙事层声明的变量更新
+   * 根据 narrativeGuardrails 裁剪或丢弃越界部分
+   *
+   * @param effects AI 声明的效果
+   * @param guardrails 护栏配置
+   * @returns 校验后的效果（可能被裁剪）
+   */
+  validateNarrativeEffects(
+    effects: import('../modules/schema').ModuleEffects,
+    guardrails: import('../modules/schema').NarrativeGuardrails | null,
+  ): { valid: import('../modules/schema').ModuleEffects; rejected: string[] } {
+    if (!guardrails) {
+      return { valid: effects, rejected: [] };
+    }
+
+    const rejected: string[] = [];
+    const valid: import('../modules/schema').ModuleEffects = {};
+
+    // 校验生存资源
+    if (effects.survival?.resources) {
+      valid.survival = { ...valid.survival, resources: {} };
+      const resources = valid.survival.resources!;
+      for (const [id, change] of Object.entries(effects.survival.resources)) {
+        // 检查是否是新资源（当前不存在）
+        const isNewResource = !this.state.玩家.生存资源?.[id];
+
+        if (isNewResource) {
+          // 新资源：检查是否允许创建
+          if (!guardrails.allowCreateResources) {
+            rejected.push(`survival.resources.${id}: 不允许创建新资源`);
+            continue;
+          }
+          // 允许创建新资源
+          resources[id] = { ...change };
+          continue;
+        }
+
+        // 已有资源：正常校验
+        const maxDelta = guardrails.maxDeltaPerResource[id];
+
+        if (change.delta !== undefined && maxDelta !== undefined) {
+          if (Math.abs(change.delta) > maxDelta) {
+            rejected.push(`survival.resources.${id}: delta ${change.delta} 超过限制 ${maxDelta}`);
+            resources[id] = {
+              delta: Math.sign(change.delta) * maxDelta,
+              min: change.min,
+            };
+            continue;
+          }
+        }
+
+        // set 操作受限（不在白名单中则拒绝）
+        if (change.set !== undefined && !guardrails.setAllowedVars.includes(`survival.resources.${id}`)) {
+          rejected.push(`survival.resources.${id}: set 操作不在白名单中`);
+          continue;
+        }
+
+        resources[id] = { ...change };
+      }
+    }
+
+    // 校验生存资源动态操作（add/remove/update）——直接放行，由引擎层处理
+    if (effects.survival?.addResources || effects.survival?.removeResources || effects.survival?.updateResources) {
+      if (!valid.survival) valid.survival = {};
+      if (effects.survival.addResources) valid.survival.addResources = effects.survival.addResources;
+      if (effects.survival.removeResources) valid.survival.removeResources = effects.survival.removeResources;
+      if (effects.survival.updateResources) valid.survival.updateResources = effects.survival.updateResources;
+    }
+
+    // 校验经营资产
+    if (effects.business) {
+      valid.business = {};
+      if (effects.business.fundsDelta !== undefined) {
+        const maxDelta = guardrails.maxDeltaPerResource['funds'];
+        if (maxDelta !== undefined && Math.abs(effects.business.fundsDelta) > maxDelta) {
+          rejected.push(`business.fundsDelta: ${effects.business.fundsDelta} 超过限制 ${maxDelta}`);
+          valid.business.fundsDelta = Math.sign(effects.business.fundsDelta) * maxDelta;
+        } else {
+          valid.business.fundsDelta = effects.business.fundsDelta;
+        }
+      }
+    }
+
+    // 校验数值属性
+    if (effects.stats?.changes) {
+      valid.stats = { changes: {} };
+      const changes = valid.stats.changes!;
+      for (const [id, change] of Object.entries(effects.stats.changes)) {
+        const maxDelta = guardrails.maxDeltaPerStat[id];
+
+        if (change.delta !== undefined && maxDelta !== undefined) {
+          if (Math.abs(change.delta) > maxDelta) {
+            rejected.push(`stats.changes.${id}: delta ${change.delta} 超过限制 ${maxDelta}`);
+            changes[id] = {
+              delta: Math.sign(change.delta) * maxDelta,
+              min: change.min,
+            };
+            continue;
+          }
+        }
+
+        // set 操作受限
+        if (change.set !== undefined && !guardrails.setAllowedVars.includes(`stats.${id}`)) {
+          rejected.push(`stats.changes.${id}: set 操作不在白名单中`);
+          continue;
+        }
+
+        changes[id] = { ...change };
+      }
+    }
+
+    // 校验成长体系
+    if (effects.progression) {
+      valid.progression = {};
+      if (effects.progression.xpDelta !== undefined) {
+        const maxDelta = guardrails.maxDeltaPerStat['xp'];
+        if (maxDelta !== undefined && Math.abs(effects.progression.xpDelta) > maxDelta) {
+          rejected.push(`progression.xpDelta: ${effects.progression.xpDelta} 超过限制 ${maxDelta}`);
+          valid.progression.xpDelta = Math.sign(effects.progression.xpDelta) * maxDelta;
+        } else {
+          valid.progression.xpDelta = effects.progression.xpDelta;
+        }
+      }
+      // tierIndex 变化总是允许的（升级/降级）
+      if (effects.progression.tierIndex !== undefined) {
+        valid.progression.tierIndex = effects.progression.tierIndex;
+      }
+    }
+
+    return { valid, rejected };
+  }
+
+  /**
+   * 应用模块效果（来自世界演化系统的机械层结算）
+   * 校验模块开关 → 应用 delta/set（带 min 下限）→ 写 effectLog
+   *
+   * @param effects 模块效果
+   * @param source 来源（用于日志）
+   * @param enabledModules 当前启用的模块 ID 列表（用于校验模块开关）
+   * @returns 效果日志
+   */
+  applyModuleEffects(
+    effects: import('../modules/schema').ModuleEffects,
+    source: 'rule' | 'periodic' | 'ai' | 'npc' = 'rule',
+    enabledModules?: string[],
+  ): import('../modules/schema').EffectLogEntry[] {
+    const log: import('../modules/schema').EffectLogEntry[] = [];
+    const tick = this.state.simulationRuntime?.tick ?? 0;
+
+    // 模块开关检查辅助函数
+    const isModuleEnabled = (moduleId: string) => {
+      if (!enabledModules) return true; // 未传入则默认启用（兼容旧调用）
+      return enabledModules.includes(moduleId);
+    };
+
+    // 应用生存资源效果（需要启用 survival 模块）
+    if (effects.survival?.resources && isModuleEnabled('survival')) {
+      if (!this.state.玩家.生存资源) {
+        this.state.玩家.生存资源 = {};
+      }
+      const resources = this.state.玩家.生存资源;
+
+      for (const [id, change] of Object.entries(effects.survival.resources)) {
+        // 存在性校验：只对已有的资源 id 应用，防止创建幽灵资源
+        if (!(id in resources)) {
+          console.warn(`[applyModuleEffects] 跳过未知生存资源 id: ${id}`);
+          log.push({
+            tick, source, module: 'survival', variable: id,
+            before: 'N/A' as any, after: 'N/A' as any,
+            reason: `跳过：资源 ${id} 不存在于当前世界`,
+          });
+          continue;
+        }
+
+        const before = resources[id]?.数量 ?? 0;
+        let after = before;
+
+        if (change.set !== undefined) {
+          after = change.set;
+        } else if (change.delta !== undefined) {
+          after = before + change.delta;
+        }
+
+        // 应用 min 下限
+        if (change.min !== undefined) {
+          after = Math.max(after, change.min);
+        }
+
+        // 确保不为负数
+        after = Math.max(0, after);
+
+        resources[id] = { 数量: after };
+
+        log.push({
+          tick, source, module: 'survival', variable: id,
+          before, after, reason: `机械层结算`,
+        });
+      }
+    }
+
+    // ── 动态添加新资源（资源发现/演化解锁）──
+    if (effects.survival?.addResources && isModuleEnabled('survival')) {
+      if (!this.state.玩家.生存资源) {
+        this.state.玩家.生存资源 = {};
+      }
+      const resources = this.state.玩家.生存资源;
+
+      for (const res of effects.survival.addResources) {
+        if (resources[res.id]) {
+          // 已存在，跳过（不重复添加）
+          continue;
+        }
+        resources[res.id] = { 数量: res.amount ?? 0 };
+        log.push({
+          tick, source, module: 'survival', variable: res.id,
+          before: 'N/A' as any, after: res.amount ?? 0,
+          reason: `新资源发现：${res.name || res.id}`,
+        });
+      }
+    }
+
+    // ── 动态移除资源（枯竭/被替代）──
+    if (effects.survival?.removeResources && isModuleEnabled('survival')) {
+      const resources = this.state.玩家.生存资源;
+      if (resources) {
+        for (const { id } of effects.survival.removeResources) {
+          if (id in resources) {
+            const before = resources[id]?.数量 ?? 0;
+            delete resources[id];
+            log.push({
+              tick, source, module: 'survival', variable: id,
+              before, after: '已移除' as any,
+              reason: `资源淘汰/枯竭`,
+            });
+          }
+        }
+      }
+    }
+
+    // ── 动态修改资源属性 ──
+    if (effects.survival?.updateResources && isModuleEnabled('survival')) {
+      const resources = this.state.玩家.生存资源;
+      if (resources) {
+        for (const upd of effects.survival.updateResources) {
+          if (upd.id in resources) {
+            log.push({
+              tick, source, module: 'survival', variable: upd.id,
+              before: JSON.stringify(resources[upd.id]),
+              after: JSON.stringify(upd),
+              reason: `资源属性变更`,
+            });
+          }
+        }
+      }
+    }
+
+    // 应用经营资产效果（需要启用 business 模块）
+    if (effects.business && isModuleEnabled('business')) {
+      if (!this.state.玩家.经营资产) {
+        this.state.玩家.经营资产 = { 资金: 0, 资产列表: [] };
+      }
+      const business = this.state.玩家.经营资产;
+
+      if (effects.business.fundsDelta !== undefined) {
+        const before = business.资金;
+        business.资金 = Math.max(0, before + effects.business.fundsDelta);
+
+        log.push({
+          tick, source, module: 'business', variable: 'funds',
+          before, after: business.资金, reason: `机械层结算`,
+        });
+      }
+    }
+
+    // 应用数值属性效果（需要启用 stat 模块）
+    if (effects.stats?.changes && isModuleEnabled('stat')) {
+      const stats = this.state.玩家.生存状态;
+
+      for (const [id, change] of Object.entries(effects.stats.changes)) {
+        // 存在性校验：只对已有的属性 key 应用
+        if (!(id in stats)) {
+          console.warn(`[applyModuleEffects] 跳过未知属性 id: ${id}`);
+          log.push({
+            tick, source, module: 'stats', variable: id,
+            before: 'N/A' as any, after: 'N/A' as any,
+            reason: `跳过：属性 ${id} 不存在于当前世界`,
+          });
+          continue;
+        }
+
+        const before = stats[id] ?? 0;
+        let after = before;
+
+        if (change.set !== undefined) {
+          after = change.set;
+        } else if (change.delta !== undefined) {
+          after = before + change.delta;
+        }
+
+        // 应用 min 下限
+        if (change.min !== undefined) {
+          after = Math.max(after, change.min);
+        }
+
+        // 确保不为负数
+        after = Math.max(0, after);
+
+        stats[id] = after;
+
+        log.push({
+          tick, source, module: 'stats', variable: id,
+          before, after, reason: `机械层结算`,
+        });
+      }
+    }
+
+    // 应用成长体系效果（需要启用 progression 模块）
+    if (effects.progression && isModuleEnabled('progression')) {
+      if (effects.progression.xpDelta !== undefined) {
+        const before = this.state.玩家.当前经验值 ?? 0;
+        this.state.玩家.当前经验值 = Math.max(0, before + effects.progression.xpDelta);
+
+        log.push({
+          tick, source, module: 'progression', variable: 'xp',
+          before, after: this.state.玩家.当前经验值, reason: `机械层结算`,
+        });
+      }
+
+      if (effects.progression.tierIndex !== undefined) {
+        const before = this.state.玩家.当前段位索引 ?? 0;
+        this.state.玩家.当前段位索引 = effects.progression.tierIndex;
+
+        log.push({
+          tick, source, module: 'progression', variable: 'tierIndex',
+          before, after: this.state.玩家.当前段位索引, reason: `机械层结算`,
+        });
+      }
+    }
+
+    // 更新 simulationRuntime 的 effectLog
+    if (this.state.simulationRuntime && log.length > 0) {
+      this.state.simulationRuntime.effectLog.push(...log);
+      // 限制日志数量（最多保留 100 条）
+      if (this.state.simulationRuntime.effectLog.length > 100) {
+        this.state.simulationRuntime.effectLog = this.state.simulationRuntime.effectLog.slice(-100);
+      }
+    }
+
+    return log;
+  }
+
+  /**
+   * 应用世界状态更新（泛化结构）
+   * 按"轴名 → 字段 → 新值"写入
+   *
+   * @param updates 世界状态更新
+   */
+  applyWorldStateUpdate(updates: Record<string, Record<string, string>>): void {
+    if (!this.state.世界.状态轴) {
+      this.state.世界.状态轴 = {};
+    }
+
+    const axes = this.state.世界.状态轴;
+
+    for (const [axisName, fields] of Object.entries(updates)) {
+      if (!axes[axisName]) {
+        axes[axisName] = {};
+      }
+
+      for (const [fieldName, value] of Object.entries(fields)) {
+        axes[axisName][fieldName] = value;
+      }
+    }
+  }
+
+  /**
+   * 获取世界状态轴
+   */
+  getWorldStateAxes(): Record<string, Record<string, string>> {
+    return this.state.世界.状态轴 ?? {};
+  }
+
   // 创建快照（挂载到消息上，用于回滚）
   // 使用 JSON 序列化替代 cloneDeep，避免超大对象导致 "Invalid string length"
   createSnapshot(): GameState {

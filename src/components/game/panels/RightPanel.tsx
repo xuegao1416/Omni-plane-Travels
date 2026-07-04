@@ -1,6 +1,7 @@
-import { Clock, MapPin, Cloud, Landmark, Globe, Heart, Zap } from 'lucide-react';
+import { Clock, MapPin, Cloud, Heart, Zap } from 'lucide-react';
 import type { GameState } from '../../../schema/variables';
 import type { WorldSystemData, ProgressionConfig, SurvivalRecipe, SurvivalModuleSchema, BusinessModuleSchema } from '../../../modules/schema';
+import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
 import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard } from './modules';
 import { findWorldDef } from '../../../data/worldLoader';
 
@@ -19,6 +20,10 @@ interface Props {
   runtimeRecipes?: SurvivalRecipe[];
   /** 经营资产：打开覆盖层 */
   onOpenBusinessOverlay?: () => void;
+  /** 生存资源：打开详情覆盖层 */
+  onOpenSurvivalOverlay?: () => void;
+  /** 生存资源变更日志 */
+  survivalChangeLog?: ResourceChangeLog[];
 }
 
 // 世界状态行 - Lucide 图标 + 文字
@@ -49,7 +54,7 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
   );
 }
 
-export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay }: Props) {
+export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
 
@@ -146,8 +151,6 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
               {world.时间系统.当前时间 && <StatusRow icon={<Clock size={13} />} text={world.时间系统.当前时间} />}
               {world.空间定位.当前位置 && <StatusRow icon={<MapPin size={13} />} text={world.空间定位.当前位置} />}
               {world.时间系统.当前天气 && <StatusRow icon={<Cloud size={13} />} text={world.时间系统.当前天气} />}
-              {world.社会环境.权力结构 && <StatusRow icon={<Landmark size={13} />} text={world.社会环境.权力结构} />}
-              {world.社会环境.社会氛围 && <StatusRow icon={<Globe size={13} />} text={world.社会环境.社会氛围} muted />}
             </>
           )}
         </div>
@@ -229,33 +232,39 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
           } : undefined}
         />
       )}
-      {worldSystem.生存资源 && (
-        <SurvivalCard
-          data={worldSystem.生存资源}
-          title={moduleNames?.['生存资源']}
-          onGenerateRecipe={onSurvivalGenerateRecipe}
-          onCraft={onSurvivalCraft}
-          onDeleteRecipe={onSurvivalDeleteRecipe}
-          isGeneratingRecipe={isGeneratingRecipe}
-        />
-      )}
+      {worldSystem.生存资源 && (() => {
+        // 合并运行时资源数据（从 GameState 读取）
+        const runtimeResources = player.生存资源;
+        const mergedData = { ...worldSystem.生存资源 };
+        if (runtimeResources && mergedData.resources) {
+          mergedData.resources = mergedData.resources.map(res => {
+            const runtime = runtimeResources[res.id];
+            if (runtime) {
+              return { ...res, amount: runtime.数量 ?? res.amount, max: runtime.最大值 ?? res.max };
+            }
+            return res;
+          });
+        }
+        return (
+          <SurvivalCard
+            data={mergedData}
+            title={moduleNames?.['生存资源']}
+            runtimeResources={runtimeResources as any}
+            onGenerateRecipe={onSurvivalGenerateRecipe}
+            onCraft={onSurvivalCraft}
+            onDeleteRecipe={onSurvivalDeleteRecipe}
+            isGeneratingRecipe={isGeneratingRecipe}
+            onOpenOverlay={onOpenSurvivalOverlay}
+            recentChanges={survivalChangeLog}
+          />
+        );
+      })()}
       {worldSystem.经营资产 && (
         <BusinessCard
           data={worldSystem.经营资产}
           title={moduleNames?.['经营资产']}
           onOpenOverlay={onOpenBusinessOverlay ?? (() => {})}
         />
-      )}
-      {/* 最新消息 */}
-      {world.信息层级.本地消息 && (
-        <div className="surface-card" style={{ padding: '1rem' }}>
-          <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            最新消息
-          </h4>
-          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-            {world.信息层级.本地消息}
-          </div>
-        </div>
       )}
     </div>
   );

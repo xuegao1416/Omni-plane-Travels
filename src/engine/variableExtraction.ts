@@ -67,6 +67,7 @@ async function callAuxiliaryApiForEngine(
   if (worldBookRules) {
     messages.push({ role: 'user', content: worldBookRules });
   }
+
   if (userMessage) {
     messages.push({ role: 'user', content: userMessage });
   }

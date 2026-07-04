@@ -191,7 +191,6 @@ export function ensureNpcStructureDefaults(state: GameState): void {
     if (n.种族描述 === undefined) n.种族描述 = '';
     if (n.种族效果 === undefined) n.种族效果 = '';
     if (n.种族特性 === undefined) n.种族特性 = [];
-    if (n.属性 === undefined) n.属性 = {};
     if (n.天赋 === undefined) n.天赋 = [];
     if (n.技能列表 === undefined) n.技能列表 = [];
     if (n.物品列表 === undefined) n.物品列表 = [];
@@ -427,10 +426,10 @@ function formatNpcCompact(npc: Record<string, unknown>, npcId: string): string {
     }
   }
 
-  // 属性（简要）
-  const attrs = ext.属性;
-  if (attrs && typeof attrs === 'object') {
-    const entries = Object.entries(attrs).slice(0, 6).map(([k, v]) => `${k}:${v}`);
+  // 生存状态（简要）
+  const survivalStats = ext.生存状态;
+  if (survivalStats && typeof survivalStats === 'object') {
+    const entries = Object.entries(survivalStats).slice(0, 6).map(([k, v]) => `${k}:${v}`);
     if (entries.length > 0) lines.push(`> 属性: ${entries.join(' | ')}`);
   }
 
@@ -470,38 +469,6 @@ export function formatSnapshotForMainAI(state: GameState): string {
     if (location) parts.push(`地点:${location}`);
     if (weather) parts.push(`天气:${weather}`);
     lines.push(`> ${parts.join(' | ')}`);
-  }
-
-  // 社会环境
-  const social = world.社会环境;
-  if (social && typeof social === 'object') {
-    const power = (social as any).权力结构 ?? '';
-    const atm = (social as any).社会氛围 ?? '';
-    if (power || atm) {
-      lines.push(`### 【社会环境】`);
-      const parts = [];
-      if (power) parts.push(`权力结构:${power}`);
-      if (atm) parts.push(`社会氛围:${atm}`);
-      lines.push(`> ${parts.join(' | ')}`);
-    }
-  }
-
-  // 信息层级
-  const info = world.信息层级;
-  if (info && typeof info === 'object') {
-    const global = (info as any).全局重大事件 ?? '';
-    const faction = (info as any).势力动态 ?? '';
-    const region = (info as any).区域事件 ?? '';
-    const local = (info as any).本地消息 ?? '';
-    const rumor = (info as any).圈内传闻 ?? '';
-    if (global || faction || region || local || rumor) {
-      lines.push(`### 【信息层级】`);
-      if (global) lines.push(`> 全局: ${global}`);
-      if (faction) lines.push(`> 势力: ${faction}`);
-      if (region) lines.push(`> 区域: ${region}`);
-      if (local) lines.push(`> 本地: ${local}`);
-      if (rumor) lines.push(`> 传闻: ${rumor}`);
-    }
   }
 
   // 玩家状态

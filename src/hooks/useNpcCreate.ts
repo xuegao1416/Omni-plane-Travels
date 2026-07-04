@@ -128,14 +128,14 @@ export function useNpcCreate({
         itemsList: n.itemsList && typeof n.itemsList === 'object' ? n.itemsList : {},
       };
 
-      // NPC 属性
-      if (n.attrs && typeof n.attrs === 'object' && statModule) {
-        npc.attrs = {};
-        if (n.attrs.attrA != null) npc.attrs['attrA'] = Number(n.attrs.attrA);
-        if (n.attrs.attrB != null) npc.attrs['attrB'] = Number(n.attrs.attrB);
+      // NPC 属性（写入 survivalStats，与玩家生存状态结构一致）
+      if (n.survivalStats && typeof n.survivalStats === 'object' && statModule) {
+        npc.survivalStats = {};
+        if (n.survivalStats.血量 != null) npc.survivalStats['血量'] = Number(n.survivalStats.血量);
+        if (n.survivalStats.体力值 != null) npc.survivalStats['体力值'] = Number(n.survivalStats.体力值);
         for (let i = 1; i <= 6; i++) {
           const key = `dim${i}`;
-          if (n.attrs[key] != null) npc.attrs[key] = Number(n.attrs[key]);
+          if (n.survivalStats[key] != null) npc.survivalStats[key] = Number(n.survivalStats[key]);
         }
       }
 

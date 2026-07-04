@@ -141,15 +141,27 @@ export function useStartScreen() {
     }
     for (const npc of pi.customNpcs) {
       const npcId = `NPC_${npc.name}`;
+
+      // 构建 NPC 生存状态（从 survivalStats 获取，如果没有则使用默认值）
+      const npcSurvivalState: { 血量: number; 体力值: number;[key: string]: number } = { 血量: 100, 体力值: 100 };
+      if (npc.survivalStats && typeof npc.survivalStats === 'object') {
+        if (npc.survivalStats.血量 != null) npcSurvivalState.血量 = Number(npc.survivalStats.血量);
+        if (npc.survivalStats.体力值 != null) npcSurvivalState.体力值 = Number(npc.survivalStats.体力值);
+        for (let i = 1; i <= 6; i++) {
+          const key = `dim${i}`;
+          if (npc.survivalStats[key] != null) npcSurvivalState[key] = Number(npc.survivalStats[key]);
+        }
+      }
+
       gs.人物档案[npcId] = {
         姓名: npc.name, 种族: npc.race || '人类', 性别: npc.gender || '', 年龄: npc.age || '',
         背景: npc.background || '',
-        生存状态: { 血量: 100, 体力值: 100 },
+        生存状态: npcSurvivalState,
         社会身份: {
           职业: npc.occupation || '',
           社会地位: npc.socialStatus || '',
         },
-        关系数据: { 好感度: 50, 关系类型: npc.relationshipType || '同伴' },
+        关系数据: { 好感度: 0, 关系类型: npc.relationshipType || '同伴' },
         个人信息: {
           外貌: npc.appearance || '',
           表性格: npc.personality || '',

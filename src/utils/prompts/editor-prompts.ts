@@ -208,9 +208,9 @@ ${worldSetting}
   "skillsList": {"技能名": {"描述": "技能描述", "类型": "战斗/生活/社交/特殊", "品质": "普通/精良/稀有/史诗/传说"}},
   "itemsList": {"物品名": {"数量": 1, "类型": "物品类型", "品质": "普通/精良/稀有/史诗/传说", "备注": "备注"}}
   ${statModule ? `,
-  "attrs": {
-    "attrA": <生命类初始值，取上限的60%~90%>,
-    "attrB": <能量类初始值，取上限的50%~80%>,
+  "survivalStats": {
+    "血量": <生命类初始值，取上限的60%~90%>,
+    "体力值": <能量类初始值，取上限的50%~80%>,
     "dim1": <${statModule.dim1.name}初始值，在范围内根据角色特点设定>,
     "dim2": <${statModule.dim2.name}初始值>,
     "dim3": <${statModule.dim3.name}初始值>,
@@ -219,7 +219,7 @@ ${worldSetting}
     "dim6": <${statModule.dim6.name}初始值>
   }` : ''}
   ${hasProgression ? `,
-  "tierIndex": <NPC的段位索引，根据实力设定，0=最低段位>` : ''}
+  "tierIndex": <NPC的段位/等级索引，根据实力设定，0=最低段位/等级>` : ''}
 }`;
 }
 
@@ -255,7 +255,7 @@ export function buildNpcFillPrompt(options: {
   statModule?: CharacterFillOptions['statModule'];
   hasProgression?: boolean;
 }): string {
-  const { worldSetting, playerName, playerGender, playerAge, playerBackground, npc } = options;
+  const { worldSetting, playerName, playerGender, playerAge, playerBackground, npc, hasProgression } = options;
 
   // 构建NPC已填信息列表
   const npcInfo: string[] = [];
@@ -330,6 +330,8 @@ ${npcInfo.length > 0 ? npcInfo.join('\n') : '- （暂无）'}
   "background": "NPC背景故事（2-3句话）",
   "skillsList": {"技能名": {"描述": "技能描述", "类型": "战斗/生活/社交/特殊", "品质": "普通/精良/稀有/史诗/传说"}},
   "itemsList": {"物品名": {"数量": 1, "类型": "物品类型", "品质": "普通/精良/稀有/史诗/传说", "备注": "备注"}}
+  ${hasProgression ? `,
+  "tierIndex": <NPC的段位/等级索引，根据实力设定，0=最低段位/等级>` : ''}
 }`;
 }
 
@@ -427,7 +429,12 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
   const moduleData = worldSystem ? extractWorldSystemData(worldSystem) : {};
   const hasStatModule = !!moduleData.数值属性;
   const statModule = hasStatModule ? moduleData.数值属性 as any : undefined;
-  const hasProgression = !!(progressionConfig && Array.isArray(progressionConfig.tiers) && progressionConfig.tiers.length > 0);
+  const hasProgression = !!(
+    progressionConfig && (
+      (Array.isArray((progressionConfig as any).tiers) && (progressionConfig as any).tiers.length > 0) ||
+      (progressionConfig as any).levelData
+    )
+  );
 
   return `你是一个后台变量裁定系统，负责分析玩家消息和AI回复，提取需要更新的变量。
 你的任务是识别剧情中的关键变化，更新游戏状态，但不续写剧情。
@@ -473,7 +480,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
   "年龄":25,
   "人物分类":"在场",
   "社会身份":{"职业":"...","社会地位":"..."},
-  "关系数据":{"好感度":50,"关系类型":"初次见面"},
+  "关系数据":{"好感度":0,"关系类型":"初次见面"},
   "个人信息":{
     "外貌":"【必填】具体外貌描写：发型、发色、瞳色、肤色、体型、面容特征、标志性特征等，不少于30字",
     "表性格":"【必填】外在表现的性格特点，2-4个关键词",
@@ -491,7 +498,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
   "技能列表":{"技能名":{"描述":"技能描述","类型":"战斗/生活/社交/特殊","品质":"普通/精良/稀有/史诗/传说"}},
   "物品列表":{"物品名":{"数量":1,"类型":"物品类型","品质":"普通/精良/稀有/史诗/传说","备注":"备注"}}
   ${statModule ? `,
-  "属性":{"attrA":<生命值>,"attrB":<能量>,"dim1":<${statModule.dim1.name}>,"dim2":<${statModule.dim2.name}>,"dim3":<${statModule.dim3.name}>,"dim4":<${statModule.dim4.name}>,"dim5":<${statModule.dim5.name}>,"dim6":<${statModule.dim6.name}>}` : ''}
+  "生存状态":{"血量":<生命值>,"体力值":<能量>,"dim1":<${statModule.dim1.name}>,"dim2":<${statModule.dim2.name}>,"dim3":<${statModule.dim3.name}>,"dim4":<${statModule.dim4.name}>,"dim5":<${statModule.dim5.name}>,"dim6":<${statModule.dim6.name}>}` : ''}
   ${hasProgression ? `,
   "成长状态":{"当前段位索引":<段位索引,根据实力设定>}` : ''}
 }}}
@@ -511,7 +518,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
   "短期目标":"如有变化则更新",
   "长期目标":"如有变化则更新"
   ${statModule ? `,
-  "属性":{"attrA":<新值,受伤/恢复时更新>,"attrB":<新值>,"dim1":<新值>,"dim2":<新值>,"dim3":<新值>,"dim4":<新值>,"dim5":<新值>,"dim6":<新值>}` : ''}
+  "生存状态":{"血量":<新值,受伤/恢复时更新>,"体力值":<新值>,"dim1":<新值>,"dim2":<新值>,"dim3":<新值>,"dim4":<新值>,"dim5":<新值>,"dim6":<新值>}` : ''}
   ${hasProgression ? `,
   "成长状态":{"当前段位索引":<新值,升级/突破时更新>}` : ''}
 }}}

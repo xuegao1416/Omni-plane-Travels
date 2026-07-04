@@ -14,7 +14,7 @@
  */
 
 import { WorldSimulationEngine } from './engine';
-import type { SimWorldContext, SimulationState } from './types';
+import type { SimWorldContext, SimulationState, SimulationSnapshot } from './types';
 import type { ApiConfig } from '../api/types';
 import { createEmptySimState } from './types';
 import { useSimulationStore } from '../stores/simulationStore';
@@ -104,4 +104,62 @@ export function saveEngineState(): void {
 export function setSimApiOverride(override: ApiConfig | null): void {
   const engine = getSimulationEngine();
   engine.setSimApiOverride(override);
+}
+
+// ─── 快照管理 API ───
+
+/**
+ * 创建世界推演快照
+ * @param msgIndex 关联的消息索引（与变量快照对齐）
+ * @param gameTime 当前游戏时间文本
+ * @param isInitial 是否为初始快照
+ * @param note 可选备注
+ */
+export function createSimulationSnapshot(
+  msgIndex: number,
+  gameTime: string,
+  isInitial: boolean = false,
+  note?: string,
+): SimulationSnapshot {
+  const engine = getSimulationEngine();
+  return engine.createSnapshot(msgIndex, gameTime, isInitial, note);
+}
+
+/**
+ * 从快照恢复世界推演状态
+ * @param snapshotId 快照 ID
+ * @returns 是否恢复成功
+ */
+export function restoreSimulationSnapshot(snapshotId: string): boolean {
+  const engine = getSimulationEngine();
+  const success = engine.restoreSnapshot(snapshotId);
+  if (success) {
+    syncEngineToStore(engine);
+  }
+  return success;
+}
+
+/**
+ * 删除指定快照
+ * @param snapshotId 快照 ID
+ */
+export function deleteSimulationSnapshot(snapshotId: string): void {
+  const engine = getSimulationEngine();
+  engine.deleteSnapshot(snapshotId);
+}
+
+/**
+ * 获取所有快照列表
+ */
+export function getSimulationSnapshots(): SimulationSnapshot[] {
+  const engine = getSimulationEngine();
+  return engine.getSnapshots();
+}
+
+/**
+ * 清除所有快照
+ */
+export function clearAllSimulationSnapshots(): void {
+  const engine = getSimulationEngine();
+  engine.clearAllSnapshots();
 }

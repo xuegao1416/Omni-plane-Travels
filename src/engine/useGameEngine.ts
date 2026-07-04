@@ -29,6 +29,7 @@ import { ROLE_COGNITION_FIREWALL_TITLE, ROLE_COGNITION_FIREWALL_CONTENT } from '
 import { assembleSystemPrompt, injectAtDepthEntries } from './promptAssembler';
 import { MacroEngine } from './macroEngine';
 import { useMemoryStore } from '../memory/memoryStore';
+import { useSimulationStore } from '../stores/simulationStore';
 import { formatSnapshotForMainAI } from '../utils/npcHelpers';
 import type { MemoryPipelineContext } from '../memory/useMemorySystem';
 import { loadPresets, resolvePreset } from '../components/settings/apiPresetUtils';
@@ -61,6 +62,50 @@ function withDegradationCheck(
   };
 }
 
+/**
+ * 格式化机械层效果摘要（供主 AI 上下文注入，避免双重叙事）
+ * 只生成可读的文本描述，不暴露内部结构
+ */
+function formatMechanicalEffectsSummary(effects: import('../modules/schema').ModuleEffects): string {
+  const lines: string[] = ['【世界演化 — 本轮已自动结算的确定性效果】'];
+
+  if (effects.survival?.resources) {
+    for (const [id, change] of Object.entries(effects.survival.resources)) {
+      if (change.delta !== undefined) {
+        lines.push(`- ${id} ${change.delta > 0 ? '+' : ''}${change.delta}`);
+      } else if (change.set !== undefined) {
+        lines.push(`- ${id} → ${change.set}`);
+      }
+    }
+  }
+
+  if (effects.business?.fundsDelta !== undefined) {
+    const d = effects.business.fundsDelta;
+    lines.push(`- 资金 ${d > 0 ? '+' : ''}${d}`);
+  }
+
+  if (effects.stats?.changes) {
+    for (const [id, change] of Object.entries(effects.stats.changes)) {
+      if (change.delta !== undefined) {
+        lines.push(`- ${id} ${change.delta > 0 ? '+' : ''}${change.delta}`);
+      } else if (change.set !== undefined) {
+        lines.push(`- ${id} → ${change.set}`);
+      }
+    }
+  }
+
+  if (effects.progression) {
+    if (effects.progression.xpDelta !== undefined) {
+      const d = effects.progression.xpDelta;
+      lines.push(`- 经验值 ${d > 0 ? '+' : ''}${d}`);
+    }
+  }
+
+  if (lines.length <= 1) return '';
+  lines.push('（这些变化已由系统自动处理，无需在正文中重复描述数值变化）');
+  return lines.join('\n');
+}
+
 /** 构建记忆管线任务对象（消除 sendMessage/retryPipeline/retrySingleStage 三处重复） */
 function buildMemoryTasks(
   memStore: ReturnType<typeof useMemoryStore.getState>,
@@ -84,20 +129,38 @@ function buildMemoryTasks(
   };
 }
 
-/** 保存变量快照 + 记忆检查点到消息（消除三处快照保存重复） */
+/** 保存变量快照 + 记忆检查点 + 世界演化快照到消息（消除三处快照保存重复） */
 function saveSnapshot(
   varMgrRef: React.RefObject<VariableManager>,
   updateMessage: (id: string, updates: Partial<ChatMessage>) => void,
   aiMsgId: string,
+  msgIndex: number,
+  gameTime?: string,
 ) {
   try {
     const snapshot = varMgrRef.current.createSnapshot();
     const memStoreForCheckpoint = useMemoryStore.getState();
     const memCheckpoint = memStoreForCheckpoint.createCheckpoint();
+
+    // 创建世界演化引擎快照
+    let simulationSnapshotId: string | undefined;
+    try {
+      const simEngine = getSimulationEngine();
+      const simSnapshot = simEngine.createSnapshot(
+        msgIndex,
+        gameTime || '',
+        false,
+      );
+      simulationSnapshotId = simSnapshot.id;
+    } catch (simErr) {
+      console.warn('[快照] 世界演化快照创建失败（不影响正文）:', simErr);
+    }
+
     updateMessage(aiMsgId, {
       snapshot,
       snapshotTime: Date.now(),
       memoryCheckpointId: memCheckpoint?.id,
+      simulationSnapshotId,
     });
   } catch (snapErr: any) {
     console.warn('[快照] 创建失败（不影响正文）:', snapErr.message);
@@ -122,6 +185,7 @@ export function useGameEngine(
   const varMgrRef = useRef(initialVarMgr || new VariableManager());
   const cancelRef = useRef<AbortController | null>(null);
   const roundRef = useRef(0);
+  const seqRef = useRef(0);  // 消息序号，单调递增
   const worldBookRef = useRef<WorldBookManager | null>(null);
   const initializedRef = useRef(false);
   // 全局初始快照（参考项目的 initialSnapshot，用于回滚兜底）
@@ -199,7 +263,7 @@ export function useGameEngine(
     setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
   }, []);
 
-  // 辅助：回滚变量快照 + 记忆检查点，并截断消息列表到指定索引
+  // 辅助：回滚变量快照 + 记忆检查点 + 世界演化快照，并截断消息列表到指定索引
   const rollbackAndTruncate = useCallback((truncateAt: number) => {
     const currentMessages = messagesRef.current;
 
@@ -231,7 +295,22 @@ export function useGameEngine(
     }
     memStore.clearPipelineOutputs();
 
-    // 3. 截断消息
+    // 3. 回滚世界演化引擎
+    try {
+      const simEngine = getSimulationEngine();
+      let simRestored = false;
+      for (let i = truncateAt - 1; i >= 0; i--) {
+        if (currentMessages[i].simulationSnapshotId) {
+          simRestored = simEngine.restoreSnapshot(currentMessages[i].simulationSnapshotId!);
+          if (simRestored) break;
+        }
+      }
+      // 如果没有找到快照或恢复失败，不做额外处理（世界演化引擎有自己的持久化状态）
+    } catch (simErr) {
+      console.warn('[回滚] 世界演化引擎恢复失败（不影响其他系统）:', simErr);
+    }
+
+    // 4. 截断消息
     setMessages(prev => {
       const truncated = prev.slice(0, truncateAt);
       messagesRef.current = truncated;
@@ -336,6 +415,10 @@ export function useGameEngine(
     roundRef.current = save.messages.length > 0
       ? save.messages.reduce((max, m) => Math.max(max, m.round), 0)
       : 0;
+    // 恢复消息序号（取最后一条消息的 seq）
+    seqRef.current = save.messages.length > 0
+      ? Math.max(...save.messages.map(m => m.seq ?? 0))
+      : 0;
     if (save.worldId && worldBookRef.current) {
       applyWorldAndModules(worldBookRef.current, save.worldId);
     }
@@ -353,6 +436,15 @@ export function useGameEngine(
     }
     // 捕获记忆系统初始快照（用于回滚兜底）
     initialMemorySnapshotRef.current = memStore.toJSON();
+
+    // 兼容老存档：补全 simulationRuntime 字段
+    const gameState = varMgrRef.current.getState();
+    if (!gameState.simulationRuntime) {
+      const { createDefaultSimulationRuntimeState } = require('../modules/schema');
+      gameState.simulationRuntime = createDefaultSimulationRuntimeState();
+      varMgrRef.current.setState(gameState);
+    }
+
     // 恢复变量提取 API 配置
     if (save.variableConfig?.apiPresetId) {
       localStorage.setItem(STORAGE_KEYS.VARIABLE_API_PRESET, save.variableConfig.apiPresetId);
@@ -381,12 +473,18 @@ export function useGameEngine(
     roundRef.current++;
     const round = roundRef.current;
 
-    const userMsg: ChatMessage = { id: uuid(), role: 'user', rawText: userText, round, timestamp: Date.now() };
+    // 分配消息序号（单调递增，用于增量存档）
+    seqRef.current++;
+    const userSeq = seqRef.current;
+    seqRef.current++;
+    const aiSeq = seqRef.current;
+
+    const userMsg: ChatMessage = { id: uuid(), role: 'user', rawText: userText, round, timestamp: Date.now(), seq: userSeq };
     addMessage(userMsg);
     eventBus.emit(EVENTS.MESSAGE_SENT, userMsg);
 
     const aiMsgId = uuid();
-    const aiMsg: ChatMessage = { id: aiMsgId, role: 'assistant', rawText: '', round, timestamp: Date.now(), streaming: true };
+    const aiMsg: ChatMessage = { id: aiMsgId, role: 'assistant', rawText: '', round, timestamp: Date.now(), streaming: true, seq: aiSeq };
     addMessage(aiMsg);
     eventBus.emit(EVENTS.GENERATION_STARTED, aiMsgId);
 
@@ -425,6 +523,48 @@ export function useGameEngine(
 
       // 保存管线上下文（用于重试管线）
       lastPipelineCtxRef.current = { round, userText, aiMsgId, batchText, recentContext, playerName };
+
+      // ── 世界演化：在变量提取之前执行 ──
+      // 机械层 effects 直接确定性应用到 GameState，不传递给辅助 API
+      let mechanicalEffectsSummary = ''; // 供主 AI 上下文注入
+      try {
+        const simEngine = getSimulationEngine();
+        const gs = varMgrRef.current.getState();
+        const gameTime = {
+          current: gs.世界?.时间系统?.当前时间 ?? '',
+        };
+
+        // 获取世界定义
+        const currentWorldDef = findWorldDef(selectedWorld);
+        const worldDesc = currentWorldDef?.description ?? currentWorldDef?.name ?? '未知世界';
+
+        // 获取仿真规则
+        const simRulesMod = currentWorldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled);
+        const simRules = simRulesMod?.moduleConfig as import('../modules/schema').SimulationRules | undefined;
+
+        if (simEngine.shouldTick(gameTime, round) && simEngine.effectiveApiConfig) {
+          const result = await simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null);
+
+          // 直接应用机械层效果（确定性，不经 AI）
+          if (result?.mechanicalEffects && Object.keys(result.mechanicalEffects).length > 0) {
+            const enabledModules = (currentWorldDef?.modules ?? [])
+              .filter(m => m.enabled)
+              .map(m => m.moduleId);
+            varMgrRef.current.applyModuleEffects(result.mechanicalEffects, 'periodic', enabledModules);
+            mechanicalEffectsSummary = formatMechanicalEffectsSummary(result.mechanicalEffects);
+          }
+
+          // 直接应用世界状态更新
+          if (result?.worldStateUpdate && Object.keys(result.worldStateUpdate).length > 0) {
+            varMgrRef.current.applyWorldStateUpdate(result.worldStateUpdate);
+          }
+
+          // 同步世界演化状态到 store
+          useSimulationStore.getState().setSimState(simEngine.state);
+        }
+      } catch (simErr) {
+        console.warn('[世界演化] 执行失败（不影响管线）:', simErr);
+      }
 
       const pipelineResult = await executor.execute({
         config: pipelineConfig,
@@ -530,8 +670,13 @@ ${perspectiveInstruction}
           try {
             const newsBrief = simEngine.getWorldNewsBrief();
             const storylineSummary = simEngine.getAllStorylineSummaries();
-            if (newsBrief || storylineSummary) {
-              simulationBrief = [newsBrief, storylineSummary].filter(Boolean).join('\n\n');
+            const parts = [newsBrief, storylineSummary].filter(Boolean);
+            // 追加机械层结算摘要（让主 AI 知道确定性效果已生效，避免双重叙事）
+            if (mechanicalEffectsSummary) {
+              parts.push(mechanicalEffectsSummary);
+            }
+            if (parts.length > 0) {
+              simulationBrief = parts.join('\n\n');
             }
           } catch {
             // 模拟引擎未初始化或不启用时静默降级
@@ -633,7 +778,8 @@ ${perspectiveInstruction}
       });
 
       // 管线完成 — 保存当前变量快照到 AI 消息（用于回滚）
-      saveSnapshot(varMgrRef, updateMessage, aiMsgId);
+      const gameTimeStr = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
+      saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTimeStr);
 
       // 清理内存中的冗余快照，防止内存无限增长
       setMessages(prev => optimizeSnapshots(prev));
@@ -664,7 +810,10 @@ ${perspectiveInstruction}
       cancelRef.current = null;
       eventBus.emit(EVENTS.GENERATION_ENDED, aiMsgId);
       // 直接触发自动存档（通过 ref 回调，不依赖事件总线时序）
-      try { onAutoSaveRef.current?.(); } catch (e) { console.warn('[auto-save] 回调失败:', e); }
+      try { onAutoSaveRef.current?.(); } catch (e) {
+        // 不再静默吞掉，让错误暴露
+        console.error('[auto-save] 回调失败（需要用户注意）:', e);
+      }
     }
   }, [apiConfig, addMessage, updateMessage]);
 
@@ -724,7 +873,8 @@ ${perspectiveInstruction}
       });
 
       // 重试成功后重新保存快照
-      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId);
+      const gameTimeStr2 = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
+      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId, ctx.round, gameTimeStr2);
 
       setMessages(prev => optimizeSnapshots(prev));
       setPipelineStatus(pipelineResult.status);
@@ -734,7 +884,10 @@ ${perspectiveInstruction}
       generatingRef.current = false;
       setIsGenerating(false);
       cancelRef.current = null;
-      try { onAutoSaveRef.current?.(); } catch (e) { console.warn('[auto-save] 回调失败:', e); }
+      try { onAutoSaveRef.current?.(); } catch (e) {
+        // 不再静默吞掉，让错误暴露
+        console.error('[auto-save] 回调失败（需要用户注意）:', e);
+      }
     }
   }, [apiConfig]);
 
@@ -788,7 +941,8 @@ ${perspectiveInstruction}
       await executor.retryStage(taskId, taskFn);
 
       // 重试成功后更新快照
-      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId);
+      const gameTimeStr3 = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
+      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId, ctx.round, gameTimeStr3);
 
       setPipelineStatus({ ...executor.getStatus(), stages: { ...executor.getStatus().stages } });
     } catch (err: unknown) {
@@ -796,7 +950,10 @@ ${perspectiveInstruction}
     } finally {
       generatingRef.current = false;
       setIsGenerating(false);
-      try { onAutoSaveRef.current?.(); } catch (e) { console.warn('[auto-save] 回调失败:', e); }
+      try { onAutoSaveRef.current?.(); } catch (e) {
+        // 不再静默吞掉，让错误暴露
+        console.error('[auto-save] 回调失败（需要用户注意）:', e);
+      }
     }
   }, [apiConfig]);
 
@@ -852,6 +1009,13 @@ ${perspectiveInstruction}
 
       varMgrRef.current.setState(state);
     }
+
+    // 初始化世界演化运行时状态
+    const { createDefaultSimulationRuntimeState } = require('../modules/schema');
+    varMgrRef.current.setState({
+      ...varMgrRef.current.getState(),
+      simulationRuntime: createDefaultSimulationRuntimeState(),
+    });
 
     // ★ 无论是否有模块，都必须重新注入世界书条目
     // 否则无模块的世界（如外部导入世界）的 worldBookEntries 永远不会被加载
@@ -928,13 +1092,16 @@ ${perspectiveInstruction}
         性别: npc.gender || '',
         年龄: npc.age || '',
         背景: npc.background || '',
-        生存状态: { 血量: 100, 体力值: 100 },
+        生存状态: npc.survivalStats
+          ? { 血量: npc.survivalStats['血量'] ?? 100, 体力值: npc.survivalStats['体力值'] ?? 100,
+              ...Object.fromEntries(Object.entries(npc.survivalStats).filter(([k]) => k !== '血量' && k !== '体力值')) }
+          : { 血量: 100, 体力值: 100 },
         社会身份: {
           职业: npc.occupation || '',
           社会地位: npc.socialStatus || '',
         },
         关系数据: {
-          好感度: 50,
+          好感度: 0,
           关系类型: npc.relationshipType || '同伴',
         },
         个人信息: {

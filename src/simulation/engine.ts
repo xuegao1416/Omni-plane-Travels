@@ -16,8 +16,12 @@ import type {
   StoryBeat, PlayerHook, GameTime, StorylineUpdate,
   SimGenerationResult, OffscreenNpcSummary, SimContext,
   NpcProactiveInteraction, ChronicleOperation, SimPreset,
-  SimWorldContext,
+  SimWorldContext, SimulationSnapshot,
 } from './types';
+import type {
+  SimulationRules, ModuleEffects, EffectLogEntry,
+  SimulationRuntimeState,
+} from '../modules/schema';
 import { createEmptySimState, createDefaultWorldContext } from './types';
 import type { GameState, NPCData } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
@@ -47,6 +51,13 @@ export class WorldSimulationEngine {
   private _worldContext: SimWorldContext | null = null;
   /** 状态变更回调（供 UI store 同步用） */
   onStateChange: ((state: SimulationState) => void) | null = null;
+
+  /** tag → rule 索引（性能优化，预建索引避免每轮遍历） */
+  private _tagRuleIndex: Map<string, SimulationRules['eventEffects']> = new Map();
+  /** keyword → rule 索引 */
+  private _keywordRuleIndex: Map<string, SimulationRules['eventEffects']> = new Map();
+  /** 当前规则的版本（用于检测规则变化，重建索引） */
+  private _rulesVersion: number = 0;
 
   constructor(state?: SimulationState) {
     this.state = state ?? createEmptySimState();
@@ -264,6 +275,7 @@ export class WorldSimulationEngine {
     round: number,
     worldSetting: string,
     preset?: SimPreset,
+    simRules?: SimulationRules | null,
   ): Promise<SimGenerationResult | null> {
     if (!this.effectiveApiConfig) {
       console.warn('[WorldSim] 没有 API 配置，跳过推演');
@@ -276,10 +288,13 @@ export class WorldSimulationEngine {
     // 1. 推进现有事件（自动级联 + 陈旧清理）
     this.advanceExistingEvents(gameState);
 
-    // 2. 构建推演上下文
+    // 2. 机械层结算（周期事件 + 事件效果匹配）
+    const { effects: mechanicalEffects, log: effectLog } = this.resolveMechanicalEffects(gameState, simRules ?? null);
+
+    // 3. 构建推演上下文
     const context = this.buildSimContext(gameState, gameTime, worldSetting);
 
-    // 3. 调用 LLM 生成新的事件和暗线
+    // 4. 调用 LLM 生成新的事件和暗线
     const activePreset = this.resolvePreset(preset);
     const prompt = buildSimulationPrompt(context, activePreset, this._worldContext ?? undefined);
     try {
@@ -298,14 +313,39 @@ export class WorldSimulationEngine {
         return null;
       }
 
-      // 4. 应用生成结果
+      // 5. 应用生成结果（叙事层：事件/暗线/交互/NPC 事迹）
       this.applyGeneration(generation, gameState);
 
-      // 5. 更新状态
+      // 6. 应用世界状态更新（如果规则定义了 worldStateRules）
+      if (simRules?.worldStateRules) {
+        const worldStateUpdate = this.applyWorldStateRules(generation, simRules.worldStateRules);
+        if (worldStateUpdate && Object.keys(worldStateUpdate).length > 0) {
+          generation.worldStateUpdate = worldStateUpdate;
+        }
+      }
+
+      // 7. 机械层效果传递给变量提取（不直接应用）
+      if (Object.keys(mechanicalEffects).length > 0) {
+        generation.mechanicalEffects = mechanicalEffects;
+      }
+
+      // 8. 更新状态
       this.state.config.lastAutoTickRound = round;
       this.state.config.lastSimulatedTime = gameTime.current;
       this.state.tickCount++;
       this.state.lastTickTimestamp = Date.now();
+
+      // 9. 更新运行时状态（周期计数器、效果日志）
+      if (gameState.simulationRuntime) {
+        gameState.simulationRuntime.tick = this.state.tickCount;
+        if (effectLog.length > 0) {
+          gameState.simulationRuntime.effectLog.push(...effectLog);
+          // 限制日志数量
+          if (gameState.simulationRuntime.effectLog.length > 100) {
+            gameState.simulationRuntime.effectLog = gameState.simulationRuntime.effectLog.slice(-100);
+          }
+        }
+      }
 
       this.saveState();
       return generation;
@@ -313,6 +353,55 @@ export class WorldSimulationEngine {
       console.error('[WorldSim] 推演失败:', err);
       return null;
     }
+  }
+
+  /**
+   * 应用世界状态规则
+   * 根据生成的事件匹配 worldStateRules，返回需要更新的世界状态
+   */
+  private applyWorldStateRules(
+    generation: SimGenerationResult,
+    rules: import('../modules/schema').WorldStateRule[],
+  ): Record<string, Record<string, string>> {
+    const updates: Record<string, Record<string, string>> = {};
+
+    // 检查新生成的事件
+    const allEvents = [...generation.newEvents, ...generation.updatedEvents];
+
+    for (const event of allEvents) {
+      for (const rule of rules) {
+        // 匹配条件
+        const trigger = rule.trigger;
+        const eventText = `${event.title} ${event.description}`.toLowerCase();
+
+        let matched = false;
+
+        // keyword 匹配
+        if (trigger.keywords && trigger.keywords.length > 0) {
+          matched = trigger.keywords.some(kw => eventText.includes(kw.toLowerCase()));
+        }
+
+        // tag 匹配（如果事件有 tag）
+        if (!matched && trigger.tags && trigger.tags.length > 0) {
+          // 暂时用 keyword 兜底
+        }
+
+        // eventType 匹配
+        if (!matched && trigger.eventType) {
+          matched = event.batchId === trigger.eventType;
+        }
+
+        if (matched) {
+          // 合并更新
+          for (const [axis, fields] of Object.entries(rule.updates)) {
+            if (!updates[axis]) updates[axis] = {};
+            Object.assign(updates[axis], fields);
+          }
+        }
+      }
+    }
+
+    return updates;
   }
 
   /** 解析当前使用的预设 */
@@ -595,10 +684,15 @@ export class WorldSimulationEngine {
 
   /** 提取核心冲突 */
   private extractCoreConflict(gameState: GameState): string {
-    const globalEvent = gameState.世界?.信息层级?.全局重大事件;
+    // 从世界演化引擎的活跃事件中提取核心冲突
+    const activeEvents = Object.values(this.state.events)
+      .filter(e => e.status === 'active' || e.status === 'brewing')
+      .sort((a, b) => b.severity - a.severity);
+    const topEvent = activeEvents[0];
+
     const crises = Object.keys(gameState.玩家?.记事本?.潜在危机 ?? {});
     const parts: string[] = [];
-    if (globalEvent) parts.push(globalEvent);
+    if (topEvent) parts.push(`重大事件: ${topEvent.title}`);
     if (crises.length > 0) parts.push(`玩家面临的危机: ${crises.join(', ')}`);
     return parts.join(' | ') || '未知';
   }
@@ -680,6 +774,7 @@ export class WorldSimulationEngine {
         const parsed = JSON.parse(raw) as SimulationState;
         // 兼容旧存档：补全缺失字段
         if (!parsed.pendingInteractions) parsed.pendingInteractions = [];
+        if (!parsed.snapshots) parsed.snapshots = [];
         if (!parsed.config.staleTickThreshold) parsed.config.staleTickThreshold = 10;
         if (!parsed.config.activePresetId) parsed.config.activePresetId = 'default';
         parsed.config.activePresetId = sanitizeActivePresetId(parsed.config.activePresetId);
@@ -694,7 +789,475 @@ export class WorldSimulationEngine {
   /** 替换整个状态（从存档恢复） */
   replaceState(state: SimulationState) {
     this.state = state;
+    // 兼容旧存档：补全 snapshots 字段
+    if (!this.state.snapshots) {
+      this.state.snapshots = [];
+    }
     this.saveState();
+  }
+
+  // ─── 规则索引管理 ───
+
+  /**
+   * 构建 tag/keyword → rule 索引
+   * 当规则变化时调用，避免每轮遍历所有规则
+   */
+  buildRuleIndex(rules: SimulationRules): void {
+    this._tagRuleIndex.clear();
+    this._keywordRuleIndex.clear();
+
+    for (const effect of rules.eventEffects) {
+      // 索引 tag
+      if (effect.trigger.tags) {
+        for (const tag of effect.trigger.tags) {
+          const existing = this._tagRuleIndex.get(tag) ?? [];
+          existing.push(effect);
+          this._tagRuleIndex.set(tag, existing);
+        }
+      }
+
+      // 索引 keyword
+      if (effect.trigger.keywords) {
+        for (const keyword of effect.trigger.keywords) {
+          const lowerKeyword = keyword.toLowerCase();
+          const existing = this._keywordRuleIndex.get(lowerKeyword) ?? [];
+          existing.push(effect);
+          this._keywordRuleIndex.set(lowerKeyword, existing);
+        }
+      }
+    }
+  }
+
+  // ─── 机械层结算 ───
+
+  /**
+   * 机械层结算：周期事件 + 事件效果匹配
+   * 不经 AI，直接确定性结算
+   *
+   * @param gameState 当前游戏状态
+   * @param rules 世界演化规则
+   * @returns 机械层效果 + 效果日志
+   */
+  resolveMechanicalEffects(
+    gameState: GameState,
+    rules: SimulationRules | null,
+  ): { effects: ModuleEffects; log: EffectLogEntry[] } {
+    if (!rules) {
+      return { effects: {}, log: [] };
+    }
+
+    const runtime = gameState.simulationRuntime;
+    if (!runtime) {
+      return { effects: {}, log: [] };
+    }
+
+    const mergedEffects: ModuleEffects = {};
+    const effectLog: EffectLogEntry[] = [];
+    const currentTick = runtime.tick;
+
+    // 1. 周期事件结算
+    for (const periodic of rules.periodicEvents) {
+      // 推进计数器
+      const counter = (runtime.periodicCounters[periodic.id] ?? 0) + 1;
+      runtime.periodicCounters[periodic.id] = counter;
+
+      // 计算下次触发时间（考虑 offset）
+      const offset = periodic.offsetTicks ?? 0;
+      const effectiveCounter = counter - offset;
+
+      // 到达触发时间
+      if (effectiveCounter > 0 && effectiveCounter % periodic.intervalTicks === 0) {
+        // 合并效果
+        this.mergeModuleEffects(mergedEffects, periodic.effects);
+
+        // 记录日志
+        effectLog.push(...this.createEffectLogEntries(
+          currentTick, 'periodic', periodic.id, periodic.effects, `周期事件: ${periodic.name}`
+        ));
+      }
+    }
+
+    // 2. 事件效果匹配（使用索引优化）
+    const activeEvents = Object.values(this.state.events)
+      .filter(e => e.status === 'active' || e.status === 'brewing');
+
+    // 如果规则变化，重建索引
+    const rulesHash = rules.eventEffects.length;
+    if (rulesHash !== this._rulesVersion) {
+      this.buildRuleIndex(rules);
+      this._rulesVersion = rulesHash;
+    }
+
+    // 使用索引匹配
+    const matchedEffectIds = new Set<string>();
+
+    for (const event of activeEvents) {
+      const eventText = `${event.title} ${event.description}`.toLowerCase();
+
+      // 按 keyword 匹配（使用索引）
+      for (const [keyword, effects] of this._keywordRuleIndex.entries()) {
+        if (eventText.includes(keyword)) {
+          for (const effect of effects) {
+            if (!matchedEffectIds.has(effect.id)) {
+              matchedEffectIds.add(effect.id);
+
+              // 检查其他条件（eventLevel, severityMin）
+              if (this.matchEventEffect(event, effect)) {
+                this.mergeModuleEffects(mergedEffects, effect.effects);
+                effectLog.push(...this.createEffectLogEntries(
+                  currentTick, 'rule', effect.id, effect.effects, `事件触发: ${event.title}`
+                ));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { effects: mergedEffects, log: effectLog };
+  }
+
+  /**
+   * 匹配事件与事件效果
+   */
+  private matchEventEffect(
+    event: SimEvent,
+    effect: { trigger: { tags?: string[]; eventType?: string; eventLevel?: string; severityMin?: number; keywords?: string[] } },
+  ): boolean {
+    const trigger = effect.trigger;
+
+    // 优先匹配 tag（如果事件有 tag）
+    if (trigger.tags && trigger.tags.length > 0) {
+      // 事件的 tag 可以从 description/title 中提取，或者事件本身有 tag 字段
+      // 这里暂时用 keyword 兜底
+    }
+
+    // 匹配 eventType
+    if (trigger.eventType && event.batchId !== trigger.eventType) {
+      return false;
+    }
+
+    // 匹配 eventLevel
+    if (trigger.eventLevel && event.level !== trigger.eventLevel) {
+      return false;
+    }
+
+    // 匹配 severityMin
+    if (trigger.severityMin && event.severity < trigger.severityMin) {
+      return false;
+    }
+
+    // 匹配 keywords（兜底）
+    if (trigger.keywords && trigger.keywords.length > 0) {
+      const text = `${event.title} ${event.description}`.toLowerCase();
+      return trigger.keywords.some(kw => text.includes(kw.toLowerCase()));
+    }
+
+    return false;
+  }
+
+  /**
+   * 合并模块效果（add 策略）
+   */
+  private mergeModuleEffects(target: ModuleEffects, source: ModuleEffects): void {
+    // 合并 survival
+    if (source.survival?.resources) {
+      if (!target.survival) target.survival = { resources: {} };
+      if (!target.survival.resources) target.survival.resources = {};
+      for (const [id, change] of Object.entries(source.survival.resources)) {
+        if (!target.survival.resources[id]) {
+          target.survival.resources[id] = { ...change };
+        } else {
+          const existing = target.survival.resources[id];
+          if (change.delta !== undefined) {
+            existing.delta = (existing.delta ?? 0) + change.delta;
+          }
+          if (change.set !== undefined) {
+            existing.set = change.set;
+          }
+        }
+      }
+    }
+
+    // 合并 business
+    if (source.business) {
+      if (!target.business) target.business = {};
+      if (source.business.fundsDelta !== undefined) {
+        target.business.fundsDelta = (target.business.fundsDelta ?? 0) + source.business.fundsDelta;
+      }
+    }
+
+    // 合并 stats
+    if (source.stats?.changes) {
+      if (!target.stats) target.stats = { changes: {} };
+      if (!target.stats.changes) target.stats.changes = {};
+      for (const [id, change] of Object.entries(source.stats.changes)) {
+        if (!target.stats.changes[id]) {
+          target.stats.changes[id] = { ...change };
+        } else {
+          const existing = target.stats.changes[id];
+          if (change.delta !== undefined) {
+            existing.delta = (existing.delta ?? 0) + change.delta;
+          }
+          if (change.set !== undefined) {
+            existing.set = change.set;
+          }
+        }
+      }
+    }
+
+    // 合并 progression
+    if (source.progression) {
+      if (!target.progression) target.progression = {};
+      if (source.progression.xpDelta !== undefined) {
+        target.progression.xpDelta = (target.progression.xpDelta ?? 0) + source.progression.xpDelta;
+      }
+      if (source.progression.tierIndex !== undefined) {
+        target.progression.tierIndex = source.progression.tierIndex;
+      }
+    }
+  }
+
+  /**
+   * 创建效果日志条目
+   */
+  private createEffectLogEntries(
+    tick: number,
+    source: 'rule' | 'periodic' | 'ai' | 'npc',
+    ruleId: string,
+    effects: ModuleEffects,
+    reason: string,
+  ): EffectLogEntry[] {
+    const entries: EffectLogEntry[] = [];
+
+    // survival
+    if (effects.survival?.resources) {
+      for (const [id, change] of Object.entries(effects.survival.resources)) {
+        entries.push({
+          tick, source, ruleId,
+          module: 'survival',
+          variable: id,
+          before: 0, // 实际值需要在应用时填充
+          after: change.delta ?? change.set ?? 0,
+          reason,
+        });
+      }
+    }
+
+    // business
+    if (effects.business?.fundsDelta) {
+      entries.push({
+        tick, source, ruleId,
+        module: 'business',
+        variable: 'funds',
+        before: 0,
+        after: effects.business.fundsDelta,
+        reason,
+      });
+    }
+
+    // stats
+    if (effects.stats?.changes) {
+      for (const [id, change] of Object.entries(effects.stats.changes)) {
+        entries.push({
+          tick, source, ruleId,
+          module: 'stats',
+          variable: id,
+          before: 0,
+          after: change.delta ?? change.set ?? 0,
+          reason,
+        });
+      }
+    }
+
+    // progression
+    if (effects.progression) {
+      if (effects.progression.xpDelta) {
+        entries.push({
+          tick, source, ruleId,
+          module: 'progression',
+          variable: 'xp',
+          before: 0,
+          after: effects.progression.xpDelta,
+          reason,
+        });
+      }
+    }
+
+    return entries;
+  }
+
+  // ─── 快照系统 ───
+
+  /**
+   * 创建当前状态的快照
+   * @param msgIndex 关联的消息索引（与变量快照对齐）
+   * @param gameTime 当前游戏时间文本
+   * @param isInitial 是否为初始快照
+   * @param note 可选备注
+   */
+  createSnapshot(
+    msgIndex: number,
+    gameTime: string,
+    isInitial: boolean = false,
+    note?: string,
+  ): SimulationSnapshot {
+    // 瘦身快照数据，防止序列化过大
+    const slimState = this._slimForSnapshot(this.state);
+
+    const snapshot: SimulationSnapshot = {
+      id: `sim_snap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: Date.now(),
+      msgIndex,
+      tickCount: this.state.tickCount,
+      gameTime,
+      activeEventCount: Object.keys(this.state.events).length,
+      storylineCount: Object.keys(this.state.storylines).length,
+      pendingInteractionCount: this.state.pendingInteractions.length,
+      snapshot: JSON.parse(JSON.stringify(slimState)),
+      isInitial,
+      note,
+    };
+
+    // 添加到快照列表
+    if (!this.state.snapshots) {
+      this.state.snapshots = [];
+    }
+    this.state.snapshots.push(snapshot);
+
+    // 最多保留 20 个快照
+    const MAX_SNAPSHOTS = 20;
+    if (this.state.snapshots.length > MAX_SNAPSHOTS) {
+      this.state.snapshots = this.state.snapshots.slice(-MAX_SNAPSHOTS);
+    }
+
+    this.saveState();
+    return snapshot;
+  }
+
+  /**
+   * 从快照恢复状态
+   * @param snapshotId 快照 ID
+   * @returns 是否恢复成功
+   */
+  restoreSnapshot(snapshotId: string): boolean {
+    if (!this.state.snapshots) return false;
+
+    const snapshot = this.state.snapshots.find(s => s.id === snapshotId);
+    if (!snapshot?.snapshot) return false;
+
+    // 恢复状态，但保留快照列表本身
+    const currentSnapshots = this.state.snapshots;
+    this.state = JSON.parse(JSON.stringify(snapshot.snapshot));
+    // 兼容：确保恢复的状态有 snapshots 字段
+    if (!this.state.snapshots) {
+      this.state.snapshots = currentSnapshots;
+    }
+
+    this.saveState();
+
+    // 通知 UI
+    if (this.onStateChange) {
+      try { this.onStateChange(this.state); } catch { /* ignore */ }
+    }
+
+    return true;
+  }
+
+  /**
+   * 删除指定快照
+   * @param snapshotId 快照 ID
+   */
+  deleteSnapshot(snapshotId: string) {
+    if (!this.state.snapshots) return;
+    this.state.snapshots = this.state.snapshots.filter(s => s.id !== snapshotId);
+    this.saveState();
+  }
+
+  /**
+   * 获取所有快照列表
+   */
+  getSnapshots(): SimulationSnapshot[] {
+    return this.state.snapshots ?? [];
+  }
+
+  /**
+   * 清除所有快照
+   */
+  clearAllSnapshots() {
+    this.state.snapshots = [];
+    this.saveState();
+  }
+
+  /**
+   * 瘦身 state 用于快照：截断长文本、精简大型数组
+   * 参考 VariableManager._slimForSnapshot 的设计理念
+   */
+  private _slimForSnapshot(state: SimulationState): SimulationState {
+    const s = { ...state };
+
+    // 精简事件描述（截断过长的描述）
+    const slimEvents: Record<string, SimEvent> = {};
+    for (const [id, evt] of Object.entries(s.events)) {
+      slimEvents[id] = {
+        ...evt,
+        description: evt.description.length > 500
+          ? evt.description.slice(0, 500) + '…'
+          : evt.description,
+        // 精简 playerHooks 的 description
+        playerHooks: evt.playerHooks.map(h => ({
+          ...h,
+          description: h.description.length > 200
+            ? h.description.slice(0, 200) + '…'
+            : h.description,
+        })),
+      };
+    }
+    s.events = slimEvents;
+
+    // 精简已解决事件（只保留基本信息）
+    const slimResolved: Record<string, SimEvent> = {};
+    for (const [id, evt] of Object.entries(s.resolvedEvents)) {
+      slimResolved[id] = {
+        ...evt,
+        description: evt.description.length > 200
+          ? evt.description.slice(0, 200) + '…'
+          : evt.description,
+        playerHooks: [], // 已解决事件不需要保留切入点
+      };
+    }
+    s.resolvedEvents = slimResolved;
+
+    // 精简暗线节拍（只保留最近 10 个）
+    const slimStorylines: Record<string, CharacterStoryline> = {};
+    for (const [id, storyline] of Object.entries(s.storylines)) {
+      slimStorylines[id] = {
+        ...storyline,
+        beats: storyline.beats.slice(-10).map(b => ({
+          ...b,
+          narrative: b.narrative.length > 300
+            ? b.narrative.slice(0, 300) + '…'
+            : b.narrative,
+        })),
+      };
+    }
+    s.storylines = slimStorylines;
+
+    // 精简待处理交互（只保留最近 5 个）
+    s.pendingInteractions = s.pendingInteractions.slice(0, 5).map(i => ({
+      ...i,
+      reply: i.reply.length > 200 ? i.reply.slice(0, 200) + '…' : i.reply,
+      innerThoughts: i.innerThoughts.length > 200
+        ? i.innerThoughts.slice(0, 200) + '…'
+        : i.innerThoughts,
+    }));
+
+    // 截断世界新闻摘要
+    if (s.worldNewsSummary && s.worldNewsSummary.length > 500) {
+      s.worldNewsSummary = s.worldNewsSummary.slice(0, 500) + '…';
+    }
+
+    return s;
   }
 
   /** 重置引擎 */

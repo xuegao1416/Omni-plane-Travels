@@ -39,7 +39,11 @@ export function buildProgressionGenPrompt(params: {
       }
     }
   ],
-  "xpFormula": { "baseXP": 100, "exponent": 2.0, "scaleFactor": 1.0 }
+  "xpFormula": { "baseXP": 100, "exponent": 2.0, "scaleFactor": 1.0 },
+  "narrativeStyle": {
+    "upgradeDesc": "角色突破时的自然语言描述（1-2句话）",
+    "keywords": ["突破", "顿悟", "境界"]
+  }
 }
 
 【等级制输出格式】
@@ -84,6 +88,14 @@ export function buildProgressionGenPrompt(params: {
   - 等级制 growthPerLevel：attrAMax=5，dimXMax=3
 
 请根据「${params.theme}」自动判断属于哪类世界，选择对应的数值尺度。
+
+【段位制叙事风格要求】（仅段位制需要，等级制不需要）
+如果选择段位制，请额外输出一个 "narrativeStyle" 字段，描述角色突破时的叙事风格：
+- narrativeStyle.upgradeDesc：突破时的表现描述（1-2句话），用符合世界观的自然语言，不要出现"升级""经验值"等游戏化词汇
+  - 修仙世界示例："丹田灵力凝实，气息暴涨，隐约触及了更高境界的门槛..."
+  - 西幻世界示例："魔力在体内涌动，你感觉对元素的掌控又精进了一分..."
+  - 武侠世界示例："内力运转间，你感觉经脉中的真气更加凝实，武学修为又进了一步..."
+- narrativeStyle.keywords：成长相关的关键词列表（如：突破、顿悟、精进、蜕变），用于替换"升级""涨经验"等游戏化表述
 
 【等级制设计要点】
 - maxLevel：根据世界节奏设定（网游100，校园50，都市30等）

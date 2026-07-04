@@ -233,6 +233,8 @@ export interface SimulationState {
   lastTickTimestamp: number;
   /** NPC 主动交互队列（待消费） */
   pendingInteractions: NpcProactiveInteraction[];
+  /** 快照列表（用于回滚） */
+  snapshots: SimulationSnapshot[];
 }
 
 /** 创建空的模拟状态 */
@@ -245,6 +247,7 @@ export function createEmptySimState(): SimulationState {
     pendingInteractions: [],
     tickCount: 0,
     lastTickTimestamp: 0,
+    snapshots: [],
   };
 }
 
@@ -296,6 +299,10 @@ export interface SimGenerationResult {
   playerHooks: PlayerHook[];
   /** NPC 主动交互 */
   npcInteractions: NpcProactiveInteraction[];
+  /** 机械层效果（周期事件 + 事件效果匹配）— 传递给变量提取，不直接应用 */
+  mechanicalEffects?: import('../modules/schema').ModuleEffects;
+  /** 世界状态更新（泛化结构）— 立即应用 */
+  worldStateUpdate?: Record<string, Record<string, string>>;
 }
 
 /** 暗线更新描述 */
@@ -354,6 +361,34 @@ export function createDefaultWorldContext(worldName: string, worldDesc: string):
     coreThemes: [],
     levelLabels: labels,
   };
+}
+
+// ─── 快照系统 ───
+
+/** 世界推演快照 — 用于回滚和存档 */
+export interface SimulationSnapshot {
+  /** 快照唯一 ID */
+  id: string;
+  /** 创建时间戳 */
+  createdAt: number;
+  /** 关联的消息索引（与变量快照对齐） */
+  msgIndex: number;
+  /** 快照时的 tick 计数 */
+  tickCount: number;
+  /** 快照时的游戏时间 */
+  gameTime: string;
+  /** 快照时的活跃事件数 */
+  activeEventCount: number;
+  /** 快照时的暗线数 */
+  storylineCount: number;
+  /** 快照时的待处理交互数 */
+  pendingInteractionCount: number;
+  /** 快照内容（完整的 SimulationState 深拷贝） */
+  snapshot: SimulationState;
+  /** 是否为初始快照 */
+  isInitial: boolean;
+  /** 用户可选的备注 */
+  note?: string;
 }
 
 // ─── 预设系统 ───

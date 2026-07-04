@@ -7,6 +7,14 @@ import { eventBus, EVENTS } from '../../../../engine/eventBus';
 import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
+import type { SimulationRules } from '../../../../modules/schema';
+
+/** 从世界定义中获取仿真规则 */
+function getSimRules(worldDef: WorldDef | undefined): SimulationRules | null {
+  if (!worldDef?.modules) return null;
+  const simMod = worldDef.modules.find(m => m.moduleId === 'simulation' && m.enabled);
+  return (simMod?.moduleConfig as unknown as SimulationRules) ?? null;
+}
 
 export function useSimulation(
   engine: GameEngine,
@@ -32,41 +40,8 @@ export function useSimulation(
     if (apiConfig) simEngine.setApiConfig(apiConfig);
   }, [apiConfig]);
 
-  // 自动推演：变量更新后检查是否需要 tick
-  useEffect(() => {
-    const handler = async () => {
-      // 同步 store 配置到引擎（UI toggle 只改 store，引擎不感知）
-      simEngine.state.config = { ...useSimulationStore.getState().simState.config };
-
-      const gs = engine.variableManager.getState();
-      const gameTime = {
-        current: gs.世界?.时间系统?.当前时间 ?? '',
-      };
-      const round = engine.messages.length;
-
-      if (!simEngine.shouldTick(gameTime, round)) return;
-      if (!simEngine.effectiveApiConfig) return;
-
-      setIsSimulating(true);
-      try {
-        const worldDesc = worldDef?.description ?? worldDef?.name ?? '未知世界';
-        await simEngine.tick(gs, gameTime, round, worldDesc);
-        // 同步到 Zustand store
-        useSimulationStore.getState().setSimState(simEngine.state);
-        // tick 可能耗时超过 auto-save 的 500ms debounce，
-        // 导致 IndexedDB 存档中保存的是 tick 前的旧状态。
-        // tick 完成后立即触发存档，确保最新状态写入 IndexedDB
-        useSaveStore.getState().scheduleAutoSave();
-      } catch (err) {
-        console.warn('[WorldSim] 自动推演失败:', err);
-      } finally {
-        setIsSimulating(false);
-      }
-    };
-
-    eventBus.on(EVENTS.VARIABLE_UPDATE_ENDED, handler);
-    return () => { eventBus.off(EVENTS.VARIABLE_UPDATE_ENDED, handler); };
-  }, [engine, apiConfig, simEngine, worldDef]);
+  // 自动推演：已移至 useGameEngine.ts 中执行（在变量提取之前）
+  // 这里只保留手动推演功能
 
   // 手动推演
   const handleManualTick = useCallback(async () => {
@@ -82,11 +57,12 @@ export function useSimulation(
       };
       const round = engine.messages.length;
       const worldDesc = worldDef?.description ?? worldDef?.name ?? '未知世界';
+      const simRules = getSimRules(worldDef);
 
       // 强制 tick（跳过 shouldTick 检查）
       simEngine.state.config.lastSimulatedTime = '';
       simEngine.state.config.lastAutoTickRound = 0;
-      await simEngine.tick(gs, gameTime, round, worldDesc);
+      await simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules);
       useSimulationStore.getState().setSimState(simEngine.state);
       useSaveStore.getState().scheduleAutoSave();
     } catch (err) {

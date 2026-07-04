@@ -56,6 +56,19 @@ export interface ProgressionConfig {
   xpFormula: { baseXP: number; exponent: number; scaleFactor: number };
 }
 
+/** 资源演化蓝图条目（静态配置） */
+export interface ResourceEvolutionConfig {
+  id: string;
+  trigger: { keywords: string[] };
+  add?: Array<{
+    id: string; name: string; symbol: string;
+    amount: number; max: number; scarce: boolean;
+    gatherRate?: string; usage?: string; description?: string;
+  }>;
+  remove?: string[];
+  narrateHint?: string;
+}
+
 /** 生存资源配置（静态，存入世界定义/世界书） */
 export interface SurvivalConfig {
   description: string;
@@ -70,6 +83,8 @@ export interface SurvivalConfig {
     consumePerCycle: string;
     criticalThreshold: number;
   };
+  /** 资源演化蓝图 */
+  resourceEvolution?: ResourceEvolutionConfig[];
 }
 
 /** 经营资产配置（静态，存入世界定义/世界书） */

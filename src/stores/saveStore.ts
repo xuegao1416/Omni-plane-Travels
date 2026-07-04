@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { GameSave, SaveMeta } from '@/storage/db';
+import type { GameSave, SaveMeta, CompactSaveRecord } from '@/storage/db';
 import {
-  saveGame as saveGameToDb,
+  saveGameIncremental,
   loadGame as loadGameFromDb,
   deleteSave as deleteSaveFromDb,
   forceDeleteSave as forceDeleteSaveFromDb,
@@ -12,7 +12,10 @@ import {
   buildPreview,
   exportSave as exportSaveFromDb,
   importSaveFromData,
+  getLastMessageSeq,
+  autoPruneIfNeeded,
   ACTIVE_SAVE_KEY,
+  SAVE_SCHEMA_VERSION,
 } from '@/storage/db';
 
 /** 校验 saveId 格式：save_<timestamp>_<random>，过滤 localStorage 脏数据 */
@@ -139,21 +142,21 @@ export const useSaveStore = create<SaveState>((set, get) => ({
   },
 
   renameSave: async (saveId, newName) => {
-    const fullSave = await loadGameFromDb(saveId);
-    if (!fullSave) return;
+    // 只更新头部 name 字段，不涉及 messages（避免把新格式降级回老格式）
+    const { savesMeta, currentSaveId } = get();
+    const existingMeta = savesMeta.find(m => m.id === saveId);
+    if (!existingMeta) return;
 
-    fullSave.name = newName;
-    fullSave.timestamp = Date.now();
-    await saveGameToDb(fullSave);
+    const newTimestamp = Date.now();
 
+    // 更新元数据
     const meta: SaveMeta = {
-      id: fullSave.id,
+      id: saveId,
       name: newName,
-      timestamp: fullSave.timestamp,
-      preview: buildPreview(fullSave),
+      timestamp: newTimestamp,
+      preview: existingMeta.preview, // 预览文本不变
     };
 
-    const { savesMeta, currentSaveId } = get();
     const updated = savesMeta.map(m => m.id === saveId ? meta : m);
 
     const changes: Partial<SaveState> = { savesMeta: updated };
@@ -163,6 +166,14 @@ export const useSaveStore = create<SaveState>((set, get) => ({
 
     set(changes);
     await saveAllSaveMeta(updated);
+
+    // 直接更新 saves store 中头部记录的 name/timestamp 字段
+    try {
+      const { updateSaveHead } = await import('@/storage/db');
+      await updateSaveHead(saveId, { name: newName, timestamp: newTimestamp });
+    } catch (err) {
+      console.warn('[存档] 更新头部 name 失败:', err);
+    }
   },
 
   importSave: async (data) => {
@@ -182,23 +193,101 @@ export const useSaveStore = create<SaveState>((set, get) => ({
   },
 
   performSave: async (saveData) => {
-    await saveGameToDb(saveData);
+    try {
+      // 配额治理：检查配额，不足时自动清理冷消息
+      await autoPruneIfNeeded(saveData.id);
 
-    const meta: SaveMeta = {
-      id: saveData.id,
-      name: saveData.name,
-      timestamp: saveData.timestamp,
-      preview: buildPreview(saveData),
-    };
+      // 获取上次保存的最后 seq
+      const lastSeq = await getLastMessageSeq(saveData.id);
 
-    const { savesMeta } = get();
-    const idx = savesMeta.findIndex(m => m.id === meta.id);
-    const updated = idx >= 0
-      ? savesMeta.map((m, i) => i === idx ? meta : m)
-      : [...savesMeta, meta];
+      // 计算新增消息（使用 seq 判断，而不是数组索引）
+      const allMessages = saveData.messages || [];
+      const newMessages = allMessages.filter(m => {
+        const msgSeq = m.seq ?? 0;
+        return msgSeq > lastSeq;
+      });
 
-    set({ savesMeta: updated });
-    await saveAllSaveMeta(updated);
+      // 构建紧凑头部（不含 messages）
+      const compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'> = {
+        id: saveData.id,
+        name: saveData.name,
+        timestamp: saveData.timestamp,
+        schemaVersion: SAVE_SCHEMA_VERSION,
+        round: allMessages.reduce((max, m) => Math.max(max, m.round), 0),
+        gameState: saveData.gameState,
+        worldId: saveData.worldId,
+        personalInfo: saveData.personalInfo,
+        characterHistory: saveData.characterHistory,
+        memoryRuntime: saveData.memoryRuntime,
+        memoryConfig: saveData.memoryConfig,
+        vectorMemory: saveData.vectorMemory,
+        variableConfig: saveData.variableConfig,
+        customWorld: saveData.customWorld,
+        simulationState: saveData.simulationState,
+      };
+
+      // 增量保存
+      await saveGameIncremental(saveData.id, compactHead, newMessages);
+
+      // 更新元数据
+      const meta: SaveMeta = {
+        id: saveData.id,
+        name: saveData.name,
+        timestamp: saveData.timestamp,
+        preview: buildPreview(saveData),
+        estBytes: allMessages.length * 500, // 粗略估算：每条消息约 500 字节
+        messageCount: allMessages.length,
+      };
+
+      const { savesMeta } = get();
+      const idx = savesMeta.findIndex(m => m.id === meta.id);
+      const updated = idx >= 0
+        ? savesMeta.map((m, i) => i === idx ? meta : m)
+        : [...savesMeta, meta];
+
+      set({ savesMeta: updated });
+      await saveAllSaveMeta(updated);
+    } catch (err) {
+      // 错误处理：不再静默吞掉
+      console.error('[存档] 保存失败:', err);
+
+      // 尝试兜底：只导头部+最近50条（避免对超大对象 stringify 二次失败）
+      try {
+        const recentMessages = (saveData.messages || []).slice(-50);
+        const backupData = {
+          type: 'omni-plane-travels-save-backup',
+          version: '2.0',
+          exportedAt: Date.now(),
+          reason: '存档失败自动备份（只含最近50条消息）',
+          save: {
+            id: saveData.id,
+            name: saveData.name,
+            timestamp: saveData.timestamp,
+            messages: recentMessages,
+            gameState: saveData.gameState,
+            worldId: saveData.worldId,
+            personalInfo: saveData.personalInfo,
+            characterHistory: saveData.characterHistory,
+            memoryRuntime: saveData.memoryRuntime,
+            memoryConfig: saveData.memoryConfig,
+            vectorMemory: saveData.vectorMemory,
+            simulationState: saveData.simulationState,
+          },
+        };
+        const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `save-backup-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        console.warn('[存档] 已自动导出备份 JSON（只含最近50条消息）');
+      } catch (exportErr) {
+        console.error('[存档] 导出备份也失败:', exportErr);
+      }
+
+      throw err;
+    }
   },
 
   saveGame: async (buildSaveData) => {
@@ -232,7 +321,11 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       _saveTimer = null;
       if (_autoSaveBuilder) {
         console.log('[auto-save] 触发自动存档...');
-        get().saveGame(_autoSaveBuilder).catch(err => console.warn('[auto-save] 保存失败:', err));
+        get().saveGame(_autoSaveBuilder).catch(err => {
+          // 不再静默吞掉，让错误暴露
+          console.error('[auto-save] 保存失败（需要用户注意）:', err);
+          // 可以在这里触发 UI 通知
+        });
       } else {
         console.warn('[auto-save] _autoSaveBuilder 未注入，跳过存档');
       }

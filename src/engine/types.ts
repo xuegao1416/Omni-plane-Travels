@@ -18,6 +18,13 @@ export interface ChatMessage {
   snapshot?: unknown;
   snapshotTime?: number;
   memoryCheckpointId?: string;
+  /** 世界演化引擎快照 ID */
+  simulationSnapshotId?: string;
+  /**
+   * 消息序号（单调递增，用于增量存档）
+   * 在消息创建时由引擎分配，确保存档时 seq 对齐
+   */
+  seq?: number;
 }
 
 export interface GameEngine {

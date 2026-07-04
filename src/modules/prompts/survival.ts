@@ -1,6 +1,6 @@
 // 生存资源模块 — Prompt 模板
 
-/** 阶段：生存资源生成 */
+/** 阶段：生存资源生成（含演化蓝图） */
 export function buildSurvivalGenPrompt(params: {
   theme: string;
   tone: string;
@@ -12,8 +12,8 @@ export function buildSurvivalGenPrompt(params: {
 
 【设计原则】
 - 生存资源是这个世界的核心挑战，资源获取和消耗是叙事驱动力
-- 3-6种核心资源，不能太多（控制复杂度）
-- 至少1种稀缺资源（标记 scarce: true），稀缺资源是生存压力的来源
+- 初始只生成早期资源（3-4种基础资源），后续资源通过演化蓝图解锁
+- 至少1种初始稀缺资源（标记 scarce: true），稀缺资源是生存压力的来源
 - 每种资源必须有 max 上限，代表物理存储/携带极限
 - 每种资源必须有 gatherRate（采集速率）和 usage（消耗速率），用自然语言描述
 - 配方不在世界创建时生成，而是在游戏中由玩家触发AI动态生成
@@ -38,7 +38,7 @@ export function buildSurvivalGenPrompt(params: {
 
 1. 整体描述：一句话说明这个世界的生存资源系统特点
 
-2. 资源列表（3-6种）：
+2. 初始资源列表（3-4种，只生成游戏开局就能获取的基础资源）：
    每种资源需要：
    - id: 英文标识（如 water, food, wood, stone, herb）
    - name: 中文名（与世界观贴合）
@@ -55,6 +55,27 @@ export function buildSurvivalGenPrompt(params: {
    - consumePerCycle: 每周期自动消耗描述
    - criticalThreshold: 危机触发阈值（默认2）
 
+4. 结构化消耗规则（consumption）：
+   系统需要确定性地执行每轮资源消耗，所以需要结构化的数值：
+   - perCycle: 每周期自动消耗的资源 { "资源id": 消耗量 }，如 { "food": 1, "water": 1 }
+   - exhaustionPenalty（可选）: 某资源耗尽时对属性的惩罚 { "属性id": 每轮扣减 }，如 { "体力值": 5 }
+     注意：属性 id 必须是这个世界的实际属性名（如"体力值""血量"等）
+
+5. 资源演化蓝图（resourceEvolution）：
+   设计2-3个演化阶段，每个阶段解锁新资源、淘汰旧资源。
+   每个演化步骤需要：
+   - id: 唯一标识（如 "evolution_iron"）
+   - trigger.keywords: 触发关键词列表（AI叙事中出现这些词时触发）
+   - add: 新增的资源列表（与初始资源格式相同）
+   - remove: 需要淘汰的资源 id 列表（可选，留空表示不淘汰任何旧资源）
+   - narrateHint: 叙事提示（一句话，告诉AI解锁时如何渲染）
+
+   设计要点：
+   - 演化应反映世界观的技术/文明进步（如石器→铁器→工业）
+   - 新资源的 max 应高于旧资源（体现进步）
+   - 旧资源淘汰要合理（如铁矿出现后石头不再是核心资源）
+   - 关键词应该是玩家行动中自然会出现的词（如"冶炼""锻造""发电"）
+
 输出JSON：
 {
   "description": "一句话描述",
@@ -65,6 +86,13 @@ export function buildSurvivalGenPrompt(params: {
       "gatherRate": "河边每天可取3桶水",
       "usage": "每人每天需要1份饮用水",
       "description": "生存必需品，用于饮用和烹饪。"
+    },
+    {
+      "id": "wood", "name": "木材", "symbol": "🪵",
+      "amount": 4, "max": 12, "scarce": false,
+      "gatherRate": "森林中每天可采集3-4根",
+      "usage": "用于生火、建造和制作工具",
+      "description": "最基础的建材和燃料。"
     },
     {
       "id": "herb", "name": "药草", "symbol": "🌿",
@@ -78,7 +106,43 @@ export function buildSurvivalGenPrompt(params: {
     "cycleName": "一天",
     "consumePerCycle": "每人每天消耗1份口粮+1份饮用水",
     "criticalThreshold": 2
-  }
+  },
+  "consumption": {
+    "perCycle": { "food": 1, "water": 1 },
+    "exhaustionPenalty": { "体力值": 5 }
+  },
+  "resourceEvolution": [
+    {
+      "id": "evolution_iron",
+      "trigger": { "keywords": ["冶炼", "熔炉", "铁矿", "锻造"] },
+      "add": [
+        {
+          "id": "iron", "name": "铁矿", "symbol": "⚙️",
+          "amount": 0, "max": 20, "scarce": true,
+          "gatherRate": "矿洞中每天可采集2-3块矿石",
+          "usage": "用于锻造工具和武器",
+          "description": "比石头更坚固的金属原料。"
+        }
+      ],
+      "remove": [],
+      "narrateHint": "你发现了铁矿脉，金属时代的大门正在打开"
+    },
+    {
+      "id": "evolution_industry",
+      "trigger": { "keywords": ["工厂", "机械", "蒸汽", "电力"] },
+      "add": [
+        {
+          "id": "steel", "name": "钢材", "symbol": "🔩",
+          "amount": 0, "max": 30, "scarce": false,
+          "gatherRate": "工厂每天可冶炼5单位钢材",
+          "usage": "高级建造和机械制造的核心材料",
+          "description": "工业时代的命脉。"
+        }
+      ],
+      "remove": ["stone"],
+      "narrateHint": "工厂的烟囱开始冒烟，工业革命悄然来临"
+    }
+  ]
 }`;
 }
 
@@ -93,6 +157,11 @@ export const SURVIVAL_UPDATE_RULES = `【生存资源更新规则】
 - 数量不能为负数
 - 多个资源同时变化时，放在同一个对象中
 - 示例：食物消耗1、木材采集3 → {"玩家":{"生存资源":{"food":{"数量":5},"wood":{"数量":8}}}}
+
+【动态资源发现】
+当叙事中出现全新的资源类型时，可以通过 UpdateVariable 直接创建：
+{"玩家":{"生存资源":{"新资源id":{"数量":初始数量}}}}
+注意：只有在演化蓝图中未覆盖的资源才用此方式创建。蓝图内的资源由演化系统自动处理。
 
 危机触发：
 - 当任何资源数量过低时，应在叙事中体现危机感

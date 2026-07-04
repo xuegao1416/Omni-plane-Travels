@@ -67,7 +67,8 @@ export function useSurvivalCraft(
       const currentResources = Object.entries(resources).map(([id, r]) => ({
         id, name: nameMap.get(id) || id, amount: r.数量, max: r.最大值 ?? 9999,
       }));
-      const worldTheme = state.世界?.社会环境?.社会氛围 || '生存世界';
+      // 社会环境已移至世界演化系统，使用默认主题
+      const worldTheme = '生存世界';
 
       const prompt = buildRecipeGenPrompt({ currentResources, playerRequest: request, worldTheme });
       const { requestStreamWithRetry } = await import('../../../../api/client');
@@ -83,8 +84,8 @@ export function useSurvivalCraft(
 
       const { normalizeRecipeInputs, normalizeRecipeOutput } = await import('../../../../utils/formatNormalize');
       const fixed = jsonMatch[1].trim()
-        .replace(/[“”]/g, '"')
-        .replace(/[‘’]/g, "'")
+        .replace(/[""]/g, '"')
+        .replace(/['']/g, "'")
         .replace(/、/g, ',');
       const raw = JSON.parse(fixed);
 
@@ -101,10 +102,15 @@ export function useSurvivalCraft(
         return;
       }
 
-      // 校验 inputs 是否引用了模块中存在的资源
+      // 校验 inputs：同时从静态模块定义和运行时变量中读取合法 id
+      // 运行时可能包含演化新增的资源
       const validIds = new Set<string>();
       if (survivalMod?.resources) {
         for (const r of survivalMod.resources) validIds.add(r.id);
+      }
+      // 追加运行时已存在的资源 id（演化新增的资源在这里）
+      for (const id of Object.keys(resources)) {
+        validIds.add(id);
       }
       const unknownInputs = Object.keys(recipe.inputs).filter(k => !validIds.has(k));
       if (unknownInputs.length > 0) {

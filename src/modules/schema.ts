@@ -86,6 +86,11 @@ export interface ProgressionConfig {
   tiers?: TierDef[];
   /** 等级制：公式化等级数据 */
   levelData?: LevelData;
+  /** 叙事风格（仅段位制，用于描述突破时的表现） */
+  narrativeStyle?: {
+    upgradeDesc: string;
+    keywords: string[];
+  };
 }
 
 /**
@@ -127,6 +132,28 @@ export interface SurvivalRecipe {
   description: string;
 }
 
+/** 资源演化蓝图条目 */
+export interface ResourceEvolutionStep {
+  /** 唯一标识，与 periodicEvents 里的兜底事件 id 对应 */
+  id: string;
+  /** 触发条件（关键词触发；轮次兜底由 periodicEvents 承载） */
+  trigger: { keywords: string[] };
+  /** 新增的资源 */
+  add?: SurvivalResource[];
+  /** 移除的资源 id */
+  remove?: string[];
+  /** 叙事提示（喂给 AI 做渲染） */
+  narrateHint?: string;
+}
+
+/** 结构化消耗规则（运行时确定性执行，不依赖 AI 解读文字） */
+export interface SurvivalConsumption {
+  /** 每周期自动消耗的资源 { resourceId: 消耗量 } */
+  perCycle: Record<string, number>;
+  /** 资源耗尽时的属性惩罚 { 属性id: 每轮扣减值 } */
+  exhaustionPenalty?: Record<string, number>;
+}
+
 /** 完整的生存资源模块 */
 export interface SurvivalModuleSchema {
   description: string;
@@ -137,6 +164,10 @@ export interface SurvivalModuleSchema {
     consumePerCycle: string;    // 每周期自动消耗描述（AI参考）
     criticalThreshold: number;  // 低于此值触发危机（默认2）
   };
+  /** 结构化消耗规则（运行时确定性执行） */
+  consumption?: SurvivalConsumption;
+  /** 资源演化蓝图（世界创建时 AI 生成） */
+  resourceEvolution?: ResourceEvolutionStep[];
   /** AI可添加自定义字段 */
   [key: string]: unknown;
 }
@@ -263,6 +294,188 @@ export interface TalentModuleSchema {
   categories: TalentCategoryDef[];  // AI生成的天赋大类列表
 }
 
+// ─── 世界演化规则模块 ───
+
+/**
+ * 模块效果 — 带模块归属的变量更新
+ * 应用前校验模块开关，未启用的模块静默跳过
+ */
+export interface ModuleEffects {
+  /** 生存资源变化（如果启用生存模块） */
+  survival?: {
+    resources?: Record<string, { delta?: number; set?: number; min?: number }>;
+    /** 动态添加新资源（资源发现/演化解锁） */
+    addResources?: Array<{
+      id: string; name: string; symbol: string;
+      amount: number; max: number; scarce: boolean;
+      gatherRate?: string; usage?: string; description?: string;
+    }>;
+    /** 动态移除资源（枯竭/被替代） */
+    removeResources?: Array<{ id: string }>;
+    /** 动态修改资源属性（稀缺度变化等） */
+    updateResources?: Array<{
+      id: string; max?: number; scarce?: boolean; gatherRate?: string;
+    }>;
+  };
+  /** 经营资产变化（如果启用经营模块） */
+  business?: {
+    fundsDelta?: number;
+    newAssets?: unknown[];
+  };
+  /** 数值属性变化（如果启用数值模块） */
+  stats?: {
+    changes?: Record<string, { delta?: number; set?: number; min?: number }>;
+  };
+  /** 成长体系变化（如果启用成长模块） */
+  progression?: {
+    xpDelta?: number;
+    tierIndex?: number;
+  };
+}
+
+/**
+ * 事件效果 — 事件触发时应用的变量变化
+ */
+export interface EventEffect {
+  /** 效果 ID */
+  id: string;
+  /** 优先级（数字大者先匹配） */
+  priority: number;
+  /** 命中多条时的叠加策略 */
+  stackStrategy: 'add' | 'max' | 'override' | 'exclusive';
+  /** 触发条件 */
+  trigger: {
+    /** 结构化 tag（优先匹配） */
+    tags?: string[];
+    /** 事件类型 */
+    eventType?: string;
+    /** 事件层级 */
+    eventLevel?: string;
+    /** 最低严重度 */
+    severityMin?: number;
+    /** 关键词兜底匹配 */
+    keywords?: string[];
+  };
+  /** 变量影响 */
+  effects: ModuleEffects;
+}
+
+/**
+ * 周期性事件 — 每隔固定轮次触发
+ */
+export interface PeriodicEvent {
+  /** 事件 ID */
+  id: string;
+  /** 事件名称 */
+  name: string;
+  /** 事件描述 */
+  description: string;
+  /** 触发间隔（轮次） */
+  intervalTicks: number;
+  /** 首次触发偏移（避免所有周期事件同轮爆发） */
+  offsetTicks?: number;
+  /** 变量影响 */
+  effects: ModuleEffects;
+  /** 周期事件结算后是否喂给 AI 做叙事渲染 */
+  narrateToAI?: boolean;
+}
+
+/**
+ * 世界状态更新规则
+ */
+export interface WorldStateRule {
+  /** 规则 ID */
+  id: string;
+  /** 触发条件 */
+  trigger: {
+    tags?: string[];
+    eventType?: string;
+    keywords?: string[];
+  };
+  /** 更新内容（轴名 → 字段 → 新值） */
+  updates: Record<string, Record<string, string>>;
+}
+
+/**
+ * AI 叙事层安全护栏
+ */
+export interface NarrativeGuardrails {
+  /** AI 单次声明各属性最大变动 */
+  maxDeltaPerStat: Record<string, number>;
+  /** AI 单次声明各资源最大变动 */
+  maxDeltaPerResource: Record<string, number>;
+  /** 允许 AI 用 set 的变量白名单 */
+  setAllowedVars: string[];
+  /** 允许 AI 创建新资源（动态资源发现） */
+  allowCreateResources?: boolean;
+  /** 新资源的默认最大值 */
+  newResourceDefaultMax?: number;
+}
+
+/**
+ * 世界演化规则（静态配置，存 WorldDef.modules[]，moduleId: 'simulation'）
+ */
+export interface SimulationRules {
+  /** 事件 → 变量映射 */
+  eventEffects: EventEffect[];
+  /** 周期性事件 */
+  periodicEvents: PeriodicEvent[];
+  /** 世界状态更新规则 */
+  worldStateRules: WorldStateRule[];
+  /** 该世界定义的状态轴（替代写死的字段） */
+  worldStateAxes?: Record<string, string[]>;
+  /** AI 叙事层的安全护栏 */
+  narrativeGuardrails: NarrativeGuardrails;
+}
+
+/**
+ * 效果日志条目（可观测性）
+ */
+export interface EffectLogEntry {
+  /** 发生轮次 */
+  tick: number;
+  /** 来源 */
+  source: 'rule' | 'periodic' | 'ai' | 'npc';
+  /** 规则 ID（如果是规则触发） */
+  ruleId?: string;
+  /** 所属模块 */
+  module: 'survival' | 'business' | 'stats' | 'progression' | 'worldState';
+  /** 变量名 */
+  variable: string;
+  /** 变动前的值 */
+  before: number | string;
+  /** 变动后的值 */
+  after: number | string;
+  /** 变动原因 */
+  reason?: string;
+}
+
+/**
+ * 世界演化运行时状态（进 GameState，随存档保存）
+ */
+export interface SimulationRuntimeState {
+  /** 当前轮次 */
+  tick: number;
+  /** 周期事件已过 tick 计数：{ zombie_horde: 28 } */
+  periodicCounters: Record<string, number>;
+  /** 变动日志（可观测性） */
+  effectLog: EffectLogEntry[];
+  /** 已触发过的周期事件 id（用于一次性事件） */
+  triggeredPeriodicEvents: string[];
+}
+
+/**
+ * 创建默认的运行时状态
+ */
+export function createDefaultSimulationRuntimeState(): SimulationRuntimeState {
+  return {
+    tick: 0,
+    periodicCounters: {},
+    effectLog: [],
+    triggeredPeriodicEvents: [],
+  };
+}
+
 // ─── 世界系统聚合类型 ───
 
 /**
@@ -276,6 +489,7 @@ export interface WorldSystemData {
   经营资产?: BusinessModuleSchema;
   骰子检定?: DiceModuleSchema;
   天赋体系?: TalentModuleSchema;
+  世界演化?: SimulationRules;
   /** 保留扩展性：自定义模块数据 */
   [key: string]: unknown;
 }
