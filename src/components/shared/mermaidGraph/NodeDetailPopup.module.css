@@ -1,0 +1,122 @@
+.popup {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 340px;
+  max-height: calc(100% - 16px);
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.16));
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--bg-tertiary, #e2e8f0);
+  flex-shrink: 0;
+}
+
+.headerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.typeBadge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  background: var(--accent-dim, rgba(59, 130, 246, 0.1));
+  color: var(--accent, #3b82f6);
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--text-primary, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  color: var(--text-secondary, #475569);
+  background: var(--bg-primary, #f0f4f8);
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.fieldList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-sm, 4px);
+  overflow: hidden;
+}
+
+.fieldRow {
+  display: flex;
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+}
+
+.fieldRowEven {
+  background: var(--bg-primary, #f0f4f8);
+}
+
+.fieldLabel {
+  color: var(--text-muted, #94a3b8);
+  flex-shrink: 0;
+  width: 80px;
+  font-weight: 500;
+}
+
+.fieldValue {
+  color: var(--text-primary, #1e293b);
+  flex: 1;
+  word-break: break-word;
+}
+
+.empty {
+  text-align: center;
+  padding: 16px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted, #94a3b8);
+}

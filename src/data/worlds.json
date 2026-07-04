@@ -1,0 +1,68 @@
+[
+  {
+    "id": "japanese_school",
+    "name": "日式校园",
+    "description": "充满青春、社团与青涩恋爱的日式高中生活。",
+    "entryId": null,
+    "icon": "Flower2",
+    "coverColor": "#ffb7c5",
+    "tags": ["青春", "日常", "恋爱", "社团", "现代"],
+    "difficulty": "easy",
+    "modules": []
+  },
+  {
+    "id": "desire_metropolis",
+    "name": "欲望魔都",
+    "description": "欲望交织的繁华不夜城",
+    "entryId": null,
+    "icon": "Heart",
+    "coverColor": "#e74c8b",
+    "tags": ["现代都市", "纸醉金迷", "情感博弈", "暧昧美学"],
+    "difficulty": "medium",
+    "modules": ["stat"]
+  },
+  {
+    "id": "wuxia_world",
+    "name": "武侠世界",
+    "description": "剑气纵横的架空武林，恩怨情仇交织的江湖。",
+    "entryId": null,
+    "icon": "Swords",
+    "coverColor": "#8d6e63",
+    "tags": ["武侠", "架空", "江湖恩怨", "高武"],
+    "difficulty": "hard",
+    "modules": ["stat", "progression"]
+  },
+  {
+    "id": "wasteland_apocalypse",
+    "name": "末日废土",
+    "description": "核战后的荒芜世界，异能与辐射怪物共存。",
+    "entryId": null,
+    "icon": "Skull",
+    "coverColor": "#795548",
+    "tags": ["末日生存", "废土朋克", "异能觉醒", "辐射变异"],
+    "difficulty": "hard",
+    "modules": ["stat", "progression", "talent", "dice"]
+  },
+  {
+    "id": "stranded_island",
+    "name": "荒岛求生",
+    "description": "飞机失事后，你和幸存者们被困在一座无人岛上。淡水、食物、庇护所——每一项都是生存的关键。",
+    "entryId": null,
+    "icon": "Palmtree",
+    "coverColor": "#059669",
+    "tags": ["生存", "荒岛", "资源管理", "探索"],
+    "difficulty": "medium",
+    "modules": ["survival"]
+  },
+  {
+    "id": "border_trade",
+    "name": "边境贸易",
+    "description": "1990年代，苏联解体前夕。中俄边境的贸易市场上，一个充满机遇与风险的淘金时代正在展开。",
+    "entryId": null,
+    "icon": "Store",
+    "coverColor": "#d97706",
+    "tags": ["经营", "90年代", "中俄边境", "贸易"],
+    "difficulty": "medium",
+    "modules": ["business"]
+  }
+]

@@ -1,0 +1,90 @@
+/* ═══════════════════════════════════════════════
+   游戏页布局 — GameScreen 三栏 / ChatPanel / RightPanel / DrawerPanel
+   阶段 3 补充：inline grid → 响应式 class、抽屉 clamp、面板响应式
+   ═══════════════════════════════════════════════ */
+
+/* 响应式网格工具类 */
+.grid-responsive {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(var(--grid-card-min), 1fr));
+}
+
+/* 固定列数网格（桌面默认，移动端逐档降列） */
+.grid-fixed-6 {
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: repeat(6, 1fr);
+}
+.grid-fixed-4 {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(4, 1fr);
+}
+.grid-fixed-3 {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ═══════════════════════════════════════════════
+   通用响应式 grid 工具类 — 内联 gridTemplateColumns 迁移目标
+   ═══════════════════════════════════════════════ */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2);
+}
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+}
+.grid-label-value {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 0.75rem;
+}
+.grid-1-2 {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-2);
+}
+
+@media (max-width: 768px) {
+  .grid-3 { grid-template-columns: 1fr 1fr; }
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: 1fr; }
+  .grid-label-value { grid-template-columns: 1fr; }
+  .grid-1-2 { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════
+   经营面板抽屉 — 桌面右侧栏 / 移动端全屏
+   ═══════════════════════════════════════════════ */
+.business-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: clamp(280px, 50vw, 600px);
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+}
+@media (max-width: 480px) {
+  .business-drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "short_name": "世界漫游指南",
+  "name": "世界漫游指南 - AI 互动叙事引擎",
+  "description": "一个基于 AI 的交互式文字冒险游戏引擎",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "categories": ["games", "entertainment"]
+}

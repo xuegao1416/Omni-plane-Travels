@@ -1,0 +1,130 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+}
+
+.dialog {
+  background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  animation: dialogSlideIn 0.2s ease;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.iconBox {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconBoxDefault {
+  background: var(--accent-dim, rgba(212, 175, 55, 0.12));
+}
+
+.iconBoxDanger {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.dialogTitle {
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary, #e8e6e3);
+}
+
+.message {
+  font-size: var(--font-size-md);
+  color: var(--text-secondary, #a0a0a0);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  padding-left: 42px;
+}
+
+.promptWrap {
+  margin-bottom: 20px;
+  padding-left: 42px;
+}
+
+.promptInput {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  border-radius: 8px;
+  background: var(--bg-tertiary, #2a2a3e);
+  color: var(--text-primary, #e8e6e3);
+  font-size: var(--font-size-md);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.promptInput:focus {
+  border-color: var(--accent, #d4af37);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-left: 42px;
+}
+
+.cancelBtn {
+  padding: 8px 18px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  background: var(--bg-tertiary, #2a2a3e);
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.cancelBtn:hover {
+  border-color: var(--text-muted, #888);
+}
+
+.confirmBtn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.confirmBtnDefault {
+  background: var(--accent, #d4af37);
+  color: var(--bg-deep, #0f0f1a);
+}
+
+.confirmBtnDanger {
+  background: rgba(239, 68, 68, 0.9);
+  color: var(--color-on-accent);
+}
+
+.confirmBtn:hover {
+  opacity: 0.85;
+}

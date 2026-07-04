@@ -1,0 +1,32 @@
+.btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.controls {
+  display: flex;
+  gap: 4px;
+}
+
+.scaleLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  padding: 0 6px;
+  line-height: 24px;
+  min-width: 36px;
+  text-align: center;
+}

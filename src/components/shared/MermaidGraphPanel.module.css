@@ -1,0 +1,84 @@
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  min-height: 300px;
+}
+
+.titleBar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--accent, #58a6ff);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted, #8b949e);
+  margin-top: 2px;
+}
+
+.viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+  min-height: 260px;
+  background: var(--bg-primary, #f0f4f8);
+}
+
+.viewportGrab {
+  cursor: grab;
+}
+
+.viewportGrabbing {
+  cursor: grabbing;
+}
+
+.surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.svgContainer {
+  line-height: 0;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-base);
+  color: var(--text-muted);
+}
+
+.overlayDark {
+  background: rgba(13, 17, 23, 0.7);
+}
+
+.overlayError {
+  font-size: var(--font-size-sm);
+  color: #f85149;
+  text-align: center;
+  padding: 24px;
+}

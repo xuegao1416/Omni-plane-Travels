@@ -1,0 +1,13 @@
+/* ═══════════════════════════════════════════════
+   全局样式入口 — 通过 @import 按顺序加载各模块
+
+   加载顺序（CSS 级联优先级由源码顺序决定）：
+   tokens → base → layout-wizard → layout-settings → layout-game → responsive
+   responsive 最后加载，确保移动端断点覆盖可生效
+   ═══════════════════════════════════════════════ */
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/layout-wizard.css';
+@import './styles/layout-settings.css';
+@import './styles/layout-game.css';
+@import './styles/responsive.css';

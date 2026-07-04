@@ -1,0 +1,186 @@
+/* ═══════════════════════════════════════════════
+   设计 Token — 颜色 / 间距 / 排版 / 圆角 / 阴影 / 动画 / 布局
+   主题切换由 [data-theme] 属性驱动（configStore 设置 dataset.theme）
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* ─── 主题色（light 默认，与 configStore light 一致）─── */
+  --bg-primary: #f0f4f8;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  --bg-deep: #e8edf3;
+  --bg-elevated: #ffffff;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.08);
+  --accent-glow: rgba(59, 130, 246, 0.12);
+  --border: #cbd5e1;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --success: #16a34a;
+  --color-on-accent: #fff;
+
+  /* ─── 字体 ─── */
+  --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif;
+  --font-body: 'Noto Sans SC', 'Source Han Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* ─── 间距 ─── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ─── 排版 Type Scale ─── */
+  --font-size-xs: 0.72rem;     /* 极小标签、徽章 */
+  --font-size-sm: 0.78rem;     /* 次要说明文字 */
+  --font-size-base: 0.82rem;   /* 正文、表单 */
+  --font-size-md: 0.88rem;     /* 小标题 */
+  --font-size-lg: 0.95rem;     /* 标题 */
+  --font-size-xl: 1.1rem;      /* 大标题 */
+
+  /* ─── 圆角 ─── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 50%;
+
+  /* ─── 阴影 ─── */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --shadow-glow: 0 0 0 3px var(--accent-dim);
+
+  /* ─── 动画 ─── */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ─── 布局尺寸 ─── */
+  --right-panel-width: 340px;
+
+  /* ─── 移动端 Token ─── */
+  --touch-min: 44px;
+  --touch-spacing: 8px;
+  --mobile-nav-height: 56px;
+  --mobile-header-height: 48px;
+
+  /* ─── UI Settings（默认值，由 UISettingsContext 运行时覆盖）─── */
+  --font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --ui-font-size: 14px;
+  --body-font-size: 15px;
+  --body-line-height: 1.6;
+
+  /* ═══════════════════════════════════════════════
+     扩展 Token — 语义色 / 维度色 / 响应式布局
+     ═══════════════════════════════════════════════ */
+
+  /* 语义色：难度等级（随主题变化） */
+  --difficulty-easy: var(--success);
+  --difficulty-medium: var(--warning);
+  --difficulty-hard: var(--danger);
+
+  /* 维度色：固定品牌标识色，不随主题变化 */
+  --dim-world-type: #6366f1;
+  --dim-tone: #f59e0b;
+  --dim-conflict: #ef4444;
+  --dim-geography: #10b981;
+  --dim-factions: #8b5cf6;
+  --dim-npcs: #ec4899;
+  --dim-culture: #14b8a6;
+  --dim-rules: #f97316;
+
+  /* 响应式布局 token */
+  --drawer-width: clamp(280px, 80vw, 560px);
+  --overlay-max: 92vw;
+  --space-inline: clamp(8px, 2vw, 16px);
+  --grid-card-min: 140px;
+
+  /* 语义色：状态标签（自动跟随4主题） */
+  --status-brewing-bg: color-mix(in srgb, var(--warning) 15%, transparent);
+  --status-brewing-text: var(--warning);
+  --status-active-bg: color-mix(in srgb, var(--danger) 15%, transparent);
+  --status-active-text: var(--danger);
+  --status-resolved-bg: color-mix(in srgb, var(--success) 15%, transparent);
+  --status-resolved-text: var(--success);
+
+  /* 语义色：事件层级（mythic/political 为固定语义色，其余跟随主题） */
+  --event-level-mythic: #a855f7;
+  --event-level-political: #3b82f6;
+  --event-level-factional: var(--warning);
+  --event-level-economic: var(--success);
+  --event-level-civilian: var(--text-muted);
+
+  /* 断点参考值（@media 内必须用裸数值，此处仅供 JS 同步与文档参考） */
+  --bp-xs: 360px;
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+}
+
+/* ─── 主题：Dark ─── */
+[data-theme="dark"] {
+  --bg-primary: #0b0d13;
+  --bg-secondary: #111420;
+  --bg-tertiary: #1e2336;
+  --bg-deep: #08090e;
+  --bg-elevated: #252a3d;
+  --text-primary: #e8e4dc;
+  --text-secondary: #9a96a0;
+  --text-muted: #5c5966;
+  --accent: #c8a26c;
+  --accent-dim: rgba(200, 162, 108, 0.1);
+  --accent-glow: rgba(200, 162, 108, 0.15);
+  --border: #2a2f42;
+  --danger: #e05252;
+  --warning: #d4a24e;
+  --success: #5ab87a;
+}
+
+/* ─── 主题：Metal ─── */
+[data-theme="metal"] {
+  --bg-primary: #f4f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8eaef;
+  --bg-deep: #ecedf1;
+  --bg-elevated: #ffffff;
+  --text-primary: #2d3142;
+  --text-secondary: #5c6178;
+  --text-muted: #9a9eb0;
+  --accent: #6b7a94;
+  --accent-dim: rgba(107, 122, 148, 0.08);
+  --accent-glow: rgba(107, 122, 148, 0.12);
+  --border: #d4d7de;
+  --danger: #dc3545;
+  --warning: #c2860a;
+  --success: #28a76a;
+}
+
+/* ─── 主题：Green ─── */
+[data-theme="green"] {
+  --bg-primary: #f2f7f4;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e0ede5;
+  --bg-deep: #e9f1ec;
+  --bg-elevated: #ffffff;
+  --text-primary: #1e3328;
+  --text-secondary: #4a6b58;
+  --text-muted: #8aab97;
+  --accent: #4a8c6a;
+  --accent-dim: rgba(74, 140, 106, 0.08);
+  --accent-glow: rgba(74, 140, 106, 0.12);
+  --border: #c8ddd0;
+  --danger: #dc3545;
+  --warning: #c2860a;
+  --success: #28a76a;
+}

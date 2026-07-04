@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════════
+   设置页通用组件
+   ═══════════════════════════════════════════════ */
+
+/* 设置页 Tab 按钮 */
+.settings-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  font-weight: 400;
+  text-align: left;
+  width: 100%;
+  min-height: var(--touch-min);
+}
+.settings-tab-btn:hover {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+.settings-tab-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 设置页移动端 Tab */
+.settings-mobile-tabs {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.settings-mobile-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  white-space: nowrap;
+  min-height: var(--touch-min);
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.settings-mobile-tab.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 分段控制器 */
+.segmented-control {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+.segmented-control-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.segmented-control-btn.active {
+  background: var(--bg-secondary);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+
+/* 开关 */
+.toggle-switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  cursor: pointer;
+  background: var(--text-muted);
+  position: relative;
+  transition: background var(--duration-normal) var(--ease-out);
+  border: none;
+  padding: 0;
+}
+.toggle-switch.on {
+  background: var(--accent);
+}
+.toggle-switch-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-on-accent);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: left var(--duration-normal) var(--ease-spring);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+.toggle-switch.on .toggle-switch-knob {
+  left: 20px;
+}
+
+/* 设置页文本域统一 focus */
+.settings-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
+}
+.settings-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
+}
+.settings-textarea.mono {
+  font-family: var(--font-mono, 'Consolas', monospace);
+}
+
