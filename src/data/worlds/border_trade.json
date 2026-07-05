@@ -57,6 +57,136 @@
           ],
           "description": "中俄边贸的核心就是信息差和汇率差。国产轻工品在俄罗斯那边能翻好几倍，但卢布一天一个价，海关政策说变就变，还得提防同行使绊子。"
         }
+      },
+      {
+        "moduleId": "simulation",
+        "name": "边贸风云",
+        "description": "90年代边贸的不确定性：汇率波动、政策变化、同行竞争……",
+        "enabled": true,
+        "moduleConfig": {
+          "eventEffects": [
+            {
+              "id": "exchange_rate_fluctuation",
+              "priority": 20,
+              "stackStrategy": "override",
+              "trigger": {
+                "tags": ["currency", "exchange"],
+                "keywords": ["卢布", "汇率", "换汇", "贬值", "涨价"]
+              },
+              "effects": {
+                "business": {
+                  "fundsDelta": 500
+                }
+              }
+            },
+            {
+              "id": "customs_seizure",
+              "priority": 25,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["customs", "seizure"],
+                "keywords": ["海关", "扣货", "罚款", "没收", "检查"]
+              },
+              "effects": {
+                "business": {
+                  "fundsDelta": -1000
+                }
+              }
+            },
+            {
+              "id": "deal_success",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["trade", "deal"],
+                "keywords": ["成交", "订单", "批发", "进货", "出货"]
+              },
+              "effects": {
+                "business": {
+                  "fundsDelta": 800
+                }
+              }
+            },
+            {
+              "id": "scam_encounter",
+              "priority": 15,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["scam", "fraud"],
+                "keywords": ["骗子", "假货", "被骗", "跑路", "赖账"]
+              },
+              "effects": {
+                "business": {
+                  "fundsDelta": -600
+                }
+              }
+            },
+            {
+              "id": "russian_connection",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["network", "russian"],
+                "keywords": ["关系", "人脉", "认识", "介绍", "合作"]
+              },
+              "effects": {
+                "business": {
+                  "fundsDelta": 300
+                }
+              }
+            }
+          ],
+          "periodicEvents": [
+            {
+              "id": "weekly_market",
+              "name": "每周集市",
+              "description": "边境集市开市，是出货进货的主要渠道。",
+              "intervalTicks": 7,
+              "effects": {
+                "business": {
+                  "fundsDelta": 200
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "policy_change",
+              "name": "政策变动",
+              "description": "海关政策或贸易规则突然变化，可能带来机遇或风险。",
+              "intervalTicks": 30,
+              "effects": {
+                "business": {
+                  "fundsDelta": -300
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "rival_sabotage",
+              "name": "同行使绊",
+              "description": "竞争对手的恶意行为：散布谣言、抢客户、举报。",
+              "intervalTicks": 20,
+              "offsetTicks": 10,
+              "effects": {
+                "business": {
+                  "fundsDelta": -400
+                }
+              },
+              "narrateToAI": true
+            }
+          ],
+          "worldStateRules": [],
+          "worldStateAxes": {
+            "市场行情": ["繁荣", "萧条"],
+            "政策环境": ["宽松", "收紧"]
+          },
+          "narrativeGuardrails": {
+            "maxDeltaPerStat": {},
+            "maxDeltaPerResource": {},
+            "setAllowedVars": [],
+            "allowCreateResources": false
+          }
+        }
       }
     ],
     "worldBookEntries": [

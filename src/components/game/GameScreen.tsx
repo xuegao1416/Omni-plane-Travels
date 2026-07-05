@@ -16,7 +16,7 @@ import { MemorySettingsOverlay } from '../settings/memory/MemorySettingsOverlay'
 import WorldDynamicsPanel from './panels/WorldDynamicsPanel';
 import { findWorldDef } from '../../data/worldLoader';
 import { eventBus, EVENTS } from '../../engine/eventBus';
-import type { WorldSystemData, DiceRoll, BusinessModuleSchema } from '../../modules/schema';
+import type { WorldSystemData, DiceRoll, BusinessModuleSchema, SimulationRules } from '../../modules/schema';
 import type { OverlayPanel } from './gameScreen/types';
 import { navButtons, buildMobileNavItems } from './gameScreen/navConfig';
 import DesktopLayout from './gameScreen/DesktopLayout';
@@ -119,6 +119,17 @@ export default function GameScreen() {
     if (ok) bumpVersion();
     return ok;
   }, [engine, apiConfig, bumpVersion]);
+  // ── Simulation rules change handler ──
+  const handleSimulationRulesChange = useCallback((rules: SimulationRules) => {
+    if (!worldDef) return;
+    // 更新世界定义中的 simulation 模块配置
+    const simModIndex = worldDef.modules?.findIndex(m => m.moduleId === 'simulation' && m.enabled);
+    if (simModIndex !== undefined && simModIndex >= 0 && worldDef.modules) {
+      worldDef.modules[simModIndex].moduleConfig = rules as unknown as Record<string, unknown>;
+      // 触发重新渲染
+      bumpVersion();
+    }
+  }, [worldDef, bumpVersion]);
   // ── Panel rendering (shared between desktop and mobile) ──
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
     switch (panel) {
@@ -128,7 +139,7 @@ export default function GameScreen() {
       case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); }} onSave={bumpVersion} />;
       case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
       case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => {}} mode="inline" />;
-      case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} />;
+      case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
       default: return null;
     }
   };

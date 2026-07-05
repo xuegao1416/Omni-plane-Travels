@@ -14,6 +14,160 @@
       "现代"
     ],
     "difficulty": "easy",
+    "modules": [
+      {
+        "moduleId": "simulation",
+        "name": "校园节奏",
+        "description": "日式高中的固定节奏：考试、文化祭、社团活动、假期……",
+        "enabled": true,
+        "moduleConfig": {
+          "eventEffects": [
+            {
+              "id": "exam_result",
+              "priority": 20,
+              "stackStrategy": "override",
+              "trigger": {
+                "tags": ["exam", "test"],
+                "keywords": ["考试", "成绩", "排名", "及格", "挂科"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "幸福感": { "delta": 10 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "club_activity",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["club", "activity"],
+                "keywords": ["社团", "部活", "练习", "比赛", "合宿"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "社交": { "delta": 5, "min": 0 },
+                    "幸福感": { "delta": 5, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "confession",
+              "priority": 15,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["love", "confession"],
+                "keywords": ["告白", "喜欢", "恋爱", "约会", "情人节"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "暧昧值": { "delta": 15, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "bullying",
+              "priority": 25,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["bullying", "trouble"],
+                "keywords": ["欺负", "霸凌", "孤立", "谣言", "打架"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "幸福感": { "delta": -20, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "cultural_festival",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["festival", "cultural"],
+                "keywords": ["文化祭", "学园祭", "准备", "演出", "摊位"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "社交": { "delta": 10, "min": 0 },
+                    "幸福感": { "delta": 15, "min": 0 }
+                  }
+                }
+              }
+            }
+          ],
+          "periodicEvents": [
+            {
+              "id": "midterm_exam",
+              "name": "期中考试",
+              "description": "每学期第六周的大考，成绩影响座位选择和老师态度。",
+              "intervalTicks": 42,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "幸福感": { "delta": -10 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "summer_vacation",
+              "name": "暑假",
+              "description": "漫长的暑假，可以参加合宿、旅行、或者在家躺平。",
+              "intervalTicks": 90,
+              "offsetTicks": 60,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "幸福感": { "delta": 20, "min": 0 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "sports_festival",
+              "name": "运动会",
+              "description": "全校运动会，班级团结的考验。",
+              "intervalTicks": 60,
+              "offsetTicks": 30,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "社交": { "delta": 8, "min": 0 },
+                    "幸福感": { "delta": 5, "min": 0 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            }
+          ],
+          "worldStateRules": [],
+          "worldStateAxes": {
+            "学业压力": ["轻松", "紧张"],
+            "人际关系": ["融洽", "复杂"]
+          },
+          "narrativeGuardrails": {
+            "maxDeltaPerStat": {
+              "*": 15
+            },
+            "maxDeltaPerResource": {},
+            "setAllowedVars": [],
+            "allowCreateResources": false
+          }
+        }
+      }
+    ],
     "worldBookEntries": [
       {
         "uid": 1001,

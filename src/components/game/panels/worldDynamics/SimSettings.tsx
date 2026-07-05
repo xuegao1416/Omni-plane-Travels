@@ -3,18 +3,37 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useSimulationStore } from '../../../../stores/simulationStore';
 import type { SimConfig } from '../../../../simulation/types';
 import { DEFAULT_SIM_CONFIG } from '../../../../simulation/types';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 import { loadPresets } from '../../../settings/apiPresetUtils';
 import { SIM_API_PRESET_KEY } from './constants';
+import type { SimulationRules } from '../../../../modules/schema';
+import type { WorldDef } from '../../../../data/worlds-schema';
+import SimulationRuleEditor from './SimulationRuleEditor';
 
-export function SimSettings() {
+interface SimSettingsProps {
+  worldDef?: WorldDef | null;
+  onRulesChange?: (rules: SimulationRules) => void;
+}
+
+export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
   const { simState, updateConfig } = useSimulationStore();
   const cfg = simState.config ?? DEFAULT_SIM_CONFIG;
   const presets = loadPresets();
+  const [showRules, setShowRules] = useState(false);
+
+  // 从世界定义获取当前的 SimulationRules
+  const simMod = worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled);
+  const currentRules = (simMod?.moduleConfig as unknown as SimulationRules) ?? null;
+
+  const handleRulesChange = (rules: SimulationRules) => {
+    if (onRulesChange) {
+      onRulesChange(rules);
+    }
+  };
 
   const [presetId, setPresetId] = useState<string>(() => {
     try { return localStorage.getItem(SIM_API_PRESET_KEY) || ''; } catch { return ''; }
@@ -149,6 +168,53 @@ export function SimSettings() {
         <div>已解决事件: {Object.keys(simState.resolvedEvents ?? {}).length}</div>
         <div>暗线角色: {Object.keys(simState.storylines ?? {}).length}</div>
         <div>待处理交互: {(simState.pendingInteractions ?? []).length}</div>
+      </div>
+
+      {/* ── 演化规则配置 ── */}
+      <div style={{
+        borderTop: '1px solid var(--border)',
+        paddingTop: '12px',
+        marginTop: '4px',
+      }}>
+        <button
+          onClick={() => setShowRules(!showRules)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px 0', width: '100%',
+          }}
+        >
+          {showRules ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+            演化规则配置
+          </span>
+          {currentRules && (
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+              ({currentRules.eventEffects.length}个事件, {currentRules.periodicEvents.length}个周期)
+            </span>
+          )}
+        </button>
+
+        {showRules && currentRules && (
+          <div style={{ marginTop: '8px' }}>
+            <SimulationRuleEditor
+              rules={currentRules}
+              onChange={handleRulesChange}
+              worldDef={worldDef ?? null}
+            />
+          </div>
+        )}
+
+        {showRules && !currentRules && (
+          <div style={{
+            marginTop: '8px', padding: '12px',
+            background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
+            textAlign: 'center',
+          }}>
+            当前世界未启用世界演化模块
+          </div>
+        )}
       </div>
 
       {/* 重置推演 */}

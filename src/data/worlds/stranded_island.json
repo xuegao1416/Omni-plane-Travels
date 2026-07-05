@@ -86,6 +86,173 @@
           },
           "description": "荒岛生存的核心不是蛮力，而是资源管理。六项物资相互转化：木材+石材→工具，工具→食物+水，布料+草药→医疗包。每一次采集、加工和消耗的决策，都在为救援争取时间。"
         }
+      },
+      {
+        "moduleId": "simulation",
+        "name": "荒岛变数",
+        "description": "荒岛上的不确定因素：天气、野兽、疾病、救援……",
+        "enabled": true,
+        "moduleConfig": {
+          "eventEffects": [
+            {
+              "id": "storm_damage",
+              "priority": 25,
+              "stackStrategy": "override",
+              "trigger": {
+                "tags": ["weather", "storm"],
+                "keywords": ["暴风雨", "台风", "飓风", "狂风", "暴雨"]
+              },
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "wood": { "delta": -3 },
+                    "cloth": { "delta": -2 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "wild_boar_attack",
+              "priority": 20,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["animal", "attack"],
+                "keywords": ["野猪", "攻击", "咬伤", "受伤", "流血"]
+              },
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "herb": { "delta": -1 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "water_source_found",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["water", "discovery"],
+                "keywords": ["泉水", "淡水", "水源", "发现", "溪流"]
+              },
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "water": { "delta": 3, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "fishing_success",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["fishing", "food"],
+                "keywords": ["钓鱼", "捕鱼", "海鲜", "贝类", "螃蟹"]
+              },
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "food": { "delta": 2, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "infection",
+              "priority": 20,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["illness", "infection"],
+                "keywords": ["感染", "发烧", "伤口", "化脓", "生病"]
+              },
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "herb": { "delta": -2 },
+                    "water": { "delta": -2 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "rescue_signal",
+              "priority": 30,
+              "stackStrategy": "override",
+              "trigger": {
+                "tags": ["rescue", "signal"],
+                "keywords": ["救援", "信号", "飞机", "船", "无线电"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "幸福感": { "delta": 30, "min": 0 }
+                  }
+                }
+              }
+            }
+          ],
+          "periodicEvents": [
+            {
+              "id": "daily_consumption",
+              "name": "每日消耗",
+              "description": "每天消耗淡水和食物，资源不足时体力下降。",
+              "intervalTicks": 1,
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "water": { "delta": -1 },
+                    "food": { "delta": -1 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "tide_cycle",
+              "name": "潮汐窗口",
+              "description": "每天两次退潮，露出礁石区，可捡拾贝类和海产。",
+              "intervalTicks": 1,
+              "offsetTicks": 1,
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "food": { "delta": 1, "min": 0 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "weather_change",
+              "name": "天气变化",
+              "description": "热带天气多变，可能突降暴雨或烈日暴晒。",
+              "intervalTicks": 5,
+              "effects": {
+                "survival": {
+                  "resources": {
+                    "wood": { "delta": -1 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            }
+          ],
+          "worldStateRules": [],
+          "worldStateAxes": {
+            "生存状态": ["稳定", "危机"],
+            "救援希望": ["遥远", "临近"]
+          },
+          "narrativeGuardrails": {
+            "maxDeltaPerStat": {},
+            "maxDeltaPerResource": {
+              "*": 5
+            },
+            "setAllowedVars": [],
+            "allowCreateResources": false
+          }
+        }
       }
     ],
     "worldBookEntries": [

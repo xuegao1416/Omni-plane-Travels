@@ -17,7 +17,7 @@ import { EffectLogTab } from './worldDynamics/EffectLogTab';
 
 type TabId = 'events' | 'storylines' | 'interactions' | 'effectlog' | 'settings';
 
-export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulating }: WorldDynamicsPanelProps) {
+export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulating, worldDef, onRulesChange }: WorldDynamicsPanelProps) {
   const { simState } = useSimulationStore();
   const [activeTab, setActiveTab] = useState<TabId>('events');
 
@@ -104,7 +104,7 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
         )}
 
         {activeTab === 'settings' && (
-          <SimSettings />
+          <SimSettings worldDef={worldDef} onRulesChange={onRulesChange} />
         )}
       </div>
     </div>

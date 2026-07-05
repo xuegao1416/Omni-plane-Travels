@@ -221,6 +221,179 @@
           "currentTierIndex": 0,
           "currentXP": 0
         }
+      },
+      {
+        "moduleId": "simulation",
+        "name": "江湖风云",
+        "description": "武林中的变数：门派纷争、秘籍争夺、朝廷打压、魔教复起……",
+        "enabled": true,
+        "moduleConfig": {
+          "eventEffects": [
+            {
+              "id": "martial_arts_duel",
+              "priority": 20,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["duel", "fight"],
+                "keywords": ["比武", "对决", "挑战", "交手", "切磋"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "气血": { "delta": -15, "min": 0 },
+                    "内力": { "delta": -10, "min": 0 },
+                    "外功修为": { "delta": 3, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "secret_manual_find",
+              "priority": 25,
+              "stackStrategy": "override",
+              "trigger": {
+                "tags": ["manual", "secret"],
+                "keywords": ["秘籍", "功法", "残页", "剑谱", "心法"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "内功修为": { "delta": 8, "min": 0 },
+                    "悟性": { "delta": 5, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "sect_conflict",
+              "priority": 15,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["sect", "conflict"],
+                "keywords": ["门派", "纷争", "围攻", "讨伐", "正邪"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "气血": { "delta": -20, "min": 0 },
+                    "定力": { "delta": 3, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "imperial_crackdown",
+              "priority": 20,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["imperial", "crackdown"],
+                "keywords": ["朝廷", "镇武司", "抓捕", "通缉", "官兵"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "灵敏": { "delta": 5, "min": 0 },
+                    "根骨": { "delta": 2, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "internal_breakthrough",
+              "priority": 15,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["breakthrough", "cultivation"],
+                "keywords": ["突破", "顿悟", "闭关", "修炼", "精进"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "内功修为": { "delta": 10, "min": 0 },
+                    "内力": { "delta": 15, "min": 0 }
+                  }
+                }
+              }
+            },
+            {
+              "id": "poison_encounter",
+              "priority": 20,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": ["poison", "encounter"],
+                "keywords": ["中毒", "暗器", "毒药", "下毒", "解毒"]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "气血": { "delta": -25, "min": 0 },
+                    "体质": { "delta": -5, "min": 0 }
+                  }
+                }
+              }
+            }
+          ],
+          "periodicEvents": [
+            {
+              "id": "martial_arts_gathering",
+              "name": "武林大会",
+              "description": "三年一度的武林大会，各路高手齐聚，比武论剑，争夺武林盟主之位。",
+              "intervalTicks": 90,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "外功修为": { "delta": 5, "min": 0 },
+                    "膂力": { "delta": 3, "min": 0 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "jianghu_grudge",
+              "name": "江湖恩怨",
+              "description": "旧仇新恨，总有找上门的麻烦。",
+              "intervalTicks": 14,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "气血": { "delta": -10, "min": 0 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "treasure_hunt",
+              "name": "宝藏出世",
+              "description": "传说中的武林秘宝或神兵利器现世，引发各方争夺。",
+              "intervalTicks": 60,
+              "offsetTicks": 30,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "根骨": { "delta": 5, "min": 0 },
+                    "悟性": { "delta": 5, "min": 0 }
+                  }
+                }
+              },
+              "narrateToAI": true
+            }
+          ],
+          "worldStateRules": [],
+          "worldStateAxes": {
+            "武林格局": ["正道当势", "邪魔当道", "群雄割据"],
+            "朝廷态度": ["放任", "打压", "招安"]
+          },
+          "narrativeGuardrails": {
+            "maxDeltaPerStat": {
+              "*": 20
+            },
+            "maxDeltaPerResource": {},
+            "setAllowedVars": [],
+            "allowCreateResources": false
+          }
+        }
       }
     ],
     "worldBookEntries": [
