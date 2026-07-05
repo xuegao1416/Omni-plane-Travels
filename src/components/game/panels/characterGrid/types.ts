@@ -6,6 +6,7 @@ import type { CustomNpc } from '../../../../storage/db';
 
 export interface CharacterGridProps {
   gameState: GameState;
+  worldId?: string;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
 }

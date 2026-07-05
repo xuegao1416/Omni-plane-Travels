@@ -3,8 +3,12 @@ import Avatar from '../../../shared/Avatar';
 import type { NPCData } from '../../../../schema/variables';
 import { favorClass, categoryStyle } from './types';
 
-export function GaugeBar({ value, color }: { value: number; color: string }) {
-  const pct = (value + 100) / 200 * 100;
+export function GaugeBar({ value, color, min = 0, max = 100 }: { value: number; color: string; min?: number; max?: number }) {
+  // 计算百分比：根据 min/max 范围
+  // 负数不显示进度条（和0一样）
+  const effectiveValue = value < 0 ? 0 : value;
+  const range = max - min;
+  const pct = range > 0 ? Math.max(0, Math.min(100, ((effectiveValue - min) / range) * 100)) : 0;
   return (
     <div style={{ height: '7px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px', transition: 'width 0.3s' }} />
@@ -46,7 +50,7 @@ export function NPCCard({ id, npc, onClick, portraitSrc }: {
           <span style={{ color: 'var(--text-muted)' }}>好感度</span>
           <span style={{ color: fav.color, fontWeight: '500' }}>{rd.好感度}</span>
         </div>
-        <GaugeBar value={rd.好感度} color={fav.color} />
+        <GaugeBar value={rd.好感度} color={fav.color} min={-100} max={100} />
       </div>
     </div>
   );

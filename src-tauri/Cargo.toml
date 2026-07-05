@@ -1,0 +1,25 @@
+[package]
+name = "omni-plane-travels"
+version = "2.0.0"
+description = "世界漫游指南 - AI 驱动的互动小说引擎"
+authors = ["xuegao1416"]
+license = "MIT"
+repository = "https://github.com/xuegao1416/Omni-plane-Travels"
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3" }
+tauri-plugin-log = "2"

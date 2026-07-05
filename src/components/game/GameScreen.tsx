@@ -123,7 +123,7 @@ export default function GameScreen() {
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
     switch (panel) {
       case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} />;
-      case 'characters': return <CharacterGrid gameState={gameState} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
+      case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
       case 'notebook': return <NotebookPanel gameState={gameState} />;
       case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); }} onSave={bumpVersion} />;
       case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;

@@ -6,7 +6,7 @@ import type { CharacterGridProps } from './characterGrid/types';
 import { NPCCard } from './characterGrid/NPCCard';
 import { NPCDetail } from './characterGrid/NPCDetail';
 
-export default function CharacterGrid({ gameState, onUpdateChronicles, onMergeChronicles }: CharacterGridProps) {
+export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, onMergeChronicles }: CharacterGridProps) {
   const npcs = gameState.人物档案;
   const [selected, setSelected] = useState<{ id: string; data: import('../../../schema/variables').NPCData } | null>(null);
   const [portraitUrls, setPortraitUrls] = useState<Record<string, string>>({});
@@ -48,6 +48,7 @@ export default function CharacterGrid({ gameState, onUpdateChronicles, onMergeCh
           onClose={() => setSelected(null)}
           onUpdateChronicles={onUpdateChronicles}
           onMergeChronicles={onMergeChronicles}
+          worldId={worldId}
         />
       )}
     </div>

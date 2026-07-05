@@ -483,31 +483,8 @@ export function formatSnapshotForMainAI(state: GameState): string {
     if (playerGoal) lines.push(`> 目标: ${playerGoal}`);
   }
 
-  // 生存状态（血量/体力值 + 六维 dim1-6 + 特色属性）
-  const survival = player.生存状态;
-  if (survival && typeof survival === 'object') {
-    const hp = (survival as any).血量;
-    const stamina = (survival as any).体力值;
-    const hasDims = [1,2,3,4,5,6].some(i => (survival as any)[`dim${i}`] != null);
-    const hasSpecial = Object.keys(survival).some(k => !['血量','体力值'].includes(k) && !k.startsWith('dim') && typeof (survival as any)[k] === 'number');
-    if (hp != null || stamina != null || hasDims || hasSpecial) {
-      lines.push(`### 【生存状态】`);
-      const parts = [];
-      if (hp != null) parts.push(`血量:${hp}`);
-      if (stamina != null) parts.push(`体力值:${stamina}`);
-      // 六维
-      for (let i = 1; i <= 6; i++) {
-        const val = (survival as any)[`dim${i}`];
-        if (val != null) parts.push(`dim${i}:${val}`);
-      }
-      // 特色属性
-      for (const [k, v] of Object.entries(survival as Record<string, unknown>)) {
-        if (['血量','体力值'].includes(k) || k.startsWith('dim')) continue;
-        if (typeof v === 'number') parts.push(`${k}:${v}`);
-      }
-      lines.push(`> ${parts.join(' | ')}`);
-    }
-  }
+  // 生存状态（血量/体力值 + 六维 dim1-6 + 特色属性）— 不注入正文生成，避免变量泄露
+  // 注：生存状态由变量提取系统管理，正文生成不应感知具体数值
 
   // 技能系统
   const skills = player.技能系统;

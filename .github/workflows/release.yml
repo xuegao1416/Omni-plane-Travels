@@ -1,44 +1,54 @@
-name: Release
+name: 'publish'
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
+      - name: install Bun
+        uses: oven-sh/setup-bun@v2
 
-      - name: Install Rust
+      - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: './src-tauri -> target'
 
-      - name: Install dependencies
+      - name: install frontend dependencies
         run: bun install
 
-      - name: Build frontend
-        run: bun run build
-
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: v__VERSION__
           releaseName: '世界漫游指南 v__VERSION__'
-          releaseBody: '下载安装即可使用。首次启动如有安全提示，请选择"仍要运行"。'
-          releaseDraft: false
+          releaseBody: |
+            ## 更新内容
+            - 详见 CHANGELOG.md
+
+            ## 下载说明
+            - Windows 用户下载 `.exe` 或 `.msi` 安装包
+          releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}

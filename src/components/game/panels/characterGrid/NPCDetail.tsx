@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   User, BarChart3, Briefcase, MapPin, Sparkles, BookOpen, Brain, Dna,
-  Zap, Star, Shield, Swords, Backpack, ScrollText,
+  Zap, Star, Shield, Swords, Backpack, ScrollText, Heart, Activity,
 } from 'lucide-react';
 import { ExcelRow } from '../../../shared/ExcelRow';
 import EmptyState from '../../../shared/EmptyState';
@@ -15,10 +15,97 @@ import { InventoryGrid } from './InventoryGrid';
 import { DeedsModal } from './DeedsModal';
 import { PortraitHeader } from './PortraitHeader';
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles }: {
+/** 生存状态显示组件（主属性 + dim1-6 + 特色属性） */
+function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number>; worldId?: string }) {
+  if (!stats || Object.keys(stats).length === 0) return null;
+
+  // 从世界定义获取属性名称
+  const { findWorldDef } = require('../../../../data/worldLoader');
+  const worldDef = worldId ? findWorldDef(worldId) : null;
+  const statMod = worldDef?.modules?.find((m: any) => m.moduleId === 'stat' && m.enabled);
+  const statConfig = statMod?.moduleConfig as any;
+
+  // 获取主属性名称和上限
+  const attrAName = statConfig?.attrA?.name || '血量';
+  const attrBName = statConfig?.attrB?.name || '体力值';
+  const attrAMax = statConfig?.attrA?.max || 100;
+  const attrBMax = statConfig?.attrB?.max || 100;
+
+  // 分类属性
+  const mainStats: Array<{ key: string; name: string; value: number; max: number }> = [];
+  const dims: Array<{ key: string; name: string; value: number }> = [];
+  const specials: Array<{ key: string; name: string; value: number }> = [];
+
+  for (const [k, v] of Object.entries(stats)) {
+    if (k === '血量' || k === 'attrA') {
+      mainStats.push({ key: k, name: attrAName, value: v as number, max: attrAMax });
+    } else if (k === '体力值' || k === 'attrB') {
+      mainStats.push({ key: k, name: attrBName, value: v as number, max: attrBMax });
+    } else if (k.startsWith('dim')) {
+      const dimIndex = parseInt(k.replace('dim', ''));
+      const dimName = statConfig?.[`dim${dimIndex}`]?.name || k;
+      dims.push({ key: k, name: dimName, value: v as number });
+    } else {
+      specials.push({ key: k, name: k, value: v as number });
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {/* 主属性（血量/体力值） */}
+      {mainStats.length > 0 && (
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {mainStats.map(({ key, name, value, max }) => (
+            <div key={key} style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{name}</span>
+                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{value}/{max}</span>
+              </div>
+              <GaugeBar value={value} color={key === '血量' || key === 'attrA' ? '#ef4444' : '#f59e0b'} max={max} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 六维属性（左三个右三个，占满） */}
+      {dims.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+          {dims.map(({ key, name, value }) => (
+            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{name}</span>
+              <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--text-primary)' }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 特色属性 */}
+      {specials.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {specials.map(({ key, name, value }) => (
+            <div
+              key={key}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '3px 8px', borderRadius: '10px',
+                background: 'var(--accent)15', fontSize: 'var(--font-size-xs)',
+              }}
+            >
+              <span style={{ color: 'var(--text-muted)' }}>{name}</span>
+              <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId }: {
   npc: NPCData; npcId: string; onClose: () => void;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  worldId?: string;
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
@@ -79,7 +166,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                 <Section icon={BarChart3} title="关系数据">
                   <div style={{ marginBottom: '8px' }}>
                     <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '2px' }}>好感度 {rd.好感度}</div>
-                    <GaugeBar value={rd.好感度} color={favorClass(rd.好感度).color} />
+                    <GaugeBar value={rd.好感度} color={favorClass(rd.好感度).color} min={-100} max={100} />
                   </div>
                   <ExcelRow label="关系类型" value={rd.关系类型} />
                 </Section>
@@ -154,7 +241,25 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                   </Section>
                 )}
                 {ext.生存状态 && Object.keys(ext.生存状态).length > 0 && (
-                  <Section icon={BarChart3} title="属性"><RecordGrid data={ext.生存状态} /></Section>
+                  <Section icon={BarChart3} title="生存状态">
+                    <SurvivalStatsDisplay stats={ext.生存状态} worldId={worldId} />
+                  </Section>
+                )}
+                {ext.成长状态 && (
+                  <Section icon={Star} title="成长状态">
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {ext.成长状态.当前段位索引 != null && (
+                        <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+                          段位: <strong>{ext.成长状态.当前段位索引}</strong>
+                        </span>
+                      )}
+                      {ext.成长状态.当前经验值 != null && (
+                        <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+                          经验: <strong>{ext.成长状态.当前经验值}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </Section>
                 )}
                 {ext.天赋 && ext.天赋.length > 0 && (
                   <Section icon={Star} title="天赋"><TagList items={ext.天赋} accent /></Section>
@@ -162,7 +267,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                 {ext.技能列表 && (
                   <Section icon={Zap} title="技能列表"><ListOrRecord data={ext.技能列表} emptyText="暂无技能" /></Section>
                 )}
-                {!ext.特殊能力 && !ext.生存状态 && !ext.天赋 && !ext.技能列表 && (
+                {!ext.特殊能力 && !ext.生存状态 && !ext.天赋 && !ext.技能列表 && !ext.成长状态 && (
                   <EmptyState icon={Swords} message="暂无技能数据" />
                 )}
               </div>
