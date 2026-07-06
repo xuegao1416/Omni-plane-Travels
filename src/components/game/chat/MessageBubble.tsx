@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, memo } from 'react';
 import { useMediaQuery } from '../../../hooks/useIsMobile';
 import ContextMenu from './ContextMenu';
 import type { Props } from './messageBubble/types';
@@ -8,7 +8,7 @@ import EditMode from './messageBubble/EditMode';
 import { useMenuItems } from './messageBubble/useMenuItems';
 import BubbleContent from './messageBubble/BubbleContent';
 
-export default function MessageBubble({ message, onDelete, onEdit, onResend, onResendFromHere, onCopy, onOptionClick, worldSystem, onDiceRoll }: Props) {
+export default memo(function MessageBubble({ message, onDelete, onEdit, onResend, onResendFromHere, onCopy, onOptionClick, worldSystem, onDiceRoll }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -114,4 +114,4 @@ export default function MessageBubble({ message, onDelete, onEdit, onResend, onR
       )}
     </div>
   );
-}
+})

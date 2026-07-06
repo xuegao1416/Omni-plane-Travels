@@ -12,7 +12,6 @@ export const DIFFICULTY_FILTERS = [
 
 export const TABS = [
   { key: 'overview', label: '概览', icon: BookOpen },
-  { key: 'setting', label: '设定', icon: ScrollText },
   { key: 'lore', label: '地理', icon: Map },
   { key: 'factions', label: '势力', icon: Flag },
   { key: 'culture', label: '文化', icon: BookMarked },

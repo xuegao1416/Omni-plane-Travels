@@ -34,7 +34,10 @@ const MODULE_COLORS: Record<string, string> = {
 };
 
 export function EffectLogTab({ effectLog }: EffectLogTabProps) {
-  if (effectLog.length === 0) {
+  // 过滤掉数据不完整的条目
+  const validLog = effectLog.filter(e => e && e.source && e.module && e.variable);
+
+  if (validLog.length === 0) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -52,7 +55,7 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
   }
 
   // 按时间倒序显示
-  const sortedLog = [...effectLog].reverse();
+  const sortedLog = [...validLog].reverse();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -62,10 +65,10 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
         fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
         borderBottom: '1px solid var(--border)', marginBottom: '8px',
       }}>
-        <span>共 {effectLog.length} 条记录</span>
-        <span>规则: {effectLog.filter(l => l.source === 'rule').length}</span>
-        <span>周期: {effectLog.filter(l => l.source === 'periodic').length}</span>
-        <span>AI: {effectLog.filter(l => l.source === 'ai').length}</span>
+        <span>共 {validLog.length} 条记录</span>
+        <span>规则: {validLog.filter(l => l.source === 'rule').length}</span>
+        <span>周期: {validLog.filter(l => l.source === 'periodic').length}</span>
+        <span>AI: {validLog.filter(l => l.source === 'ai').length}</span>
       </div>
 
       {/* 日志列表 */}
@@ -80,7 +83,7 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
         >
           {/* Tick */}
           <span style={{ color: 'var(--text-muted)', minWidth: '32px' }}>
-            #{entry.tick}
+            #{entry.tick ?? '?'}
           </span>
 
           {/* 来源标签 */}
@@ -89,7 +92,7 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
             background: SOURCE_COLORS[entry.source] ?? '#6b7280',
             color: '#fff', fontSize: '10px', fontWeight: 600,
           }}>
-            {SOURCE_LABELS[entry.source] ?? entry.source}
+            {SOURCE_LABELS[entry.source] ?? entry.source ?? '未知'}
           </span>
 
           {/* 模块标签 */}
@@ -98,17 +101,17 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
             background: MODULE_COLORS[entry.module] ?? '#6b7280',
             color: '#fff', fontSize: '10px',
           }}>
-            {entry.module}
+            {entry.module ?? '?'}
           </span>
 
           {/* 变量名 */}
           <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-            {entry.variable}
+            {entry.variable ?? '?'}
           </span>
 
           {/* 变化 */}
           <span style={{ color: 'var(--text-secondary)' }}>
-            {typeof entry.before === 'number' && typeof entry.after === 'number' ? (
+            {entry.before != null && entry.after != null && typeof entry.before === 'number' && typeof entry.after === 'number' ? (
               <>
                 {entry.before} → {entry.after}
                 <span style={{
@@ -118,8 +121,10 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
                   ({entry.after > entry.before ? '+' : ''}{entry.after - entry.before})
                 </span>
               </>
+            ) : entry.before != null || entry.after != null ? (
+              <>{String(entry.before ?? '?')} → {String(entry.after ?? '?')}</>
             ) : (
-              <>{String(entry.before)} → {String(entry.after)}</>
+              <span style={{ color: 'var(--text-muted)' }}>无数据</span>
             )}
           </span>
 

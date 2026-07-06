@@ -76,7 +76,7 @@ export class MacroEngine {
     let result = text;
 
     // 1. {{setvar::key::value}} — 写入变量
-    result = result.replace(/\{\{setvar::([^:}]+)::([^}]*)\}\}/gi, (_, key, value) => {
+    result = result.replace(/\{\{setvar::([^:}]+)::([\s\S]*?)\}\}/gi, (_, key, value) => {
       this.setVar(key.trim(), value);
       return '';
     });

@@ -155,7 +155,7 @@ export default function MainMenuView({
         transition: 'opacity 1s ease 1.2s',
         letterSpacing: '0.05em',
       }}>
-        v2.1.0
+        v2.2.0
       </div>
       <BackgroundMusic />
     </div>

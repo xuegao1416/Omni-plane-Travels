@@ -7,7 +7,7 @@ import WorldCard, { CreateWorldCard, getWorldIcon } from './WorldCard';
 import WorldBookEditor from './WorldBookEditor';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import { DIFFICULTY_FILTERS, TABS, type TabKey, normalizeExternal } from './stepWorldBrowser/constants';
-import { OverviewTab, SettingTab, LoreTab, FactionsTab, CultureTab, NpcsTab, RulesTab, SystemsTab, EconomyTab } from './stepWorldBrowser/WorldDetailTabs';
+import { OverviewTab, LoreTab, FactionsTab, CultureTab, NpcsTab, RulesTab, SystemsTab, EconomyTab } from './stepWorldBrowser/WorldDetailTabs';
 
 interface StepWorldBrowserProps {
   selectedWorld: string;
@@ -74,7 +74,6 @@ export default function StepWorldBrowser({
   const renderTabContent = () => (
     <div className="world-tab-content">
       {activeTab === 'overview' && <OverviewTab world={selected!} worldEntry={worldEntry} />}
-      {activeTab === 'setting' && <SettingTab world={selected!} worldEntry={worldEntry} />}
       {activeTab === 'lore' && <LoreTab world={selected!} />}
       {activeTab === 'factions' && <FactionsTab world={selected!} />}
       {activeTab === 'culture' && <CultureTab world={selected!} />}

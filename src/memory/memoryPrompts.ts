@@ -160,8 +160,9 @@ export function getDefaultNarrativeIngestPrompt(): string {
 
 第2步：扫描只读参考锚点，对比变化
 - 场景：地点是否变了？时间是否变了？在场实体是否变了？没变就留空。
+- 空间检查：本批事件发生在哪个地点？新建立的关系是在哪个地点生效的？
 - 线程：有没有旧任务被推进、完成、失败？有没有新任务出现？
-- 关系网：有没有两个人物之间的关系发生了变化、被确认、被强化、被削弱、被破裂？
+- 关系网：有没有两个人物之间的关系发生了变化、被确认、被强化、被削弱、被破裂？这个关系是在哪个地点建立/生效的？
 - 状态槽：有没有伤势、BUFF、伪装、封锁等临时持续状态出现、变化或消失？
 - 关系边：有没有人物-势力、人物-地点、势力-势力之间的关系发生变化？
 
@@ -186,15 +187,20 @@ export function getDefaultNarrativeIngestPrompt(): string {
 
 ■ relationUpserts（关系边更新 - 非人物对人物）
   - id、sourceEntityId、targetEntityId、relationType、stance、strength(0-1)、status(active/broken/changed)、summary
+  - locationScope：关系生效的地点范围（如"公寓"、"公司"、"袁小安家"），不确定时填"全局"
 
 ■ relationNetworkUpserts（人物关系网更新 - 人物对人物）
   - id、sourceEntityId、targetEntityId、relationType、summary、strength(0-1)、status、confidence(0-1)
+  - locationScope：关系生效的地点范围（如"公寓"、"公司"、"袁小安家"），不确定时填"全局"
 
 ■ eventCandidates（关键历史事件卡）
-  - id、title、summary、excerpt、importance(1-5)、status(hot/warm/cold)、entityRefs、locationRefs、threadRefs、timeLabels
+  - id、title、summary、excerpt、importance(1-5)、status(hot/warm/cold)、entityRefs、threadRefs、timeLabels
+  - locationRefs：必须填写！事件发生的具体地点（如["袁小安的卧室"]、["公司办公室"]），不能留空
 
 ■ entityPatches（实体档案补丁）
-  - id、name、entityType(character/location/faction/item/ability)、aliases、currentStatus、stableFacts、currentStance、affiliations
+  - id、name、entityType(character/location/faction/item/ability)、aliases、currentStatus、currentStance、affiliations
+  - stableFacts：每条事实应尽量包含地点信息（如"在袁小安家与赖方杭发生关系"而非仅"与赖方杭发生关系"）
+  - locationFacts：带地点标注的事实数组，格式 [{ "location": "地点", "fact": "事实" }]，不确定地点时不填此字段
 
 ■ archiveHints（归档提示）
 
@@ -207,10 +213,10 @@ export function getDefaultNarrativeIngestPrompt(): string {
   "scenePatch": { "timeLabel": "", "locationLabel": "", "presentEntities": [], "immediateGoal": "", "immediateRisk": "", "conversationFocus": "", "recentChange": "", "confidence": 0.0 },
   "threadUpserts": [],
   "stateSlotUpserts": [],
-  "relationUpserts": [],
-  "relationNetworkUpserts": [],
-  "eventCandidates": [],
-  "entityPatches": [],
+  "relationUpserts": [{ "id": "", "sourceEntityId": "", "targetEntityId": "", "relationType": "", "stance": "", "strength": 0.5, "status": "active", "summary": "", "locationScope": "" }],
+  "relationNetworkUpserts": [{ "id": "", "sourceEntityId": "", "targetEntityId": "", "relationType": "", "summary": "", "strength": 0.5, "status": "active", "confidence": 0.5, "locationScope": "" }],
+  "eventCandidates": [{ "id": "", "title": "", "summary": "", "excerpt": "", "importance": 3, "status": "hot", "entityRefs": [], "locationRefs": [""], "threadRefs": [], "timeLabels": [] }],
+  "entityPatches": [{ "id": "", "name": "", "entityType": "character", "aliases": [], "currentStatus": [], "stableFacts": [], "currentStance": "", "affiliations": [], "locationFacts": [{ "location": "", "fact": "" }] }],
   "archiveHints": [],
   "dropReasons": []
 }`;

@@ -27,7 +27,7 @@ export function extractWorldSystemData(
       const state = statRaw.initialState || {};
       const dim = (idx: number) => ({
         name: cfg[`dim${idx}`]?.name || `属性${idx}`,
-        value: state[`dim${idx}Value`] ?? 50,
+        value: state[`dim${idx}`] ?? state[`dim${idx}Value`] ?? 50,
         range: cfg[`dim${idx}`]?.range || [0, 100],
       });
       const specialArr = Array.isArray(cfg.special) ? cfg.special.map((sp: any) => ({

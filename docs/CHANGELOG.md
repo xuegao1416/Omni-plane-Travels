@@ -1,5 +1,39 @@
 # 更新日志
 
+## v2.2.0 — 全量代码审查修复 + 延迟优化 + 记忆空间感知 (2026-07-06)
+
+### 🐛 Bug 修复
+
+- **模拟规则匹配**：修复 `matchEventEffect` 无 keywords 时永远返回 false，导致依赖 tag/eventType 的规则全部失效
+- **JSON 修复正则**：修复 `repairJSON` 中 `,s*` typo（应为 `,\s*`），尾逗号修复现在能正确处理空格/换行
+- **维度值静默丢失**：修复 dim 键名不匹配（`dim1Value` vs `dim1`），维度值不再回退为默认 50
+- **setvar 宏截断**：修复 `{{setvar::key::value}}` 在值包含 `}` 时截断的问题
+- **brewing 事件零生命周期**：brewing 事件现在至少存活 1 tick 才升级为 active
+- **entity stableFacts 覆盖**：pipeline 版本的实体档案写入改为累积 stableFacts，与 hook 版本一致，不再丢失历史事实
+- **retrySingleStage 竞态**：修复单步重试未设置 `generatingRef`，导致可并发发送请求
+
+### ⚡ 性能优化
+
+- **世界演化非阻塞**：`simEngine.tick()` 改为 fire-and-forget 后台执行，正文生成不再等待世界演化 API 调用（节省 2-15 秒）
+- **速率限制器默认值**：从 10 秒降到 3 秒，减少管线阶段间等待（可通过 `detectOptimalRateLimit` 自动调整）
+- **变量提取延迟**：移除硬编码 3 秒 sleep，仅保留可配置延迟（默认 1 秒）
+- **MessageBubble memo**：添加 `React.memo` + `useCallback` 稳定回调，避免聊天列表不必要的重渲染
+- **限流日志降级**：`console.log` 改为 `console.debug`，减少控制台噪音
+
+### 🛡️ 健壮性
+
+- **useMemorySystem.callAI 超时**：添加 120 秒超时保护，防止 API 挂起导致无限等待
+- **Chat Error Boundary**：每条消息独立 Error Boundary，单条消息渲染失败不影响整体聊天
+
+### 🧠 记忆空间感知（解决记忆混乱）
+
+- **类型扩展**：`relationNetwork`/`relationEdge` 新增 `locationScope` 字段，`entityCards` 新增 `locationFacts` 带地点的事实数组
+- **写入提示词改造**：CoT 增加空间检查步骤，事件卡强制填写 `locationRefs`，关系要求填写 `locationScope`，实体事实要求包含地点信息
+- **sceneAnchor 替换式更新**：不再用 `??` 回退旧值，AI 返回空即清空，防止旧地点的 goal/risk 泄漏到新场景
+- **地点变化自动降级**：切换地点时，旧地点的空间关系从 `active` 自动降级为 `changed`
+- **编译输出空间排序**：关系选择按当前地点排序（当前地点优先），格式化输出包含 `[地点]` 标注
+- **模拟快照指数膨胀修复**：`_slimForSnapshot` 未排除 `snapshots` 字段导致每个快照嵌套所有旧快照（119MB → ~1MB）
+
 ## v2.1.0 — Simulation模块配置系统 + 世界演化规则编辑器 (2026-07-05)
 
 ### ✨ 新增

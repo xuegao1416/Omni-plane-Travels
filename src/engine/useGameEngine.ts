@@ -524,8 +524,9 @@ export function useGameEngine(
       // 保存管线上下文（用于重试管线）
       lastPipelineCtxRef.current = { round, userText, aiMsgId, batchText, recentContext, playerName };
 
-      // ── 世界演化：在变量提取之前执行 ──
+      // ── 世界演化：非阻塞后台执行 ──
       // 机械层 effects 直接确定性应用到 GameState，不传递给辅助 API
+      // 改为 fire-and-forget，不阻塞主管线启动；效果在下一轮生效
       let mechanicalEffectsSummary = ''; // 供主 AI 上下文注入
       try {
         const simEngine = getSimulationEngine();
@@ -543,27 +544,29 @@ export function useGameEngine(
         const simRules = simRulesMod?.moduleConfig as import('../modules/schema').SimulationRules | undefined;
 
         if (simEngine.shouldTick(gameTime, round) && simEngine.effectiveApiConfig) {
-          const result = await simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null);
-
-          // 直接应用机械层效果（确定性，不经 AI）
-          if (result?.mechanicalEffects && Object.keys(result.mechanicalEffects).length > 0) {
-            const enabledModules = (currentWorldDef?.modules ?? [])
-              .filter(m => m.enabled)
-              .map(m => m.moduleId);
-            varMgrRef.current.applyModuleEffects(result.mechanicalEffects, 'periodic', enabledModules);
-            mechanicalEffectsSummary = formatMechanicalEffectsSummary(result.mechanicalEffects);
-          }
-
-          // 直接应用世界状态更新
-          if (result?.worldStateUpdate && Object.keys(result.worldStateUpdate).length > 0) {
-            varMgrRef.current.applyWorldStateUpdate(result.worldStateUpdate);
-          }
-
-          // 同步世界演化状态到 store
-          useSimulationStore.getState().setSimState(simEngine.state);
+          // 后台执行，不 await — 世界演化结果在下一轮对话生效
+          simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null)
+            .then((result) => {
+              // 直接应用机械层效果（确定性，不经 AI）
+              if (result?.mechanicalEffects && Object.keys(result.mechanicalEffects).length > 0) {
+                const enabledModules = (currentWorldDef?.modules ?? [])
+                  .filter(m => m.enabled)
+                  .map(m => m.moduleId);
+                varMgrRef.current.applyModuleEffects(result.mechanicalEffects, 'periodic', enabledModules);
+              }
+              // 直接应用世界状态更新
+              if (result?.worldStateUpdate && Object.keys(result.worldStateUpdate).length > 0) {
+                varMgrRef.current.applyWorldStateUpdate(result.worldStateUpdate);
+              }
+              // 同步世界演化状态到 store
+              useSimulationStore.getState().setSimState(simEngine.state);
+            })
+            .catch((simErr) => {
+              console.warn('[世界演化] 后台执行失败（不影响管线）:', simErr);
+            });
         }
       } catch (simErr) {
-        console.warn('[世界演化] 执行失败（不影响管线）:', simErr);
+        console.warn('[世界演化] 初始化失败（不影响管线）:', simErr);
       }
 
       const pipelineResult = await executor.execute({
@@ -910,6 +913,7 @@ ${perspectiveInstruction}
       return;
     }
 
+    generatingRef.current = true;
     setIsGenerating(true);
     try {
       const memStore = useMemoryStore.getState();

@@ -120,9 +120,10 @@ export async function runVariableExtraction(params: {
     }
   } catch { /* localStorage 不可用时 fallback */ }
 
-  // 等待一段时间，让记忆系统的 API 调用完成，避免 429 限流
-  const totalDelay = delayMs + 3000; // 额外等待 3 秒
-  await sleep(totalDelay);
+  // 等待可配置的延迟（管线执行器已保证记忆任务先于此阶段完成）
+  if (delayMs > 0) {
+    await sleep(delayMs);
+  }
 
   let lastError: unknown = null;
 

@@ -244,7 +244,7 @@ function repairJSON(json: string): string {
   let s = json;
 
   // 去掉尾部逗号：,} -> }  ,] -> ]
-  s = s.replace(/,s*([}]])/g, '$1');
+  s = s.replace(/,\s*([}\]])/g, '$1');
 
   // 如果字符串中有未闭合的引号，先截断到最后一个完整值
   let inString = false;
@@ -275,7 +275,7 @@ function repairJSON(json: string): string {
   s += '}'.repeat(Math.max(0, openBrace - closeBrace));
 
   // 再次去掉可能产生的尾部逗号
-  s = s.replace(/,s*([}]])/g, '$1');
+  s = s.replace(/,\s*([}\]])/g, '$1');
 
   return s;
 }

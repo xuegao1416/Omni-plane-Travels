@@ -7,15 +7,26 @@ import type { WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
 import type { WorldBookEntry } from '../../../worldbook/index';
 import { findEntryByType } from './constants';
 
+/** 从设定文本中提取【世界背景】之后、【时间】/【地点】/【氛围】之前的内容 */
+function extractBackgroundText(content: string): string {
+  // 匹配 【背景】 或 【世界背景】 之后，到 【时间】/【地点】/【氛围】/【核心】/【特色】 之前的内容
+  const bgMatch = content.match(/【(?:世界)?背景】\s*([\s\S]*?)(?=【(?:时间|地点|氛围|核心|特色)】)/);
+  if (bgMatch) return bgMatch[1].trim();
+  // 兜底：去掉末尾的 时间/地点/氛围 行
+  const lines = content.split('\n');
+  const cutIdx = lines.findIndex(l => /^【(?:时间|地点|氛围)/.test(l.trim()));
+  return (cutIdx > 0 ? lines.slice(0, cutIdx) : lines).join('\n').trim();
+}
+
 export function OverviewTab({ world, worldEntry }: { world: WorldDef; worldEntry: WorldBookEntry | null }) {
   const settingEntry = findEntryByType(world.worldBookEntries, 'setting');
   const highlightsEntry = findEntryByType(world.worldBookEntries, 'highlights');
+  const rawContent = worldEntry?.content || settingEntry?.content || '';
+  const backgroundText = rawContent ? extractBackgroundText(rawContent) : '';
   return (
     <div className="tab-section">
-      {worldEntry?.content ? (
-        <div className="detail-block"><div className="detail-block-title"><ScrollText size={15} />世界设定</div><div className="detail-block-body">{worldEntry.content}</div></div>
-      ) : settingEntry?.content && (
-        <div className="detail-block"><div className="detail-block-title"><ScrollText size={15} />世界设定</div><div className="detail-block-body">{settingEntry.content}</div></div>
+      {backgroundText && (
+        <div className="detail-block"><div className="detail-block-title"><ScrollText size={15} />世界设定</div><div className="detail-block-body">{backgroundText}</div></div>
       )}
       {settingEntry?.meta && (
         <div className="detail-badges">
@@ -34,21 +45,6 @@ export function OverviewTab({ world, worldEntry }: { world: WorldDef; worldEntry
   );
 }
 
-export function SettingTab({ world, worldEntry }: { world: WorldDef; worldEntry: WorldBookEntry | null }) {
-  const settingEntry = findEntryByType(world.worldBookEntries, 'setting');
-  return (
-    <div className="tab-section">
-      {worldEntry?.content && <div className="detail-block"><div className="detail-block-title"><ScrollText size={15} />世界设定</div><div className="detail-block-body">{worldEntry.content}</div></div>}
-      {settingEntry?.meta && (
-        <div className="detail-block"><div className="detail-block-title"><Globe size={15} />基本信息</div><div className="detail-block-body">
-          {settingEntry.meta.timePeriod && <div className="detail-row"><Clock size={13} /><strong>时代背景：</strong>{settingEntry.meta.timePeriod}</div>}
-          {settingEntry.meta.location && <div className="detail-row"><MapPin size={13} /><strong>地理位置：</strong>{settingEntry.meta.location}</div>}
-          {settingEntry.meta.atmosphere && <div className="detail-row"><Cloud size={13} /><strong>氛围基调：</strong>{settingEntry.meta.atmosphere}</div>}
-        </div></div>
-      )}
-    </div>
-  );
-}
 
 export function LoreTab({ world }: { world: WorldDef }) {
   const loreEntries = world.worldBookEntries?.filter(e => e.entryType === 'lore') ?? [];
@@ -172,7 +168,7 @@ export function SystemsTab({ world }: { world: WorldDef }) {
   const modulesRaw = world.modules as any[] | undefined;
   const isStringArray = Array.isArray(modulesRaw) && modulesRaw.length > 0 && typeof modulesRaw[0] === 'string';
   const enabledModules = isStringArray ? (modulesRaw as string[]) : [];
-  const MODULE_NAMES: Record<string, string> = { stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系' };
+  const MODULE_NAMES: Record<string, string> = { stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', simulation: '世界演化' };
 
   if (isStringArray && !statData && !progData && !survData) {
     return (

@@ -14,369 +14,6 @@
       "弱肉强食"
     ],
     "difficulty": "hard",
-    "modules": [
-      {
-        "moduleId": "stat",
-        "name": "废土体质",
-        "description": "",
-        "enabled": true,
-        "moduleConfig": {
-          "attrA": {
-            "name": "生命",
-            "current": 80,
-            "max": 100
-          },
-          "attrB": {
-            "name": "体力",
-            "current": 60,
-            "max": 100
-          },
-          "dim1": {
-            "name": "力量",
-            "value": 7,
-            "range": [0, 20],
-            "description": "搬动废墟、挥动武器、近战搏杀的根本"
-          },
-          "dim2": {
-            "name": "耐力",
-            "value": 8,
-            "range": [0, 20],
-            "description": "长途跋涉、持续战斗、抵抗疲劳的资本"
-          },
-          "dim3": {
-            "name": "感知",
-            "value": 6,
-            "range": [0, 20],
-            "description": "发现陷阱、嗅出辐射、听辨变异兽动静"
-          },
-          "dim4": {
-            "name": "智力",
-            "value": 5,
-            "range": [0, 20],
-            "description": "维修器械、破解密码、分析旧世界图纸"
-          },
-          "dim5": {
-            "name": "魅力",
-            "value": 4,
-            "range": [0, 20],
-            "description": "谈判、招募、震慑或取信于人"
-          },
-          "dim6": {
-            "name": "意志",
-            "value": 6,
-            "range": [0, 20],
-            "description": "抵抗恐惧、压制异能失控、熬过辐射病发作"
-          },
-          "special": [
-            {
-              "id": "radiation_res",
-              "name": "辐射抗性",
-              "value": 2,
-              "range": [0, 20],
-              "description": "对辐射尘埃、污染水源、变异生物毒素的肉身免疫力"
-            },
-            {
-              "id": "psychic_power",
-              "name": "异能觉醒度",
-              "value": 0,
-              "range": [0, 20],
-              "description": "觉醒异能的深度与强度，越高越易失控变异"
-            }
-          ]
-        }
-      },
-      {
-        "moduleId": "progression",
-        "name": "废土生存位阶",
-        "description": "在这片废土上，每一步晋升都是用血和辐射换来的。从拾荒者到传说，活着就是最强的证明。",
-        "enabled": true,
-        "moduleConfig": {
-          "mode": "tiered",
-          "tiers": [
-            {
-              "name": "拾荒者",
-              "description": "没有觉醒异能，靠体力和警惕在废墟边缘讨食，随时可能死于辐射病或掠夺者。",
-              "xpRequired": 0,
-              "statBonuses": {
-                "attrAMax": 100,
-                "attrBMax": 100,
-                "dim1Max": 100,
-                "dim2Max": 100,
-                "dim3Max": 100,
-                "dim4Max": 100,
-                "dim5Max": 100,
-                "dim6Max": 100
-              }
-            },
-            {
-              "name": "觉醒者",
-              "description": "在辐射中活下来并觉醒了初级异能，能操控微弱火焰、硬化皮肤或感知辐射源，但使用后会剧烈疲劳。",
-              "xpRequired": 200,
-              "statBonuses": {
-                "attrAMax": 180,
-                "attrBMax": 180,
-                "dim1Max": 150,
-                "dim2Max": 150,
-                "dim3Max": 150,
-                "dim4Max": 150,
-                "dim5Max": 150,
-                "dim6Max": 150
-              }
-            },
-            {
-              "name": "老兵",
-              "description": "异能稳定，可连续作战，是各大聚落争抢的护卫和猎手，常被委托清理变异兽巢穴。",
-              "xpRequired": 500,
-              "statBonuses": {
-                "attrAMax": 300,
-                "attrBMax": 300,
-                "dim1Max": 250,
-                "dim2Max": 250,
-                "dim3Max": 250,
-                "dim4Max": 250,
-                "dim5Max": 250,
-                "dim6Max": 250
-              }
-            },
-            {
-              "name": "头狼",
-              "description": "异能质变，可以一人对抗小队级武装掠夺者，通常在废土上建立自己的小型聚落或武装车队。",
-              "xpRequired": 1200,
-              "statBonuses": {
-                "attrAMax": 500,
-                "attrBMax": 500,
-                "dim1Max": 400,
-                "dim2Max": 400,
-                "dim3Max": 400,
-                "dim4Max": 400,
-                "dim5Max": 400,
-                "dim6Max": 400
-              }
-            },
-            {
-              "name": "领主",
-              "description": "异能领域化，能在身周生成小型气候或力场，掌控数十公里的领地，与军阀平起平坐。",
-              "xpRequired": 3000,
-              "statBonuses": {
-                "attrAMax": 800,
-                "attrBMax": 800,
-                "dim1Max": 700,
-                "dim2Max": 700,
-                "dim3Max": 700,
-                "dim4Max": 700,
-                "dim5Max": 700,
-                "dim6Max": 700
-              }
-            },
-            {
-              "name": "灾厄",
-              "description": "人形天灾，异能可摧毁小型城镇，是被各大势力用核弹协议共同制衡的活体兵器，全废土不超过十人。",
-              "xpRequired": 7000,
-              "statBonuses": {
-                "attrAMax": 1500,
-                "attrBMax": 1500,
-                "dim1Max": 1200,
-                "dim2Max": 1200,
-                "dim3Max": 1200,
-                "dim4Max": 1200,
-                "dim5Max": 1200,
-                "dim6Max": 1200
-              }
-            },
-            {
-              "name": "传说",
-              "description": "只存在于流浪商队歌谣和地下酒馆醉话中的存在。据说有人见过他们在辐射风暴中心漫步，对变异兽群挥手即退。",
-              "xpRequired": 15000,
-              "statBonuses": {
-                "attrAMax": 2500,
-                "attrBMax": 2500,
-                "dim1Max": 2000,
-                "dim2Max": 2000,
-                "dim3Max": 2000,
-                "dim4Max": 2000,
-                "dim5Max": 2000,
-                "dim6Max": 2000
-              }
-            }
-          ],
-          "xpFormula": {
-            "baseXP": 200,
-            "exponent": 1.7,
-            "scaleFactor": 1.0
-          },
-          "currentTierIndex": 0,
-          "currentXP": 0
-        }
-      },
-      {
-        "moduleId": "simulation",
-        "name": "废土变数",
-        "description": "末日废土的不确定因素：辐射风暴、变异兽潮、掠夺者袭击、资源枯竭……",
-        "enabled": true,
-        "moduleConfig": {
-          "eventEffects": [
-            {
-              "id": "radiation_storm",
-              "priority": 30,
-              "stackStrategy": "override",
-              "trigger": {
-                "tags": ["radiation", "storm"],
-                "keywords": ["辐射风暴", "辐射尘", "核冬天", "辐射云"]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": { "delta": -20, "min": 0 },
-                    "辐射抗性": { "delta": -3, "min": 0 }
-                  }
-                }
-              }
-            },
-            {
-              "id": "mutant_attack",
-              "priority": 25,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": ["mutant", "attack"],
-                "keywords": ["变异兽", "攻击", "异形", "怪物", "变异体"]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": { "delta": -15, "min": 0 },
-                    "体力": { "delta": -10, "min": 0 }
-                  }
-                }
-              }
-            },
-            {
-              "id": "raider_ambush",
-              "priority": 20,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": ["raider", "ambush"],
-                "keywords": ["掠夺者", "伏击", "抢劫", "强盗", "袭击"]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": { "delta": -10, "min": 0 }
-                  }
-                }
-              }
-            },
-            {
-              "id": "resource_find",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": ["resource", "discovery"],
-                "keywords": ["发现", "废墟", "搜索", "物资", "补给"]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "体力": { "delta": 10, "min": 0 }
-                  }
-                }
-              }
-            },
-            {
-              "id": "psychic_awakening",
-              "priority": 15,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": ["psychic", "awakening"],
-                "keywords": ["觉醒", "异能", "超能力", "能力", "突破"]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "异能觉醒度": { "delta": 5, "min": 0 }
-                  }
-                }
-              }
-            },
-            {
-              "id": "trader_visit",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": ["trade", "merchant"],
-                "keywords": ["商人", "交易", "买卖", "流浪商队", "以物易物"]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": { "delta": 5, "min": 0 },
-                    "体力": { "delta": 5, "min": 0 }
-                  }
-                }
-              }
-            }
-          ],
-          "periodicEvents": [
-            {
-              "id": "radiation_sickness",
-              "name": "辐射病发作",
-              "description": "长期暴露在辐射环境中，身体会周期性出现辐射病症状。",
-              "intervalTicks": 14,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": { "delta": -10, "min": 0 },
-                    "体力": { "delta": -15, "min": 0 }
-                  }
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "supply_scarcity",
-              "name": "资源枯竭",
-              "description": "周边资源被搜刮殆尽，需要前往更危险的区域寻找物资。",
-              "intervalTicks": 30,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "体力": { "delta": -10, "min": 0 }
-                  }
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "settlement_conflict",
-              "name": "聚落冲突",
-              "description": "不同聚落之间的资源争夺，可能被卷入其中。",
-              "intervalTicks": 20,
-              "offsetTicks": 10,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": { "delta": -15, "min": 0 }
-                  }
-                }
-              },
-              "narrateToAI": true
-            }
-          ],
-          "worldStateRules": [],
-          "worldStateAxes": {
-            "辐射强度": ["低", "中", "高", "致命"],
-            "势力格局": ["混乱", "割据", "统一"]
-          },
-          "narrativeGuardrails": {
-            "maxDeltaPerStat": {
-              "*": 25
-            },
-            "maxDeltaPerResource": {},
-            "setAllowedVars": [],
-            "allowCreateResources": false
-          }
-        }
-      }
-    ],
     "worldBookEntries": [
       {
         "uid": 1,
@@ -413,30 +50,81 @@
       },
       {
         "uid": 3,
-        "key": [],
-        "constant": true,
-        "comment": "势力分布",
-        "content": "【废土主要势力】\n\n- **钢铁黎明**（阵营：中立偏恶）\n  占据旧世界军火库和兵工厂的准军事组织，狂热排斥异能者，视其为“人类基因的污染”。他们穿着缴获的动力装甲，用.308弹药和焊枪维持秩序，对觉醒者格杀勿论。领地：旧费城军械库遗址。\n\n- **变异者兄弟会**（阵营：友善偏中）\n  由高阶觉醒者建立的聚落联盟，总部设在改造后的地铁枢纽“希望之心”。他们主张异能是人类进化的必经之路，有偿接纳各地觉醒者，但内部派系分裂——温和派主张与凡人共存，激进派认为应取代凡人。\n\n- **血狼帮**（阵营：敌对）\n  废土上规模最大的掠夺者帮派，以劫掠商队和小型聚落为生。帮众多为极度自私的亡命徒，信奉“抢到就是你的”。副首领铁牙·莫里森是半机械改造人，左臂为动力义肢，极度危险。活动范围：红雾荒原边缘及旧州际公路沿线。\n\n- **流浪商队公会**（阵营：中立）\n  由十余支武装商队联合组成的贸易联盟，垄断了废土上大部分跨区域物资流通。他们不参与势力战争，但会向任何出得起价的人出售情报和稀缺物资。总部：移动式车队，无固定驻地。",
+        "entryType": "factions",
+        "key": [
+          "钢铁黎明"
+        ],
+        "constant": false,
+        "comment": "钢铁黎明",
+        "content": "钢铁黎明：占据旧军火库，狂热排斥异能者，穿动力装甲，用.308弹药维持秩序。领地：旧费城军械库遗址。",
         "order": 3,
         "position": "before_char",
-        "entryType": "factions",
         "meta": {
           "factions": [
             {
               "name": "钢铁黎明",
               "description": "占据旧军火库，狂热排斥异能者，穿动力装甲，用.308弹药维持秩序。领地：旧费城军械库遗址。",
               "alignment": "中立偏恶"
-            },
+            }
+          ]
+        }
+      },
+      {
+        "uid": 4,
+        "entryType": "factions",
+        "key": [
+          "变异者兄弟会"
+        ],
+        "constant": false,
+        "comment": "变异者兄弟会",
+        "content": "变异者兄弟会：高阶觉醒者联盟，总部“希望之心”地铁枢纽，主张异能是进化方向，但内部温和/激进派分裂。",
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "factions": [
             {
               "name": "变异者兄弟会",
               "description": "高阶觉醒者联盟，总部“希望之心”地铁枢纽，主张异能是进化方向，但内部温和/激进派分裂。",
               "alignment": "友善偏中"
-            },
+            }
+          ]
+        }
+      },
+      {
+        "uid": 5,
+        "entryType": "factions",
+        "key": [
+          "血狼帮"
+        ],
+        "constant": false,
+        "comment": "血狼帮",
+        "content": "血狼帮：最大掠夺者帮派，劫掠为生，信奉暴力。副首领铁牙·莫里森为半机械改造人。活动：红雾荒原边缘及旧公路。",
+        "order": 5,
+        "position": "before_char",
+        "meta": {
+          "factions": [
             {
               "name": "血狼帮",
               "description": "最大掠夺者帮派，劫掠为生，信奉暴力。副首领铁牙·莫里森为半机械改造人。活动：红雾荒原边缘及旧公路。",
               "alignment": "敌对"
-            },
+            }
+          ]
+        }
+      },
+      {
+        "uid": 6,
+        "entryType": "factions",
+        "key": [
+          "流浪商队公会",
+          "商队"
+        ],
+        "constant": false,
+        "comment": "流浪商队公会",
+        "content": "流浪商队公会：十余支武装商队联合，垄断跨区贸易，出售情报和物资，无固定驻地。",
+        "order": 6,
+        "position": "before_char",
+        "meta": {
+          "factions": [
             {
               "name": "流浪商队公会",
               "description": "十余支武装商队联合，垄断跨区贸易，出售情报和物资，无固定驻地。",
@@ -446,14 +134,16 @@
         }
       },
       {
-        "uid": 4,
-        "key": [],
-        "constant": true,
-        "comment": "预设NPC",
-        "content": "【核心角色】\n\n- **老狗**（拾荒者/向导）\n  在废土上活了五十年的老家伙，左腿是自制的弹簧义肢，脸上有大片辐射灼伤疤痕。他知道红雾荒原每一条安全裂隙、每一个变异兽巢穴的位置。性格：沉默、多疑、嘴硬心软，对陌生人极度警惕但认准了就会以命相托。\n\n- **月见**（变异者治疗师）\n  十八岁少女，觉醒治愈系异能，手心能发出淡蓝色荧光中和辐射。她的血液被各势力觊觎，因此常年躲在铁锈镇的集装箱诊所里。性格：温柔但坚韧，对凡人抱有警惕，极度厌恶暴力，会拒绝对伤者出手的人。\n\n- **铁牙·莫里森**（血狼帮副首领）\n  左臂是从旧世界军事基地拆来的动力义肢，能一拳打穿薄钢板。他残忍但不疯癫，信奉“废土信用”——说过的话必定兑现，无论善恶。性格：残暴、嗜血、守诺、极度讨厌背叛者。\n\n- **商队调频员“嘀嗒”**（流浪商队公会联络人）\n  负责用短波电台协调商队路线和交易信息的中年女性，声音沙哑但头脑清晰。她能帮你找到任何稀缺物资或买家，但价格从不讲价。性格：理性、刻薄、守口如瓶。",
-        "order": 4,
-        "position": "before_char",
+        "uid": 7,
         "entryType": "npcs",
+        "key": [
+          "老狗"
+        ],
+        "constant": false,
+        "comment": "老狗",
+        "content": "【老狗】（拾荒者/向导）\n五十岁，左腿为弹簧义肢，熟悉红雾荒原所有安全路线和变异兽巢穴。。性格：沉默、多疑、嘴硬心软，认准后以命相托。",
+        "order": 7,
+        "position": "before_char",
         "meta": {
           "npcs": [
             {
@@ -461,19 +151,68 @@
               "role": "拾荒者/向导",
               "description": "五十岁，左腿为弹簧义肢，熟悉红雾荒原所有安全路线和变异兽巢穴。",
               "personality": "沉默、多疑、嘴硬心软，认准后以命相托"
-            },
+            }
+          ]
+        }
+      },
+      {
+        "uid": 8,
+        "entryType": "npcs",
+        "key": [
+          "月见"
+        ],
+        "constant": false,
+        "comment": "月见",
+        "content": "【月见】（变异者治疗师）\n十八岁少女，治愈系异能，手心放蓝光中和辐射，常躲在铁锈镇集装箱诊所。。性格：温柔、坚韧、警惕凡人、厌恶暴力。",
+        "order": 8,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
             {
               "name": "月见",
               "role": "变异者治疗师",
               "description": "十八岁少女，治愈系异能，手心放蓝光中和辐射，常躲在铁锈镇集装箱诊所。",
               "personality": "温柔、坚韧、警惕凡人、厌恶暴力"
-            },
+            }
+          ]
+        }
+      },
+      {
+        "uid": 9,
+        "entryType": "npcs",
+        "key": [
+          "铁牙",
+          "莫里森"
+        ],
+        "constant": false,
+        "comment": "铁牙·莫里森",
+        "content": "【铁牙·莫里森】（血狼帮副首领）\n左臂为动力义肢，可一拳击穿钢板，信奉废土信用，极度讨厌背叛。。性格：残暴、嗜血、守诺。",
+        "order": 9,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
             {
               "name": "铁牙·莫里森",
               "role": "血狼帮副首领",
               "description": "左臂为动力义肢，可一拳击穿钢板，信奉废土信用，极度讨厌背叛。",
               "personality": "残暴、嗜血、守诺"
-            },
+            }
+          ]
+        }
+      },
+      {
+        "uid": 10,
+        "entryType": "npcs",
+        "key": [
+          "嘀嗒"
+        ],
+        "constant": false,
+        "comment": "嘀嗒",
+        "content": "【嘀嗒】（流浪商队公会联络人）\n负责短波电台协调交易，嗓音沙哑，能找任何物资但绝不讲价。。性格：理性、刻薄、守口如瓶。",
+        "order": 10,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
             {
               "name": "嘀嗒",
               "role": "流浪商队公会联络人",
@@ -484,7 +223,7 @@
         }
       },
       {
-        "uid": 5,
+        "uid": 11,
         "key": [
           "花钱",
           "消费",
@@ -499,7 +238,7 @@
         "constant": false,
         "comment": "经济与时间",
         "content": "【货币体系】\n废土通用硬通货为**.308口径步枪弹**（俗称“废土金币”），因其稳定性高、可自装填且被所有势力接受。其次为**纯净水瓶盖**，用于小额交易。旧世界的纸币和金银基本失去流通价值。\n\n【物价水平】\n生存品极贵：一壶净水（2升）≈ 5发.308，一罐军用口粮 ≈ 8发.308，一剂抗辐宁 ≈ 15发.308。而武器更贵：一把修好的旧世界手枪 ≈ 50发.308，一件二手防辐射斗篷 ≈ 20发.308。\n\n【时间系统】\n余烬历（核爆年为元年），当前为余烬历 207 年秋。时间流速与现实同步（1:1），以“日”为单位推进。",
-        "order": 5,
+        "order": 11,
         "position": "before_char",
         "entryType": "economy",
         "meta": {
@@ -515,12 +254,12 @@
         }
       },
       {
-        "uid": 6,
+        "uid": 12,
         "key": [],
         "constant": true,
         "comment": "世界亮点",
         "content": "【本世界特色】\n- 以.308子弹为核心的残酷经济体系\n- 异能觉醒与基因异化的生死抉择\n- 辐射区探索与旧世界遗迹解密\n- 势力间的动态好感与背叛机制\n- 真实到骨子里的废土生存压迫感",
-        "order": 6,
+        "order": 12,
         "position": "before_char",
         "entryType": "highlights",
         "meta": {
@@ -534,12 +273,12 @@
         }
       },
       {
-        "uid": 7,
+        "uid": 13,
         "key": [],
         "constant": true,
         "comment": "世界事件",
         "content": "【废土动态事件】\n\n1. **辐射风暴**（重大事件）\n  暗红色的辐射尘暴从东北方向压来，持续三到五天。室外辐射值飙升十倍，露天暴露一小时即致辐射病。必须躲入地下掩体或防辐射建筑。触发：每月随机 1-3 次。\n\n2. **变异兽潮**（重大事件）\n  红雾荒原深处的变异生物群因食物短缺而大规模南迁，沿途踏平小型聚落。铁锈镇等定居点会发布求援任务。触发：每年秋冬之交。\n\n3. **商队集结**（次要事件）\n  流浪商队公会每月在旧州际公路某处举行一次“黑市交易日”，各势力派代表交换稀缺物资和情报，是获取稀有零件和高端异能的绝佳机会。触发：每月中旬。\n\n4. **帮派火并**（重大事件）\n  血狼帮与另一掠夺者帮派因地盘或战利品爆发武装冲突，战火可能波及附近聚落，迫使居民选边站或逃离。触发：资源紧张时随机。\n\n5. **旧世遗迹现世**（重大事件）\n  某处旧世界军事基地或生物实验室因地震或塌方暴露入口，内部可能有动力装甲、净化芯片或基因药剂，但往往伴随着致命的安保机器人和辐射陷阱。触发：探索或情报触发。",
-        "order": 7,
+        "order": 13,
         "position": "before_char",
         "entryType": "events",
         "meta": {
@@ -578,12 +317,12 @@
         }
       },
       {
-        "uid": 8,
+        "uid": 14,
         "key": [],
         "constant": true,
         "comment": "人际关系",
         "content": "【废土人际关系】\n在余烬大地上，信任是比净水更稀缺的东西。废土上的人际关系基于**生存利益交换**，但少数并肩穿越死地的同伴之间，会形成比旧世界更牢不可破的羁绊——因为在废土，背弃往往意味着死亡。\n\n【好感度机制】\n- 提升：分享物资、救人性命、共同对抗变异兽、完成委托任务。\n- 降低：私吞战利品、临阵脱逃、向敌对势力出卖同伴信息。\n- 特殊：为同伴挡下辐射或致命伤害，可获得“过命”状态，该NPC永不背叛。\n\n【关系类型】\n- **拾荒搭档**：临时或长期的探险组合，彼此熟悉对方在危机下的反应模式。关系紧密时能共享“直觉预警”——一方感知到危险，另一方自动获得提示。\n- **聚落住民**：你定居或常驻的聚落居民对你有“庇护值”。庇护值高时，居民会主动提供物资赊账、警告危险；低时可能被驱逐甚至出卖。\n- **势力干系人**：与钢铁黎明、变异者兄弟会、血狼帮、商队公会等的联络人关系，决定你能否进入其核心区域、购买限制级物资或获得武装支援。\n- **变异兽感应**：某些高阶觉醒者能与特定变异兽建立微弱精神连接，关系好时变异兽会避开你，敌对时则成为追踪猎手。",
-        "order": 8,
+        "order": 14,
         "position": "before_char",
         "entryType": "relationships",
         "meta": {
@@ -612,7 +351,7 @@
         }
       },
       {
-        "uid": 9,
+        "uid": 15,
         "entryType": "lore",
         "key": [
           "十三号线",
@@ -624,21 +363,11 @@
         "comment": "地下动脉·十三号线",
         "content": "十三号线是废土上最繁忙的地下通道，贯穿原纽约-费城走廊，全长约九十公里。隧道深埋地下二十米，混凝土壁厚达两米，能抵御大部分地面辐射。沿线共十四个废弃车站，其中七个被改造为人类聚落。\n\n- **七号站·锈市**：最大的地下交易市场，站台两侧摆满摊位，出售子弹、抗辐宁、旧世界零件和变异兽皮。这里也是情报集散地，一杯“辐射茶”（用变异茶叶泡的苦水）能换到三天的生存消息。\n- **三号站·诊所站**：由前军医“老白”经营的地下医疗站，能用旧世界手术器械做简单外伤处理和辐射净化，但收费昂贵——一剂抗辐宁就要十五发子弹。\n- **九号站·禁区**：隧道深处被铁栅栏封锁的站点，据说深处盘踞着一只“地铁吞噬者”——一种融合了车厢铁皮的巨型变异蜈蚣。曾有三支武装小队深入探索，无一生还。\n\n隧道内照明依靠手摇发电机和拾荒者收集的荧光棒，铁轨上常有流浪者推着手推车穿行，潮湿的空气中混杂着铁锈、霉菌和轻微的辐射腥味。",
         "constant": false,
-        "selectiveLogic": 0,
-        "order": 9,
-        "position": "before_char",
-        "depth": 30,
-        "probability": 100,
-        "keysecondary": [
-          "锈市",
-          "诊所站",
-          "禁区",
-          "地铁吞噬者",
-          "辐射茶"
-        ]
+        "order": 15,
+        "position": "before_char"
       },
       {
-        "uid": 10,
+        "uid": 16,
         "entryType": "lore",
         "key": [
           "铁锈镇",
@@ -650,21 +379,11 @@
         "comment": "地表聚落·铁锈镇",
         "content": "铁锈镇建立在旧世界一座小型地下避难所的地表扩展区上，因周围废弃工厂的铁锈色而得名。镇子被三层防御包围：最外层是斜插的钢筋和废铁尖桩（防止变异兽冲击），中层是五米高的废旧汽车钢板墙（焊满削尖的钢管），内层是混凝土预制块垒成的核心居住区。\n\n镇内约有八十名常住居民，以种植变异薯类（抗辐射、但口感苦涩）和过滤地下水为生。镇中心是一座用两层集装箱搭建的“集议厅”，兼做诊所、仓库和临时避难所。集议厅门口挂着一枚旧世界的炮弹壳，充作警钟。\n\n铁锈镇实行“以工易物”制度：外来者须用体力劳动（修缮围墙、巡逻、拾荒上缴三成）换取水和粮食。镇内唯一一台柴油发电机每天运行两小时（傍晚六点到八点），是方圆百里内唯一的电力来源，由退伍老兵“汉克”专职维护。",
         "constant": false,
-        "selectiveLogic": 0,
-        "order": 10,
-        "position": "before_char",
-        "depth": 30,
-        "probability": 100,
-        "keysecondary": [
-          "钢板墙",
-          "集议厅",
-          "炮弹壳警钟",
-          "以工易物",
-          "柴油发电机"
-        ]
+        "order": 16,
+        "position": "before_char"
       },
       {
-        "uid": 11,
+        "uid": 17,
         "entryType": "lore",
         "key": [
           "红雾荒原",
@@ -676,21 +395,11 @@
         "comment": "死亡之地·红雾荒原",
         "content": "红雾荒原位于旧费城以北约四十公里，是核爆核心区的下风沉降带。这里终年弥漫着淡红色的辐射尘雾，能见度不足十五米，空气中放射性微粒浓度是安全阈值的三十倍。\n\n地表覆盖着灰白色辐射粉尘，踩上去像雪但散发出微弱的热感。旧世界的建筑残骸扭曲变形，金属表面布满锈蚀和结晶状的辐射斑。荒原上零星生长着“辐射苔藓”——一种能在强辐射下存活的暗绿色低等植物，摘下来放在铁罐中能作为简易辐射计（苔藓变黑即辐射超标）。\n\n红雾区最珍贵的产出是“辐射晶石”：一种在强辐射环境下形成的半透明晶体，可用于改造能量武器或制作高精度辐射探测器。但采集晶石需全套防化装备（铅衬防护服+军用级防毒面具），单次暴露极限为四小时，超出将引发不可逆的骨髓辐射病。\n\n传闻红雾深处有“变异兽王”出没，但从未有活人带回确凿证据——所有深入中心的探索队，至今只有三人生还，且全部在返程后三天内死于急性辐射衰竭。",
         "constant": false,
-        "selectiveLogic": 0,
-        "order": 11,
-        "position": "before_char",
-        "depth": 30,
-        "probability": 100,
-        "keysecondary": [
-          "辐射粉尘",
-          "辐射苔藓",
-          "辐射晶石",
-          "铅衬防护服",
-          "变异兽王"
-        ]
+        "order": 17,
+        "position": "before_char"
       },
       {
-        "uid": 12,
+        "uid": 19,
         "entryType": "culture",
         "key": [
           "废土规矩",
@@ -702,19 +411,464 @@
         "comment": "废土生存法则与社群文化",
         "content": "废土的文化是在极端匮乏中淬炼出的冷酷实用主义，没有温情，只有存活。以下是所有废土居民默认遵守的成文或不成文规矩：\n\n**第一法则·物资至上**：在废土，一壶净水比十条人命值钱，一发子弹能买一个人情。交易时永远先确认对方的枪口方向，再确认货物。\n\n**第二法则·不问过去**：没有人会追问你战前是谁、因何流落至此。每个人的过去都沾着血，追问意味着挑起仇恨。废土只认你的当前能力和信用。\n\n**第三法则·以牙还牙**：劫掠他人物资等同于宣判对方死刑。被劫者有权无限追杀劫掠者，各聚落和商队也会联合悬赏劫掠者的头颅。\n\n**第四法则·搭手之恩**：在荒野中遇到求救者，若力所能及则须施以最低限度的援助（一口水、一条绷带）。但若对方已无生还可能，所有人都默契地选择快速离开——多余的同情会害死自己。\n\n**葬礼文化**：废土人死后不土葬（防瘟疫和变异兽掘尸），一律火化。焚烧时，亲属会在火堆旁寻找遗体中凝结的“辐射晶石”——若死者生前有异能，骨灰中会凝结出微小的晶粒，被称为“魂晶”，由家属保存或嵌入武器作为遗物。葬礼上讲述逝者生平时必须说真话，无论善恶——废土人相信，只有完整真实的一生，死者才能安心踏入“灰烬之河”。\n\n**废土信用**：口头承诺在废土上具有极高分量。一个商人的信用若崩塌，整个商队公会都会将其除名；一个拾荒者若食言，将再无任何聚落收留。但也因此，废土上极少有人轻易许诺——因为他们知道，承诺意味着拿命担保。",
         "constant": false,
-        "selectiveLogic": 0,
-        "order": 12,
-        "position": "before_char",
-        "depth": 30,
-        "probability": 100,
-        "keysecondary": [
-          "物资至上",
-          "不问过去",
-          "以牙还牙",
-          "魂晶",
-          "废土信用"
-        ]
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": -1,
+        "comment": "[模块] 数值属性 - 规则",
+        "content": "【数值属性更新规则】\n\n当角色受到伤害/恢复/消耗/提升时，更新对应属性：\n{\"玩家\":{\"生存状态\":{\"血量\":75}}}  // 生命类变化\n{\"玩家\":{\"生存状态\":{\"体力值\":55}}}  // 能量类变化\n{\"玩家\":{\"生存状态\":{\"dim1\":47}}}  // 六维变化\n{\"玩家\":{\"生存状态\":{\"str\":8}}}  // 特色属性变化\n\n注意：\n- 只输出发生变化的属性，未变化的不要输出\n- 属性值不能超过当前段位上限（如果有成长体系模块）\n- 属性值不能低于range[0]\n\n─── 属性体系 ───\n生命类：生理活性（上限100）\n能量类：意志余火（上限60）\n六维属性：清除效能、结构韧性、神经反射、逻辑解构、层级威望、命运偏置\n特色属性：孢子侵蚀度（身体组织被真菌孢子寄生的深度，数值越高越接近异变，但也可能获得某些畸变能力。）、氧气配额权限（在地堡密闭循环系统中，个体被允许消耗的空气质量等级与呼吸时长。）",
+        "constant": false,
+        "key": [
+          "生理活性",
+          "意志余火",
+          "清除效能",
+          "结构韧性",
+          "神经反射",
+          "逻辑解构",
+          "层级威望",
+          "命运偏置",
+          "孢子侵蚀度",
+          "氧气配额权限",
+          "属性",
+          "数值",
+          "状态"
+        ],
+        "order": 51,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
+        "uid": -2,
+        "comment": "[模块] 成长体系 - 规则",
+        "content": "【成长体系更新规则】\n\ncurrentXP 语义说明：\n- currentXP 是\"当前级别内积累的经验值\"，不是角色总经验值\n- 每次升级/升段后，currentXP 重置为 0，然后重新积累\n- 例如：从 Lv.5 升到 Lv.6 时，currentXP 重置为 0\n\n获得经验值时（增量更新）：\n{\"玩家\":{\"当前经验值\":当前值+获得量}}\n\n升级/升段时：\n{\"玩家\":{\"当前段位索引\":新索引,\"当前经验值\":0}}\n\n注意：\n- currentXP 不能为负数\n- currentXP 是当前级别内的累计值，不是总经验值\n- 等级制：currentTierIndex 不能超过 maxLevel\n- 段位制：currentTierIndex 不能超过 tiers.length - 1\n- 属性天花板由框架自动计算，AI不需要手动输出\n\n─── 段位体系 ───\n1. 凡人：地堡最底层的居民或无防护的荒野流民。体内孢子浓度处于危险边缘，仅靠微薄的抗生素和简陋防毒面具苟活，身体机能处于常人极限之下。\n2. 一阶异能者：适应了废土边缘环境的生存者。体内产生了初步的孢子抗体，肉体力量与敏捷在残酷的搜寻任务中得到磨炼。\n3. 二阶异能者：接受过地堡系统化军事训练和初步基因强化。配备标准过滤义体，拥有稳定的精神意志和对抗变异真菌生物的丰富经验。\n4. 三阶异能者：融合了温和派真菌孢子的半异化战士，或进行了高纯度机械改造的精锐。能够在无防护的深层孢子区域自由行动，肉体与精神已超越旧时代人类。\n4. 四阶异能者：异能领域化，能在身周生成小型气候或力场，掌控数十公里的领地，与军阀平起平坐。\n5. 五阶异能者：人形天灾，异能可摧毁小型城镇，是被各大势力用核弹协议共同制衡的活体兵器，全废土不超过十人。体内的真菌菌丝替代了部分脆弱的神经与血管，拥有恐怖的自愈力与环境掌控力，是地堡文明的终极兵器或废土的神明。\n\n─── 叙事风格 ───\n角色成长时的表现：体内的基因锁在狂暴的孢子抗衡中崩解重组，你听到了来自真菌网络深处的低鸣，肉体与意志在痛苦的蜕变中迎来了新生。\n成长相关关键词：基因重组、孢子共生、义体突破、抗性升华、阶层晋升、肉体蜕变\n注意：在正文中描述角色成长时，使用上述自然语言风格，不要出现\"升级\"\"经验值\"\"叮\"等游戏化词汇。",
+        "constant": false,
+        "key": [
+          "凡人",
+          "一阶异能者",
+          "二阶异能者",
+          "三阶异能者",
+          "四阶异能者",
+          "五阶异能者",
+          "段位",
+          "境界",
+          "突破",
+          "升级",
+          "进阶"
+        ],
+        "order": 53,
+        "position": "after_char",
+        "entryType": "module_rule"
       }
-    ]
+    ],
+    "modules": [
+      {
+        "moduleId": "stat",
+        "name": "废土体质",
+        "description": "",
+        "enabled": true,
+        "moduleConfig": {
+          "attrA": {
+            "name": "生命",
+            "current": 80,
+            "max": 100
+          },
+          "attrB": {
+            "name": "体力",
+            "current": 60,
+            "max": 100
+          },
+          "dim1": {
+            "name": "力量",
+            "value": 7,
+            "range": [
+              0,
+              20
+            ],
+            "description": "搬动废墟、挥动武器、近战搏杀的根本"
+          },
+          "dim2": {
+            "name": "耐力",
+            "value": 8,
+            "range": [
+              0,
+              20
+            ],
+            "description": "长途跋涉、持续战斗、抵抗疲劳的资本"
+          },
+          "dim3": {
+            "name": "感知",
+            "value": 6,
+            "range": [
+              0,
+              20
+            ],
+            "description": "发现陷阱、嗅出辐射、听辨变异兽动静"
+          },
+          "dim4": {
+            "name": "智力",
+            "value": 5,
+            "range": [
+              0,
+              20
+            ],
+            "description": "维修器械、破解密码、分析旧世界图纸"
+          },
+          "dim5": {
+            "name": "魅力",
+            "value": 4,
+            "range": [
+              0,
+              20
+            ],
+            "description": "谈判、招募、震慑或取信于人"
+          },
+          "dim6": {
+            "name": "意志",
+            "value": 6,
+            "range": [
+              0,
+              20
+            ],
+            "description": "抵抗恐惧、压制异能失控、熬过辐射病发作"
+          },
+          "special": [
+            {
+              "id": "radiation_res",
+              "name": "辐射抗性",
+              "value": 2,
+              "range": [
+                0,
+                20
+              ],
+              "description": "对辐射尘埃、污染水源、变异生物毒素的肉身免疫力"
+            },
+            {
+              "id": "psychic_power",
+              "name": "异能觉醒度",
+              "value": 0,
+              "range": [
+                0,
+                20
+              ],
+              "description": "觉醒异能的深度与强度，越高越易失控变异"
+            }
+          ]
+        }
+      },
+      {
+        "moduleId": "progression",
+        "name": "废土生存位阶",
+        "description": "在这片废土上，每一步晋升都是用血和辐射换来的。从拾荒者到传说，活着就是最强的证明。",
+        "enabled": true,
+        "moduleConfig": {
+          "mode": "tiered",
+          "tiers": [
+            {
+              "name": "凡人",
+              "description": "没有觉醒异能的普通幸存者，靠体力和警惕在废墟边缘讨食，随时可能死于辐射病或掠夺者。"
+            },
+            {
+              "name": "一阶异能者",
+              "description": "在辐射中活下来并觉醒了初级异能，能操控微弱火焰、硬化皮肤或感知辐射源，但使用后会剧烈疲劳。"
+            },
+            {
+              "name": "二阶异能者",
+              "description": "异能稳定，可连续作战，是各大聚落争抢的护卫和猎手，常被委托清理变异兽巢穴。"
+            },
+            {
+              "name": "三阶异能者",
+              "description": "异能质变，可以一人对抗小队级武装掠夺者，通常在废土上建立自己的小型聚落或武装车队。"
+            },
+            {
+              "name": "四阶异能者",
+              "description": "异能领域化，能在身周生成小型气候或力场，掌控数十公里的领地，与军阀平起平坐。"
+            },
+            {
+              "name": "五阶异能者",
+              "description": "人形天灾，异能可摧毁小型城镇，是被各大势力用核弹协议共同制衡的活体兵器，全废土不超过十人。"
+            }
+          ],
+          "xpFormula": {
+            "baseXP": 200,
+            "exponent": 1.7,
+            "scaleFactor": 1.0
+          },
+          "currentTierIndex": 0,
+          "currentXP": 0
+        }
+      },
+      {
+        "moduleId": "simulation",
+        "name": "废土变数",
+        "description": "末日废土的不确定因素：辐射风暴、变异兽潮、掠夺者袭击、资源枯竭……",
+        "enabled": true,
+        "moduleConfig": {
+          "eventEffects": [
+            {
+              "id": "radiation_storm",
+              "priority": 30,
+              "stackStrategy": "override",
+              "trigger": {
+                "tags": [
+                  "radiation",
+                  "storm"
+                ],
+                "keywords": [
+                  "辐射风暴",
+                  "辐射尘",
+                  "核冬天",
+                  "辐射云"
+                ]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "生命": {
+                      "delta": -20,
+                      "min": 0
+                    },
+                    "辐射抗性": {
+                      "delta": -3,
+                      "min": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "mutant_attack",
+              "priority": 25,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": [
+                  "mutant",
+                  "attack"
+                ],
+                "keywords": [
+                  "变异兽",
+                  "攻击",
+                  "异形",
+                  "怪物",
+                  "变异体"
+                ]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "生命": {
+                      "delta": -15,
+                      "min": 0
+                    },
+                    "体力": {
+                      "delta": -10,
+                      "min": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "raider_ambush",
+              "priority": 20,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": [
+                  "raider",
+                  "ambush"
+                ],
+                "keywords": [
+                  "掠夺者",
+                  "伏击",
+                  "抢劫",
+                  "强盗",
+                  "袭击"
+                ]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "生命": {
+                      "delta": -10,
+                      "min": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "resource_find",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": [
+                  "resource",
+                  "discovery"
+                ],
+                "keywords": [
+                  "发现",
+                  "废墟",
+                  "搜索",
+                  "物资",
+                  "补给"
+                ]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "体力": {
+                      "delta": 10,
+                      "min": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "psychic_awakening",
+              "priority": 15,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": [
+                  "psychic",
+                  "awakening"
+                ],
+                "keywords": [
+                  "觉醒",
+                  "异能",
+                  "超能力",
+                  "能力",
+                  "突破"
+                ]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "异能觉醒度": {
+                      "delta": 5,
+                      "min": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "id": "trader_visit",
+              "priority": 10,
+              "stackStrategy": "add",
+              "trigger": {
+                "tags": [
+                  "trade",
+                  "merchant"
+                ],
+                "keywords": [
+                  "商人",
+                  "交易",
+                  "买卖",
+                  "流浪商队",
+                  "以物易物"
+                ]
+              },
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "生命": {
+                      "delta": 5,
+                      "min": 0
+                    },
+                    "体力": {
+                      "delta": 5,
+                      "min": 0
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "periodicEvents": [
+            {
+              "id": "radiation_sickness",
+              "name": "辐射病发作",
+              "description": "长期暴露在辐射环境中，身体会周期性出现辐射病症状。",
+              "intervalTicks": 14,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "生命": {
+                      "delta": -10,
+                      "min": 0
+                    },
+                    "体力": {
+                      "delta": -15,
+                      "min": 0
+                    }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "supply_scarcity",
+              "name": "资源枯竭",
+              "description": "周边资源被搜刮殆尽，需要前往更危险的区域寻找物资。",
+              "intervalTicks": 30,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "体力": {
+                      "delta": -10,
+                      "min": 0
+                    }
+                  }
+                }
+              },
+              "narrateToAI": true
+            },
+            {
+              "id": "settlement_conflict",
+              "name": "聚落冲突",
+              "description": "不同聚落之间的资源争夺，可能被卷入其中。",
+              "intervalTicks": 20,
+              "offsetTicks": 10,
+              "effects": {
+                "stats": {
+                  "changes": {
+                    "生命": {
+                      "delta": -15,
+                      "min": 0
+                    }
+                  }
+                }
+              },
+              "narrateToAI": true
+            }
+          ],
+          "worldStateRules": [],
+          "worldStateAxes": {
+            "辐射强度": [
+              "低",
+              "中",
+              "高",
+              "致命"
+            ],
+            "势力格局": [
+              "混乱",
+              "割据",
+              "统一"
+            ]
+          },
+          "narrativeGuardrails": {
+            "maxDeltaPerStat": {
+              "*": 25
+            },
+            "maxDeltaPerResource": {},
+            "setAllowedVars": [],
+            "allowCreateResources": false
+          }
+        }
+      }
+    ],
+    "createdAt": "2026-07-06T10:51:50.823Z",
+    "version": "2.1.1"
   }
 ]

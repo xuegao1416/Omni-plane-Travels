@@ -237,6 +237,8 @@ export interface NarrativeRelationEdge {
   sourceEndIndex: number | null;
   createdAt?: number;
   updatedAt?: number;
+  /** 关系生效的地点范围，如"公寓"、"公司"、"袁小安家"。不确定时填"全局" */
+  locationScope?: string;
 }
 
 export interface NarrativeRelationNetworkItem {
@@ -252,6 +254,8 @@ export interface NarrativeRelationNetworkItem {
   sourceEndIndex: number | null;
   createdAt?: number;
   updatedAt?: number;
+  /** 关系生效的地点范围，如"公寓"、"公司"、"袁小安家"。不确定时填"全局" */
+  locationScope?: string;
 }
 
 export interface NarrativeEventCard {
@@ -288,6 +292,8 @@ export interface NarrativeEntityCard {
   sourceEndIndex: number | null;
   createdAt?: number;
   updatedAt?: number;
+  /** 带地点标注的事实，用于空间感知记忆。如 { location: "袁小安家", fact: "在此处与赖方杭发生关系" } */
+  locationFacts?: Array<{ location: string; fact: string }>;
 }
 
 export interface NarrativeArchiveCard {

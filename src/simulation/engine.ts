@@ -417,10 +417,15 @@ export class WorldSimulationEngine {
    * 推进现有事件（不调 AI，纯逻辑推进）
    */
   private advanceExistingEvents(_gameState: GameState) {
+    const currentTick = this.state.tickCount;
     for (const evt of Object.values(this.state.events)) {
       if (evt.status === 'brewing') {
-        evt.status = 'active';
-        evt.startedAtTime = evt.createdAtTime;
+        // brewing 事件至少存活 1 tick 才升级为 active，让玩家有机会看到"酝酿中"状态
+        const age = currentTick - (evt.lastUpdatedTick ?? 0);
+        if (age >= 1) {
+          evt.status = 'active';
+          evt.startedAtTime = evt.createdAtTime;
+        }
       }
       if (evt.status === 'active' && evt.childEventIds.length > 0) {
         const allChildrenResolved = evt.childEventIds.every(
@@ -947,13 +952,16 @@ export class WorldSimulationEngine {
       return false;
     }
 
-    // 匹配 keywords（兜底）
+    // 匹配 keywords（可选过滤条件）
     if (trigger.keywords && trigger.keywords.length > 0) {
       const text = `${event.title} ${event.description}`.toLowerCase();
-      return trigger.keywords.some(kw => text.includes(kw.toLowerCase()));
+      if (!trigger.keywords.some(kw => text.includes(kw.toLowerCase()))) {
+        return false;
+      }
     }
 
-    return false;
+    // 所有条件都通过（或无额外条件），视为匹配
+    return true;
   }
 
   /**
@@ -1146,13 +1154,11 @@ export class WorldSimulationEngine {
     const snapshot = this.state.snapshots.find(s => s.id === snapshotId);
     if (!snapshot?.snapshot) return false;
 
-    // 恢复状态，但保留快照列表本身
+    // 恢复状态，但保留快照列表本身（快照内不嵌套旧快照，所以恢复时需保留当前列表）
     const currentSnapshots = this.state.snapshots;
     this.state = JSON.parse(JSON.stringify(snapshot.snapshot));
-    // 兼容：确保恢复的状态有 snapshots 字段
-    if (!this.state.snapshots) {
-      this.state.snapshots = currentSnapshots;
-    }
+    // 快照瘦身时 snapshots 被清空，恢复时始终用当前列表
+    this.state.snapshots = currentSnapshots;
 
     this.saveState();
 
@@ -1195,6 +1201,9 @@ export class WorldSimulationEngine {
    */
   private _slimForSnapshot(state: SimulationState): SimulationState {
     const s = { ...state };
+
+    // 关键：快照内不嵌套旧快照，否则指数膨胀（每个快照包含所有旧快照）
+    s.snapshots = [];
 
     // 精简事件描述（截断过长的描述）
     const slimEvents: Record<string, SimEvent> = {};

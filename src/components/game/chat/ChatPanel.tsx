@@ -1,9 +1,10 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { useUISettings } from '../../../context/UISettingsContext';
 import type { ChatMessage } from '../../../engine/types';
 import type { PipelineStatus as PipelineStatusType, PipelineTaskId } from '../../../engine/pipelineTypes';
 import type { WorldSystemData, DiceRoll } from '../../../modules/schema';
 import MessageBubble from './MessageBubble';
+import ErrorBoundary from '../../ErrorBoundary';
 import InputArea from './InputArea';
 import PipelineMonitorModal from './PipelineMonitorModal';
 
@@ -32,13 +33,13 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
   const { settings, t } = useUISettings();
 
   // 处理内联选项点击
-  const handleOptionClick = (optionText: string) => {
+  const handleOptionClick = useCallback((optionText: string) => {
     setInputText(prev => {
       const trimmed = prev.trim()
       if (!trimmed) return optionText
       return `${trimmed} ${optionText}`
     })
-  };
+  }, []);
 
   // 自动滚动到底部（受设置控制）
   useEffect(() => {
@@ -50,7 +51,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
   }, [messages, settings.autoScroll]);
 
   // 复制到剪贴板
-  const handleCopy = (text: string) => {
+  const handleCopy = useCallback((text: string) => {
     navigator.clipboard.writeText(text).catch(() => {
       // fallback for older browsers
       const ta = document.createElement('textarea');
@@ -62,7 +63,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
       document.execCommand('copy');
       document.body.removeChild(ta);
     });
-  };
+  }, []);
 
   return (
     <div style={{
@@ -97,18 +98,30 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
           </div>
         )}
         {messages.map(msg => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            onDelete={onDelete}
-            onEdit={onEdit}
-            onResend={onResend}
-            onResendFromHere={onResendFromHere}
-            onCopy={handleCopy}
-            onOptionClick={handleOptionClick}
-            worldSystem={worldSystem}
-            onDiceRoll={onDiceRoll}
-          />
+          <ErrorBoundary key={msg.id} fallback={
+            <div style={{
+              padding: '0.75rem 1rem',
+              borderRadius: '8px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--danger, #e74c3c)',
+              color: 'var(--text-muted)',
+              fontSize: 'var(--font-size-sm)',
+            }}>
+              ⚠ 消息渲染失败 (ID: {msg.id.slice(0, 8)}…)
+            </div>
+          }>
+            <MessageBubble
+              message={msg}
+              onDelete={onDelete}
+              onEdit={onEdit}
+              onResend={onResend}
+              onResendFromHere={onResendFromHere}
+              onCopy={handleCopy}
+              onOptionClick={handleOptionClick}
+              worldSystem={worldSystem}
+              onDiceRoll={onDiceRoll}
+            />
+          </ErrorBoundary>
         ))}
       </div>
 

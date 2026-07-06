@@ -3,7 +3,7 @@
 // ============================================================
 
 let lastCallTime = 0;
-let currentInterval = 10000; // 默认 10 秒
+let currentInterval = 3000; // 默认 3 秒（可通过 setRateLimitInterval 或 detectOptimalRateLimit 调整）
 
 /**
  * 设置限流间隔
@@ -29,11 +29,8 @@ export async function waitForRateLimit(): Promise<void> {
   const timeSinceLastCall = now - lastCallTime;
   if (timeSinceLastCall < currentInterval) {
     const waitTime = currentInterval - timeSinceLastCall;
-    console.log(`⏳ [限流] 距上次调用 ${Math.round(timeSinceLastCall)}ms，需等待 ${Math.round(waitTime)}ms（间隔 ${currentInterval}ms）`);
+    console.debug(`⏳ [限流] 等待 ${Math.round(waitTime)}ms（间隔 ${currentInterval}ms）`);
     await new Promise(resolve => setTimeout(resolve, waitTime));
-    console.log(`✅ [限流] 等待结束，可以发起请求`);
-  } else {
-    console.log(`✅ [限流] 距上次调用 ${Math.round(timeSinceLastCall)}ms，无需等待`);
   }
   lastCallTime = Date.now();
 }

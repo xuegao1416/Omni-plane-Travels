@@ -104,12 +104,38 @@ function selectHotThreads(threads: NarrativeThread[], limit: number): NarrativeT
   }).slice(0, limit);
 }
 
-function selectHotRelations(edges: NarrativeRelationEdge[], limit: number): NarrativeRelationEdge[] {
-  return [...edges].filter(e => e.status === 'active').sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0)).slice(0, limit);
+function selectHotRelations(edges: NarrativeRelationEdge[], limit: number, currentLocation?: string): NarrativeRelationEdge[] {
+  return [...edges]
+    .filter(e => e.status === 'active' || e.status === 'changed')
+    .sort((a, b) => {
+      // 当前地点的关系优先
+      const aLoc = a.locationScope === currentLocation ? 1 : 0;
+      const bLoc = b.locationScope === currentLocation ? 1 : 0;
+      if (aLoc !== bLoc) return bLoc - aLoc;
+      // active 优先于 changed
+      const aStatus = a.status === 'active' ? 1 : 0;
+      const bStatus = b.status === 'active' ? 1 : 0;
+      if (aStatus !== bStatus) return bStatus - aStatus;
+      return (b.strength ?? 0) - (a.strength ?? 0);
+    })
+    .slice(0, limit);
 }
 
-function selectHotRelationNetwork(items: NarrativeRelationNetworkItem[], limit: number): NarrativeRelationNetworkItem[] {
-  return [...items].filter(i => i.status === 'active').sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0) || (b.strength ?? 0) - (a.strength ?? 0)).slice(0, limit);
+function selectHotRelationNetwork(items: NarrativeRelationNetworkItem[], limit: number, currentLocation?: string): NarrativeRelationNetworkItem[] {
+  return [...items]
+    .filter(i => i.status === 'active' || i.status === 'changed')
+    .sort((a, b) => {
+      // 当前地点的关系优先
+      const aLoc = a.locationScope === currentLocation ? 1 : 0;
+      const bLoc = b.locationScope === currentLocation ? 1 : 0;
+      if (aLoc !== bLoc) return bLoc - aLoc;
+      // active 优先于 changed
+      const aStatus = a.status === 'active' ? 1 : 0;
+      const bStatus = b.status === 'active' ? 1 : 0;
+      if (aStatus !== bStatus) return bStatus - aStatus;
+      return (b.confidence ?? 0) - (a.confidence ?? 0) || (b.strength ?? 0) - (a.strength ?? 0);
+    })
+    .slice(0, limit);
 }
 
 function selectHotEvents(events: NarrativeEventCard[], limit: number): NarrativeEventCard[] {
@@ -156,15 +182,19 @@ function formatThreadLine(t: NarrativeThread): string {
 }
 
 function formatRelationLine(r: NarrativeRelationEdge): string {
-  return `- ${r.sourceEntityId} → ${r.targetEntityId}：${r.relationType}｜${r.summary}`;
+  const loc = r.locationScope ? ` [${r.locationScope}]` : '';
+  return `- ${r.sourceEntityId} → ${r.targetEntityId}：${r.relationType}${loc}｜${r.summary}`;
 }
 
 function formatRelationNetworkLine(r: NarrativeRelationNetworkItem): string {
-  return `- ${r.sourceEntityId} ↔ ${r.targetEntityId}：${r.relationType}｜${r.summary}`;
+  const loc = r.locationScope ? ` [${r.locationScope}]` : '';
+  return `- ${r.sourceEntityId} ↔ ${r.targetEntityId}：${r.relationType}${loc}｜${r.summary}`;
 }
 
 function formatEventLine(e: NarrativeEventCard): string {
-  return `- ${e.title}｜${e.summary}`;
+  const locs = asArr(e.locationRefs);
+  const loc = locs.length > 0 ? ` [${locs.join('/')}]` : '';
+  return `- ${e.title}${loc}｜${e.summary}`;
 }
 
 function formatEntityLine(e: NarrativeEntityCard): string {
@@ -174,6 +204,11 @@ function formatEntityLine(e: NarrativeEntityCard): string {
   if (e.currentStance) parts.push(`｜立场：${e.currentStance}`);
   const facts = asArr(e.stableFacts);
   if (facts.length > 0) parts.push(`｜${facts[0]}`);
+  // 带地点的事实（优先显示当前场景相关的）
+  const locFacts = e.locationFacts;
+  if (locFacts && locFacts.length > 0) {
+    parts.push(`｜地点事实：${locFacts[0].location} - ${locFacts[0].fact}`);
+  }
   return parts.join('');
 }
 
@@ -223,7 +258,9 @@ export function formatRuntimeToCompiledText(
     hotIds.threads = hotThreads.map(t => t.id);
   }
 
-  const hotRelations = selectHotRelations(runtime.relationEdges, budget.hotRelationLimit);
+  const currentLocation = runtime.sceneAnchor?.locationLabel || '';
+
+  const hotRelations = selectHotRelations(runtime.relationEdges, budget.hotRelationLimit, currentLocation);
   if (hotRelations.length > 0) {
     const text = hotRelations.map(formatRelationLine).join('\n');
     const trimmed = trimToTokenBudget(text, budget.relations);
@@ -232,7 +269,7 @@ export function formatRuntimeToCompiledText(
     hotIds.relations = hotRelations.map(r => r.id);
   }
 
-  const hotNetwork = selectHotRelationNetwork(runtime.relationNetwork, budget.hotRelationLimit);
+  const hotNetwork = selectHotRelationNetwork(runtime.relationNetwork, budget.hotRelationLimit, currentLocation);
   if (hotNetwork.length > 0) {
     const text = hotNetwork.map(formatRelationNetworkLine).join('\n');
     const trimmed = trimToTokenBudget(text, budget.relationNetwork);

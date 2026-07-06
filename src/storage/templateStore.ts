@@ -257,7 +257,8 @@ export function parsePlayerPresetJSON(jsonStr: string): ValidateResult<PlayerPre
   let raw: any;
   try { raw = JSON.parse(jsonStr); } catch { return { ok: false, error: 'JSON 解析失败，请检查文件格式' }; }
 
-  const data = raw;
+  // 兼容信封格式（导出时带 type/data 外壳）和裸格式
+  const data = raw.data ?? raw;
 
   if (!isStr(data.name) || !data.name.trim()) return { ok: false, error: '缺少有效的 name 字段' };
   if (!isStr(data.gender)) return { ok: false, error: 'gender 字段必须是字符串' };
@@ -306,7 +307,8 @@ export function parseNpcTemplateJSON(jsonStr: string): ValidateResult<NpcTemplat
   let raw: any;
   try { raw = JSON.parse(jsonStr); } catch { return { ok: false, error: 'JSON 解析失败，请检查文件格式' }; }
 
-  const data = raw;
+  // 兼容信封格式（导出时带 type/data 外壳）和裸格式
+  const data = raw.data ?? raw;
   const npc = data.npc ?? data;
 
   if (!isValidNpcShape(npc)) {
@@ -354,7 +356,8 @@ export function parseHistoryPresetJSON(jsonStr: string): ValidateResult<HistoryP
   let raw: any;
   try { raw = JSON.parse(jsonStr); } catch { return { ok: false, error: 'JSON 解析失败，请检查文件格式' }; }
 
-  const data = raw;
+  // 兼容信封格式（导出时带 type/data 外壳）和裸格式
+  const data = raw.data ?? raw;
 
   if (!isStr(data.name) || !data.name.trim()) return { ok: false, error: '缺少有效的 name 字段' };
   if (!isObj(data.segments)) return { ok: false, error: 'segments 字段必须是对象' };

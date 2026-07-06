@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { WorldDef, WorldBookEntryDef, WorldModule } from '../../../data/worlds-schema';
 import type { DimensionChoice, DimensionGeneration, DimensionSelection } from '../../../worldgen/choice';
 import { generateWorldFromSelections, generateModuleEntries } from '../../../worldgen/choice';
-import { requestStreamWithRetry } from '../../../api/client';
+import { requestStreamWithRetry, requestCompletion } from '../../../api/client';
 import { GUIDED_DIMENSIONS } from './dimensions';
 import { generateGuidedOptions, extractJSON } from './helpers';
 
@@ -42,14 +42,22 @@ export function useGuidedSelection({
   );
   const customChoice = customSelection?.choices?.find(c => c.id === 'E');
 
-  const createCallAI = useCallback(() => {
+  const createCallAI = useCallback((opts?: { stream?: boolean }) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    const useStream = opts?.stream ?? false;
     return async (messages: Array<{ role: string; content: string }>): Promise<string> => {
-      const result = await requestStreamWithRetry(apiConfig, messages as any, {
+      if (useStream) {
+        const result = await requestStreamWithRetry(apiConfig, messages as any, {
+          signal: ctrl.signal,
+          onDelta: () => {},
+        });
+        return result.text;
+      }
+      // 非流式：完整接收后再返回，避免 JSON 被截断
+      const result = await requestCompletion(apiConfig, messages as any, {
         signal: ctrl.signal,
-        onDelta: () => {},
       });
       return result.text;
     };

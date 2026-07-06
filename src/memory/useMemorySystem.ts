@@ -172,7 +172,7 @@ async function callAI(
   await waitForRateLimit();
 
   const { requestCompletion } = await import('../api/client');
-  const result = await requestCompletion(
+  const promise = requestCompletion(
     { ...apiConfig, provider: 'openai' },
     [
       { role: 'system', content: systemPrompt },
@@ -180,6 +180,12 @@ async function callAI(
     ],
     { responseFormat: 'json', temperature },
   );
+
+  // 超时保护：120 秒
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('记忆系统 AI 调用超时（120s）')), 120_000),
+  );
+  const result = await Promise.race([promise, timeoutPromise]);
   return result.text;
 }
 
@@ -797,8 +803,14 @@ function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, playerName: 
     parts.push(`状态槽：${activeSlots.map(s => `${s.slotType}(${s.scopeId})`).join('、')}`);
   }
   if (runtime.relationNetwork.length > 0) {
-    const topRels = runtime.relationNetwork.slice(0, 5);
-    parts.push(`关系网：${topRels.map(r => `${r.sourceEntityId}→${r.targetEntityId}(${r.relationType})`).join('、')}`);
+    const topRels = runtime.relationNetwork
+      .filter(r => r.status === 'active' || r.status === 'changed')
+      .slice(0, 8)
+      .map(r => {
+        const loc = r.locationScope ? `[${r.locationScope}]` : '';
+        return `${r.sourceEntityId}→${r.targetEntityId}(${r.relationType}${loc})`;
+      });
+    if (topRels.length > 0) parts.push(`关系网：${topRels.join('、')}`);
   }
   return parts.length > 0 ? parts.join('\n') : '暂无已知参考锚点';
 }
@@ -808,17 +820,46 @@ function applyIngestResult(runtime: NarrativeMemoryRuntime, parsed: Record<strin
   const scenePatch = parsed.scenePatch as Record<string, string> | undefined;
   if (scenePatch && typeof scenePatch === 'object') {
     const existing = runtime.sceneAnchor;
+    const oldLocation = existing?.locationLabel || '';
+
+    // 替换式更新：AI 返回空字符串也视为"有意清空"，不用 ?? 回退到旧值
+    const pick = (field: string, fallback: string = '') =>
+      scenePatch[field] !== undefined && scenePatch[field] !== null
+        ? String(scenePatch[field])
+        : (existing?.[field as keyof typeof existing] as string ?? fallback);
+
+    const newLocation = pick('locationLabel');
+    const newPresentEntities = Array.isArray(scenePatch.presentEntities)
+      ? scenePatch.presentEntities as string[]
+      : (Array.isArray(existing?.presentEntities) ? existing.presentEntities : []);
+
     runtime.sceneAnchor = {
-      timeLabel: scenePatch.timeLabel ?? existing?.timeLabel ?? '',
-      locationLabel: scenePatch.locationLabel ?? existing?.locationLabel ?? '',
-      presentEntities: (Array.isArray(scenePatch.presentEntities) ? scenePatch.presentEntities as string[] : Array.isArray(existing?.presentEntities) ? existing.presentEntities : []) ?? [],
-      immediateGoal: scenePatch.immediateGoal ?? existing?.immediateGoal ?? '',
-      immediateRisk: scenePatch.immediateRisk ?? existing?.immediateRisk ?? '',
-      conversationFocus: scenePatch.conversationFocus ?? existing?.conversationFocus ?? '',
-      recentChange: scenePatch.recentChange ?? existing?.recentChange ?? '',
+      timeLabel: pick('timeLabel'),
+      locationLabel: newLocation,
+      presentEntities: newPresentEntities,
+      immediateGoal: pick('immediateGoal'),
+      immediateRisk: pick('immediateRisk'),
+      conversationFocus: pick('conversationFocus'),
+      recentChange: pick('recentChange'),
       confidence: Number(scenePatch.confidence) || existing?.confidence || 0.5,
       updatedAt: Date.now(),
     };
+
+    // 地点变化时：将旧地点的空间关系降级为 changed
+    if (newLocation && oldLocation && newLocation !== oldLocation) {
+      for (const edge of runtime.relationNetwork) {
+        if (edge.locationScope && edge.locationScope === oldLocation && edge.status === 'active') {
+          edge.status = 'changed';
+          edge.updatedAt = Date.now();
+        }
+      }
+      for (const edge of runtime.relationEdges) {
+        if (edge.locationScope && edge.locationScope === oldLocation && edge.status === 'active') {
+          edge.status = 'changed';
+          edge.updatedAt = Date.now();
+        }
+      }
+    }
   }
 
   // 应用线程更新
@@ -862,9 +903,16 @@ function applyIngestResult(runtime: NarrativeMemoryRuntime, parsed: Record<strin
       const idx = runtime.entityCards.findIndex(c => c.id === patch.id || c.name === patch.name);
       if (idx >= 0) {
         const existing = runtime.entityCards[idx];
+        // locationFacts 累积：保留旧的 + 合并新的，按 location+fact 去重
+        const oldLocFacts = Array.isArray(existing.locationFacts) ? existing.locationFacts : [];
+        const newLocFacts = Array.isArray(patch.locationFacts) ? patch.locationFacts as Array<{ location: string; fact: string }> : [];
+        const mergedLocFacts = [...oldLocFacts, ...newLocFacts]
+          .filter((v, i, arr) => arr.findIndex(x => x.location === v.location && x.fact === v.fact) === i)
+          .slice(-15);
         runtime.entityCards[idx] = {
           ...existing, ...patch,
           stableFacts: [...new Set([...ensureArr(existing.stableFacts), ...ensureArr(patch.stableFacts)])].slice(-10),
+          locationFacts: mergedLocFacts,
           updatedAt: Date.now(),
         };
       } else {
