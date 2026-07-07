@@ -295,6 +295,29 @@ export async function deleteMessages(saveId: string): Promise<void> {
   await tx.done;
 }
 
+/**
+ * 删除指定存档中 seq > maxSeq 的消息（用于重roll后清理被截断的旧消息）
+ */
+export async function deleteMessagesAboveSeq(saveId: string, maxSeq: number): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(MESSAGES_STORE, 'readwrite');
+  const index = tx.store.index('saveId_seq');
+
+  // 只遍历 seq > maxSeq 的记录
+  const range = IDBKeyRange.bound(
+    [saveId, maxSeq + 1],
+    [saveId, Number.MAX_SAFE_INTEGER],
+  );
+
+  let cursor = await index.openCursor(range);
+  while (cursor) {
+    await cursor.delete();
+    cursor = await cursor.continue();
+  }
+
+  await tx.done;
+}
+
 // ─── 配额管理 ─────────────────────────────────────────
 
 /** 配额检查结果 */

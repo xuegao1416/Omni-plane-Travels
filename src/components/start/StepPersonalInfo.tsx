@@ -140,7 +140,7 @@ export default function StepPersonalInfo({
       {npcEditorOpen && (
         <NpcEditorModal initial={editingNpc} onSave={handleSaveNpc} onCancel={() => { setNpcEditorOpen(false); setEditingNpc(null); }}
           apiConfig={apiConfig} playerName={personalInfo.name} playerGender={personalInfo.gender} playerAge={personalInfo.age} playerBackground={personalInfo.background}
-          selectedWorld={selectedWorld} allWorlds={allWorlds} worldEntry={worldEntry} />
+          selectedWorld={selectedWorld} allWorlds={allWorlds} worldEntry={worldEntry} worldModules={worldModules} />
       )}
       {npcPickerOpen && <TemplatePickerDialog mode="npc" onClose={() => setNpcPickerOpen(false)} onBlank={() => { setEditingNpc(null); setNpcEditorOpen(true); }} onImportTemplate={(npc) => { setEditingNpc(npc); setNpcEditorOpen(true); }} />}
       {playerPickerOpen && <TemplatePickerDialog mode="player" currentProfile={personalInfo} onClose={() => setPlayerPickerOpen(false)} onApplyPreset={(profile) => setPersonalInfo(profile)} />}

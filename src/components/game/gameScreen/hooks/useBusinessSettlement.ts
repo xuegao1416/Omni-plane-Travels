@@ -3,6 +3,7 @@ import { eventBus, EVENTS } from '../../../../engine/eventBus';
 import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { BusinessModuleSchema } from '../../../../modules/schema';
+import { normalizeAssetStatus } from '../../panels/businessOverlay/utils';
 
 type AssetStatus = 'active' | 'idle' | 'damaged' | 'destroyed';
 type TxType = 'income' | 'expense' | 'purchase' | 'sale' | 'upgrade' | 'event';
@@ -54,6 +55,19 @@ export function useBusinessSettlement(
 
       const state = engine.variableManager.getState();
       const runtimeBiz = state.玩家?.经营资产 as RuntimeBusiness | undefined;
+
+      // 规范化资产状态 + 补全缺失的收益字段（AI 创建资产时经常漏填）
+      if (runtimeBiz?.资产列表) {
+        for (const asset of runtimeBiz.资产列表) {
+          asset.状态 = normalizeAssetStatus(asset.状态 as any) as AssetStatus;
+          // AI 漏填收益字段时，给合理默认值（基础5/每级3/维护2，净收益+6）
+          if (!asset.基础收益 && !asset.每级收益 && !asset.维护费) {
+            asset.基础收益 = 5;
+            asset.每级收益 = 3;
+            asset.维护费 = 2;
+          }
+        }
+      }
 
       // 如果 GameState 中还没有经营资产数据，从世界定义初始化
       if (!runtimeBiz) {

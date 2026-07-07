@@ -1,13 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import type { CustomNpc } from '../../storage/db';
 import type { ApiConfig } from '../../api/types';
 import type { WorldDef } from '../../data/worldLoader';
 import type { WorldBookEntry } from '../../worldbook/index';
-import { X, Wand2, Loader, Download } from 'lucide-react';
+import type { WorldModule } from '../../data/worlds-schema';
+import { X, Wand2, Loader, Download, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
 import { useConfigStore } from '../../stores/configStore';
 import { useNpcFill } from '../../hooks/useNpcFill';
 import { exportNpcTemplateJSON, downloadJSON } from '../../storage/templateStore';
+
+const QUALITY_OPTIONS = ['普通', '精良', '稀有', '史诗', '传说'] as const;
 
 interface Props {
   initial?: CustomNpc | null;
@@ -21,6 +24,7 @@ interface Props {
   selectedWorld?: string;
   allWorlds?: WorldDef[];
   worldEntry?: WorldBookEntry | null;
+  worldModules?: WorldModule[];
 }
 
 const emptyNpc = (): CustomNpc => ({
@@ -49,16 +53,95 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** 可折叠分组 */
+function CollapsibleSection({ title, count, expanded, onToggle, children }: {
+  title: string; count: number; expanded: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+      <button onClick={onToggle} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', border: 'none', background: 'var(--bg-primary)', cursor: 'pointer',
+        fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)',
+      }}>
+        <span>{title}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {count > 0 && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{count}</span>}
+          <ChevronDown size={14} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-muted)' }} />
+        </span>
+      </button>
+      {expanded && (
+        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border)' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NpcEditorModal({
   initial, onSave, onCancel,
   apiConfig, playerName, playerGender, playerAge, playerBackground,
-  selectedWorld, allWorlds, worldEntry,
+  selectedWorld, allWorlds, worldEntry, worldModules,
 }: Props) {
   const t = useConfigStore(s => s.t);
   const [npc, setNpc] = useState<CustomNpc>(() => initial || emptyNpc());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  // 模块检测
+  const statMod = worldModules?.find(m => m.moduleId === 'stat' && m.enabled);
+  const progMod = worldModules?.find(m => m.moduleId === 'progression' && m.enabled);
+  const statConfig = statMod?.moduleConfig as any;
+  const progConfig = progMod?.moduleConfig as any;
 
   const set = <K extends keyof CustomNpc>(key: K, val: CustomNpc[K]) =>
     setNpc(prev => ({ ...prev, [key]: val }));
+
+  // 技能/物品 Map 操作
+  const renameMapKey = (field: 'skillsList' | 'itemsList', oldKey: string, newKey: string) => {
+    if (!newKey.trim() || oldKey === newKey) return;
+    setNpc(prev => {
+      const map = { ...(prev[field] as any) };
+      const val = map[oldKey]; if (!val) return prev;
+      delete map[oldKey]; map[newKey] = val;
+      return { ...prev, [field]: map };
+    });
+  };
+  const removeMapEntry = (field: 'skillsList' | 'itemsList', key: string) => {
+    setNpc(prev => { const map = { ...(prev[field] as any) }; delete map[key]; return { ...prev, [field]: map }; });
+  };
+  const addMapEntry = (field: 'skillsList' | 'itemsList', defaultValue: any) => {
+    const prefix = field === 'skillsList' ? '技能' : '物品';
+    const name = `${prefix}${Object.keys(npc[field]).length + 1}`;
+    setNpc(prev => ({ ...prev, [field]: { ...(prev[field] as any), [name]: defaultValue } }));
+  };
+  const updateSkillField = (name: string, field: string, value: string) => {
+    setNpc(prev => {
+      const map = { ...prev.skillsList };
+      const skill = map[name]; if (!skill) return prev;
+      map[name] = { ...skill, [field]: value };
+      return { ...prev, skillsList: map };
+    });
+  };
+  const updateItemField = (name: string, field: string, value: any) => {
+    setNpc(prev => {
+      const map = { ...prev.itemsList };
+      const item = map[name]; if (!item) return prev;
+      map[name] = { ...item, [field]: field === '数量' ? Number(value) || 1 : value };
+      return { ...prev, itemsList: map };
+    });
+  };
+  const setSurvivalStat = (key: string, value: number) => {
+    setNpc(prev => ({ ...prev, survivalStats: { ...(prev.survivalStats || {}), [key]: value } }));
+  };
 
   const canSave = npc.name.trim().length > 0;
 
@@ -213,6 +296,138 @@ export default function NpcEditorModal({
           <div className="form-group">
             <textarea value={npc.background} onChange={e => set('background', e.target.value)} placeholder="简述NPC的背景故事..." rows={3} />
           </div>
+
+          {/* ── 技能列表 ── */}
+          <CollapsibleSection
+            title="技能列表" count={Object.keys(npc.skillsList).length}
+            expanded={expandedSections.has('skills')} onToggle={() => toggleSection('skills')}
+          >
+            {Object.entries(npc.skillsList).map(([name, skill]) => (
+              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input type="text" defaultValue={name}
+                    onBlur={e => { if (e.target.value !== name) renameMapKey('skillsList', name, e.target.value); }}
+                    placeholder="技能名称..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                  <select value={skill.品质} onChange={e => updateSkillField(name, '品质', e.target.value)}
+                    style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-secondary)' }}>
+                    {QUALITY_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
+                  </select>
+                  <button onClick={() => removeMapEntry('skillsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                </div>
+                <input type="text" value={skill.描述} onChange={e => updateSkillField(name, '描述', e.target.value)} placeholder="技能描述..." style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                <input type="text" value={skill.类型} onChange={e => updateSkillField(name, '类型', e.target.value)} placeholder="类型(攻击/防御/辅助...)" style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+              </div>
+            ))}
+            <button className="btn-ghost" onClick={() => addMapEntry('skillsList', { 品质: '普通', 描述: '', 类型: '' })} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加技能</button>
+          </CollapsibleSection>
+
+          {/* ── 物品列表 ── */}
+          <CollapsibleSection
+            title="物品列表" count={Object.keys(npc.itemsList).length}
+            expanded={expandedSections.has('items')} onToggle={() => toggleSection('items')}
+          >
+            {Object.entries(npc.itemsList).map(([name, item]) => (
+              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <input type="text" defaultValue={name}
+                    onBlur={e => { if (e.target.value !== name) renameMapKey('itemsList', name, e.target.value); }}
+                    placeholder="物品名称..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                  <input type="number" value={item.数量} onChange={e => updateItemField(name, '数量', e.target.value)} min={1} style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', width: '50px' }} />
+                  <select value={item.品质} onChange={e => updateItemField(name, '品质', e.target.value)}
+                    style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-secondary)' }}>
+                    {QUALITY_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
+                  </select>
+                  <button onClick={() => removeMapEntry('itemsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input type="text" value={item.类型} onChange={e => updateItemField(name, '类型', e.target.value)} placeholder="类型(武器/防具/消耗品...)" style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                  <input type="text" value={item.备注} onChange={e => updateItemField(name, '备注', e.target.value)} placeholder="备注..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                </div>
+              </div>
+            ))}
+            <button className="btn-ghost" onClick={() => addMapEntry('itemsList', { 数量: 1, 类型: '', 品质: '普通', 备注: '' })} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加物品</button>
+          </CollapsibleSection>
+
+          {/* ── 人物事迹 ── */}
+          <CollapsibleSection
+            title="人物事迹" count={npc.chronicles.length}
+            expanded={expandedSections.has('chronicles')} onToggle={() => toggleSection('chronicles')}
+          >
+            {npc.chronicles.map((c, i) => (
+              <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{i + 1}.</span>
+                <input type="text" value={c} onChange={e => {
+                  const next = [...npc.chronicles]; next[i] = e.target.value; set('chronicles', next);
+                }} placeholder="事迹内容..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                <button onClick={() => { const next = npc.chronicles.filter((_, j) => j !== i); set('chronicles', next); }}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', flexShrink: 0 }}><Trash2 size={14} /></button>
+              </div>
+            ))}
+            <button className="btn-ghost" onClick={() => set('chronicles', [...npc.chronicles, ''])} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加事迹</button>
+          </CollapsibleSection>
+
+          {/* ── 生存属性（仅当世界启用 stat 模块时显示）── */}
+          {statConfig && (
+            <CollapsibleSection
+              title={statMod!.name || '生存属性'} count={npc.survivalStats ? Object.keys(npc.survivalStats).length : 0}
+              expanded={expandedSections.has('stats')} onToggle={() => toggleSection('stats')}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {[{ key: '血量', cfg: statConfig.attrA, fallback: 100 }, { key: '体力值', cfg: statConfig.attrB, fallback: 100 }].map(({ key, cfg, fallback }) => (
+                    <div key={key}>
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{cfg?.name || key}</span>
+                      <input type="number" value={npc.survivalStats?.[key] ?? fallback}
+                        onChange={e => setSurvivalStat(key, Number(e.target.value) || 0)}
+                        style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', width: '100%', boxSizing: 'border-box' }} />
+                    </div>
+                  ))}
+                </div>
+                {['dim1','dim2','dim3','dim4','dim5','dim6'].filter(k => statConfig[k]).length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                    {(['dim1','dim2','dim3','dim4','dim5','dim6'] as const).map(key => {
+                      const dim = statConfig[key];
+                      if (!dim) return null;
+                      return (
+                        <div key={key}>
+                          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{dim.name}</span>
+                          <input type="number" value={npc.survivalStats?.[key] ?? dim.value ?? 0}
+                            onChange={e => setSurvivalStat(key, Number(e.target.value) || 0)}
+                            style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', width: '100%', boxSizing: 'border-box', textAlign: 'center' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* ── 段位（仅当世界启用 progression 模块时显示）── */}
+          {progConfig?.tiers?.length > 0 && (
+            <CollapsibleSection
+              title={progMod!.name || '成长体系'} count={npc.tierIndex != null ? 1 : 0}
+              expanded={expandedSections.has('tier')} onToggle={() => toggleSection('tier')}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {progConfig.tiers.map((tier: any, i: number) => (
+                  <label key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px',
+                    borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
+                    background: (npc.tierIndex ?? 0) === i ? 'var(--accent-dim)' : 'transparent',
+                    border: `1px solid ${(npc.tierIndex ?? 0) === i ? 'var(--accent)' : 'var(--border)'}`,
+                    transition: 'all 0.12s',
+                  }}>
+                    <input type="radio" name="npcTier" checked={(npc.tierIndex ?? 0) === i}
+                      onChange={() => set('tierIndex', i)} style={{ display: 'none' }} />
+                    <span style={{ fontWeight: 600, color: (npc.tierIndex ?? 0) === i ? 'var(--accent)' : 'var(--text-primary)', minWidth: '1.5em' }}>{i + 1}.</span>
+                    <span style={{ fontWeight: 600, color: (npc.tierIndex ?? 0) === i ? 'var(--accent)' : 'var(--text-primary)' }}>{tier.name}</span>
+                    {tier.description && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tier.description}</span>}
+                  </label>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
         </div>
 
         <div className="world-editor-footer">

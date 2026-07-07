@@ -13,6 +13,7 @@ import {
   exportSave as exportSaveFromDb,
   importSaveFromData,
   getLastMessageSeq,
+  deleteMessages,
   autoPruneIfNeeded,
   ACTIVE_SAVE_KEY,
   SAVE_SCHEMA_VERSION,
@@ -197,15 +198,25 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       // 配额治理：检查配额，不足时自动清理冷消息
       await autoPruneIfNeeded(saveData.id);
 
-      // 获取上次保存的最后 seq
+      // 获取上次保存的最后 seq 和消息数
       const lastSeq = await getLastMessageSeq(saveData.id);
 
       // 计算新增消息（使用 seq 判断，而不是数组索引）
       const allMessages = saveData.messages || [];
-      const newMessages = allMessages.filter(m => {
-        const msgSeq = m.seq ?? 0;
-        return msgSeq > lastSeq;
-      });
+
+      // ★ 检测截断/重roll：如果数据库中的消息数 > 当前消息数，
+      // 说明发生过 rollbackAndTruncate，旧消息残留在数据库中
+      // 需要全量重写（先删后写）以保证一致性
+      const dbMessageCount = lastSeq >= 0 ? lastSeq + 1 : 0;
+      const needsFullRewrite = dbMessageCount > allMessages.length;
+
+      if (needsFullRewrite) {
+        await deleteMessages(saveData.id);
+      }
+
+      const newMessages = needsFullRewrite
+        ? allMessages  // 全量重写：所有消息都是"新"的
+        : allMessages.filter(m => (m.seq ?? 0) > lastSeq);
 
       // 构建紧凑头部（不含 messages）
       const compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'> = {

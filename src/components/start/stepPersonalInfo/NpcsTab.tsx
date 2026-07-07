@@ -23,6 +23,13 @@ export default function NpcsTab({ personalInfo, set, onEditNpc, onOpenPicker }: 
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {[npc.gender, npc.age && `${npc.age}岁`, npc.race, npc.relationshipType].filter(Boolean).join(' / ') || '未设定'}
             </div>
+            {(Object.keys(npc.skillsList).length > 0 || Object.keys(npc.itemsList).length > 0 || npc.chronicles.length > 0) && (
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--accent)', marginTop: '2px' }}>
+                {Object.keys(npc.skillsList).length > 0 && `${Object.keys(npc.skillsList).length}技能 `}
+                {Object.keys(npc.itemsList).length > 0 && `${Object.keys(npc.itemsList).length}物品 `}
+                {npc.chronicles.length > 0 && `${npc.chronicles.length}事迹`}
+              </div>
+            )}
           </div>
           <button onClick={() => onEditNpc(npc)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}><Pencil size={14} /></button>
           <button onClick={() => removeNpc(npc.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>

@@ -25,6 +25,7 @@ import { useSimulation } from './gameScreen/hooks/useSimulation';
 import { useSurvivalCraft } from './gameScreen/hooks/useSurvivalCraft';
 import { useSurvivalSettlement } from './gameScreen/hooks/useSurvivalSettlement';
 import { useBusinessSettlement } from './gameScreen/hooks/useBusinessSettlement';
+import { normalizeAssetStatus } from './panels/businessOverlay/utils';
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
@@ -151,6 +152,41 @@ export default function GameScreen() {
     navigate, setShowLeftOverlay, setMobileActivePanel,
   }), [navigate]);
   // ── Shared elements ──
+  const bizData = (() => {
+    const bizConfig = worldDef?.modules?.find(m => m.moduleId === 'business' && m.enabled)?.moduleConfig as BusinessModuleSchema | undefined;
+    if (!bizConfig) return undefined;
+    // 优先从当前渲染的 gameState 读取，其次从 VariableManager 实时读取（防止渲染间隙丢失更新）
+    const runtimeBiz = gameState.玩家?.经营资产
+      ?? (engine.variableManager.getVar('玩家.经营资产') as { 资金: number; 资产列表: any[]; 交易日志?: any[] } | undefined);
+    if (!runtimeBiz) return bizConfig;
+    return {
+      ...bizConfig,
+      funds: runtimeBiz.资金,
+      assets: runtimeBiz.资产列表.map(a => {
+        // AI 漏填收益字段时，给合理默认值
+        const hasIncome = a.基础收益 || a.每级收益 || a.维护费;
+        return {
+          id: a.id || `asset-${Math.random().toString(36).slice(2, 8)}`,
+          name: a.名称 || a.类型 || a.id || '未命名资产',
+          type: a.类型 || '',
+          level: a.等级 ?? 1,
+          maxLevel: a.最高等级 ?? 3,
+          description: a.描述 || '',
+          status: normalizeAssetStatus(a.状态),
+          income: {
+            base: a.基础收益 ?? (hasIncome ? 0 : 5),
+            perLevel: a.每级收益 ?? (hasIncome ? 0 : 3),
+            cycle: bizConfig.cycleName || '天',
+          },
+          maintenance: a.维护费 ?? (hasIncome ? 0 : 2),
+        };
+      }),
+      transactionLog: (runtimeBiz.交易日志 || []).map(t => ({
+        cycle: 0, type: t.类型, description: t.描述, amount: t.金额,
+      })),
+    } as BusinessModuleSchema;
+  })();
+
   const rightPanelEl = (
     <RightPanel
       gameState={gameState} worldId={state.selectedWorld}
@@ -161,6 +197,7 @@ export default function GameScreen() {
       onOpenBusinessOverlay={() => setBusinessOverlayOpen(true)}
       onOpenSurvivalOverlay={() => setSurvivalOverlayOpen(true)}
       survivalChangeLog={getSurvivalChangeLog()}
+      businessData={bizData}
     />
   );
 
@@ -174,26 +211,6 @@ export default function GameScreen() {
       onDiceRoll={handleDiceRoll} onRetrySingleStage={engine.retrySingleStage}
     />
   );
-  const bizData = (() => {
-    const bizConfig = worldDef?.modules?.find(m => m.moduleId === 'business' && m.enabled)?.moduleConfig as BusinessModuleSchema | undefined;
-    if (!bizConfig) return undefined;
-    const runtimeBiz = gameState.玩家?.经营资产;
-    if (!runtimeBiz) return bizConfig;
-    return {
-      ...bizConfig,
-      funds: runtimeBiz.资金,
-      assets: runtimeBiz.资产列表.map(a => ({
-        id: a.id, name: a.名称, type: a.类型,
-        level: a.等级, maxLevel: a.最高等级,
-        description: a.描述, status: a.状态,
-        income: { base: a.基础收益, perLevel: a.每级收益, cycle: bizConfig.cycleName || '天' },
-        maintenance: a.维护费,
-      })),
-      transactionLog: (runtimeBiz.交易日志 || []).map(t => ({
-        cycle: 0, type: t.类型, description: t.描述, amount: t.金额,
-      })),
-    } as BusinessModuleSchema;
-  })();
   // 生存资源数据（供 SurvivalOverlay 使用）
   const survivalData = (() => {
     return worldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled)?.moduleConfig as import('../../modules/schema').SurvivalModuleSchema | undefined;

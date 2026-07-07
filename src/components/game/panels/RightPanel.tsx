@@ -4,6 +4,7 @@ import type { WorldSystemData, ProgressionConfig, SurvivalRecipe, SurvivalModule
 import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
 import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard } from './modules';
 import { findWorldDef } from '../../../data/worldLoader';
+import { normalizeAssetStatus } from './businessOverlay/utils';
 
 interface Props {
   gameState: GameState;
@@ -24,6 +25,8 @@ interface Props {
   onOpenSurvivalOverlay?: () => void;
   /** 生存资源变更日志 */
   survivalChangeLog?: ResourceChangeLog[];
+  /** 预计算的经营资产数据（来自 GameScreen，保证资金同步） */
+  businessData?: BusinessModuleSchema;
 }
 
 // 世界状态行 - Lucide 图标 + 文字
@@ -54,7 +57,7 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
   );
 }
 
-export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog }: Props) {
+export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
 
@@ -91,13 +94,25 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             (worldSystem as any)[key] = {
               ...bizConfig,
               funds: runtimeBiz.资金,
-              assets: runtimeBiz.资产列表.map(a => ({
-                id: a.id, name: a.名称, type: a.类型,
-                level: a.等级, maxLevel: a.最高等级,
-                description: a.描述, status: a.状态,
-                income: { base: a.基础收益, perLevel: a.每级收益, cycle: bizConfig.cycleName || '天' },
-                maintenance: a.维护费,
-              })),
+              assets: runtimeBiz.资产列表.map(a => {
+                // AI 漏填收益字段时，给合理默认值
+                const hasIncome = a.基础收益 || a.每级收益 || a.维护费;
+                return {
+                  id: a.id || `asset-${Math.random().toString(36).slice(2, 8)}`,
+                  name: a.名称 || a.类型 || a.id || '未命名资产',
+                  type: a.类型 || '',
+                  level: a.等级 ?? 1,
+                  maxLevel: a.最高等级 ?? 3,
+                  description: a.描述 || '',
+                  status: normalizeAssetStatus(a.状态),
+                  income: {
+                    base: a.基础收益 ?? (hasIncome ? 0 : 5),
+                    perLevel: a.每级收益 ?? (hasIncome ? 0 : 3),
+                    cycle: bizConfig.cycleName || '天',
+                  },
+                  maintenance: a.维护费 ?? (hasIncome ? 0 : 2),
+                };
+              }),
               transactionLog: (runtimeBiz.交易日志 || []).map(t => ({
                 cycle: 0, type: t.类型, description: t.描述, amount: t.金额,
               })),
@@ -259,9 +274,9 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
           />
         );
       })()}
-      {worldSystem.经营资产 && (
+      {(businessData || worldSystem.经营资产) && (
         <BusinessCard
-          data={worldSystem.经营资产}
+          data={(businessData || worldSystem.经营资产) as BusinessModuleSchema}
           title={moduleNames?.['经营资产']}
           onOpenOverlay={onOpenBusinessOverlay ?? (() => {})}
         />
