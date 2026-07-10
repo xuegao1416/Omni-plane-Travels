@@ -27,6 +27,7 @@ import { STORAGE_KEYS } from '../config/storageKeys';
 import { useImageStore } from '../stores/imageStore';
 import { ROLE_COGNITION_FIREWALL_TITLE, ROLE_COGNITION_FIREWALL_CONTENT } from '../utils/roleCognitionFirewall';
 import { assembleSystemPrompt, injectAtDepthEntries } from './promptAssembler';
+import { runBusinessExtraction } from './businessExtraction';
 import { MacroEngine } from './macroEngine';
 import { useMemoryStore } from '../memory/memoryStore';
 import { useSimulationStore } from '../stores/simulationStore';
@@ -203,6 +204,8 @@ export function useGameEngine(
   const playerProfileRef = useRef(playerProfile ?? null);
   const characterHistoryRef = useRef(characterHistory ?? '');
   const onAutoSaveRef = useRef(onAutoSave);
+  const selectedWorldRef = useRef(selectedWorld);
+  useEffect(() => { selectedWorldRef.current = selectedWorld; }, [selectedWorld]);
   // 存储最后一轮管线执行器实例（用于单步重试）
   const lastExecutorRef = useRef<PipelineExecutor | null>(null);
   // 存储最后一轮管线执行上下文（用于重试管线）
@@ -257,6 +260,51 @@ export function useGameEngine(
       applyWorldAndModules(worldBookRef.current, selectedWorld);
     }
   }, [selectedWorld]);
+
+  // ── 经营资产独立提取：变量提取完成后 fire-and-forget ──
+  useEffect(() => {
+    const unsubscribe = eventBus.on(EVENTS.VARIABLE_UPDATE_ENDED, () => {
+      try {
+        const worldId = selectedWorldRef.current;
+        console.log('[经营提取] 事件触发, worldId:', worldId);
+        if (!worldId || worldId === 'default') return;
+        const worldDef = findWorldDef(worldId);
+        const hasBusiness = worldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
+        console.log('[经营提取] worldDef:', worldDef?.name, 'hasBusiness:', hasBusiness);
+        if (!hasBusiness) return;
+
+        const ctx = lastPipelineCtxRef.current;
+        if (!ctx) return;
+
+        // API 配置：优先变量提取专用预设 > 主API
+        let effectiveConfig: ApiConfig | null = apiConfig;
+        try {
+          const varPresetId = localStorage.getItem(STORAGE_KEYS.VARIABLE_API_PRESET);
+          if (varPresetId) {
+            const { loadPresets } = require('../components/settings/apiPresetUtils');
+            const presets = loadPresets();
+            const preset = presets.find((p: any) => p.id === varPresetId);
+            if (preset) effectiveConfig = { ...preset.config };
+          }
+        } catch { /* fallback */ }
+        if (!effectiveConfig) return;
+
+        console.log('[经营提取] 启动后台提取');
+        runBusinessExtraction({
+          varMgr: varMgrRef.current,
+          selectedWorld: worldId,
+          userText: ctx.userText,
+          aiContentText: ctx.batchText,
+          mainApiConfig: effectiveConfig,
+        }).catch(err => {
+          console.warn('[经营提取] 后台执行失败（不影响主流程）:', err);
+        });
+      } catch (err) {
+        console.warn('[经营提取] 初始化失败（不影响主流程）:', err);
+      }
+    });
+    return unsubscribe;
+  }, [apiConfig]);
 
   const addMessage = useCallback((msg: ChatMessage) => { setMessages(prev => [...prev, msg]); }, []);
   const updateMessage = useCallback((id: string, updates: Partial<ChatMessage>) => {
@@ -644,11 +692,11 @@ ${npcLines}
 ${(() => {
   const skills = (state as any).玩家?.技能系统;
   if (skills && typeof skills === 'object' && Object.keys(skills).length > 0) {
-    const lines = Object.entries(skills).map(([name, data]: [string, any]) => {
+    const lines = Object.entries(skills).filter(([_, d]: [string, any]) => d != null).map(([name, data]: [string, any]) => {
       const parts = [`【${name}】`];
-      if (data.品质) parts.push(`品质:${data.品质}`);
-      if (data.类型) parts.push(`类型:${data.类型}`);
-      if (data.描述) parts.push(`效果:${data.描述}`);
+      if (data?.品质) parts.push(`品质:${data.品质}`);
+      if (data?.类型) parts.push(`类型:${data.类型}`);
+      if (data?.描述) parts.push(`效果:${data.描述}`);
       return `- ${parts.join(' | ')}`;
     });
     return `- 技能：\n${lines.join('\n')}`;
@@ -922,19 +970,32 @@ ${perspectiveInstruction}
       // 根据 taskId 构建对应的执行函数
       const memConfig = memStore.config;
       const memoryTasks = buildMemoryTasks(memStore, memCtx, memConfig);
-      const taskFnMap: Record<string, (() => Promise<void>) | undefined> = memoryTasks
-        ? {
-            memory_write: memoryTasks.write,
-            memory_summary: memoryTasks.summary,
-            memory_vector: memoryTasks.vector,
-            memory_query_rewrite: memoryTasks.queryRewrite,
-            memory_retrieve_plan: memoryTasks.retrievePlan,
-            memory_multi_round: memoryTasks.multiRound,
-            memory_rerank: memoryTasks.rerank,
-            memory_retrieve_finalize: memoryTasks.retrieveFinalize,
-            memory_compile: memoryTasks.compile,
-          }
-        : {};
+      const taskFnMap: Record<string, (() => Promise<void>) | undefined> = {
+        ...(memoryTasks ? {
+          memory_write: memoryTasks.write,
+          memory_summary: memoryTasks.summary,
+          memory_vector: memoryTasks.vector,
+          memory_query_rewrite: memoryTasks.queryRewrite,
+          memory_retrieve_plan: memoryTasks.retrievePlan,
+          memory_multi_round: memoryTasks.multiRound,
+          memory_rerank: memoryTasks.rerank,
+          memory_retrieve_finalize: memoryTasks.retrieveFinalize,
+          memory_compile: memoryTasks.compile,
+        } : {}),
+        variable: async () => {
+          const { runVariableExtraction } = await import('./variableExtraction');
+          await runVariableExtraction({
+            varMgr: varMgrRef.current,
+            parsed: { content: extractContentForPrompt(aiMsg.rawText!), thinking: '', actionOptions: [], summary: null },
+            round: ctx.round,
+            userText: ctx.userText,
+            mainApiConfig: apiConfig,
+            worldBook: worldBookRef.current,
+            delayMs: 0,
+            maxRetries: 0,
+          });
+        },
+      };
 
       const taskFn = taskFnMap[taskId];
       if (!taskFn) {

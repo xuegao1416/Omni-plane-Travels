@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "世界漫游指南",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "identifier": "com.omni-plane-travels.app",
   "build": {
     "frontendDist": "../dist",

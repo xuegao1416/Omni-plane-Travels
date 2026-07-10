@@ -126,6 +126,13 @@ export function useStartScreen() {
         }
       }
     }
+
+    // 经营模块启用时，删除默认的货币资源（资金由经营资产统一管理）
+    const hasBusinessModule = selectedWorldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
+    if (hasBusinessModule) {
+      delete (gs.玩家 as any).货币资源;
+    }
+
     gs.玩家.姓名 = pi.name;
     gs.玩家.性别 = pi.gender;
     gs.玩家.年龄 = pi.age;

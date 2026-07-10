@@ -7,116 +7,13 @@ import type { WorldBookEntryDef, WorldDef, WorldModule } from '../../data/worlds
 import { executeBuildPipeline } from '../../modules/buildPipeline';
 import { createBuildContext } from '../../modules/buildContext';
 import type { CallAI } from '../types';
-import type { DimensionConfig, DimensionGeneration, DimensionSelection } from './types';
-import { DIMENSIONS } from './prompts';
+import type { DimensionGeneration, DimensionSelection } from './types';
 
 // ── JSON 提取工具 ──
 function extractJSON(text: string): string {
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = codeBlockMatch ? codeBlockMatch[1].trim() : (text.match(/(\{[\s\S]*\})/)?.[1]?.trim() ?? text.trim());
   return raw.replace(/[""]/g, '"').replace(/['']/g, "'");
-}
-
-/**
- * 第1次调用：一次生成所有维度的选项
- * 返回 Record<dimensionKey, DimensionGeneration>
- */
-export async function generateAllOptions(
-  userDesc: string,
-  callAI: CallAI,
-): Promise<Record<string, DimensionGeneration>> {
-  const dimensionList = DIMENSIONS.map(d =>
-    `- ${d.label}（${d.key}）：${getDimensionHint(d.key)}`
-  ).join('\n');
-
-  const prompt = `你是一个世界构建专家。用户想要创建一个世界：
-"${userDesc}"
-
-请为以下每个维度各生成4个选项。每个选项要有明显差异，并且与用户描述的世界类型相匹配。
-
-维度列表：
-${dimensionList}
-
-请严格按以下JSON格式返回，不要有任何其他文字：
-{
-  "worldType": {
-    "narrative": "关于世界类型的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "类型名", "subtitle": "30-50字的详细描述，包含该类型的核心特点、氛围和玩法倾向" },
-      { "id": "B", "title": "类型名", "subtitle": "30-50字的详细描述" },
-      { "id": "C", "title": "类型名", "subtitle": "30-50字的详细描述" },
-      { "id": "D", "title": "类型名", "subtitle": "30-50字的详细描述" }
-    ]
-  },
-  "tone": {
-    "narrative": "关于基调的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "基调名", "subtitle": "30-50字的详细描述，包含叙事风格、情感基调、适合的故事类型" },
-      ...
-    ]
-  },
-  "geography": {
-    "narrative": "关于地理的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "地理格局名", "subtitle": "30-50字的详细描述，包含地形特征、重要区域、对势力分布的影响" },
-      ...
-    ]
-  },
-  "factions": {
-    "narrative": "关于势力的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "势力格局名", "subtitle": "30-50字的详细描述，包含主要势力、势力关系、冲突焦点" },
-      ...
-    ]
-  },
-  "culture": {
-    "narrative": "关于文化的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "文化类型名", "subtitle": "30-50字的详细描述，包含社会结构、信仰体系、重要习俗" },
-      ...
-    ]
-  },
-  "economy": {
-    "narrative": "关于经济的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "经济体系名", "subtitle": "30-50字的详细描述，包含货币形式、贸易方式、资源分配特点" },
-      ...
-    ]
-  },
-  "npcs": {
-    "narrative": "关于关键人物的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "人物群体特征", "subtitle": "30-50字的详细描述，包含典型角色类型、背景设定、与玩家的潜在关系" },
-      ...
-    ]
-  },
-  "rules": {
-    "narrative": "关于规则的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "规则体系名", "subtitle": "30-50字的详细描述，包含核心机制、进阶方式、特殊限制" },
-      ...
-    ]
-  }
-}`;
-
-  const raw = await callAI([{ role: 'user', content: prompt }]);
-  const data = JSON.parse(extractJSON(raw));
-
-  // 整理为标准格式
-  const result: Record<string, DimensionGeneration> = {};
-  for (const dim of DIMENSIONS) {
-    const dimData = data[dim.key];
-    if (dimData && Array.isArray(dimData.choices)) {
-      result[dim.key] = {
-        narrative: dimData.narrative || '',
-        choices: dimData.choices,
-      };
-    } else {
-      // 兜底：空选项
-      result[dim.key] = { narrative: '', choices: [] };
-    }
-  }
-  return result;
 }
 
 /**
@@ -383,25 +280,4 @@ export async function generateModuleEntries(
       worldBookEntries: [],
     };
   }
-}
-
-// ── 辅助函数 ──
-
-function getDimensionHint(key: string): string {
-  const hints: Record<string, string> = {
-    worldType: '根据用户描述生成4个不同世界类型变体（如用户描述修仙，可生成"古典仙侠"、"都市修仙"等）',
-    tone: '不同风格基调，如"严肃古典"、"轻松日常"、"黑暗残酷"、"史诗壮阔"',
-    geography: '不同地理格局，如"五大陆分布"、"群岛散布"、"一超多强"',
-    factions: '不同势力结构，如"正邪对立"、"群雄割据"、"暗流涌动"',
-    culture: '不同文化特征，如"宗门制度"、"城邦联盟"、"部落传统"',
-    economy: '不同经济体系，如"灵石经济"、"信用点体系"、"以物易物"',
-    npcs: '不同关键人物组合，如"正道领袖"、"亦正亦邪"、"底层群像"',
-    rules: '不同规则体系，如"修仙九境"、"科技等级"、"血脉觉醒"',
-  };
-  return hints[key] || '生成4个有明显差异的选项';
-}
-
-/** 获取维度配置列表 */
-export function getDimensions(): DimensionConfig[] {
-  return DIMENSIONS;
 }

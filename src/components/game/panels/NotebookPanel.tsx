@@ -14,9 +14,9 @@ function priorityColor(p?: string) {
 
 export default function NotebookPanel({ gameState }: Props) {
   const nb = gameState.玩家.记事本;
-  const crises = Object.entries(nb.潜在危机);
-  const opps = Object.entries(nb.当前机遇);
-  const todos = Object.entries(nb.待办事项);
+  const crises = Object.entries(nb?.潜在危机 ?? {});
+  const opps = Object.entries(nb?.当前机遇 ?? {});
+  const todos = Object.entries(nb?.待办事项 ?? {});
 
   return (
     <div>

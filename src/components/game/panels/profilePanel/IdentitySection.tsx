@@ -19,7 +19,7 @@ export function IdentitySection({ player, hasBusinessModule }: Props) {
           <ExcelRow label="年龄" value={String(player.年龄)} />
           {player.性格 && <ExcelRow label="性格" value={player.性格} />}
           {player.外貌 && <ExcelRow label="外貌" value={player.外貌} />}
-          <ExcelRow label="职业" value={player.身份信息.职业} />
+          <ExcelRow label="职业" value={player.身份信息?.职业 ?? ''} />
         </div>
       </Collapsible>
 
@@ -27,8 +27,8 @@ export function IdentitySection({ player, hasBusinessModule }: Props) {
       {!hasBusinessModule && (
         <Collapsible icon={<DollarSign size={15} />} title="货币资源">
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--font-size-md)' }}>
-            <span style={{ color: 'var(--accent)' }}>{player.货币资源.主货币.名称 || '金币'}</span>
-            <span style={{ fontWeight: '600' }}>{player.货币资源.主货币.数量}</span>
+            <span style={{ color: 'var(--accent)' }}>{player.货币资源?.主货币?.名称 || '金币'}</span>
+            <span style={{ fontWeight: '600' }}>{player.货币资源?.主货币?.数量 ?? 0}</span>
           </div>
         </Collapsible>
       )}

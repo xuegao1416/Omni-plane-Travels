@@ -1,4 +1,4 @@
-import { Globe, Shield, Server, Zap, ExternalLink, Check } from 'lucide-react';
+import { Globe, Shield, Server, Zap, ExternalLink, Check, Terminal } from 'lucide-react';
 import { PROXY_CODE } from './constants';
 
 export { PROXY_CODE };
@@ -77,6 +77,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       { text: '粘贴你刚才复制的 Worker URL' },
       { text: '点击「测试连接」验证是否正常工作', tip: '如果显示「连接成功」就说明代理工作正常！' },
       { text: '保存设置，大功告成！', tip: '以后遇到 CORS 错误，应用会自动使用代理' },
+    ] as StepItem[],
+  }},
+  { id: 'logs', title: '查看日志（遇到问题时）', icon: Terminal, content: {
+    steps: [
+      { text: '如果代理不工作，可以查看浏览器控制台日志来排查问题' },
+      { text: '按 F12 打开浏览器开发者工具', tip: 'Chrome/Edge: F12 或 Ctrl+Shift+I\n也可以右键页面 → 检查' },
+      { text: '点击顶部的「Console」（控制台）选项卡' },
+      { text: '找到带 [Proxy] 标记的日志', tip: '紫色标题的折叠区域就是代理日志\n展开可以看到完整的请求路由信息' },
+      { text: '日志会显示：代理地址是否正确、是否使用了代理、请求是否成功', tip: '✓ 绿色 = 正常\n✗ 红色 = 有问题，展开看具体原因' },
+      { text: '把红色错误的日志截图发给开发者即可', tip: '重点看：代理地址、目标 API、错误信息这三项' },
     ] as StepItem[],
   }},
 ];

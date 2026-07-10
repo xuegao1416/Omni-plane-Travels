@@ -95,6 +95,8 @@ export function useBusinessSettlement(
             金额: t.amount || 0,
           })) || [],
           };
+          // 经营模块启用时，删除默认的货币资源（资金由经营资产统一管理）
+          delete (state.玩家 as any).货币资源;
           engine.variableManager.setState(state);
           bumpVersion();
         }

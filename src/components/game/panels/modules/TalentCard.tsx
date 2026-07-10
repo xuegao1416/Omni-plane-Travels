@@ -12,7 +12,7 @@ interface TalentCardProps {
 }
 
 export default memo(function TalentCard({ data, title }: TalentCardProps) {
-  if (!data.categories.length) {
+  if (!data.categories?.length) {
     return (
       <Collapsible icon={<Star size={15} />} title={title || '天赋体系'} defaultOpen={true}>
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>暂无天赋</div>
@@ -23,7 +23,7 @@ export default memo(function TalentCard({ data, title }: TalentCardProps) {
   return (
     <Collapsible icon={<Star size={15} />} title={title || '天赋体系'} defaultOpen={true}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {data.categories.map(cat => (
+        {(data.categories ?? []).map(cat => (
           <div key={cat.id}>
             {/* 大类标题 */}
             <div style={{

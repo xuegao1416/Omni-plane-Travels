@@ -1150,13 +1150,12 @@ export function buildPreview(save: GameSave): string {
 function getWorldNameById(worldId: string): string {
   // 内置世界 ID → 中文名映射
   const BUILTIN_WORLD_NAMES: Record<string, string> = {
-    cyberpunk_city: '赛博朋克',
-    desire_metropolis: '欲望都市',
-    wasteland_apocalypse: '废土末日',
-    japanese_school: '日系校园',
-    crystal_world: '绯晶之乡',
-    wuxia_world: '武侠江湖',
-    palace_intrigue: '宫斗权谋',
+    desire_metropolis: '烟火人间',
+    wasteland_apocalypse: '余烬废土',
+    japanese_school: '日式校园',
+    wuxia_world: '武林风云',
+    stranded_island: '孤岛求生',
+    border_trade: '绥芬边贸',
   };
 
   // 先检查内置世界

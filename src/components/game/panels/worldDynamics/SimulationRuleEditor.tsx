@@ -367,9 +367,9 @@ export default function SimulationRuleEditor({ rules, onChange, worldDef }: Simu
               <span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>属性最大变动:</span>
               <input
                 type="number"
-                value={rules.narrativeGuardrails.maxDeltaPerStat['*'] ?? 20}
+                value={rules.narrativeGuardrails?.maxDeltaPerStat?.['*'] ?? 20}
                 onChange={e => updateGuardrails({
-                  maxDeltaPerStat: { ...rules.narrativeGuardrails.maxDeltaPerStat, '*': parseInt(e.target.value) || 20 },
+                  maxDeltaPerStat: { ...(rules.narrativeGuardrails?.maxDeltaPerStat ?? {}), '*': parseInt(e.target.value) || 20 },
                 })}
                 className="input-field"
                 style={{ width: '80px' }}
@@ -380,9 +380,9 @@ export default function SimulationRuleEditor({ rules, onChange, worldDef }: Simu
               <span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>资源最大变动:</span>
               <input
                 type="number"
-                value={rules.narrativeGuardrails.maxDeltaPerResource['*'] ?? 10}
+                value={rules.narrativeGuardrails?.maxDeltaPerResource?.['*'] ?? 10}
                 onChange={e => updateGuardrails({
-                  maxDeltaPerResource: { ...rules.narrativeGuardrails.maxDeltaPerResource, '*': parseInt(e.target.value) || 10 },
+                  maxDeltaPerResource: { ...(rules.narrativeGuardrails?.maxDeltaPerResource ?? {}), '*': parseInt(e.target.value) || 10 },
                 })}
                 className="input-field"
                 style={{ width: '80px' }}
@@ -392,7 +392,7 @@ export default function SimulationRuleEditor({ rules, onChange, worldDef }: Simu
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
-                checked={rules.narrativeGuardrails.allowCreateResources ?? true}
+                checked={rules.narrativeGuardrails?.allowCreateResources ?? true}
                 onChange={e => updateGuardrails({ allowCreateResources: e.target.checked })}
               />
               <span style={{ color: 'var(--text-primary)' }}>允许 AI 创建新资源</span>

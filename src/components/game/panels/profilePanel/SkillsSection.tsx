@@ -17,8 +17,8 @@ export function SkillsSection({ skills }: Props) {
   return (
     <>
       <Collapsible icon={<Swords size={15} />} title="技能系统">
-        {Object.entries(skills).map(([name, skill]) => {
-          const qColor = getQualityColor(skill.品质);
+        {Object.entries(skills).filter(([_, s]) => s != null).map(([name, skill]) => {
+          const qColor = getQualityColor(skill?.品质 ?? '普通');
           return (
             <div
               key={name}
@@ -40,8 +40,8 @@ export function SkillsSection({ skills }: Props) {
               <span style={{
                 fontSize: '10px', padding: '1px 6px', borderRadius: '8px',
                 background: qColor + '18', color: qColor,
-              }}>{skill.品质}</span>
-              {skill.描述 && (
+              }}>{skill?.品质 ?? '普通'}</span>
+              {skill?.描述 && (
                 <span style={{
                   fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
                   maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -54,9 +54,9 @@ export function SkillsSection({ skills }: Props) {
 
       {/* 技能详情弹窗 */}
       {selectedSkill && (
-        <DetailModal title={selectedSkill.name} quality={selectedSkill.data.品质} onClose={() => setSelectedSkill(null)}>
-          {selectedSkill.data.类型 && <DetailRow label="类型" value={selectedSkill.data.类型} />}
-          {selectedSkill.data.描述 && <DetailRow label="描述" value={selectedSkill.data.描述} />}
+        <DetailModal title={selectedSkill.name} quality={selectedSkill.data?.品质 ?? '普通'} onClose={() => setSelectedSkill(null)}>
+          {selectedSkill.data?.类型 && <DetailRow label="类型" value={selectedSkill.data.类型} />}
+          {selectedSkill.data?.描述 && <DetailRow label="描述" value={selectedSkill.data.描述} />}
         </DetailModal>
       )}
     </>

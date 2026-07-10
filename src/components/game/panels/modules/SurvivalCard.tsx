@@ -39,7 +39,7 @@ export default memo(function SurvivalCard({
   // 合并静态资源定义和运行时资源数量
   // 运行时可能包含演化新增的资源（不在 data.resources 中）
   const mergedResources = (() => {
-    const base = data.resources.map(res => ({
+    const base = (data.resources ?? []).map(res => ({
       ...res,
       amount: runtimeResources?.[res.id]?.数量 ?? res.amount,
     }));

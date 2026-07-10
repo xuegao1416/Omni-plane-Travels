@@ -22,7 +22,8 @@ export function ItemsSection({ items }: Props) {
             const entry = Object.entries(items)[i];
             if (entry) {
               const [name, item] = entry;
-              const qColor = getQualityColor(item.品质);
+              if (item == null) return null;
+              const qColor = getQualityColor(item?.品质 ?? '普通');
               const IconComp = getItemIcon(item);
               return (
                 <div
@@ -79,10 +80,10 @@ export function ItemsSection({ items }: Props) {
 
       {/* 物品详情弹窗 */}
       {selectedItem && (
-        <DetailModal title={selectedItem.name} quality={selectedItem.data.品质} onClose={() => setSelectedItem(null)}>
-          <DetailRow label="数量" value={selectedItem.data.数量} />
-          {selectedItem.data.类型 && <DetailRow label="类型" value={selectedItem.data.类型} />}
-          {selectedItem.data.备注 && <DetailRow label="备注" value={selectedItem.data.备注} />}
+        <DetailModal title={selectedItem.name} quality={selectedItem.data?.品质 ?? '普通'} onClose={() => setSelectedItem(null)}>
+          <DetailRow label="数量" value={selectedItem.data?.数量 ?? 1} />
+          {selectedItem.data?.类型 && <DetailRow label="类型" value={selectedItem.data.类型} />}
+          {selectedItem.data?.备注 && <DetailRow label="备注" value={selectedItem.data.备注} />}
         </DetailModal>
       )}
     </>

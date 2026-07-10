@@ -7,11 +7,11 @@ import { NPCCard } from './characterGrid/NPCCard';
 import { NPCDetail } from './characterGrid/NPCDetail';
 
 export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, onMergeChronicles }: CharacterGridProps) {
-  const npcs = gameState.人物档案;
+  const npcs = gameState.人物档案 ?? {};
   const [selected, setSelected] = useState<{ id: string; data: import('../../../schema/variables').NPCData } | null>(null);
   const [portraitUrls, setPortraitUrls] = useState<Record<string, string>>({});
 
-  const sorted = Object.entries(npcs).sort((a, b) => (b[1].关系数据?.好感度 ?? 0) - (a[1].关系数据?.好感度 ?? 0));
+  const sorted = Object.entries(npcs).sort((a, b) => (b[1]?.关系数据?.好感度 ?? 0) - (a[1]?.关系数据?.好感度 ?? 0));
 
   useEffect(() => {
     let cancelled = false;

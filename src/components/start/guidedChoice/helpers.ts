@@ -7,35 +7,43 @@ export async function generateGuidedOptions(
   callAI: (messages: Array<{ role: string; content: string }>) => Promise<string>,
 ): Promise<Record<string, DimensionGeneration>> {
   const dimensionList = GUIDED_DIMENSIONS.map(d =>
-    `- ${d.label}（${d.key}）：${DIMENSION_HINTS[d.key] || '生成4个有明显差异的选项'}`
+    `- ${d.label}：${DIMENSION_HINTS[d.key] || '生成4个有明显差异的选项'}`
   ).join('\n');
 
-  const prompt = `你是一个世界构建专家。用户想要创建一个世界：
-"${userDesc}"
+  // 生成完整的 JSON 模板，消除 "..." 占位符防止 AI 偷懒
+  const jsonTemplate = GUIDED_DIMENSIONS.map(d =>
+    `  "${d.key}": {
+    "narrative": "2-3句引导语，激发用户对该维度的想象",
+    "choices": [
+      { "id": "A", "title": "2-4字标题", "subtitle": "15-30字描述，具体生动、有画面感" },
+      { "id": "B", "title": "2-4字标题", "subtitle": "15-30字描述" },
+      { "id": "C", "title": "2-4字标题", "subtitle": "15-30字描述" },
+      { "id": "D", "title": "2-4字标题", "subtitle": "15-30字描述" }
+    ]
+  }`
+  ).join(',\n');
 
-请为以下每个维度各生成4个选项。每个选项要有明显差异，并且与用户描述的世界类型相匹配。
+  const prompt = `你是一个世界构建专家，擅长根据用户描述为各种题材生成丰富多样的设定选项。
 
-维度列表：
+【用户描述】
+「${userDesc}」
+
+请仔细理解用户描述中的题材方向（校园、科幻、奇幻、武侠、日常、历史、悬疑等）和氛围倾向（温馨、紧张、幽默、诗意、浪漫等），然后为以下每个维度各生成4个选项。
+
+【核心要求】
+1. 紧扣用户描述：绝对不能偏离用户设想的题材和氛围。用户要温馨校园就做温馨校园，不要往黑暗修仙、末日生存、尔虞我诈的方向跑偏。
+2. 选项之间要有真正差异：4个选项代表4种不同方向，能激发用户的不同想象，而非同一类东西的微调。
+3. 标题2-4字，精准有力。
+4. 副标题15-30字，具体生动，看完就能在脑海中产生画面。不要写空洞的概念词。
+5. narrative 引导语要贴合用户描述的语境，用自然的语言启发用户思考。
+
+【维度列表】
 ${dimensionList}
 
-请严格按以下JSON格式返回，不要有任何其他文字：
+严格按以下JSON格式返回，不要任何额外文字（不要写注释、不要用省略号代替内容、不要省略任何维度）：
+
 {
-  "worldType": {
-    "narrative": "关于世界类型的2-3句描述",
-    "choices": [
-      { "id": "A", "title": "类型名", "subtitle": "一句话描述" },
-      { "id": "B", "title": "类型名", "subtitle": "一句话描述" },
-      { "id": "C", "title": "类型名", "subtitle": "一句话描述" },
-      { "id": "D", "title": "类型名", "subtitle": "一句话描述" }
-    ]
-  },
-  "tone": { "narrative": "...", "choices": [...] },
-  "conflict": { "narrative": "...", "choices": [...] },
-  "geography": { "narrative": "...", "choices": [...] },
-  "factions": { "narrative": "...", "choices": [...] },
-  "npcs": { "narrative": "...", "choices": [...] },
-  "culture": { "narrative": "...", "choices": [...] },
-  "rules": { "narrative": "...", "choices": [...] }
+${jsonTemplate}
 }`;
 
   const raw = await callAI([{ role: 'user', content: prompt }]);

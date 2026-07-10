@@ -10,11 +10,20 @@ function getProxyUrl(): string | null {
     // 只允许 http/https 协议，防止 javascript: / file: 等危险协议
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      console.warn('[API] 代理 URL 协议不安全，已忽略:', parsed.protocol);
+      console.warn(`%c[Proxy] ✗ 代理 URL 协议不安全，已忽略: ${parsed.protocol}`, 'color: #ef4444; font-weight: bold');
+      console.warn('你填的值:', url);
+      console.warn('正确格式: https://你的worker名.workers.dev');
       return null;
     }
     return url;
   } catch {
+    const raw = localStorage.getItem(STORAGE_KEYS.PROXY_URL)?.trim();
+    if (raw) {
+      console.warn(`%c[Proxy] ✗ 代理 URL 格式无效，已忽略`, 'color: #ef4444; font-weight: bold');
+      console.warn('你填的值:', raw);
+      console.warn('正确格式: https://你的worker名.workers.dev');
+      console.warn('常见错误: 忘记写 https:// 或者有多余空格');
+    }
     return null;
   }
 }
@@ -29,6 +38,22 @@ function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: R
   if (apiKey) {
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
+
+  // 代理日志：记录请求路由信息
+  console.groupCollapsed(`%c[Proxy] 请求路由`, 'color: #818cf8; font-weight: bold');
+  console.log('目标 API:', endpoint);
+  console.log('代理地址:', proxyUrl || '(未设置，直连模式)');
+  console.log('Authorization:', apiKey ? '✓ 已设置' : '✗ 未设置');
+  if (proxyUrl) {
+    console.log('%c→ 使用代理转发', 'color: #22c55e');
+    console.log('实际请求 URL:', proxyUrl);
+    console.log('X-Target-URL:', endpoint);
+  } else {
+    console.log('%c→ 直连模式', 'color: #eab308');
+    console.log('实际请求 URL:', endpoint);
+  }
+  console.groupEnd();
+
   if (proxyUrl) {
     headers['X-Target-URL'] = endpoint;
     return { url: proxyUrl, headers };
@@ -42,6 +67,8 @@ export function buildEndpoint(config: ApiConfig): string {
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
+  // URL 已含版本路径（如 /v2/xxx）时直接追加 /chat/completions，不插入多余的 /v1
+  if (/\/v\d+\//.test(base)) return `${base}/chat/completions`;
   return `${base}/v1/chat/completions`;
 }
 
@@ -210,6 +237,23 @@ export async function requestCompletion(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    const proxyUrl = getProxyUrl();
+    console.groupCollapsed(`%c[Proxy] ✗ 请求失败 ${res.status}`, 'color: #ef4444; font-weight: bold');
+    console.log('状态码:', res.status, res.statusText);
+    console.log('目标 API:', endpoint);
+    console.log('代理地址:', proxyUrl || '(直连)');
+    console.log('实际请求 URL:', fetchUrl);
+    console.log('错误响应:', errText.slice(0, 500));
+    if (res.status === 0 || res.status === 404) {
+      console.warn('可能原因: 代理地址错误或代理服务未部署');
+    } else if (res.status === 401 || res.status === 403) {
+      console.warn('可能原因: API Key 无效或已过期');
+    } else if (res.status === 429) {
+      console.warn('可能原因: 请求过于频繁，触发限流');
+    } else if (res.status >= 500) {
+      console.warn('可能原因: API 服务端错误，稍后重试');
+    }
+    console.groupEnd();
     throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
   }
 
@@ -249,6 +293,14 @@ export async function requestCompletionStream(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    const proxyUrl = getProxyUrl();
+    console.groupCollapsed(`%c[Proxy] ✗ 流式请求失败 ${res.status}`, 'color: #ef4444; font-weight: bold');
+    console.log('状态码:', res.status, res.statusText);
+    console.log('目标 API:', endpoint);
+    console.log('代理地址:', proxyUrl || '(直连)');
+    console.log('实际请求 URL:', fetchUrl);
+    console.log('错误响应:', errText.slice(0, 500));
+    console.groupEnd();
     throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
   }
 
@@ -340,6 +392,8 @@ export async function fetchModels(config: ApiConfig): Promise<string[]> {
     url = `${base}/models`;
   } else if (base.endsWith('/v1/chat/completions')) {
     url = base.replace(/\/chat\/completions$/, '/models');
+  } else if (/\/v\d+\//.test(base)) {
+    url = `${base}/models`;
   } else {
     url = `${base}/v1/models`;
   }
@@ -398,15 +452,43 @@ export async function testConnection(config: ApiConfig): Promise<{ success: bool
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
+      const proxyUrl = getProxyUrl();
+      console.groupCollapsed(`%c[Proxy] ✗ 测试连接失败 ${res.status}`, 'color: #ef4444; font-weight: bold');
+      console.log('状态码:', res.status, res.statusText);
+      console.log('目标 API:', endpoint);
+      console.log('代理地址:', proxyUrl || '(直连)');
+      console.log('错误响应:', errText.slice(0, 500));
+      console.groupEnd();
       return { success: false, message: `API ${res.status}: ${errText.slice(0, 200)}`, elapsed: Date.now() - start };
     }
 
     return { success: true, message: `连接成功 (${Date.now() - start}ms)`, elapsed: Date.now() - start };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    const proxyUrl = getProxyUrl();
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Network request failed')) {
+      console.groupCollapsed(`%c[Proxy] ✗ 网络请求失败`, 'color: #ef4444; font-weight: bold');
+      console.log('错误信息:', msg);
+      console.log('目标 API:', endpoint);
+      console.log('代理地址:', proxyUrl || '(直连)');
+      console.log('实际请求 URL:', fetchUrl);
+      console.warn('可能原因:');
+      if (proxyUrl) {
+        console.warn('  1. 代理地址错误（检查是否包含 https://）');
+        console.warn('  2. 代理服务未部署或已删除');
+        console.warn('  3. 代理服务有访问限制');
+      } else {
+        console.warn('  1. API 地址错误（检查是否包含 https://）');
+        console.warn('  2. 网络连接问题');
+        console.warn('  3. API 服务不可用');
+      }
+      console.groupEnd();
       return { success: false, message: '网络请求失败，请检查 API 地址是否正确', elapsed: 0 };
     }
+    console.groupCollapsed(`%c[Proxy] ✗ 测试连接异常`, 'color: #ef4444; font-weight: bold');
+    console.log('错误信息:', msg);
+    console.log('代理地址:', proxyUrl || '(直连)');
+    console.groupEnd();
     return { success: false, message: msg, elapsed: 0 };
   }
 }

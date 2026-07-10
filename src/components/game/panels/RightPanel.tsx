@@ -94,7 +94,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             (worldSystem as any)[key] = {
               ...bizConfig,
               funds: runtimeBiz.资金,
-              assets: runtimeBiz.资产列表.map(a => {
+              assets: (runtimeBiz.资产列表 ?? []).map(a => {
                 // AI 漏填收益字段时，给合理默认值
                 const hasIncome = a.基础收益 || a.每级收益 || a.维护费;
                 return {
@@ -113,8 +113,8 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
                   maintenance: a.维护费 ?? (hasIncome ? 0 : 2),
                 };
               }),
-              transactionLog: (runtimeBiz.交易日志 || []).map(t => ({
-                cycle: 0, type: t.类型, description: t.描述, amount: t.金额,
+              transactionLog: (runtimeBiz.交易日志 || []).map((t, i) => ({
+                cycle: i + 1, type: t.类型, description: t.描述, amount: t.金额,
               })),
             };
           } else {
@@ -189,8 +189,8 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
           <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             生存状态
           </h4>
-          <GaugeBar icon={<Heart size={11} color="#ef4444" />} label="血量" value={player.生存状态.血量} max={100} color="#ef4444" />
-          <GaugeBar icon={<Zap size={11} color="#f59e0b" />} label="体力" value={player.生存状态.体力值} max={100} color="#f59e0b" />
+          <GaugeBar icon={<Heart size={11} color="#ef4444" />} label="血量" value={player.生存状态?.血量 ?? 100} max={100} color="#ef4444" />
+          <GaugeBar icon={<Zap size={11} color="#f59e0b" />} label="体力" value={player.生存状态?.体力值 ?? 100} max={100} color="#f59e0b" />
         </div>
       )}
 

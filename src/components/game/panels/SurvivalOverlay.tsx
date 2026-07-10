@@ -54,7 +54,7 @@ export default function SurvivalOverlay({
   const threshold = data.rules?.criticalThreshold ?? 2;
 
   // 合并静态资源定义和运行时数量
-  const mergedResources = data.resources.map(res => ({
+  const mergedResources = (data.resources ?? []).map(res => ({
     ...res,
     amount: runtimeResources?.[res.id]?.数量 ?? res.amount,
   }));

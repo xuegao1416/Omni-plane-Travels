@@ -191,6 +191,21 @@ export class VariableManager {
 
   // NPC 感知的合并更新
   private applyMergeUpdate(patch: Record<string, unknown>): void {
+    // ★ 经营资产.资产列表 必须替换而非合并（lodash merge 会按索引覆盖而非追加）
+    let pendingAssetList: unknown[] | undefined;
+    const playerPatch = patch.玩家 as Record<string, unknown> | undefined;
+    const bizPatch = playerPatch?.经营资产 as Record<string, unknown> | undefined;
+    if (Array.isArray(bizPatch?.资产列表)) {
+      pendingAssetList = bizPatch.资产列表;
+      delete bizPatch.资产列表;
+      if (Object.keys(bizPatch).length === 0) {
+        delete playerPatch!.经营资产;
+      }
+      if (Object.keys(playerPatch!).length === 0) {
+        delete patch.玩家;
+      }
+    }
+
     // 处理 人物档案 中的 NPC 数据
     if (patch.人物档案 && typeof patch.人物档案 === 'object' && !Array.isArray(patch.人物档案)) {
       const npcUpdates = patch.人物档案 as Record<string, unknown>;
@@ -275,6 +290,14 @@ export class VariableManager {
     } else {
       // 没有 NPC 数据，普通合并
       merge(this.state, patch);
+    }
+
+    // ★ 应用资产列表替换（已在前面从 patch 中提取）
+    if (pendingAssetList) {
+      if (!this.state.玩家.经营资产) {
+        this.state.玩家.经营资产 = { 资金: 0, 资产列表: [], 交易日志: [] };
+      }
+      this.state.玩家.经营资产.资产列表 = pendingAssetList as any;
     }
 
     this.normalizeState();

@@ -10,6 +10,7 @@ import {
   Cpu, Swords, GraduationCap, Flower2,
   ScrollText, MapPin, Clock, AlertTriangle, DollarSign, Flag, User,
   Sparkles, Check, Landmark, Scroll, Backpack, Dna, Lightbulb, Bookmark,
+  Building2, Truck, Package, Store,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ const ICON_NAME_MAP: Record<string, LucideIcon> = {
   // 扩展图标（原 stepWorldDetail/iconMap 使用）
   ScrollText, MapPin, Clock, AlertTriangle, DollarSign, Flag, User,
   Sparkles, Check, Landmark, Scroll, Backpack, Dna, Lightbulb, Bookmark,
+  Building2, Truck, Package, Store,
 };
 
 /**

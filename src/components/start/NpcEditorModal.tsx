@@ -58,20 +58,16 @@ function CollapsibleSection({ title, count, expanded, onToggle, children }: {
   title: string; count: number; expanded: boolean; onToggle: () => void; children: React.ReactNode;
 }) {
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-      <button onClick={onToggle} style={{
-        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', border: 'none', background: 'var(--bg-primary)', cursor: 'pointer',
-        fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)',
-      }}>
+    <div className="form-group">
+      <label onClick={onToggle} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>{title}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {count > 0 && <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{count}</span>}
           <ChevronDown size={14} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', color: 'var(--text-muted)' }} />
         </span>
-      </button>
+      </label>
       {expanded && (
-        <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {children}
         </div>
       )}
@@ -302,20 +298,20 @@ export default function NpcEditorModal({
             title="技能列表" count={Object.keys(npc.skillsList).length}
             expanded={expandedSections.has('skills')} onToggle={() => toggleSection('skills')}
           >
-            {Object.entries(npc.skillsList).map(([name, skill]) => (
+            {Object.entries(npc.skillsList).filter(([_, s]) => s != null).map(([name, skill]) => (
               <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <input type="text" defaultValue={name}
                     onBlur={e => { if (e.target.value !== name) renameMapKey('skillsList', name, e.target.value); }}
                     placeholder="技能名称..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
-                  <select value={skill.品质} onChange={e => updateSkillField(name, '品质', e.target.value)}
+                  <select value={skill?.品质 ?? '普通'} onChange={e => updateSkillField(name, '品质', e.target.value)}
                     style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-secondary)' }}>
                     {QUALITY_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                   </select>
                   <button onClick={() => removeMapEntry('skillsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                 </div>
-                <input type="text" value={skill.描述} onChange={e => updateSkillField(name, '描述', e.target.value)} placeholder="技能描述..." style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
-                <input type="text" value={skill.类型} onChange={e => updateSkillField(name, '类型', e.target.value)} placeholder="类型(攻击/防御/辅助...)" style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                <input type="text" value={skill?.描述 ?? ''} onChange={e => updateSkillField(name, '描述', e.target.value)} placeholder="技能描述..." style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                <input type="text" value={skill?.类型 ?? ''} onChange={e => updateSkillField(name, '类型', e.target.value)} placeholder="类型(攻击/防御/辅助...)" style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
               </div>
             ))}
             <button className="btn-ghost" onClick={() => addMapEntry('skillsList', { 品质: '普通', 描述: '', 类型: '' })} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加技能</button>
@@ -326,22 +322,22 @@ export default function NpcEditorModal({
             title="物品列表" count={Object.keys(npc.itemsList).length}
             expanded={expandedSections.has('items')} onToggle={() => toggleSection('items')}
           >
-            {Object.entries(npc.itemsList).map(([name, item]) => (
+            {Object.entries(npc.itemsList).filter(([_, it]) => it != null).map(([name, item]) => (
               <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <input type="text" defaultValue={name}
                     onBlur={e => { if (e.target.value !== name) renameMapKey('itemsList', name, e.target.value); }}
                     placeholder="物品名称..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
-                  <input type="number" value={item.数量} onChange={e => updateItemField(name, '数量', e.target.value)} min={1} style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', width: '50px' }} />
-                  <select value={item.品质} onChange={e => updateItemField(name, '品质', e.target.value)}
+                  <input type="number" value={item?.数量 ?? 1} onChange={e => updateItemField(name, '数量', e.target.value)} min={1} style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', width: '50px' }} />
+                  <select value={item?.品质 ?? '普通'} onChange={e => updateItemField(name, '品质', e.target.value)}
                     style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-secondary)' }}>
                     {QUALITY_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                   </select>
                   <button onClick={() => removeMapEntry('itemsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
-                  <input type="text" value={item.类型} onChange={e => updateItemField(name, '类型', e.target.value)} placeholder="类型(武器/防具/消耗品...)" style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
-                  <input type="text" value={item.备注} onChange={e => updateItemField(name, '备注', e.target.value)} placeholder="备注..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                  <input type="text" value={item?.类型 ?? ''} onChange={e => updateItemField(name, '类型', e.target.value)} placeholder="类型(武器/防具/消耗品...)" style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
+                  <input type="text" value={item?.备注 ?? ''} onChange={e => updateItemField(name, '备注', e.target.value)} placeholder="备注..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
                 </div>
               </div>
             ))}
@@ -353,7 +349,7 @@ export default function NpcEditorModal({
             title="人物事迹" count={npc.chronicles.length}
             expanded={expandedSections.has('chronicles')} onToggle={() => toggleSection('chronicles')}
           >
-            {npc.chronicles.map((c, i) => (
+            {(npc.chronicles ?? []).map((c, i) => (
               <div key={i} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{i + 1}.</span>
                 <input type="text" value={c} onChange={e => {

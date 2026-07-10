@@ -62,3 +62,66 @@ export const BUSINESS_UPDATE_RULES = `【经营资产更新规则】
 - 资金不能为负数
 - 经营日志：重大事件添加到交易日志数组
 - 只输出发生变化的字段，未变化的不要输出`;
+
+/**
+ * 经营资产独立提取提示词
+ * 从主变量提取中剥离，专门用于从叙事中提取经营资产变更
+ */
+export function buildBusinessExtractionPrompt(params: {
+  currentBusiness: Record<string, unknown> | undefined;
+  environment: { description?: string; cycleName?: string } | undefined;
+  userText: string;
+  aiContent: string;
+}): string {
+  const { currentBusiness, environment, userText, aiContent } = params;
+
+  const businessState = currentBusiness
+    ? JSON.stringify(currentBusiness, null, 2)
+    : '（尚未初始化）';
+
+  const envDesc = environment?.description || '这个世界存在商业活动。';
+  const cycleName = environment?.cycleName || '天';
+
+  const assetList = Array.isArray((currentBusiness as any)?.资产列表)
+    ? (currentBusiness as any).资产列表 as Array<Record<string, unknown>>
+    : [];
+  const assetSummary = assetList.length > 0
+    ? assetList.map((a: Record<string, unknown>) =>
+      `- ${a.名称 || a.id}（${a.类型 || '通用'}）：等级 ${a.等级 ?? 1}/${a.最高等级 ?? 3}，状态 ${a.状态 || 'active'}`
+    ).join('\n')
+    : '（暂无资产）';
+
+  return `你是经营资产提取系统。分析叙事文本，提取玩家的经营资产变更。
+
+【当前经营状态】
+${businessState}
+
+【经营环境】${envDesc} 结算周期：${cycleName}
+
+【当前资产】
+${assetSummary}
+
+【玩家消息】
+${userText}
+
+【AI 叙事】
+${aiContent}
+
+═══════════════════════════════════════
+【规则】
+1. 只提取经营相关变更
+2. 用 <UpdateVariable></UpdateVariable> 包裹 JSON
+3. 只输出变化的字段
+
+【收购】新资产需填全部字段：
+<UpdateVariable>{"玩家":{"经营资产":{"资金":扣款后余额,"资产列表":[{"id":"英文id","名称":"中文名","类型":"类别","等级":1,"最高等级":3,"描述":"描述","状态":"active","基础收益":数值,"每级收益":数值,"维护费":数值}]}}}</UpdateVariable>
+
+【升级】<UpdateVariable>{"玩家":{"经营资产":{"资金":扣款后余额,"资产列表":[{"id":"原id","等级":新等级}]}}}</UpdateVariable>
+
+【出售】RFC 6902 remove：
+<UpdateVariable>[{"op":"remove","path":"/玩家/经营资产/资产列表/0"},{"op":"replace","path":"/玩家/经营资产/资金","value":新资金}]</UpdateVariable>
+
+【资金变更】<UpdateVariable>{"玩家":{"经营资产":{"资金":新余额}}}</UpdateVariable>
+
+【无变更】<UpdateVariable>{}</UpdateVariable>`;
+}

@@ -102,7 +102,7 @@ export default function GuidedChoiceOverlay({
           {!s.error && currentGeneration && currentDim && (
             <>
               <div style={cardGridStyle}>
-                {currentGeneration.choices.map((choice) => {
+                {(currentGeneration.choices ?? []).map((choice) => {
                   const isSelected = !!(currentDim.multiSelect
                     ? currentSelection?.choices?.some(c => c.id === choice.id)
                     : currentSelection?.choiceId === choice.id);

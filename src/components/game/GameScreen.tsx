@@ -162,7 +162,7 @@ export default function GameScreen() {
     return {
       ...bizConfig,
       funds: runtimeBiz.资金,
-      assets: runtimeBiz.资产列表.map(a => {
+      assets: (runtimeBiz.资产列表 ?? []).map(a => {
         // AI 漏填收益字段时，给合理默认值
         const hasIncome = a.基础收益 || a.每级收益 || a.维护费;
         return {
@@ -181,8 +181,8 @@ export default function GameScreen() {
           maintenance: a.维护费 ?? (hasIncome ? 0 : 2),
         };
       }),
-      transactionLog: (runtimeBiz.交易日志 || []).map(t => ({
-        cycle: 0, type: t.类型, description: t.描述, amount: t.金额,
+      transactionLog: (runtimeBiz.交易日志 || []).map((t, i) => ({
+        cycle: i + 1, type: t.类型, description: t.描述, amount: t.金额,
       })),
     } as BusinessModuleSchema;
   })();

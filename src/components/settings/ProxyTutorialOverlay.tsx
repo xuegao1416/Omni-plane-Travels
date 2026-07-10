@@ -3,6 +3,7 @@ import { X, Rocket, HelpCircle } from 'lucide-react';
 import { TUTORIAL_STEPS } from './proxyTutorial/data';
 import { PROXY_CODE } from './proxyTutorial/constants';
 import { OverviewCard } from './proxyTutorial/OverviewCard';
+import { ImageTutorialCard } from './proxyTutorial/ImageTutorialCard';
 import { TutorialStepCard } from './proxyTutorial/TutorialStepCard';
 import { ProxyInput } from './proxyTutorial/ProxyInput';
 import { FAQItem, FAQ_ITEMS } from './proxyTutorial/FAQItem';
@@ -58,6 +59,8 @@ export default function ProxyTutorialOverlay({ onClose, onApplyProxy }: Props) {
         {/* Content */}
         <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
           <OverviewCard />
+
+          <ImageTutorialCard />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {TUTORIAL_STEPS.map((step, index) => (

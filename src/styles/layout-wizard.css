@@ -193,6 +193,23 @@
   min-height: 100px;
 }
 
+/* NPC编辑器可折叠分组标题 */
+.npc-collapse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  user-select: none;
+}
+.npc-collapse-header:hover {
+  background: var(--bg-tertiary);
+}
+
 /* 性别单选 */
 .gender-radio-group {
   display: flex;
