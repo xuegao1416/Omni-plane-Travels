@@ -15,6 +15,7 @@ export interface ImportPanelProps {
   mapping: WorkflowParamMapping;
   presetsCount: number;
   connecting: boolean;
+  workflowSummary: Array<{ label: string; value: string }>;
   onNameChange: (name: string) => void;
   onJsonChange: (json: string) => void;
   onValidate: () => void;
@@ -34,6 +35,7 @@ export function ImportPanel({
   mapping,
   presetsCount,
   connecting,
+  workflowSummary,
   onNameChange,
   onJsonChange,
   onValidate,
@@ -45,7 +47,7 @@ export function ImportPanel({
   return (
     <Collapsible
       title={editingPreset ? `编辑: ${draftName || '未命名'}` : '导入新工作流'}
-      desc="粘贴 ComfyUI 导出的 workflow JSON，自动识别参数注入位"
+      desc="支持 ComfyUI 导出的 API 格式或标准 Workflow 格式，自动识别并转换"
       defaultOpen={presetsCount === 0}
     >
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -59,11 +61,11 @@ export function ImportPanel({
           />
         </Field>
 
-        <Field label="Workflow JSON" hint="在 ComfyUI 中点击 Workflow → Export (API) 复制 JSON">
+        <Field label="Workflow JSON" hint="ComfyUI 中 Workflow → Export 或 Export (API) 均可，自动识别格式">
           <TextArea
             value={draftJson}
             onChange={onJsonChange}
-            placeholder={`{ "3": { "class_type": "CheckpointLoaderSimple", ... }, ... }`}
+            placeholder={`{ "3": { "class_type": "CheckpointLoaderSimple", ... }, ... }  或  { "nodes": [...], "links": [...] }`}
             rows={8}
             mono
           />
@@ -88,6 +90,26 @@ export function ImportPanel({
         {/* 验证结果 */}
         {validation && (
           <ValidationPanel validation={validation} />
+        )}
+
+        {/* 工作流摘要 */}
+        {workflowSummary.length > 0 && (
+          <div style={{
+            padding: '8px 12px',
+            borderRadius: '6px',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            fontSize: '12px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}>
+            {workflowSummary.map((item) => (
+              <span key={item.label} style={{ color: 'var(--text-secondary)' }}>
+                <strong>{item.label}:</strong> {item.value}
+              </span>
+            ))}
+          </div>
         )}
 
         {/* 映射配置 */}

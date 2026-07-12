@@ -12,7 +12,19 @@ export function useSurvivalCraft(
   bumpVersion: () => void,
 ) {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
-  const [runtimeRecipes, setRuntimeRecipes] = useState<SurvivalRecipe[]>([]);
+  // 从存档恢复：读档后 runtimeRecipes 由 gameState.玩家.生存配方 还原
+  const [runtimeRecipes, setRuntimeRecipes] = useState<SurvivalRecipe[]>(
+    () => engine.variableManager.getState().玩家?.生存配方 ?? []
+  );
+
+  /** 把运行时配方同步写回 gameState（随存档持久化） */
+  const persistRecipes = useCallback((recipes: SurvivalRecipe[]) => {
+    const state = engine.variableManager.getState();
+    if (!state.玩家) return;
+    state.玩家.生存配方 = recipes;
+    engine.variableManager.setState(state);
+    bumpVersion();
+  }, [engine, bumpVersion]);
 
   const handleSurvivalCraft = useCallback((recipe: SurvivalRecipe) => {
     const state = engine.variableManager.getState();
@@ -62,6 +74,10 @@ export function useSurvivalCraft(
         for (const r of survivalMod.resources) {
           nameMap.set(r.id, r.name || r.id);
         }
+      }
+      // 追加运行时资源的中文名（演化新增的资源在运行时携带 name）
+      for (const [id, r] of Object.entries(resources)) {
+        if (r.name && !nameMap.has(id)) nameMap.set(id, r.name);
       }
 
       const currentResources = Object.entries(resources).map(([id, r]) => ({
@@ -118,7 +134,18 @@ export function useSurvivalCraft(
         return;
       }
 
-      setRuntimeRecipes(prev => [...prev, recipe]);
+      // 产出也必须落在已有资源集合内：不能凭空造出尚未出现在世界中的资源
+      // （例如石器时代点"创建蒸汽机"应被拒绝，提示当前资源不满足）
+      if (!validIds.has(recipe.output.resourceId)) {
+        setNotification(`当前资源不满足：无法制作「${recipe.output.resourceId}」，该资源尚未出现在世界中（只能使用已有资源制作）`);
+        return;
+      }
+
+      setRuntimeRecipes(prev => {
+        const next = [...prev, recipe];
+        persistRecipes(next);
+        return next;
+      });
       setNotification(`配方「${recipe.name}」已创建`);
     } catch (err) {
       console.warn('[配方生成] 失败:', err);
@@ -129,8 +156,12 @@ export function useSurvivalCraft(
   }, [engine, apiConfig, worldDef, setNotification]);
 
   const handleSurvivalDeleteRecipe = useCallback((recipeId: string) => {
-    setRuntimeRecipes(prev => prev.filter(r => r.id !== recipeId));
-  }, []);
+    setRuntimeRecipes(prev => {
+      const next = prev.filter(r => r.id !== recipeId);
+      persistRecipes(next);
+      return next;
+    });
+  }, [persistRecipes]);
 
   return {
     runtimeRecipes,

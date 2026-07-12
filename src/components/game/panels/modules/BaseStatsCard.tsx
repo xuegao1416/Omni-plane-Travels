@@ -15,11 +15,11 @@ export default memo(function BaseStatsCard({ data, title }: BaseStatsCardProps) 
     <Collapsible icon={<Heart size={15} />} title={title || (data.attrA.name + ' / ' + data.attrB.name)} defaultOpen={true}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <GaugeBar
-          icon={<Heart size={11} color="#ef4444" />}
+          icon={<Heart size={11} color="var(--danger)" />}
           label={data.attrA.name}
           value={data.attrA.current}
           max={data.attrA.max}
-          color="#ef4444"
+          color="var(--danger)"
         />
         <GaugeBar
           icon={<Zap size={11} color="#3b82f6" />}

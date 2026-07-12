@@ -8,7 +8,7 @@ export function PresetCard({ name, desc, promptCount, regexCount, active, builti
       display: 'flex', alignItems: 'center', gap: '10px',
       padding: '12px 14px', borderRadius: '10px',
       border: active ? '2px solid var(--accent)' : '1px solid var(--border)',
-      background: active ? 'var(--accent-dim, rgba(234,179,8,0.08))' : 'var(--bg-secondary)',
+      background: active ? 'var(--accent-dim)' : 'var(--bg-secondary)',
       cursor: 'pointer', transition: 'border-color 0.15s',
     }} onClick={onSelect}>
       <div style={{ flex: 1, minWidth: 0 }}>

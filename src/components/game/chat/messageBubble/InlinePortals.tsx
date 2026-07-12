@@ -5,6 +5,16 @@ import type { WorldSystemData, DiceRoll } from '../../../../modules/schema';
 import type { RenderedContent } from './renderPipeline';
 import { useImageStore } from '../../../../stores/imageStore';
 
+/** 延迟卸载 React root，避免在 React commit 阶段同步 unmount 导致竞态警告 */
+function deferredUnmount(roots: Root[]) {
+  // 微任务延迟：等当前 React 渲染/提交周期结束后再 unmount
+  queueMicrotask(() => {
+    roots.forEach(root => {
+      try { root.unmount(); } catch { /* ignore */ }
+    });
+  });
+}
+
 /**
  * 内联 Portal 挂载 Hook：骰子卡片、天赋卡片、生图按钮。
  * 管理 createRoot / unmount 生命周期。
@@ -23,9 +33,7 @@ export function useInlinePortals(
 
   // ─── 骰子卡片 Portal ────────────────────────
   useEffect(() => {
-    diceRootsRef.current.forEach(root => {
-      try { root.unmount(); } catch { /* ignore */ }
-    });
+    deferredUnmount(diceRootsRef.current);
     diceRootsRef.current = [];
 
     if (!messageHtmlRef.current || isUser || !worldSystem?.骰子检定 || message.streaming) return;
@@ -57,18 +65,14 @@ export function useInlinePortals(
     mountDiceCards();
 
     return () => {
-      diceRootsRef.current.forEach(root => {
-        try { root.unmount(); } catch { /* ignore */ }
-      });
+      deferredUnmount(diceRootsRef.current);
       diceRootsRef.current = [];
     };
   }, [renderedContent, worldSystem, onDiceRoll, isUser, message.streaming, messageHtmlRef]);
 
   // ─── 天赋觉醒卡片 Portal ────────────────────────
   useEffect(() => {
-    talentRootsRef.current.forEach(root => {
-      try { root.unmount(); } catch { /* ignore */ }
-    });
+    deferredUnmount(talentRootsRef.current);
     talentRootsRef.current = [];
 
     if (!messageHtmlRef.current || isUser || !worldSystem?.天赋体系 || message.streaming) return;
@@ -105,9 +109,7 @@ export function useInlinePortals(
     mountTalentCards();
 
     return () => {
-      talentRootsRef.current.forEach(root => {
-        try { root.unmount(); } catch { /* ignore */ }
-      });
+      deferredUnmount(talentRootsRef.current);
       talentRootsRef.current = [];
     };
   }, [renderedContent, worldSystem, isUser, message.streaming, messageHtmlRef]);
@@ -116,9 +118,7 @@ export function useInlinePortals(
   const inlineImageEnabled = useImageStore((s) => s.config.inlineImageEnabled);
 
   useEffect(() => {
-    imageGenRootsRef.current.forEach(root => {
-      try { root.unmount(); } catch { /* ignore */ }
-    });
+    deferredUnmount(imageGenRootsRef.current);
     imageGenRootsRef.current = [];
 
     if (!messageHtmlRef.current || isUser || !inlineImageEnabled || message.streaming) return;
@@ -143,9 +143,7 @@ export function useInlinePortals(
     mountImageButtons();
 
     return () => {
-      imageGenRootsRef.current.forEach(root => {
-        try { root.unmount(); } catch { /* ignore */ }
-      });
+      deferredUnmount(imageGenRootsRef.current);
       imageGenRootsRef.current = [];
     };
   }, [renderedContent, inlineImageEnabled, isUser, message.streaming, message.id, messageHtmlRef]);

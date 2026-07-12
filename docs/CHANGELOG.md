@@ -1,5 +1,40 @@
 # 更新日志
 
+## v2.5.0 — 发布就绪改造 + 功能增强 (2026-07-12)
+
+### 🔒 安全 / 稳定（G0）
+
+- **L-01** API Key 加密存储（Web Crypto AES-GCM non-extractable + IndexedDB）
+- **L-02** iframe DOMPurify 净化 + sandbox=allow-scripts（移除 allow-same-origin 防沙箱逃逸）
+- **L-03** Tauri CSP 最小白名单（非 null）
+- **L-04** 流式超时 120s AbortController 真正 abort（消除永久卡死）
+- **L-05** 依赖钉定精确版本 + 移除冗余 @types/uuid/@types/dompurify
+- **L-06** build.ts 全量输出多 chunk
+- **L-07** Tauri devUrl→3456 + http:default 能力
+
+### 📄 发布就绪（G1）
+
+- **L-08** 新增 LICENSE（MIT）、CONTRIBUTING、PRIVACY.md
+- **L-09** 新增用户教程（配 Key→建世界→发消息→回滚变量全流程）
+- **L-10** 新增独立落地页（docs/site/index.html）
+- **L-11** 新增内容政策 + 社区准则
+- **L-12** 新增治理文档（永久开源免费）
+- **L-13** 语义色全量 token 化（var() 替代硬编码色值）
+- **L-14** 桌面 DrawerPanel a11y（role/aria-modal/Esc/焦点陷阱）
+- **L-15** 桌面图标导航补 aria-label
+- **L-16** 核心纯函数单测（variableManager/responseExtractor/rateLimiter/db迁移）
+- **L-17** 429 尊重 Retry-After + 分桶限流
+- **L-18** 补最小 sw.js（PWA 可安装）
+- **L-19** 原型污染防护（isSafePath/containsDangerousKey）
+- **L-20** @types/uuid 版本错配清理 + typecheck 脚本
+
+### ⚡ 功能增强
+
+- **ComfyUI 工作流管线升级**：格式自动检测 + 拓扑注入 + 资源校验 + 代理穿透
+- **世界演化引擎**：注入玩家对话上下文，解决前后台叙事不同步
+- **反八股模块化改造**：禁用词扩充 + 6 个可开关子模块 + 正则后处理安全网
+- **生存系统增强**：配方存档持久化 + 运行时资源元数据显示 + 产出校验
+
 ## v2.2.0 — 全量代码审查修复 + 延迟优化 + 记忆空间感知 (2026-07-06)
 
 ### 🐛 Bug 修复

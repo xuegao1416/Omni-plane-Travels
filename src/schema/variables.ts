@@ -1,5 +1,7 @@
 // 游戏变量类型定义 - 从世界漫游指南.json的Zod schema提取
 
+import type { SurvivalRecipe } from '../modules/schema';
+
 export interface WorldModuleRuntime {
   moduleId: string;
   名称: string;
@@ -75,8 +77,23 @@ export interface PlayerState {
   当前经验值?: number;
   /** 可用属性点 */
   可用属性点?: number;
-  /** 生存资源（生存模块启用时填充） */
-  生存资源?: Record<string, { 数量: number; 最大值?: number }>;
+  /** 生存资源（生存模块启用时填充）
+   * 基础资源只存 { 数量, 最大值? }，元数据来自世界静态定义；
+   * 演化动态新增的资源会在此附带 name/symbol/最大值/scarse 等元数据，
+   * 以便 UI 正确显示（而非匿名 ❓）。 */
+  生存资源?: Record<string, {
+    数量: number;
+    最大值?: number;
+    name?: string;
+    symbol?: string;
+    scarce?: boolean;
+    description?: string;
+    gatherRate?: string;
+    usage?: string;
+  }>;
+  /** 运行时配方（玩家在游戏中点击"创建配方"由 AI 动态生成）
+   * 存于 gameState 随存档持久化，刷新/读档后不会丢失。 */
+  生存配方?: SurvivalRecipe[];
   /** 经营资产（经营模块启用时填充，AI 通过 UpdateVariable 更新） */
   经营资产?: {
     资金: number;

@@ -130,7 +130,7 @@ export default memo(function DiceCard({ data, statData, onUpdate, title }: DiceC
 });
 
 function DiceResult({ roll, compact }: { roll: DiceRoll; compact?: boolean }) {
-  const resultColor = roll.isNatural20 ? '#22c55e' : roll.isNatural1 ? '#ef4444' : roll.success ? 'var(--accent)' : 'var(--text-muted)';
+  const resultColor = roll.isNatural20 ? 'var(--success)' : roll.isNatural1 ? 'var(--danger)' : roll.success ? 'var(--accent)' : 'var(--text-muted)';
 
   if (compact) {
     return (
@@ -144,7 +144,7 @@ function DiceResult({ roll, compact }: { roll: DiceRoll; compact?: boolean }) {
   return (
     <div style={{
       padding: '6px 8px', borderRadius: '6px',
-      background: roll.isNatural20 ? '#22c55e15' : roll.isNatural1 ? '#ef444415' : 'var(--bg-tertiary)',
+      background: roll.isNatural20 ? 'var(--success-bg-soft)' : roll.isNatural1 ? 'var(--danger-bg-soft)' : 'var(--bg-tertiary)',
       border: `1px solid ${resultColor}30`,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -163,12 +163,12 @@ function DiceResult({ roll, compact }: { roll: DiceRoll; compact?: boolean }) {
         {' '}vs DC{roll.dc}
       </div>
       {roll.isNatural20 && (
-        <div style={{ fontSize: 'var(--font-size-xs)', color: '#22c55e', fontWeight: 600, marginTop: '2px' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--success)', fontWeight: 600, marginTop: '2px' }}>
           🎉 大成功！
         </div>
       )}
       {roll.isNatural1 && (
-        <div style={{ fontSize: 'var(--font-size-xs)', color: '#ef4444', fontWeight: 600, marginTop: '2px' }}>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--danger)', fontWeight: 600, marginTop: '2px' }}>
           💀 大失败！
         </div>
       )}

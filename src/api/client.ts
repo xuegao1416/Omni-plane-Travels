@@ -1,9 +1,10 @@
 import type { ApiConfig, Message, RequestOptions, StreamOptions, CompletionResult } from './types';
 import { nativeFetch } from '../utils/nativeFetch';
 import { STORAGE_KEYS } from '../config/storageKeys';
+import { notifyRateLimited, bucketKeyForConfig } from './rateLimiter';
 
 // 获取代理 URL（校验协议安全性）
-function getProxyUrl(): string | null {
+export function getProxyUrl(): string | null {
   try {
     const url = localStorage.getItem(STORAGE_KEYS.PROXY_URL)?.trim();
     if (!url) return null;
@@ -29,7 +30,7 @@ function getProxyUrl(): string | null {
 }
 
 /** 统一准备请求 URL 和 Headers（处理代理逻辑） */
-function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>): { url: string; headers: Record<string, string> } {
+export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>): { url: string; headers: Record<string, string> } {
   const proxyUrl = getProxyUrl();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -254,6 +255,10 @@ export async function requestCompletion(
       console.warn('可能原因: API 服务端错误，稍后重试');
     }
     console.groupEnd();
+    // 尊重服务端 429 限流（L-17）：记录 Retry-After 并抬高该桶间隔
+    if (res.status === 429) {
+      notifyRateLimited(res.headers.get('Retry-After'), bucketKeyForConfig(config));
+    }
     throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
   }
 
@@ -301,6 +306,10 @@ export async function requestCompletionStream(
     console.log('实际请求 URL:', fetchUrl);
     console.log('错误响应:', errText.slice(0, 500));
     console.groupEnd();
+    // 尊重服务端 429 限流（L-17）：记录 Retry-After 并抬高该桶间隔
+    if (res.status === 429) {
+      notifyRateLimited(res.headers.get('Retry-After'), bucketKeyForConfig(config));
+    }
     throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
   }
 
@@ -359,7 +368,7 @@ async function requestWithFallback(
   }
 }
 
-// 主入口：重试 + 降级 + 超时
+// 主入口：重试 + 降级 + 超时真正 abort（L-04）
 export async function requestStreamWithRetry(
   config: ApiConfig,
   messages: Message[],
@@ -368,16 +377,28 @@ export async function requestStreamWithRetry(
   const timeoutMs = 120_000; // 2分钟超时
   return withRetry(async () => {
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    // 内部控制器：超时或被外部 signal 中止时，真正 abort 底层 fetch
+    const controller = new AbortController();
+    const onExternalAbort = () => controller.abort();
+    if (options.signal) {
+      if (options.signal.aborted) controller.abort();
+      else options.signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+
     const timeoutId = setTimeout(() => {
-      if (!options.signal?.aborted) {
-        // 超时只用于提示，不强制 abort（用户可能还在等）
-        console.warn('[API] 请求已超过2分钟，可能需要手动取消');
+      if (!controller.signal.aborted) {
+        console.warn(`[API] 请求已超过 ${Math.round(timeoutMs / 1000)}s，强制中止`);
+        controller.abort(new DOMException('Streaming timeout exceeded', 'TimeoutError'));
       }
     }, timeoutMs);
+
     try {
-      return await requestWithFallback(config, messages, options);
+      // 用合并后的 signal 替代调用方的 signal，确保超时也能中止
+      return await requestWithFallback(config, messages, { ...options, signal: controller.signal });
     } finally {
       clearTimeout(timeoutId);
+      if (options.signal) options.signal.removeEventListener('abort', onExternalAbort);
     }
   });
 }
@@ -433,8 +454,10 @@ export async function fetchModels(config: ApiConfig): Promise<string[]> {
 // 测试连接（使用 nativeFetch 绕过 CORS）
 export async function testConnection(config: ApiConfig): Promise<{ success: boolean; message: string; elapsed: number }> {
   const start = Date.now();
+  let endpoint = '';
+  let fetchUrl = '';
   try {
-    const endpoint = buildEndpoint(config);
+    endpoint = buildEndpoint(config);
     const body = {
       model: config.model,
       messages: [{ role: 'user', content: 'Hi' }],
@@ -442,7 +465,8 @@ export async function testConnection(config: ApiConfig): Promise<{ success: bool
       stream: false,
     };
 
-    const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
+    const { url: resolvedFetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
+    fetchUrl = resolvedFetchUrl;
 
     const res = await nativeFetch(fetchUrl, {
       method: 'POST',

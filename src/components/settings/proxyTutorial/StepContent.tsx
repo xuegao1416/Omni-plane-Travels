@@ -11,14 +11,14 @@ export function StepContent({ step, copiedCode, onCopyCode }: {
     return (
       <>
         {step.content.problem && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', padding: '12px 14px' }}>
-            <div style={{ fontWeight: '500', marginBottom: '6px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}><XCircle size={14} /> 问题</div>
+          <div style={{ background: 'var(--danger-bg-soft)', border: '1px solid var(--danger-bg)', borderRadius: '8px', padding: '12px 14px' }}>
+            <div style={{ fontWeight: '500', marginBottom: '6px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '8px' }}><XCircle size={14} /> 问题</div>
             <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{step.content.problem}</div>
           </div>
         )}
         {step.content.solution && (
-          <div style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', borderRadius: '8px', padding: '12px 14px' }}>
-            <div style={{ fontWeight: '500', marginBottom: '6px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={14} /> 解决方案</div>
+          <div style={{ background: 'var(--success-bg-soft)', border: '1px solid var(--success-bg)', borderRadius: '8px', padding: '12px 14px' }}>
+            <div style={{ fontWeight: '500', marginBottom: '6px', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={14} /> 解决方案</div>
             <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{step.content.solution}</div>
           </div>
         )}
@@ -49,7 +49,7 @@ export function StepContent({ step, copiedCode, onCopyCode }: {
               {s.link && <> {' '}<a href={s.link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>打开链接 <ExternalLink size={12} /></a></>}
             </div>
             {s.tip && (
-              <div style={{ marginTop: '6px', padding: '8px 10px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '6px', fontSize: 'var(--font-size-xs)', color: '#eab308', whiteSpace: 'pre-line', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <div style={{ marginTop: '6px', padding: '8px 10px', background: 'var(--warning-bg-soft)', border: '1px solid var(--warning-bg)', borderRadius: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--warning)', whiteSpace: 'pre-line', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <Lightbulb size={14} style={{ flexShrink: 0, marginTop: '2px' }} /><span>{s.tip}</span>
               </div>
             )}
@@ -60,7 +60,7 @@ export function StepContent({ step, copiedCode, onCopyCode }: {
               <div style={{ marginTop: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: 'none' }}>
                   <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>代理代码（点击复制）</span>
-                  <button onClick={onCopyCode} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copiedCode ? 'rgba(34, 197, 94, 0.2)' : 'var(--accent)', border: 'none', borderRadius: '6px', color: copiedCode ? '#22c55e' : '#fff', fontSize: 'var(--font-size-xs)', fontWeight: '500', cursor: 'pointer' }}>
+                  <button onClick={onCopyCode} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copiedCode ? 'var(--success-bg)' : 'var(--accent)', border: 'none', borderRadius: '6px', color: copiedCode ? 'var(--success)' : '#fff', fontSize: 'var(--font-size-xs)', fontWeight: '500', cursor: 'pointer' }}>
                     {copiedCode ? <><Check size={14} /> 已复制！</> : <><Copy size={14} /> 复制代码</>}
                   </button>
                 </div>

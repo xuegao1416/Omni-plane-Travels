@@ -17,8 +17,8 @@ export const STAGE_META: Record<PipelineTaskId, { icon: LucideIcon; color: strin
   memory_multi_round:     { icon: RefreshCw,  color: '#6d28d9', desc: '多轮补充遗漏的记忆' },
   memory_rerank:          { icon: BarChart3,  color: '#5b21b6', desc: '精排打分，优化记忆顺序' },
   memory_retrieve_finalize:{ icon: Search,    color: '#4c1d95', desc: '本地匹配 + 去重 + 排序' },
-  memory_compile:         { icon: Puzzle,     color: '#f59e0b', desc: '组装记忆上下文注入系统提示词' },
-  variable:               { icon: Variable,   color: '#ef4444', desc: '提取游戏变量更新' },
+  memory_compile:         { icon: Puzzle,     color: 'var(--warning)', desc: '组装记忆上下文注入系统提示词' },
+  variable:               { icon: Variable,   color: 'var(--danger)', desc: '提取游戏变量更新' },
 };
 
 /** 阶段执行顺序 */

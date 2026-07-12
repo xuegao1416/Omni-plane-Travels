@@ -11,7 +11,7 @@ interface EffectLogTabProps {
 /** 来源标签颜色 */
 const SOURCE_COLORS: Record<string, string> = {
   rule: '#3b82f6',      // 蓝色
-  periodic: '#f59e0b',  // 橙色
+  periodic: 'var(--warning)',  // 橙色
   ai: '#8b5cf6',        // 紫色
   npc: '#10b981',       // 绿色
 };
@@ -26,8 +26,8 @@ const SOURCE_LABELS: Record<string, string> = {
 
 /** 模块标签颜色 */
 const MODULE_COLORS: Record<string, string> = {
-  survival: '#ef4444',    // 红色
-  business: '#f59e0b',    // 橙色
+  survival: 'var(--danger)',    // 红色
+  business: 'var(--warning)',    // 橙色
   stats: '#3b82f6',       // 蓝色
   progression: '#8b5cf6', // 紫色
   worldState: '#6b7280',  // 灰色
@@ -116,7 +116,7 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
                 {entry.before} → {entry.after}
                 <span style={{
                   marginLeft: '4px',
-                  color: entry.after > entry.before ? '#22c55e' : entry.after < entry.before ? '#ef4444' : 'var(--text-muted)',
+                  color: entry.after > entry.before ? 'var(--success)' : entry.after < entry.before ? 'var(--danger)' : 'var(--text-muted)',
                 }}>
                   ({entry.after > entry.before ? '+' : ''}{entry.after - entry.before})
                 </span>

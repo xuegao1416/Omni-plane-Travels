@@ -75,6 +75,7 @@ export default function DesktopLayout({
                 onOverlayChange(overlay === btn.id ? null : btn.id);
               }}
               title={t(btn.labelKey)}
+              aria-label={t(btn.labelKey)}
               style={{
                 width: '38px',
                 height: '38px',
@@ -105,6 +106,7 @@ export default function DesktopLayout({
         <button
           onClick={onToggleFullscreen}
           title={isFullscreen ? '退出全屏' : '全屏'}
+          aria-label={isFullscreen ? '退出全屏' : '全屏'}
           className="btn-ghost btn-icon"
         >
           {isFullscreen ? <Minimize2 size={18} strokeWidth={1.5} /> : <Maximize2 size={18} strokeWidth={1.5} />}
@@ -113,6 +115,7 @@ export default function DesktopLayout({
         <button
           onClick={() => onNavigate('settings')}
           title={t('nav.settings')}
+          aria-label={t('nav.settings')}
           className="btn-ghost btn-icon"
         >
           <Settings size={18} strokeWidth={1.5} />
@@ -156,6 +159,7 @@ export default function DesktopLayout({
       {/* 右侧折叠按钮 */}
       <button
         onClick={onToggleRightPanel}
+        aria-label={rightCollapsed ? '展开右侧信息栏' : '折叠右侧信息栏'}
         style={{
           position: 'fixed',
           right: rightCollapsed ? '0' : 'var(--right-panel-width)',

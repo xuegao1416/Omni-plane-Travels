@@ -193,7 +193,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   <input type="text" value={aiGenName} onChange={e => setAiGenName(e.target.value)} placeholder="例如：一个被僵尸占领的末日废土世界..." style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)' }} onKeyDown={e => e.key === 'Enter' && !isGeneratingWorld && handleAIGenerate()} />
                   <button className="btn-primary" onClick={handleAIGenerate} disabled={isGeneratingWorld} style={{ padding: '8px 20px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{isGeneratingWorld ? <><Loader size={14} className="animate-spin" /> 生成中...</> : <><Sparkles size={14} style={{ flexShrink: 0 }} /> 生成</>}</button>
-                  {isGeneratingWorld && <button className="btn-ghost" onClick={() => aiAbortRef.current?.abort()} style={{ padding: '8px 12px', color: '#ef4444' }}>{t('common.cancel')}</button>}
+                  {isGeneratingWorld && <button className="btn-ghost" onClick={() => aiAbortRef.current?.abort()} style={{ padding: '8px 12px', color: 'var(--danger)' }}>{t('common.cancel')}</button>}
                 </div>
                 <ModuleSelector selected={selectedModules} onToggle={toggleModule} disabledByConflict={disabledByConflict} />
                 {selectedModules.has('survival') && (
@@ -201,7 +201,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
                     <input type="text" value={survivalGenDesc} onChange={e => setSurvivalGenDesc(e.target.value)} placeholder="描述你想要的生存资源系统（如：荒岛求生，需要淡水/食物/木材/药草，初期紧张后期富足...）" style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }} />
                   </div>
                 )}
-                {genError && <div style={{ color: '#ef4444', fontSize: 'var(--font-size-sm)', marginTop: 8 }}>{genError}</div>}
+                {genError && <div style={{ color: 'var(--danger)', fontSize: 'var(--font-size-sm)', marginTop: 8 }}>{genError}</div>}
                 {isGeneratingWorld && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)' }}>

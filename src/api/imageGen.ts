@@ -14,6 +14,26 @@ import {
   NAI_RESOLUTIONS,
   OPENAI_COMPATIBLE_IMAGE_PROVIDERS,
 } from './imageGenTypes';
+import {
+  applyRuntimeValuesToApiPrompt,
+  validateAndRepairComfyApiPromptResources,
+  formatComfyWorkflowResourceValidationError,
+} from './comfy/comfyWorkflow';
+import type { ApiPromptWorkflow } from './comfy/comfyWorkflow';
+import { getProxyUrl } from './client';
+import { nativeFetch } from '../utils/nativeFetch';
+
+/** 轻量代理辅助 — 为生图请求注入用户自建 CF Worker 代理（无日志，适合轮询场景） */
+function withProxy(
+  url: string,
+  headers: Record<string, string> = {},
+): { url: string; headers: Record<string, string> } {
+  const proxyUrl = getProxyUrl();
+  if (proxyUrl) {
+    return { url: proxyUrl, headers: { ...headers, 'X-Target-URL': url } };
+  }
+  return { url, headers };
+}
 
 // ─── 工具函数 ───
 
@@ -114,11 +134,11 @@ export function resolveComfyMergedPrompts(
   options: { negativePrompt?: string } = {},
   cfg: Partial<ImageGenConfig> = {},
 ): { positivePrompt: string; negativePrompt: string } {
-  const globalPositivePrompt = normalizePositivePrompt(cfg?.comfyPositivePrompt || '');
+  const globalPositivePrompt = normalizePositivePrompt(cfg?.positivePrompt || '');
   const requestPositivePrompt = normalizePositivePrompt(prompt);
   const positivePrompt = mergePromptTags(globalPositivePrompt, requestPositivePrompt);
 
-  const globalNegativePrompt = normalizeNegativePrompt(cfg?.comfyNegativePrompt || '');
+  const globalNegativePrompt = normalizeNegativePrompt(cfg?.negativePrompt || '');
   const requestNegativePrompt = normalizeNegativePrompt(options?.negativePrompt || '');
   const negativePrompt = mergePromptTags(globalNegativePrompt, requestNegativePrompt) || DEFAULT_NEGATIVE_PROMPT;
 
@@ -257,7 +277,8 @@ export function getGenerationConfigError(cfg: Partial<ImageGenConfig>): string {
 
 export async function fetchComfyUIData(apiUrl: string): Promise<ComfyUIData> {
   const baseUrl = apiUrl.replace(/\/$/, '');
-  const res = await fetch(`${baseUrl}/object_info`);
+  const { url, headers } = withProxy(`${baseUrl}/object_info`);
+  const res = await nativeFetch(url, { headers });
   if (!res.ok) throw new Error('无法连接到 ComfyUI');
   const data = await res.json();
 
@@ -564,23 +585,103 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
 
   // 优先使用自定义工作流
   const customWorkflow = resolveComfyWorkflow(config);
-  let execution: ReturnType<typeof buildDefaultComfyExecutionPayload | typeof buildCustomWorkflowPayload>;
+
+  // 统一的执行参数
+  let promptPayload: Record<string, Record<string, unknown>>;
+  let positivePrompt: string;
+  let negativePrompt: string;
+  let width: number;
+  let height: number;
+  let seed: number;
+  let steps: number;
+  let cfgScale: number;
+  let resultModelLabel: string;
+  let resultSamplerLabel: string;
 
   if (customWorkflow) {
-    try {
-      execution = buildCustomWorkflowPayload(customWorkflow, prompt, {}, config);
-    } catch (e) {
-      console.warn('[ComfyUI] 自定义工作流构建失败，回退到默认流:', e);
-      execution = buildDefaultComfyExecutionPayload(prompt, {}, config);
+    // ── 新管线：拓扑感知注入 + 资源校验，绝不静默回退 ──
+    const merged = resolveComfyMergedPrompts(prompt, {}, config);
+    const requestedSize = resolveRequestedImageSize(config, {});
+    positivePrompt = merged.positivePrompt;
+    negativePrompt = merged.negativePrompt;
+    width = requestedSize.width;
+    height = requestedSize.height;
+    seed = config.seed || Math.floor(Math.random() * 4294967295);
+    steps = config.steps || 20;
+    cfgScale = config.scale || 7;
+    resultModelLabel = `ComfyUI [${customWorkflow.name}]: ${config.comfyModel || ''}`;
+    resultSamplerLabel = config.comfySampler || 'euler';
+
+    // 获取 object_info 用于资源校验
+    const comfyData = await fetchComfyUIData(apiUrl);
+
+    // 拓扑感知运行时注入（从 KSampler 正/负向输入反向回溯到真正的 CLIPTextEncode 节点）
+    const injectedPrompt = applyRuntimeValuesToApiPrompt(
+      customWorkflow.workflow as unknown as ApiPromptWorkflow,
+      {
+        positivePrompt,
+        negativePrompt,
+        width,
+        height,
+        seed,
+        steps,
+        cfg: cfgScale,
+        sampler_name: config.comfySampler || 'euler',
+        scheduler: config.comfyScheduler || 'normal',
+        denoise: 1,
+        model: config.comfyModel || '',
+        vae: config.comfyVae || '',
+      },
+    );
+
+    // 资源校验与修复（缺失 model/VAE 会抛出明确错误，不再静默回退到默认流）
+    const validation = validateAndRepairComfyApiPromptResources(
+      injectedPrompt,
+      comfyData.objectInfo,
+      {
+        model: config.comfyModel || '',
+        vae: config.comfyVae || '',
+        sampler_name: config.comfySampler || 'euler',
+        scheduler: config.comfyScheduler || 'normal',
+      },
+    );
+
+    if (validation.unresolved.length > 0) {
+      throw new Error(formatComfyWorkflowResourceValidationError(validation.unresolved));
     }
+
+    if (validation.repaired.length > 0) {
+      console.info(
+        '[ComfyUI] 工作流资源已自动修复:',
+        validation.repaired.map(
+          (r) => `${r.nodeId}.${r.inputName}: ${r.from} → ${r.to}`,
+        ),
+      );
+    }
+
+    promptPayload = validation.prompt as unknown as Record<string, Record<string, unknown>>;
   } else {
-    execution = buildDefaultComfyExecutionPayload(prompt, {}, config);
+    // ── 默认内置工作流 ──
+    const execution = buildDefaultComfyExecutionPayload(prompt, {}, config);
+    promptPayload = execution.promptPayload;
+    positivePrompt = execution.positivePrompt;
+    negativePrompt = execution.negativePrompt;
+    width = execution.width;
+    height = execution.height;
+    seed = execution.seed;
+    steps = execution.steps;
+    cfgScale = execution.cfgScale;
+    resultModelLabel = execution.resultModelLabel;
+    resultSamplerLabel = execution.resultSamplerLabel;
   }
 
-  const res = await fetch(`${apiUrl}/prompt`, {
+  const { url: promptUrl, headers: promptHeaders } = withProxy(`${apiUrl}/prompt`, {
+    'Content-Type': 'application/json',
+  });
+  const res = await nativeFetch(promptUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: execution.promptPayload }),
+    headers: promptHeaders,
+    body: JSON.stringify({ prompt: promptPayload }),
   });
 
   if (!res.ok) throw new Error(`ComfyUI 请求失败: ${res.statusText}`);
@@ -603,7 +704,8 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
           return;
         }
 
-        const historyRes = await fetch(`${apiUrl}/history/${prompt_id}`);
+        const { url: historyUrl, headers: historyHeaders } = withProxy(`${apiUrl}/history/${prompt_id}`);
+        const historyRes = await nativeFetch(historyUrl, { headers: historyHeaders });
         if (!historyRes.ok) {
           consecutiveErrors++;
           console.warn(`[ComfyUI] history 请求失败 (${historyRes.status}), attempt ${attempts}, 连续错误 ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}`);
@@ -633,9 +735,10 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
           if (nodeOutput?.images && nodeOutput.images.length > 0) {
             const image = nodeOutput.images[0];
             console.log(`[ComfyUI] 找到图片: ${image.filename}`);
-            const imgRes = await fetch(
+            const { url: viewUrl, headers: viewHeaders } = withProxy(
               `${apiUrl}/view?filename=${encodeURIComponent(image.filename)}&subfolder=${encodeURIComponent(image.subfolder)}&type=${encodeURIComponent(image.type)}`,
             );
+            const imgRes = await nativeFetch(viewUrl, { headers: viewHeaders });
             if (!imgRes.ok) {
               reject(new Error(`图片下载失败 (${imgRes.status})`));
               return;
@@ -643,15 +746,15 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
             const blob = await imgRes.blob();
             resolve({
               blob,
-              seed: execution.seed,
-              prompt: execution.positivePrompt,
-              negativePrompt: execution.negativePrompt,
-              width: execution.width,
-              height: execution.height,
-              model: execution.resultModelLabel,
-              sampler: execution.resultSamplerLabel,
-              steps: execution.steps,
-              scale: execution.cfgScale,
+              seed,
+              prompt: positivePrompt,
+              negativePrompt,
+              width,
+              height,
+              model: resultModelLabel,
+              sampler: resultSamplerLabel,
+              steps,
+              scale: cfgScale,
             });
             return;
           }
@@ -893,12 +996,13 @@ export async function generateNovelAIImage(prompt: string, config: Partial<Image
   }
 
   const endpoint = 'https://image.novelai.net/ai/generate-image';
-  const resp = await fetch(endpoint, {
+  const { url: naiUrl, headers: naiHeaders } = withProxy(endpoint, {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  });
+  const resp = await nativeFetch(naiUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: naiHeaders,
     body: JSON.stringify(requestBody),
   });
 
@@ -968,12 +1072,13 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
 
   if (negativePrompt) requestBody.negative_prompt = negativePrompt;
 
-  const resp = await fetch(endpoint, {
+  const { url: oaiUrl, headers: oaiHeaders } = withProxy(endpoint, {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  });
+  const resp = await nativeFetch(oaiUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: oaiHeaders,
     body: JSON.stringify(requestBody),
   });
 
@@ -1017,7 +1122,8 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
       (typeof firstData === 'string' && /^https?:\/\//i.test(firstData) ? firstData : '');
 
     if (imageUrl) {
-      const imageResp = await fetch(imageUrl);
+      const { url: dlUrl, headers: dlHeaders } = withProxy(imageUrl);
+      const imageResp = await nativeFetch(dlUrl, { headers: dlHeaders });
       if (!imageResp.ok) throw new Error('其他生图返回的图片地址无法下载');
       imageBlob = await imageResp.blob();
     }

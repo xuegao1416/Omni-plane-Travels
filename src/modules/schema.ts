@@ -134,13 +134,20 @@ export interface SurvivalRecipe {
 
 /** 资源演化蓝图条目 */
 export interface ResourceEvolutionStep {
-  /** 唯一标识，与 periodicEvents 里的兜底事件 id 对应 */
+  /** 唯一标识 */
   id: string;
-  /** 触发条件（关键词触发；轮次兜底由 periodicEvents 承载） */
+  /**
+   * 触发条件（两层机制）：
+   * - 层A 游戏内动态新增：trigger.keywords 命中当前活跃事件文本或玩家本轮对话时触发
+   * - 层B 轮次兜底：afterRounds 设置后，到达该轮次强制触发（即使关键词未命中）
+   * 两层满足其一即触发；触发后仅执行一次（记录在 simulationRuntime.evolvedSteps）。
+   */
   trigger: { keywords: string[] };
+  /** 层B：强制触发的轮次（>= 该轮次即触发，用于"到后期出现 X 资源"） */
+  afterRounds?: number;
   /** 新增的资源 */
   add?: SurvivalResource[];
-  /** 移除的资源 id */
+  /** 移除的资源 id（枯竭/被替代，如石器时代后期淘汰木头） */
   remove?: string[];
   /** 叙事提示（喂给 AI 做渲染） */
   narrateHint?: string;
@@ -462,6 +469,8 @@ export interface SimulationRuntimeState {
   effectLog: EffectLogEntry[];
   /** 已触发过的周期事件 id（用于一次性事件） */
   triggeredPeriodicEvents: string[];
+  /** 已触发过的资源演化蓝图 id（每个演化步骤仅触发一次） */
+  evolvedSteps?: string[];
 }
 
 /**
@@ -473,6 +482,7 @@ export function createDefaultSimulationRuntimeState(): SimulationRuntimeState {
     periodicCounters: {},
     effectLog: [],
     triggeredPeriodicEvents: [],
+    evolvedSteps: [],
   };
 }
 

@@ -13,7 +13,7 @@ export function ValidationPanel({ validation }: { validation: WorkflowValidation
     }}>
       <div style={{ fontWeight: 600, marginBottom: '6px' }}>
         {validation.valid ? (
-          <span style={{ color: 'var(--success, #10b981)' }}>
+          <span style={{ color: 'var(--success)' }}>
             <CheckCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
             验证通过
           </span>
@@ -38,19 +38,33 @@ export function ValidationPanel({ validation }: { validation: WorkflowValidation
 
       {validation.missing.length > 0 && (
         <div>
-          <div style={{ color: 'var(--warning, #f59e0b)', fontWeight: 500, marginBottom: '2px' }}>
+          <div style={{ color: 'var(--warning)', fontWeight: 500, marginBottom: '2px' }}>
             <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
             缺失节点（本地 ComfyUI 中未安装）:
           </div>
           {validation.missing.map((m, i) => (
-            <div key={i} style={{ color: 'var(--warning, #f59e0b)', paddingLeft: '16px' }}>
+            <div key={i} style={{ color: 'var(--warning)', paddingLeft: '16px' }}>
               {m}
             </div>
           ))}
         </div>
       )}
 
-      {validation.fatalErrors.length === 0 && validation.missing.length === 0 && (
+      {validation.modelWarnings.length > 0 && (
+        <div>
+          <div style={{ color: 'var(--warning)', fontWeight: 500, marginBottom: '2px' }}>
+            <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+            资源不可用（模型 / VAE / Lora 等）:
+          </div>
+          {validation.modelWarnings.map((w, i) => (
+            <div key={i} style={{ color: 'var(--warning)', paddingLeft: '16px' }}>
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {validation.fatalErrors.length === 0 && validation.missing.length === 0 && validation.modelWarnings.length === 0 && (
         <div style={{ color: 'var(--text-secondary)' }}>
           已识别 {validation.nodeTypes.length} 种节点类型，全部可用
         </div>

@@ -165,7 +165,7 @@ export default function SavesView({
                     {meta.estBytes && meta.estBytes > 50 * 1024 * 1024 && (
                       <span style={{
                         display: 'flex', alignItems: 'center', gap: '2px',
-                        color: 'var(--danger, #e74c3c)', fontWeight: 600,
+                        color: 'var(--danger)', fontWeight: 600,
                       }}>
                         <AlertTriangle size={11} />
                         {formatBytes(meta.estBytes)}
@@ -254,10 +254,10 @@ export default function SavesView({
               onClick={() => onForceDeleteSave(selectedId)}
               style={{
                 padding: '10px 20px',
-                border: '1px solid var(--danger, #e74c3c)',
+                border: '1px solid var(--danger)',
                 borderRadius: 'var(--radius-md)',
                 background: 'transparent',
-                color: 'var(--danger, #e74c3c)',
+                color: 'var(--danger)',
                 cursor: 'pointer',
                 fontSize: 'var(--font-size-sm)',
                 display: 'flex',

@@ -5,9 +5,9 @@ import type { WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
 
 export const DIFFICULTY_FILTERS = [
   { key: 'all', label: '全部', color: undefined as string | undefined },
-  { key: 'easy', label: '简单', color: '#22c55e' as string | undefined },
-  { key: 'medium', label: '中等', color: '#eab308' as string | undefined },
-  { key: 'hard', label: '困难', color: '#ef4444' as string | undefined },
+  { key: 'easy', label: '简单', color: 'var(--difficulty-easy)' as string | undefined },
+  { key: 'medium', label: '中等', color: 'var(--difficulty-medium)' as string | undefined },
+  { key: 'hard', label: '困难', color: 'var(--difficulty-hard)' as string | undefined },
 ];
 
 export const TABS = [

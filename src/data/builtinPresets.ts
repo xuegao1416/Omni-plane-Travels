@@ -115,7 +115,7 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
   {
     id: 'builtin_display_strip_meta_tags',
     scriptName: '去除元标签（规则/风格等）',
-    findRegex: '<(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat)>[\\s\\S]*?</(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat)>',
+    findRegex: '<(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat|AntiFormula|AntiMetaphor|AntiReveal|AntiVoiceDesc|AntiSynesthesia|AntiShaguanlian|AntiMicroMacro|EmotionalBalance|VariableContext)>[\\s\\S]*?</(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat|AntiFormula|AntiMetaphor|AntiReveal|AntiVoiceDesc|AntiSynesthesia|AntiShaguanlian|AntiMicroMacro|EmotionalBalance|VariableContext)>',
     replaceString: '',
     placement: [2],
     disabled: false,
@@ -176,6 +176,17 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
     markdownOnly: true,
     promptOnly: false,
   },
+  // --- 八股词清理（安全网：即使 AI 生成了八股词，输出阶段自动删除） ---
+  {
+    id: 'builtin_display_anti_cliche',
+    scriptName: '八股词清理',
+    findRegex: '/死死[的地]?|一抹|极其|由于|病态的|舐|生理性的?|霸道的?地?/gis',
+    replaceString: '',
+    placement: [2],
+    disabled: false,
+    markdownOnly: true,
+    promptOnly: false,
+  },
 ];
 
 // --- API 上下文用正则脚本（promptOnly: true）---
@@ -205,7 +216,7 @@ const PROMPT_SCRIPTS: RegexScript[] = [
   {
     id: 'builtin_prompt_strip_meta_tags',
     scriptName: 'API-去除元标签',
-    findRegex: '<(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat)>[\\s\\S]*?</(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat)>',
+    findRegex: '<(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat|AntiFormula|AntiMetaphor|AntiReveal|AntiVoiceDesc|AntiSynesthesia|AntiShaguanlian|AntiMicroMacro|EmotionalBalance|VariableContext)>[\\s\\S]*?</(?:integrity|NarrativeRules|WritingStyle|WritingProcess|WritingRules|Dialogue|DialogueBalance|ExpressionRules|Relationship|NSFWContent|PerspectiveBoundary|FigureCrafting|Task|OutputFormat|AntiFormula|AntiMetaphor|AntiReveal|AntiVoiceDesc|AntiSynesthesia|AntiShaguanlian|AntiMicroMacro|EmotionalBalance|VariableContext)>',
     replaceString: '',
     placement: [2],
     disabled: false,
@@ -389,12 +400,22 @@ const PROMPT_EXPRESSION_RULES = `<ExpressionRules>
 - 使用具体可感的描写，摒弃模糊量词（如"一丝"、"一分"、"几分"）
 - 避免陈词滥调的比喻（如"心湖"、"涟漪"、"藤蔓"、"石子"等）
 - 追求新颖独特的表达方式，拒绝套路化描写
+- 能用一个动词解决的，不堆三个形容词
+- 比喻必须贴合角色身份和场景物件，月光/潮水/刀/野兽/深渊等词不得到处乱贴
 
 禁用词汇（绝对禁止，含近义词）：
-["肉刃","一丝","每一","不容","小兽","幼兽","闪过","低吼","嘶吼","粗噶","膜拜","人儿","撕裂","毁灭","灭顶","弓起","痉挛","不易察觉","虔诚","不容置疑","仪式"]
+["肉刃","一丝","每一","不容","小兽","幼兽","闪过","低吼","嘶吼","粗噶","膜拜","人儿","撕裂","毁灭","灭顶","弓起","痉挛","不易察觉","虔诚","不容置疑","仪式","极其","死死","一抹","霸道","生理性","该死","见鬼","四肢百骸","由于","病态的","舐"]
 
 禁用句式（避免使用）：
-["精致人偶","如石子投入心湖","荡起涟漪","像一根针","一丝不易察觉","不容置疑的","精密仪器","磨人的小妖精","要我的命"]
+["精致人偶","如石子投入心湖","荡起涟漪","像一根针","一丝不易察觉","不容置疑的","精密仪器","磨人的小妖精","要我的命","像烙铁","像触电般","像小兽"]
+
+禁用表情套路（禁止油腻/模板化表情）：
+["眼神冰冷","深邃","暗了暗","眸色一沉","眉头微皱","嘴角勾起","邪魅一笑","似笑非笑","脸皮绷了一下","面部肌肉抽动","表情裂开一瞬"]
+允许的自然表情：板起脸、沉下脸、拉下脸、收了笑、笑不出来、别开脸、看了他一眼、没接话
+
+禁用身体反应套路（禁止模板化生理描写）：
+["指节泛白","青筋暴起","呼吸一滞","倒吸一口凉气","喉结微滚","浑身一震","身子一僵","身体细微绷紧","喉间动了一下"]
+需要表现情绪时，优先写行动选择、距离变化、沉默、改口、停顿、避让
 </ExpressionRules>`;
 
 /** 防八股规范 — 解决 AI 输出重复、模式化问题 */
@@ -421,6 +442,60 @@ const PROMPT_ANTI_FORMULA = `<AntiFormula>
 - 输出前检查：这个情节结构是否与历史雷同？
 - 如果有相似性，必须重写，用完全不同的方式表达
 </AntiFormula>`;
+
+// ── 模块化反八股条目（可独立开关）──
+
+/** 杀比拟 — 禁止比喻和拟人句 */
+const PROMPT_ANTI_METAPHOR = `<AntiMetaphor>
+在全文的任意位置不输出任何比拟句（比喻和拟人）与其他非必要修辞。
+- 不写"像…"、"仿佛…"、"宛如…"、"犹如…"等比喻句式
+- 不写"月光温柔地抚摸"、"风低语"等拟人句式
+- 用直接描写替代修辞：直接写事物本身的状态、变化和效果
+- 仅在比喻与角色具体身份、场景物件、当时情绪严格相关时方可使用（如一个厨子想到锅气，一个学生想到试卷）
+</AntiMetaphor>`;
+
+/** 杀揭示 — 禁止作者视角解释角色动机 */
+const PROMPT_ANTI_REVEAL = `<AntiReveal>
+叙述者绝对隐身。严禁越权对角色的行为进行概括、定性、评价或心理学诊断。
+- 绝对禁止写"他在赌"、"这是一个危险的信号"、"为了掩饰尴尬"、"她终于崩溃"
+- 动作即本体：只写实际发生的动作、神态、对白，不替读者解读
+- 角色的内心活动通过具体行为展现（一句没说完的话、放重的杯子、突然改口、绕开的视线），而非旁白贴标签
+- 信任读者的理解能力，不需要作者额外解释
+</AntiReveal>`;
+
+/** 杀声述 — 禁止描写声音/语气 */
+const PROMPT_ANTI_VOICE_DESC = `<AntiVoiceDesc>
+正文中不要描写角色说话的声音或语气。
+- 对白直接写台词，可搭配动作、表情、停顿、视线、姿态等客观行为
+- 禁止写音量、音色、声线、嗓音、语调、声音状态
+- 禁止"声音里带着某种情绪"、"低沉的嗓音"、"声音微微发颤"等表达
+- 让读者从台词内容和伴随行为自行感受语气
+</AntiVoiceDesc>`;
+
+/** 杀通感 — 禁止情绪躯体化和自然隐喻 */
+const PROMPT_ANTI_SYNESTHESIA = `<AntiSynesthesia>
+禁止将抽象的情绪直接转化为具体的生理反应或自然景象。
+- 禁止躯体化描写：不写"指节发白"、"生理性"、"血液倒流"、"瞳孔骤缩"
+- 禁止自然隐喻：不写"石子投入心湖"、"雨后青草一般"、"潮湿季节里疯长的有毒藤蔓"
+- 需要身体感受时，用宏观主观体感：手心发凉、耳鸣、胃里发沉
+- 情绪应落到具体行为、选择和环境互动中
+</AntiSynesthesia>`;
+
+/** 杀转折词 — 禁止特定句式 */
+const PROMPT_ANTI_SHAGUANLIAN = `<AntiShaguanlian>
+- 避免使用"不是…而是…"、"不是…是…"、"是…不是…"、"不是…只是…"、"没有…就只是"、"没…就这么"等转折对比句式，应将其替换成其他类型的陈述句、因果句
+- 正文中避免使用破折号"——"，只可以在对话中使用破折号以表示尾音拖长等语气表达
+- 直接描写你的观点，不必否定前语
+</AntiShaguanlian>`;
+
+/** 杀极端感知 — 禁止微观模糊词和宏观爆发词 */
+const PROMPT_ANTI_MICRO_MACRO = `<AntiMicroMacro>
+禁止在文中出现极端的感知词汇：
+- 微观/模糊类禁止：一丝、不易察觉、些许、几分、若有若无、似有似无
+- 宏观/爆发类禁止：毁天灭地、铺天盖地、排山倒海、不容置疑、不容抗拒、无法抗拒
+- 强调绝对性禁止：绝对、完全、彻底、百分之百、毫无疑问
+- 用具体可感的描写替代模糊量词和极端表达
+</AntiMicroMacro>`;
 
 /** NSFW 内容规范 */
 const PROMPT_NSFW_CONTENT = `<NSFWContent>
@@ -684,6 +759,13 @@ const DEFAULT_PROMPTS: PresetPromptEntry[] = [
   { identifier: 'dialogue_balance',  name: '对话互动规范',   role: 'system', content: PROMPT_DIALOGUE_BALANCE,  enabled: true, order: 900, triggerMode: 'blue' },
   { identifier: 'expression_rules',  name: '表达规范与禁用词', role: 'system', content: PROMPT_EXPRESSION_RULES, enabled: true, order: 1000, triggerMode: 'blue' },
   { identifier: 'anti_formula',      name: '防八股规范',    role: 'system', content: PROMPT_ANTI_FORMULA,      enabled: true, order: 1050, triggerMode: 'blue' },
+  // 模块化反八股（可独立开关）
+  { identifier: 'anti_metaphor',     name: '杀比拟',       role: 'system', content: PROMPT_ANTI_METAPHOR,     enabled: false, order: 1051, triggerMode: 'blue' },
+  { identifier: 'anti_reveal',       name: '杀揭示',       role: 'system', content: PROMPT_ANTI_REVEAL,       enabled: false, order: 1052, triggerMode: 'blue' },
+  { identifier: 'anti_voice_desc',   name: '杀声述',       role: 'system', content: PROMPT_ANTI_VOICE_DESC,   enabled: false, order: 1053, triggerMode: 'blue' },
+  { identifier: 'anti_synesthesia',  name: '杀通感',       role: 'system', content: PROMPT_ANTI_SYNESTHESIA,  enabled: false, order: 1054, triggerMode: 'blue' },
+  { identifier: 'anti_shaguanlian',  name: '杀转折词',      role: 'system', content: PROMPT_ANTI_SHAGUANLIAN,  enabled: false, order: 1055, triggerMode: 'blue' },
+  { identifier: 'anti_micro_macro',  name: '杀极端感知',    role: 'system', content: PROMPT_ANTI_MICRO_MACRO,  enabled: false, order: 1056, triggerMode: 'blue' },
 
   // 第四组：特殊内容
   { identifier: 'nsfw_content',      name: 'NSFW内容规范',   role: 'system', content: PROMPT_NSFW_CONTENT,     enabled: true, order: 1100, triggerMode: 'blue' },

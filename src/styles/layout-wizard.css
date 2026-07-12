@@ -315,7 +315,7 @@
   cursor: pointer; font-size: var(--font-size-md); padding: 2px 6px; border-radius: var(--radius-sm);
   transition: all var(--duration-fast) var(--ease-out);
 }
-.world-dynamic-item .remove-btn:hover { background: rgba(239,68,68,0.12); color: var(--danger); }
+.world-dynamic-item .remove-btn:hover { background: var(--danger-bg); color: var(--danger); }
 
 /* AI生成世界模式切换 */
 .mode-toggle {
@@ -875,7 +875,7 @@
 }
 .world-card-delete {
   border: none;
-  background: rgba(239,68,68,0.15);
+  background: var(--danger-bg);
   width: 22px;
   height: 22px;
   border-radius: 4px;
@@ -886,7 +886,7 @@
   color: var(--danger);
   transition: all 0.15s ease;
 }
-.world-card-delete:hover { background: rgba(239,68,68,0.3); }
+.world-card-delete:hover { background: var(--danger-bg-hover); }
 .world-card-edit {
   border: none;
   background: rgba(59,130,246,0.15);
@@ -1049,7 +1049,7 @@
   gap: var(--space-1);
   padding: var(--space-1) var(--space-3);
   margin: var(--space-1) 0;
-  background: rgba(234,179,8,0.06);
+  background: var(--warning-bg-soft);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   color: var(--text-secondary, var(--text-muted));
@@ -1105,11 +1105,11 @@
   border-radius: var(--radius-sm);
 }
 .detail-flag.danger {
-  background: rgba(239,68,68,0.1);
+  background: var(--danger-bg-soft);
   color: var(--danger);
 }
 .detail-flag.safe {
-  background: rgba(34,197,94,0.1);
+  background: var(--success-bg-soft);
   color: var(--success);
 }
 
@@ -1259,7 +1259,7 @@
 .resource-scarce {
   font-size: var(--font-size-xs);
   color: var(--danger);
-  background: rgba(239,68,68,0.1);
+  background: var(--danger-bg-soft);
   padding: 1px var(--space-1);
   border-radius: var(--radius-sm);
   font-weight: 500;
@@ -1301,15 +1301,15 @@
   font-weight: 500;
 }
 .faction-alignment.friendly {
-  background: rgba(34,197,94,0.12);
+  background: var(--success-bg);
   color: var(--success);
 }
 .faction-alignment.neutral {
-  background: rgba(234,179,8,0.12);
+  background: var(--warning-bg);
   color: var(--warning);
 }
 .faction-alignment.hostile {
-  background: rgba(239,68,68,0.12);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 .faction-desc {
@@ -1726,7 +1726,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.history-tab-status { font-size: var(--font-size-xs); flex-shrink: 0; color: var(--success, var(--success)); }
+.history-tab-status { font-size: var(--font-size-xs); flex-shrink: 0; color: var(--success); }
 
 @media (max-width: 768px) {
   .history-tabs {
@@ -1987,8 +1987,8 @@
 }
 
 .wbe-badge-trigger {
-  background: rgba(34, 197, 94, 0.12);
-  color: #16a34a;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .wbe-hint {
@@ -2063,14 +2063,14 @@
   gap: 6px;
   padding: 8px 20px;
   font-size: var(--font-size-xs);
-  background: rgba(34, 197, 94, 0.08);
-  color: #16a34a;
+  background: var(--success-bg-soft);
+  color: var(--success);
   flex-shrink: 0;
 }
 
 .wbe-import-msg-error {
-  background: rgba(239, 68, 68, 0.08);
-  color: #dc2626;
+  background: var(--danger-bg-soft);
+  color: var(--danger);
 }
 
 /* 条目列表 —— 用 block 布局，避免 flex shrink 塌陷 */
@@ -2154,7 +2154,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #22c55e;
+  background: var(--success);
   flex-shrink: 0;
 }
 
@@ -2198,8 +2198,8 @@
 }
 
 .wbe-entry-delete:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: var(--danger-bg-soft);
+  color: var(--danger);
 }
 
 /* 条目展开内容 —— 单列布局，宽松舒展 */

@@ -267,9 +267,11 @@ export interface SimContext {
   regionStates: Record<string, string>;
   /** 世界核心冲突 */
   coreConflict?: string;
+  /** 最近对话上下文（玩家消息 + 最近几轮摘要） */
+  recentConversation?: string;
 }
 
-/** 离场 NPC 摘要 */
+/** NPC 摘要（全量角色名录，供演化 AI 参考） */
 export interface OffscreenNpcSummary {
   npcId: string;
   name: string;
@@ -281,6 +283,10 @@ export interface OffscreenNpcSummary {
   longTermGoal: string;
   lastKnownChronicles: string[];
   relationship: string;
+  /** 角色分类：在场 / 离场 / 重点 */
+  category: string;
+  /** 带索引号的人物事迹 [0] [1] [2]... */
+  chroniclesWithIndex: string[];
 }
 
 // ─── 事件生成 Prompt 结构 ───

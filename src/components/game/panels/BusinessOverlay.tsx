@@ -100,7 +100,7 @@ export default function BusinessOverlay({
               <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
                 <div style={{
                   fontSize: 'var(--font-size-lg)', fontWeight: 600,
-                  color: totalIncome >= 0 ? '#22c55e' : '#ef4444',
+                  color: totalIncome >= 0 ? 'var(--success)' : 'var(--danger)',
                 }}>
                   {totalIncome >= 0 ? '+' : ''}{totalIncome}
                 </div>

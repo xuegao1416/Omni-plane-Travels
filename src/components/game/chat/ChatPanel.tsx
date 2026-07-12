@@ -103,7 +103,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
               padding: '0.75rem 1rem',
               borderRadius: '8px',
               background: 'var(--bg-secondary)',
-              border: '1px solid var(--danger, #e74c3c)',
+              border: '1px solid var(--danger)',
               color: 'var(--text-muted)',
               fontSize: 'var(--font-size-sm)',
             }}>

@@ -60,6 +60,8 @@ export interface ProgressionConfig {
 export interface ResourceEvolutionConfig {
   id: string;
   trigger: { keywords: string[] };
+  /** 层B：强制触发的轮次（>= 该轮次即触发，用于"到后期出现 X 资源"） */
+  afterRounds?: number;
   add?: Array<{
     id: string; name: string; symbol: string;
     amount: number; max: number; scarce: boolean;

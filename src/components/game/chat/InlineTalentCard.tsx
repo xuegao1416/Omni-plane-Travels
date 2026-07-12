@@ -18,19 +18,19 @@ interface InlineTalentCardProps {
 /** 品质颜色映射 */
 const RARITY_COLORS: Record<string, string> = {
   '普通': '#9ca3af',
-  '精良': '#22c55e',
+  '精良': 'var(--success)',
   '稀有': '#3b82f6',
   '史诗': '#a855f7',
-  '传说': '#f59e0b',
+  '传说': 'var(--warning)',
 };
 
 /** 品质背景色映射 */
 const RARITY_BG_COLORS: Record<string, string> = {
   '普通': 'rgba(156, 163, 175, 0.1)',
-  '精良': 'rgba(34, 197, 94, 0.1)',
+  '精良': 'var(--success-bg-soft)',
   '稀有': 'rgba(59, 130, 246, 0.1)',
   '史诗': 'rgba(168, 85, 247, 0.1)',
-  '传说': 'rgba(245, 158, 11, 0.1)',
+  '传说': 'var(--warning-bg-soft)',
 };
 
 export default function InlineTalentCard({ id, name, rarity, description, effects }: InlineTalentCardProps) {

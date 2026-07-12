@@ -44,6 +44,17 @@ export default function ImageGenSettingsTab() {
                 />
               </Field>
             </div>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <Field label="生图 LLM 提示词" hint="控制 AI 如何生成正文生图标签。留空使用内置默认模板。">
+                <TextArea
+                  value={config.inlineImagePromptTemplate}
+                  onChange={(v) => updateConfig('inlineImagePromptTemplate', v)}
+                  placeholder="留空使用内置默认模板"
+                  rows={10}
+                  mono
+                />
+              </Field>
+            </div>
           </>
         )}
       </Section>

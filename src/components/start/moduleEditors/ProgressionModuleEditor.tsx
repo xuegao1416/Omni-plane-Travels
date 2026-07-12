@@ -59,7 +59,7 @@ export function ProgressionModuleEditor({ data, onChange }: { data: ProgressionM
               <span style={{ fontSize: '10px', color: 'var(--text-muted)', minWidth: 16 }}>{i + 1}.</span>
               <input style={{ ...inputStyle, flex: 1 }} value={tier.name} onChange={e => set(`tiers.${i}.name`, e.target.value)} placeholder="段位名" />
               <input style={{ ...inputStyle, flex: 2 }} value={tier.description} onChange={e => set(`tiers.${i}.description`, e.target.value)} placeholder="描述" />
-              <button onClick={() => removeTier(i)} style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}>✕</button>
+              <button onClick={() => removeTier(i)} style={{ border: 'none', background: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}>✕</button>
             </div>
           ))}
           <button className="btn-ghost" onClick={addTier} style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px' }}>+ 添加段位</button>

@@ -74,7 +74,7 @@ export function SurvivalModuleEditor({ data, onChange }: {
             <label style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--text-muted)' }}>
               <input type="checkbox" checked={res.scarce} onChange={e => setResField(i, 'scarce', e.target.checked)} /> 稀缺
             </label>
-            <button className="btn-ghost" onClick={() => removeResource(i)} style={{ color: '#ef4444', padding: '2px 6px', fontSize: 'var(--font-size-xs)' }}>✕</button>
+            <button className="btn-ghost" onClick={() => removeResource(i)} style={{ color: 'var(--danger)', padding: '2px 6px', fontSize: 'var(--font-size-xs)' }}>✕</button>
           </div>
           <input value={res.description || ''} onChange={e => setResField(i, 'description', e.target.value)} placeholder="获取方式与用途" style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>

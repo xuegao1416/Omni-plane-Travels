@@ -155,7 +155,7 @@ export default function ModuleSelector({ selected, onToggle, compact, disabledBy
                     </span>
                   )}
                   {!mod.disabled && disabledByConflict?.has(mod.id) && (
-                    <span style={{ fontSize: 'var(--font-size-xs)', color: '#f59e0b', marginLeft: 4 }}>
+                    <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--warning)', marginLeft: 4 }}>
                       互斥
                     </span>
                   )}

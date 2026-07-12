@@ -40,7 +40,7 @@ export default function BubbleContent({
         ref={iframeRef}
         className="message-renderer-iframe"
         srcDoc={createIframeSrcDoc(renderedContent.content)}
-        sandbox="allow-same-origin"
+        sandbox="allow-scripts"
         loading="lazy"
         style={{
           width: '100%',

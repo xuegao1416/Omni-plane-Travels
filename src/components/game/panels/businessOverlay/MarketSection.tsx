@@ -20,7 +20,7 @@ function MarketRow({ item }: { item: MarketItem }) {
       <TrendIcon trend={item.trend} />
       <span style={{
         fontSize: 'var(--font-size-xs)', fontWeight: 600,
-        color: item.trend === 'up' ? '#22c55e' : item.trend === 'down' ? '#ef4444' : 'var(--text-muted)',
+        color: item.trend === 'up' ? 'var(--success)' : item.trend === 'down' ? 'var(--danger)' : 'var(--text-muted)',
       }}>
         {item.changePercent > 0 ? '+' : ''}{item.changePercent}%
       </span>

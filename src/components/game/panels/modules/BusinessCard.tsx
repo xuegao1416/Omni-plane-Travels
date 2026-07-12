@@ -38,11 +38,11 @@ export default memo(function BusinessCard({ data, title, onOpenOverlay }: Busine
         {/* 净收入 */}
         {activeAssets > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TrendingUp size={14} color={netIncome >= 0 ? '#22c55e' : '#ef4444'} />
+            <TrendingUp size={14} color={netIncome >= 0 ? 'var(--success)' : 'var(--danger)'} />
             <span style={{ color: 'var(--text-muted)' }}>净收入</span>
             <span style={{
               fontWeight: 600, marginLeft: 'auto',
-              color: netIncome >= 0 ? '#22c55e' : '#ef4444',
+              color: netIncome >= 0 ? 'var(--success)' : 'var(--danger)',
             }}>
               {netIncome >= 0 ? '+' : ''}{netIncome}/{data.cycleName || '天'}
             </span>

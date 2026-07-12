@@ -67,8 +67,8 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
 
   // 结果颜色
   const resultColor = result
-    ? result.isNatural20 ? '#22c55e'
-    : result.isNatural1 ? '#ef4444'
+    ? result.isNatural20 ? 'var(--success)'
+    : result.isNatural1 ? 'var(--danger)'
     : result.success ? 'var(--accent)'
     : 'var(--text-muted)'
     : undefined;

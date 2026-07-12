@@ -156,6 +156,8 @@ export async function executeBuildPipeline(
       const survRaw = await callAI([{ role: 'user', content: survPrompt }]);
       ctx.survivalData = JSON.parse(extractJSON(survRaw)) as SurvivalModuleSchema;
       if (ctx.survivalData) {
+        // 创建世界时不生成任何静态配方：配方只能由玩家在游戏中点击"创建配方"触发 AI 动态生成
+        delete ctx.survivalData.recipes;
         ctx.survivalConfig = extractSurvivalConfig(ctx.survivalData);
       }
     } catch (err: unknown) {

@@ -469,6 +469,10 @@ AI 生成回复
 
 - [架构文档](docs/ARCHITECTURE.md) — 完整的架构分析、用户流程、数据流、各层职责
 - [变更日志](docs/CHANGELOG.md) — 版本更新记录
+- [用户教程](docs/tutorial.md) — 配置 API Key → 创建世界 → 发消息 → 变量回滚全流程
+- [隐私政策](PRIVACY.md) — API Key 仅存本机、无账号、无遥测
+- [内容政策](docs/content-policy.md) — NSFW 边界、分享合规、社区准则
+- [治理](docs/governance.md) — 开源模式与社区治理
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/heart.svg" width="20" height="20" /> 致谢
 

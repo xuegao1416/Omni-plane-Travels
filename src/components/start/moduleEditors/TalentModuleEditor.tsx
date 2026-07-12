@@ -78,7 +78,7 @@ export function TalentModuleEditor({ data, onChange, onAiGenerate, isGenerating 
             </div>
           </div>
           <button className="btn-ghost" onClick={() => setEditingCat(ci)} style={{ fontSize: 'var(--font-size-xs)', padding: '3px 10px' }}>编辑</button>
-          <button onClick={() => removeCategory(ci)} style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '4px' }}>✕</button>
+          <button onClick={() => removeCategory(ci)} style={{ border: 'none', background: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 12, padding: '4px' }}>✕</button>
         </div>
       ))}
 
@@ -185,7 +185,7 @@ export function TalentModuleEditor({ data, onChange, onAiGenerate, isGenerating 
                     <select style={{ ...inputStyle, width: 60 }} value={tal.rarity} onChange={e => setTalentField(ti, 'rarity', e.target.value)}>
                       {RARITY_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
-                    <button onClick={() => removeTalent(ti)} style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}>✕</button>
+                    <button onClick={() => removeTalent(ti)} style={{ border: 'none', background: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}>✕</button>
                   </div>
                   <input style={{ ...inputStyle }} value={tal.description} onChange={e => setTalentField(ti, 'description', e.target.value)} placeholder="描述..." />
                 </div>

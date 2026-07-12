@@ -20,7 +20,7 @@ import type {
 } from './types';
 import type {
   SimulationRules, ModuleEffects, EffectLogEntry,
-  SimulationRuntimeState,
+  SimulationRuntimeState, ResourceEvolutionStep,
 } from '../modules/schema';
 import { createEmptySimState, createDefaultWorldContext } from './types';
 import type { GameState, NPCData } from '../schema/variables';
@@ -276,6 +276,8 @@ export class WorldSimulationEngine {
     worldSetting: string,
     preset?: SimPreset,
     simRules?: SimulationRules | null,
+    recentConversation?: string,
+    resourceEvolution?: ResourceEvolutionStep[],
   ): Promise<SimGenerationResult | null> {
     if (!this.effectiveApiConfig) {
       console.warn('[WorldSim] 没有 API 配置，跳过推演');
@@ -292,7 +294,7 @@ export class WorldSimulationEngine {
     const { effects: mechanicalEffects, log: effectLog } = this.resolveMechanicalEffects(gameState, simRules ?? null);
 
     // 3. 构建推演上下文
-    const context = this.buildSimContext(gameState, gameTime, worldSetting);
+    const context = this.buildSimContext(gameState, gameTime, worldSetting, recentConversation);
 
     // 4. 调用 LLM 生成新的事件和暗线
     const activePreset = this.resolvePreset(preset);
@@ -315,6 +317,17 @@ export class WorldSimulationEngine {
 
       // 5. 应用生成结果（叙事层：事件/暗线/交互/NPC 事迹）
       this.applyGeneration(generation, gameState);
+
+      // 5.5 资源演化蓝图机械结算（关键词动态 + 轮次兜底），合并进机械层效果
+      if (resourceEvolution && resourceEvolution.length > 0) {
+        const evo = this.resolveResourceEvolution(gameState, resourceEvolution, recentConversation);
+        if (evo.effects.survival) {
+          this.mergeModuleEffects(mechanicalEffects, evo.effects);
+        }
+        if (evo.log.length > 0) {
+          effectLog.push(...evo.log);
+        }
+      }
 
       // 6. 应用世界状态更新（如果规则定义了 worldStateRules）
       if (simRules?.worldStateRules) {
@@ -631,6 +644,7 @@ export class WorldSimulationEngine {
     gameState: GameState,
     gameTime: GameTime,
     worldSetting: string,
+    recentConversation?: string,
   ): SimContext {
     const activeEvents = Object.values(this.state.events)
       .filter(e => e.status === 'active' || e.status === 'brewing');
@@ -641,7 +655,7 @@ export class WorldSimulationEngine {
       : '当前世界暂无重大事件在推进。';
 
     const offscreenNpcs = this.extractOffscreenNpcs(gameState);
-    const offscreenSummaries = offscreenNpcs.map(npc => this.buildOffscreenSummary(npc));
+    const offscreenSummaries = offscreenNpcs.map(([npcId, npc]) => this.buildOffscreenSummary(npcId, npc));
 
     const regionStates: Record<string, string> = {};
     for (const npc of Object.values(gameState.人物档案)) {
@@ -658,23 +672,22 @@ export class WorldSimulationEngine {
       offscreenNpcSummaries: offscreenSummaries,
       regionStates,
       coreConflict: this.extractCoreConflict(gameState),
+      recentConversation,
     };
   }
 
-  /** 提取离场 NPC 摘要 */
-  private extractOffscreenNpcs(gameState: GameState): NPCData[] {
-    return Object.values(gameState.人物档案)
-      .filter(npc => {
-        const category = npc.人物分类;
-        return (category === '离场' || category === '重点') && npc.重要NPC;
-      })
-      .slice(0, this.state.config.maxStorylineCharacters);
+  /** 提取全量角色名录（返回 [npcId, npc] 元组，保留 map key） */
+  private extractOffscreenNpcs(gameState: GameState): [string, NPCData][] {
+    return Object.entries(gameState.人物档案)
+      .filter(([, npc]) => npc && typeof npc === 'object');
   }
 
-  /** 构建单个 NPC 的摘要 */
-  private buildOffscreenSummary(npc: NPCData): OffscreenNpcSummary {
+  /** 构建单个 NPC 的摘要（带事迹索引） */
+  private buildOffscreenSummary(npcId: string, npc: NPCData): OffscreenNpcSummary {
+    const chronicles = Array.isArray(npc.人物事迹) ? npc.人物事迹 : [];
+    const category = npc.人物分类 ?? '在场';
     return {
-      npcId: npc.姓名,
+      npcId,
       name: npc.姓名,
       race: npc.种族 || '人类',
       personality: `${npc.个人信息?.表性格 ?? ''} / ${npc.个人信息?.里性格 ?? ''}`,
@@ -682,8 +695,10 @@ export class WorldSimulationEngine {
       currentStatus: npc.个人信息?.当前状态 ?? '未知',
       shortTermGoal: npc.短期目标 ?? '未知',
       longTermGoal: npc.长期目标 ?? '未知',
-      lastKnownChronicles: (Array.isArray(npc.人物事迹) ? npc.人物事迹 : []).slice(-5),
+      lastKnownChronicles: chronicles.slice(-5),
       relationship: `${npc.关系数据?.好感度 ?? 0}好感 / ${npc.关系数据?.关系类型 ?? '陌生人'}`,
+      category,
+      chroniclesWithIndex: chronicles.map((c, i) => `[${i}] ${c}`),
     };
   }
 
@@ -923,6 +938,91 @@ export class WorldSimulationEngine {
   }
 
   /**
+   * 资源演化蓝图机械结算（不经 AI，确定性触发）
+   *
+   * 两层触发机制：
+   * - 层A 游戏内动态：活跃事件文本或玩家本轮对话命中 step.trigger.keywords
+   * - 层B 轮次兜底：currentTick >= step.afterRounds 时强制触发
+   * 满足其一即触发，且每个 step 仅触发一次（记录在 simulationRuntime.evolvedSteps）。
+   *
+   * @param gameState 当前游戏状态（用于读取 simulationRuntime）
+   * @param steps 资源演化蓝图步骤
+   * @param recentNarrative 玩家本轮对话文本（用于层A关键词匹配）
+   * @returns 机械层效果 + 效果日志
+   */
+  private resolveResourceEvolution(
+    gameState: GameState,
+    steps: ResourceEvolutionStep[] | undefined,
+    recentNarrative: string | undefined,
+  ): { effects: ModuleEffects; log: EffectLogEntry[] } {
+    const runtime = gameState.simulationRuntime;
+    if (!runtime || !steps || steps.length === 0) {
+      return { effects: {}, log: [] };
+    }
+
+    const mergedEffects: ModuleEffects = {};
+    const effectLog: EffectLogEntry[] = [];
+    const currentTick = runtime.tick;
+    const evolvedSteps = runtime.evolvedSteps ?? (runtime.evolvedSteps = []);
+
+    // 层A 文本来源：当前活跃事件文本 + 玩家本轮对话
+    const activeEvents = Object.values(this.state.events)
+      .filter(e => e.status === 'active' || e.status === 'brewing');
+    const eventsText = activeEvents
+      .map(e => `${e.title} ${e.description}`)
+      .join(' ')
+      .toLowerCase();
+    const narrativeText = (recentNarrative ?? '').toLowerCase();
+
+    for (const step of steps) {
+      if (evolvedSteps.includes(step.id)) continue; // 已触发过，跳过
+
+      let triggered = false;
+      let reason = '';
+
+      // 层B：轮次兜底
+      if (typeof step.afterRounds === 'number' && currentTick >= step.afterRounds) {
+        triggered = true;
+        reason = `演化蓝图【${step.id}】轮次兜底触发（第 ${currentTick} 轮 ≥ ${step.afterRounds}）`;
+      }
+
+      // 层A：关键词动态触发（未命中轮次时也检查）
+      if (!triggered && step.trigger?.keywords?.length) {
+        const hit = step.trigger.keywords
+          .map(k => k.toLowerCase())
+          .find(k => eventsText.includes(k) || narrativeText.includes(k));
+        if (hit) {
+          triggered = true;
+          reason = `演化蓝图【${step.id}】关键词触发：「${hit}」`;
+        }
+      }
+
+      if (!triggered) continue;
+
+      // 组装 survival 效果
+      const survival: NonNullable<ModuleEffects['survival']> = {};
+      if (step.add?.length) {
+        survival.addResources = step.add.map(r => ({
+          id: r.id, name: r.name, symbol: r.symbol,
+          amount: r.amount ?? 0, max: r.max, scarce: r.scarce,
+          gatherRate: r.gatherRate, usage: r.usage, description: r.description,
+        }));
+      }
+      if (step.remove?.length) {
+        survival.removeResources = step.remove.map(id => ({ id }));
+      }
+
+      if (survival.addResources || survival.removeResources) {
+        mergedEffects.survival = { ...mergedEffects.survival, ...survival };
+        effectLog.push(...this.createEffectLogEntries(currentTick, 'periodic', step.id, { survival }, reason));
+        evolvedSteps.push(step.id);
+      }
+    }
+
+    return { effects: mergedEffects, log: effectLog };
+  }
+
+  /**
    * 匹配事件与事件效果
    */
   private matchEventEffect(
@@ -987,6 +1087,18 @@ export class WorldSimulationEngine {
       }
     }
 
+    // 合并 survival 动态新增/移除资源（演化蓝图、周期事件共用）
+    if (source.survival?.addResources?.length) {
+      if (!target.survival) target.survival = {};
+      if (!target.survival.addResources) target.survival.addResources = [];
+      target.survival.addResources.push(...source.survival.addResources);
+    }
+    if (source.survival?.removeResources?.length) {
+      if (!target.survival) target.survival = {};
+      if (!target.survival.removeResources) target.survival.removeResources = [];
+      target.survival.removeResources.push(...source.survival.removeResources);
+    }
+
     // 合并 business
     if (source.business) {
       if (!target.business) target.business = {};
@@ -1048,6 +1160,34 @@ export class WorldSimulationEngine {
           before: 0, // 实际值需要在应用时填充
           after: change.delta ?? change.set ?? 0,
           reason,
+        });
+      }
+    }
+
+    // survival 动态新增资源（演化解锁/资源发现）
+    if (effects.survival?.addResources) {
+      for (const res of effects.survival.addResources) {
+        entries.push({
+          tick, source, ruleId,
+          module: 'survival',
+          variable: res.id,
+          before: 'N/A' as any,
+          after: res.amount ?? 0,
+          reason: `${reason}｜新增资源：${res.name || res.id}`,
+        });
+      }
+    }
+
+    // survival 动态移除资源（枯竭/被替代）
+    if (effects.survival?.removeResources) {
+      for (const { id } of effects.survival.removeResources) {
+        entries.push({
+          tick, source, ruleId,
+          module: 'survival',
+          variable: id,
+          before: 'N/A' as any,
+          after: '已移除' as any,
+          reason: `${reason}｜移除资源：${id}`,
         });
       }
     }

@@ -117,6 +117,7 @@ export interface ImageGenConfig {
   inlineImageEnabled: boolean;
   inlineImageRegex: string;
   autoClickImageGen: boolean;
+  inlineImagePromptTemplate: string;
   // ─── 角色画像 ───
   characterPortraitEnabled: boolean;
   characterPortraitAutoUpdateEnabled: boolean;
@@ -253,6 +254,7 @@ export const DEFAULT_IMAGE_CONFIG: ImageGenConfig = {
   inlineImageEnabled: false,
   inlineImageRegex: 'image###([\\s\\S]+?)###',
   autoClickImageGen: false,
+  inlineImagePromptTemplate: '',
   // 角色画像
   characterPortraitEnabled: false,
   characterPortraitAutoUpdateEnabled: false,

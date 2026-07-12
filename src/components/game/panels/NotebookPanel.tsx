@@ -7,9 +7,9 @@ interface Props { gameState: GameState; }
 
 function priorityColor(p?: string) {
   if (!p) return '#6b7280';
-  if (p.includes('紧急') || p.includes('高')) return '#ef4444';
-  if (p.includes('中')) return '#f59e0b';
-  return '#22c55e';
+  if (p.includes('紧急') || p.includes('高')) return 'var(--danger)';
+  if (p.includes('中')) return 'var(--warning)';
+  return 'var(--success)';
 }
 
 export default function NotebookPanel({ gameState }: Props) {
@@ -25,7 +25,7 @@ export default function NotebookPanel({ gameState }: Props) {
           {crises.map(([name, c]) => (
             <div key={name} style={{
               padding: '8px 10px', marginBottom: '6px', background: 'var(--bg-primary)',
-              borderRadius: 'var(--radius-sm)', borderLeft: '3px solid #ef4444', fontSize: 'var(--font-size-base)',
+              borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--danger)', fontSize: 'var(--font-size-base)',
             }}>
               <div style={{ fontWeight: '500', marginBottom: '3px' }}>{name}</div>
               {c.严重程度 && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>严重程度：{c.严重程度}</div>}
@@ -41,7 +41,7 @@ export default function NotebookPanel({ gameState }: Props) {
           {opps.map(([name, o]) => (
             <div key={name} style={{
               padding: '8px 10px', marginBottom: '6px', background: 'var(--bg-primary)',
-              borderRadius: 'var(--radius-sm)', borderLeft: '3px solid #22c55e', fontSize: 'var(--font-size-base)',
+              borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--success)', fontSize: 'var(--font-size-base)',
             }}>
               <div style={{ fontWeight: '500', marginBottom: '3px' }}>{name}</div>
               {o.时效性 && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>时效：{o.时效性}</div>}
@@ -63,7 +63,7 @@ export default function NotebookPanel({ gameState }: Props) {
               }}>
                 <span style={{
                   width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-                  background: done ? '#22c55e' : priorityColor(t.优先级),
+                  background: done ? 'var(--success)' : priorityColor(t.优先级),
                 }} />
                 <div style={{ flex: 1, opacity: done ? 0.5 : 1 }}>
                   <span style={{ textDecoration: done ? 'line-through' : 'none' }}>{name}</span>

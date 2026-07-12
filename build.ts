@@ -29,9 +29,13 @@ if (!jsResult.success) {
   process.exit(1);
 }
 
-// 遍历全部输出：entry-point → JS，asset(.css) → 组件 CSS
-// 旧脚本只取 outputs[0]，导致 JS 中 import 的 CSS（覆盖层/弹窗/按钮等）
-// 被静默丢弃，组件样式全部丢失。这里把 JS 抽取的 CSS 收集起来，稍后合并进 main.css。
+// 遍历全部输出：
+// - entry-point → 主入口 main.js
+// - chunk       → 动态 import 的代码分片（InlineDiceCard / InlineImageGenButton / mermaid / jszip 等），
+//                 必须原样写入 dist/ 且文件名保持不变，main.js 通过相对路径 import 这些分片
+// - asset(.css) → JS 抽取的组件 CSS，稍后合并进 main.css
+// 旧脚本对非 asset 输出一律 jsContent = text，会静默丢弃除最后一个 chunk 外的所有分片，
+// 导致运行时动态 import 失败。这里区分 entry-point 与 chunk，分别落盘。
 let jsContent = '';
 const jsExtractedCssChunks: string[] = [];
 for (const output of jsResult.outputs) {
@@ -39,8 +43,13 @@ for (const output of jsResult.outputs) {
   if (output.kind === 'asset' && output.path.endsWith('.css')) {
     jsExtractedCssChunks.push(text);
     console.log(`   🧩 JS 抽取 CSS: ${output.path} (${(text.length / 1024).toFixed(1)} KB)`);
-  } else {
+  } else if (output.kind === 'entry-point') {
     jsContent = text;
+  } else {
+    // chunk：动态分片，原样落盘（保留文件名，main.js 引用它）
+    const baseName = output.path.split(/[\\/]/).pop() || 'chunk.js';
+    writeFileSync(join(DIST, baseName), text);
+    console.log(`   📦 JS 分片: ${baseName} (${(text.length / 1024 / 1024).toFixed(2)} MB)`);
   }
 }
 writeFileSync(join(DIST, 'main.js'), jsContent);
@@ -85,6 +94,10 @@ console.log('📱 复制 PWA 资源...');
 if (existsSync('./manifest.json')) {
   copyFileSync('./manifest.json', join(DIST, 'manifest.json'));
   console.log('   ✅ manifest.json');
+}
+if (existsSync('./sw.js')) {
+  copyFileSync('./sw.js', join(DIST, 'sw.js'));
+  console.log('   ✅ sw.js');
 }
 if (existsSync('./icon.png')) {
   copyFileSync('./icon.png', join(DIST, 'icon.png'));

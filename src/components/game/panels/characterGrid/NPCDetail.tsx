@@ -61,7 +61,7 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
                 <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{name}</span>
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{value}/{max}</span>
               </div>
-              <GaugeBar value={value} color={key === '血量' || key === 'attrA' ? '#ef4444' : '#f59e0b'} max={max} />
+              <GaugeBar value={value} color={key === '血量' || key === 'attrA' ? 'var(--danger)' : 'var(--warning)'} max={max} />
             </div>
           ))}
         </div>

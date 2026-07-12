@@ -8,8 +8,18 @@ import { Collapsible } from '../../../shared/Collapsible';
 interface SurvivalCardProps {
   data: SurvivalModuleSchema;
   title?: string;
-  /** 当前运行时资源数量（来自变量系统，用于覆盖 data.resources 中的 amount） */
-  runtimeResources?: Record<string, { 数量: number }>;
+  /** 当前运行时资源（来自变量系统），覆盖 data.resources 中的 amount；
+   * 演化新增资源在此附带 name/symbol/最大值/scarse 等元数据 */
+  runtimeResources?: Record<string, {
+    数量: number;
+    最大值?: number;
+    name?: string;
+    symbol?: string;
+    scarce?: boolean;
+    description?: string;
+    gatherRate?: string;
+    usage?: string;
+  }>;
   /** 生成配方回调（玩家需求 → AI生成） */
   onGenerateRecipe?: (request: string) => Promise<void>;
   /** 制作回调（消耗资源+产出） */
@@ -44,13 +54,18 @@ export default memo(function SurvivalCard({
       amount: runtimeResources?.[res.id]?.数量 ?? res.amount,
     }));
     // 追加运行时存在但静态定义中没有的资源（演化新增）
+    // 使用运行时存储的元数据（name/symbol/最大值/scarse），正确显示而非匿名 ❓
     if (runtimeResources) {
       for (const [id, rt] of Object.entries(runtimeResources)) {
         if (!base.some(r => r.id === id)) {
           base.push({
-            id, name: id, symbol: '❓',
-            amount: rt.数量, max: 99, scarce: false,
-            description: '新发现的资源',
+            id,
+            name: rt.name || id,
+            symbol: rt.symbol || '❓',
+            amount: rt.数量 ?? 0,
+            max: rt.最大值 ?? 99,
+            scarce: rt.scarce ?? false,
+            description: rt.description || '新发现的资源',
           });
         }
       }
@@ -124,13 +139,13 @@ export default memo(function SurvivalCard({
             const isCritical = res.amount > 0 && res.amount <= threshold;
             const isEmpty = res.amount === 0;
             const isNew = newlyDiscovered.has(res.id);
-            const barColor = isEmpty ? 'var(--text-muted)' : isCritical ? '#ef4444' : res.scarce ? '#f59e0b' : '#22c55e';
+            const barColor = isEmpty ? 'var(--text-muted)' : isCritical ? 'var(--danger)' : res.scarce ? 'var(--warning)' : 'var(--success)';
 
             return (
               <div key={res.id} style={{
                 display: 'flex', flexDirection: 'column', gap: '2px',
                 animation: isNew ? 'survival-discover 0.6s ease-out' : undefined,
-                background: isNew ? 'rgba(34, 197, 94, 0.08)' : undefined,
+                background: isNew ? 'var(--success-bg-soft)' : undefined,
                 borderRadius: isNew ? '6px' : undefined,
                 padding: isNew ? '4px 6px' : undefined,
                 margin: isNew ? '-4px -6px' : undefined,
@@ -141,19 +156,19 @@ export default memo(function SurvivalCard({
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>{res.symbol}</span>
-                    <span style={{ color: isCritical ? '#ef4444' : isNew ? '#22c55e' : 'var(--text-muted)' }}>{res.name}</span>
-                    {isNew && <Sparkle size={12} color="#22c55e" />}
+                    <span style={{ color: isCritical ? 'var(--danger)' : isNew ? 'var(--success)' : 'var(--text-muted)' }}>{res.name}</span>
+                    {isNew && <Sparkle size={12} color="var(--success)" />}
                     {res.scarce && (
                       <span style={{
                         fontSize: '10px', padding: '0 4px', borderRadius: '6px',
-                        background: '#ef444420', color: '#ef4444',
+                        background: 'var(--danger-bg-soft)', color: 'var(--danger)',
                       }}>稀缺</span>
                     )}
-                    {isCritical && <AlertTriangle size={12} color="#ef4444" />}
+                    {isCritical && <AlertTriangle size={12} color="var(--danger)" />}
                   </span>
                   <span style={{
                     fontWeight: 600,
-                    color: isEmpty ? 'var(--text-muted)' : isCritical ? '#ef4444' : 'var(--text-primary)',
+                    color: isEmpty ? 'var(--text-muted)' : isCritical ? 'var(--danger)' : 'var(--text-primary)',
                   }}>
                     {isEmpty ? '未获取' : `${res.amount}/${res.max}`}
                   </span>
@@ -278,7 +293,7 @@ export default memo(function SurvivalCard({
                   {inputStr.map((item, i) => (
                     <span key={i}>
                       {i > 0 && ' + '}
-                      <span style={{ color: item.enough ? 'var(--text-secondary)' : '#ef4444' }}>
+                      <span style={{ color: item.enough ? 'var(--text-secondary)' : 'var(--danger)' }}>
                         {item.text}
                       </span>
                     </span>
@@ -318,8 +333,8 @@ export default memo(function SurvivalCard({
                     onClick={() => onDeleteRecipe(recipe.id)}
                     style={{
                       fontSize: '10px', padding: '2px 8px',
-                      background: 'none', color: '#ef4444',
-                      border: '1px solid #ef444440', borderRadius: '4px',
+                      background: 'none', color: 'var(--danger)',
+                      border: '1px solid var(--danger-bg-soft)', borderRadius: '4px',
                       cursor: 'pointer',
                       display: 'flex', alignItems: 'center', gap: '2px',
                     }}
@@ -347,7 +362,7 @@ export default memo(function SurvivalCard({
             {significantChanges.map((c, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
-                color: c.after < c.before ? '#ef4444' : '#22c55e',
+                color: c.after < c.before ? 'var(--danger)' : 'var(--success)',
               }}>
                 <span>{c.symbol}</span>
                 <span>{c.resourceName}</span>

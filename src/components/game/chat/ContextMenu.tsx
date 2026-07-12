@@ -116,7 +116,7 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
           onMouseEnter={e => {
             if (!item.disabled) {
               e.currentTarget.style.background = item.danger
-                ? 'rgba(239,68,68,0.08)'
+                ? 'var(--danger-bg-soft)'
                 : 'var(--accent-dim)';
             }
           }}

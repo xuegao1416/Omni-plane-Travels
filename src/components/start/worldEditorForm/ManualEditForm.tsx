@@ -1,5 +1,5 @@
 import type { FormState } from './types';
-import { WORLD_ICONS } from '../worldIcons';
+import { ALL_WORLD_ICONS } from '@/components/shared/worldIcons';
 import ModuleSelector from '../ModuleSelector';
 import { StatModuleEditor } from '../moduleEditors/StatModuleEditor';
 import { ProgressionModuleEditor } from '../moduleEditors/ProgressionModuleEditor';
@@ -46,7 +46,7 @@ export function ManualEditForm({
         <div className="world-form-row">
           <div className="world-form-group"><label>图标</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, maxHeight: 120, overflowY: 'auto' }}>
-              {WORLD_ICONS.map(({ name, icon: Icon }) => (
+              {ALL_WORLD_ICONS.map(({ name, icon: Icon }) => (
                 <button key={name} type="button" onClick={() => update({ icon: name })} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', border: form.icon === name ? '2px solid var(--accent)' : '1px solid var(--border)', borderRadius: 4, background: form.icon === name ? 'var(--accent-dim)' : 'transparent', color: form.icon === name ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer' }} title={name}><Icon size={16} /></button>
               ))}
             </div>

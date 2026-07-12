@@ -25,19 +25,21 @@ export function buildSimulationPrompt(
 ): string {
   const activePreset = preset ?? DEFAULT_SIM_PRESET;
 
-  // 构建上下文变量
+  // 构建上下文变量 — 全量角色名录（带事迹索引）
   const offscreenNpcText = context.offscreenNpcSummaries.length > 0
-    ? context.offscreenNpcSummaries.map(npc => `
-### NPC: ${npc.name} (${npc.race})
-- 性格: ${npc.personality}
-- 当前位置: ${npc.currentLocation}
-- 当前状态: ${npc.currentStatus}
-- 短期目标: ${npc.shortTermGoal}
-- 长期目标: ${npc.longTermGoal}
-- 最近事迹: ${npc.lastKnownChronicles.join('; ') || '无'}
-- 与玩家关系: ${npc.relationship}
-`).join('\n')
-    : '当前没有重要角色离场。';
+    ? context.offscreenNpcSummaries.map(npc => {
+    const chronicleLines = npc.chroniclesWithIndex.length > 0
+      ? npc.chroniclesWithIndex.map(c => `    ${c}`).join('\n')
+      : '    暂无';
+    return `- npcId: ${npc.npcId} | 姓名: ${npc.name} | 分类: ${npc.category} | 种族: ${npc.race}
+  性格: ${npc.personality}
+  当前位置: ${npc.currentLocation} | 当前状态: ${npc.currentStatus}
+  短期目标: ${npc.shortTermGoal} | 长期目标: ${npc.longTermGoal}
+  与玩家关系: ${npc.relationship}
+  人物事迹（索引号是 chronicleOps 的精确坐标）:
+${chronicleLines}`;
+  }).join('\n')
+    : '当前暂无角色数据。';
 
   const activeEventsText = context.activeEventsSummary || '当前世界暂无重大事件在推进。';
 
@@ -46,6 +48,7 @@ export function buildSimulationPrompt(
     GAME_TIME: context.gameTime.current,
     CORE_CONFLICT: context.coreConflict || '未知',
     ACTIVE_EVENTS: activeEventsText,
+    RECENT_CONVERSATION: context.recentConversation || '',
     OFFSCREEN_NPCS: offscreenNpcText,
     REGION_STATES: Object.entries(context.regionStates)
       .map(([r, s]) => `- ${r}: ${s}`)
@@ -70,9 +73,18 @@ ${vars.CORE_CONFLICT}
 
 ## 当前推进中的世界事件
 ${vars.ACTIVE_EVENTS}
-
-## 离场角色状态
+${vars.RECENT_CONVERSATION ? `
+## 最近对话上下文（玩家正在做的事）
+${vars.RECENT_CONVERSATION}
+` : ''}
+## 角色名录
 ${vars.OFFSCREEN_NPCS}
+
+【角色名字铁律】
+- 上方名录列出了所有已知角色，你只能使用名录中的姓名，禁止自创、猜测或编造任何角色名字
+- 引用事迹时使用名录中的索引号 [0][1][2]... 作为 chronicleOps 的精确坐标，不要凭空编号
+- 如果需要引用一个不在名录中的角色，不要编造名字，直接跳过该角色
+- npcId 字段必须使用名录中给出的 npcId，不要用姓名代替
 
 ## 区域状态
 ${vars.REGION_STATES}

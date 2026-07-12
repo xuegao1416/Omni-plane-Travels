@@ -10,6 +10,19 @@ const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'
 function isSafePath(path: string): boolean {
   return !path.split('.').some(seg => DANGEROUS_PATH_SEGMENTS.has(seg));
 }
+
+/** 递归检测对象树（含嵌套）是否含原型污染危险键（L-19）。用于 merge 前的源头净化校验 */
+function containsDangerousKey(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (seen.has(value as object)) return false; // 防循环引用死循环
+  seen.add(value as object);
+  for (const key of Object.keys(value as object)) {
+    if (DANGEROUS_PATH_SEGMENTS.has(key)) return true;
+    const child = (value as Record<string, unknown>)[key];
+    if (child && typeof child === 'object' && containsDangerousKey(child, seen)) return true;
+  }
+  return false;
+}
 import {
   resolveNpcId,
   warnIgnoredNpcPatchUpdate,
@@ -226,6 +239,7 @@ export class VariableManager {
         }
 
         if (!npcId) continue;
+        if (!isSafePath(npcId)) continue; // 防御原型污染：拒绝危险键作为 NPC 标识
         if (!this.state.人物档案[npcId]) {
           (this.state.人物档案 as any)[npcId] = {};
         }
@@ -279,17 +293,24 @@ export class VariableManager {
           const newEntries = incomingChronicles.filter(c => !existingArr.includes(c));
           (this.state.人物档案[npcId] as any).人物事迹 = [...existingArr, ...newEntries];
         }
-        merge(this.state.人物档案[npcId], npcData);
+        // 原型污染防护（L-19）：源头含危险键则跳过合并，避免污染 this.state
+        if (!containsDangerousKey(npcData)) {
+          merge(this.state.人物档案[npcId], npcData);
+        }
       }
 
       // 从 patch 中移除已单独处理的 人物档案
       const { 人物档案: _npcs, ...rest } = patch;
       if (Object.keys(rest).length > 0) {
-        merge(this.state, rest);
+        if (!containsDangerousKey(rest)) {
+          merge(this.state, rest);
+        }
       }
     } else {
       // 没有 NPC 数据，普通合并
-      merge(this.state, patch);
+      if (!containsDangerousKey(patch)) {
+        merge(this.state, patch);
+      }
     }
 
     // ★ 应用资产列表替换（已在前面从 patch 中提取）
@@ -564,7 +585,8 @@ export class VariableManager {
         // 确保不为负数
         after = Math.max(0, after);
 
-        resources[id] = { 数量: after };
+        // 保留已有字段（动态新增资源的 name/symbol/最大值 等元数据），只更新数量
+        resources[id] = { ...resources[id], 数量: after };
 
         log.push({
           tick, source, module: 'survival', variable: id,
@@ -585,7 +607,17 @@ export class VariableManager {
           // 已存在，跳过（不重复添加）
           continue;
         }
-        resources[res.id] = { 数量: res.amount ?? 0 };
+        // 写入完整元数据，保证 UI 能正确显示（而非匿名 ❓）
+        resources[res.id] = {
+          数量: res.amount ?? 0,
+          name: res.name,
+          symbol: res.symbol,
+          最大值: res.max,
+          scarce: res.scarce,
+          ...(res.description ? { description: res.description } : {}),
+          ...(res.gatherRate ? { gatherRate: res.gatherRate } : {}),
+          ...(res.usage ? { usage: res.usage } : {}),
+        };
         log.push({
           tick, source, module: 'survival', variable: res.id,
           before: 'N/A' as any, after: res.amount ?? 0,

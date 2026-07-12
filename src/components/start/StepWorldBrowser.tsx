@@ -137,7 +137,7 @@ export default function StepWorldBrowser({
           <div className="world-card create-world-card" onClick={handleImportClick} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '2px dashed var(--border)', background: 'transparent' }}>
             <Upload size={28} style={{ color: 'var(--text-muted)' }} /><span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>导入世界</span>
           </div>
-          {importError && <div style={{ gridColumn: '1 / -1', color: '#ef4444', fontSize: 'var(--font-size-sm)', textAlign: 'center' }}>{importError}</div>}
+          {importError && <div style={{ gridColumn: '1 / -1', color: 'var(--danger)', fontSize: 'var(--font-size-sm)', textAlign: 'center' }}>{importError}</div>}
         </div>
         <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportFile} />
       </div>

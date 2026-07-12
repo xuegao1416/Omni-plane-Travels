@@ -611,91 +611,82 @@ export interface CompactSaveRecord {
 }
 
 /**
+ * 纯函数：规划 v3（内联 messages）→ v4（分片）迁移。
+ * 不接触 IndexedDB，便于单测（L-16）。
+ * - 已为新格式（schemaVersion >= SAVE_SCHEMA_VERSION）→ 返回 null（跳过）
+ * - 否则返回紧凑头部 compactHead + 消息分片记录 messageRecords
+ *   - 无消息 → messageRecords 为空，compactHead.messageCount=0 / lastMessageSeq=-1
+ *   - 有消息 → 每条消息生成一条分片，seq 从 0 递增
+ */
+export function planV2ToV3Migration(oldSave: GameSave): {
+  head: CompactSaveRecord;
+  messageRecords: MessageRecord[];
+} | null {
+  if ((oldSave as any).schemaVersion >= SAVE_SCHEMA_VERSION) {
+    return null; // 已迁移，跳过
+  }
+
+  const messages = oldSave.messages || [];
+
+  const compactHead: CompactSaveRecord = {
+    id: oldSave.id,
+    name: oldSave.name,
+    timestamp: oldSave.timestamp,
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    round: messages.reduce((max, m) => Math.max(max, m.round), 0),
+    gameState: oldSave.gameState,
+    worldId: oldSave.worldId,
+    personalInfo: oldSave.personalInfo,
+    characterHistory: oldSave.characterHistory,
+    memoryRuntime: oldSave.memoryRuntime,
+    memoryConfig: oldSave.memoryConfig,
+    vectorMemory: oldSave.vectorMemory,
+    variableConfig: oldSave.variableConfig,
+    customWorld: oldSave.customWorld,
+    simulationState: oldSave.simulationState,
+    messageCount: messages.length,
+    lastMessageSeq: messages.length > 0 ? messages.length - 1 : -1,
+  };
+
+  const messageRecords: MessageRecord[] = messages.map((m, i) => ({
+    key: `${oldSave.id}#${i}`,
+    saveId: oldSave.id,
+    seq: i,
+    message: { ...m, seq: i },
+  }));
+
+  return { head: compactHead, messageRecords };
+}
+
+/**
  * 迁移老存档（v3 内联 messages）到新格式（v4 分片存储）
  * - 将内联的 messages 拆到 messages store
  * - 生成紧凑头部（不含 messages）
  * - 一次性事务完成，失败不动老记录
+ * 实现基于纯函数 planV2ToV3Migration，保证迁移逻辑可单测。
  */
 export async function migrateV2ToV3(oldSave: GameSave): Promise<boolean> {
   try {
+    const plan = planV2ToV3Migration(oldSave);
+    if (!plan) return true; // 已迁移，跳过
+
     const db = await getDB();
+    const { head: compactHead, messageRecords } = plan;
 
-    // 检查是否已经是新格式
-    if ((oldSave as any).schemaVersion >= SAVE_SCHEMA_VERSION) {
-      return true; // 已迁移，跳过
-    }
-
-    // 没有消息或空消息，直接转为紧凑头部
-    if (!oldSave.messages || oldSave.messages.length === 0) {
-      const compactHead: CompactSaveRecord = {
-        id: oldSave.id,
-        name: oldSave.name,
-        timestamp: oldSave.timestamp,
-        schemaVersion: SAVE_SCHEMA_VERSION,
-        round: 0,
-        gameState: oldSave.gameState,
-        worldId: oldSave.worldId,
-        personalInfo: oldSave.personalInfo,
-        characterHistory: oldSave.characterHistory,
-        memoryRuntime: oldSave.memoryRuntime,
-        memoryConfig: oldSave.memoryConfig,
-        vectorMemory: oldSave.vectorMemory,
-        variableConfig: oldSave.variableConfig,
-        customWorld: oldSave.customWorld,
-        simulationState: oldSave.simulationState,
-        messageCount: 0,
-        lastMessageSeq: -1,
-      };
-
+    if (messageRecords.length > 0) {
+      // 一次性事务：写消息分片 + 更新头部
+      const tx = db.transaction([MESSAGES_STORE, SAVES_STORE], 'readwrite');
+      const msgStore = tx.objectStore(MESSAGES_STORE);
+      for (const rec of messageRecords) {
+        await msgStore.put(rec);
+      }
+      await tx.objectStore(SAVES_STORE).put(compactHead as any);
+      await tx.done;
+    } else {
       await db.put(SAVES_STORE, compactHead as any);
-      return true;
     }
 
-    // 有消息，需要分片迁移
-    const messages = oldSave.messages;
-
-    // 一次性事务：写消息分片 + 更新头部
-    const tx = db.transaction([MESSAGES_STORE, SAVES_STORE], 'readwrite');
-
-    // 1) 写消息分片（同时给消息对象分配 seq 字段）
-    const msgStore = tx.objectStore(MESSAGES_STORE);
-    for (let i = 0; i < messages.length; i++) {
-      // 给消息对象分配 seq 字段（确保后续 performSave 能正确判断新增）
-      messages[i].seq = i;
-      const record: MessageRecord = {
-        key: `${oldSave.id}#${i}`,
-        saveId: oldSave.id,
-        seq: i,
-        message: messages[i],
-      };
-      await msgStore.put(record);
-    }
-
-    // 2) 写紧凑头部
-    const compactHead: CompactSaveRecord = {
-      id: oldSave.id,
-      name: oldSave.name,
-      timestamp: oldSave.timestamp,
-      schemaVersion: SAVE_SCHEMA_VERSION,
-      round: messages.reduce((max, m) => Math.max(max, m.round), 0),
-      gameState: oldSave.gameState,
-      worldId: oldSave.worldId,
-      personalInfo: oldSave.personalInfo,
-      characterHistory: oldSave.characterHistory,
-      memoryRuntime: oldSave.memoryRuntime,
-      memoryConfig: oldSave.memoryConfig,
-      vectorMemory: oldSave.vectorMemory,
-      variableConfig: oldSave.variableConfig,
-      customWorld: oldSave.customWorld,
-      simulationState: oldSave.simulationState,
-      messageCount: messages.length,
-      lastMessageSeq: messages.length - 1,
-    };
-
-    await tx.objectStore(SAVES_STORE).put(compactHead as any);
-    await tx.done;
-
-    console.log(`[存档迁移] 成功迁移存档 ${oldSave.id}，共 ${messages.length} 条消息`);
+    console.log(`[存档迁移] 成功迁移存档 ${oldSave.id}，共 ${messageRecords.length} 条消息`);
     return true;
   } catch (err) {
     console.warn(`[存档迁移] 迁移存档 ${oldSave.id} 失败（不影响原存档）:`, err);

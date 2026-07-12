@@ -187,6 +187,19 @@ const PURIFY_CONFIG = {
   FORBID_ATTR: ['onload', 'onmouseover', 'onfocus', 'onblur']
 }
 
+// iframe 专用净化配置（L-02）
+// iframe 已由 sandbox="allow-scripts"（不含 allow-same-origin）隔离，无法访问父页面，
+// 因此允许 <script>/<style>/<canvas> 等保持功能；但仍须：
+// - 禁止嵌套 iframe / frame / object / embed / base（防止二次帧攻击与 URL 劫持）
+// - 禁止 form / 输入类标签（防止钓鱼提交）
+// - 禁止 javascript: URI 与 on* 内联事件（DOMPurify 默认已拦截）
+const PURIFY_CONFIG_IFRAME = {
+  ADD_TAGS: ['script', 'style', 'canvas', 'svg'],
+  FORBID_TAGS: ['iframe', 'frame', 'frameset', 'object', 'embed', 'base', 'form', 'input', 'button', 'link', 'meta'],
+  // 仍保留默认对 javascript: 与内联事件处理器的拦截
+  ALLOW_DATA_ATTR: false,
+}
+
 // ============ 检测完整 HTML 页面 ============
 export function isFullHtmlPage(content: string): boolean {
   if (!content || typeof content !== 'string') return false
@@ -318,7 +331,7 @@ export function parseContent(text: string, options: ParseContentOptions = {}): P
   if (isFullHtmlPage(text)) {
     return {
       type: 'iframe',
-      content: text
+      content: DOMPurify.sanitize(text, PURIFY_CONFIG_IFRAME)
     }
   }
 
@@ -333,7 +346,7 @@ export function parseContent(text: string, options: ParseContentOptions = {}): P
       if (isFullHtmlPage(extractedHtml)) {
         return {
           type: 'iframe',
-          content: extractedHtml
+          content: DOMPurify.sanitize(extractedHtml, PURIFY_CONFIG_IFRAME)
         }
       }
 

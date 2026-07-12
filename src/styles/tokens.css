@@ -22,6 +22,18 @@
   --success: #16a34a;
   --color-on-accent: #fff;
 
+  /* 语义色 tint 刻度（单一来源；color-mix 经 var(--danger/--warning/--success) 自动跟随主题。
+     仅在 :root 定义，无需在 dark/metal/green 块重复。三档：soft 8% / 默认 12% / hover 28% */
+  --danger-bg:        color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-bg-soft:  color-mix(in srgb, var(--danger) 8%,  transparent);
+  --danger-bg-hover: color-mix(in srgb, var(--danger) 28%, transparent);
+  --danger-strong:   var(--danger); /* 实色危险表面；表面文字用 var(--color-on-accent) 保 AA */
+  --warning-bg:      color-mix(in srgb, var(--warning) 12%, transparent);
+  --warning-bg-soft: color-mix(in srgb, var(--warning) 8%,  transparent);
+  --success-bg:      color-mix(in srgb, var(--success) 12%, transparent);
+  --success-bg-soft: color-mix(in srgb, var(--success) 8%,  transparent);
+  --success-dim:     color-mix(in srgb, var(--success) 20%, var(--bg-primary)); /* 替代组件内 #1a3a1a 兜底 */
+
   /* ─── 字体 ─── */
   --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif;
   --font-body: 'Noto Sans SC', 'Source Han Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
@@ -107,11 +119,11 @@
   --grid-card-min: 140px;
 
   /* 语义色：状态标签（自动跟随4主题） */
-  --status-brewing-bg: color-mix(in srgb, var(--warning) 15%, transparent);
+  --status-brewing-bg: var(--warning-bg);
   --status-brewing-text: var(--warning);
-  --status-active-bg: color-mix(in srgb, var(--danger) 15%, transparent);
+  --status-active-bg: var(--danger-bg);
   --status-active-text: var(--danger);
-  --status-resolved-bg: color-mix(in srgb, var(--success) 15%, transparent);
+  --status-resolved-bg: var(--success-bg);
   --status-resolved-text: var(--success);
 
   /* 语义色：事件层级（mythic/political 为固定语义色，其余跟随主题） */

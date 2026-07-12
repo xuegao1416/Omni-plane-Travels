@@ -189,8 +189,8 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
           <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             生存状态
           </h4>
-          <GaugeBar icon={<Heart size={11} color="#ef4444" />} label="血量" value={player.生存状态?.血量 ?? 100} max={100} color="#ef4444" />
-          <GaugeBar icon={<Zap size={11} color="#f59e0b" />} label="体力" value={player.生存状态?.体力值 ?? 100} max={100} color="#f59e0b" />
+          <GaugeBar icon={<Heart size={11} color="var(--danger)" />} label="血量" value={player.生存状态?.血量 ?? 100} max={100} color="var(--danger)" />
+          <GaugeBar icon={<Zap size={11} color="var(--warning)" />} label="体力" value={player.生存状态?.体力值 ?? 100} max={100} color="var(--warning)" />
         </div>
       )}
 

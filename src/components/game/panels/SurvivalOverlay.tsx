@@ -17,8 +17,17 @@ interface SurvivalOverlayProps {
   data: SurvivalModuleSchema;
   title?: string;
   onClose: () => void;
-  /** 运行时资源数量（来自变量系统） */
-  runtimeResources?: Record<string, { 数量: number }>;
+  /** 运行时资源（来自变量系统，可能携带 name/symbol/最大值/scarse 等元数据） */
+  runtimeResources?: Record<string, {
+    数量: number;
+    最大值?: number;
+    name?: string;
+    symbol?: string;
+    scarce?: boolean;
+    description?: string;
+    gatherRate?: string;
+    usage?: string;
+  }>;
   /** 资源变更日志 */
   changeLog?: ResourceChangeLog[];
 }
@@ -60,13 +69,20 @@ export default function SurvivalOverlay({
   }));
 
   // 追加运行时存在但静态定义中没有的资源（演化新增）
+  // 优先使用运行时携带的元数据（name/symbol/最大值/scarce），避免匿名 ❓ 显示
   if (runtimeResources) {
     for (const [id, rt] of Object.entries(runtimeResources)) {
       if (!mergedResources.some(r => r.id === id)) {
         mergedResources.push({
-          id, name: id, symbol: '❓',
-          amount: rt.数量, max: 99, scarce: false,
-          description: '新发现的资源',
+          id,
+          name: rt.name || id,
+          symbol: rt.symbol || '❓',
+          amount: rt.数量,
+          max: rt.最大值 ?? 99,
+          scarce: rt.scarce ?? false,
+          description: rt.description || '新发现的资源',
+          gatherRate: rt.gatherRate,
+          usage: rt.usage,
         });
       }
     }
@@ -160,7 +176,7 @@ export default function SurvivalOverlay({
                 const isCritical = res.amount > 0 && res.amount <= threshold;
                 const isEmpty = res.amount === 0;
                 const isExpanded = expandedResource === res.id;
-                const barColor = isEmpty ? 'var(--text-muted)' : isCritical ? '#ef4444' : res.scarce ? '#f59e0b' : '#22c55e';
+                const barColor = isEmpty ? 'var(--text-muted)' : isCritical ? 'var(--danger)' : res.scarce ? 'var(--warning)' : 'var(--success)';
 
                 return (
                   <div
@@ -168,8 +184,8 @@ export default function SurvivalOverlay({
                     onClick={() => setExpandedResource(isExpanded ? null : res.id)}
                     style={{
                       padding: '10px 12px', borderRadius: '8px',
-                      border: `1px solid ${isCritical ? '#ef444440' : 'var(--border)'}`,
-                      background: isCritical ? '#ef444408' : 'var(--bg-secondary)',
+                      border: `1px solid ${isCritical ? 'var(--danger-bg-soft)' : 'var(--border)'}`,
+                      background: isCritical ? 'var(--danger)08' : 'var(--bg-secondary)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                     }}
@@ -181,21 +197,21 @@ export default function SurvivalOverlay({
                     }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '16px' }}>{res.symbol}</span>
-                        <span style={{ fontWeight: 600, color: isCritical ? '#ef4444' : 'var(--text-primary)' }}>
+                        <span style={{ fontWeight: 600, color: isCritical ? 'var(--danger)' : 'var(--text-primary)' }}>
                           {res.name}
                         </span>
                         {res.scarce && (
                           <span style={{
                             fontSize: '10px', padding: '0 4px', borderRadius: '6px',
-                            background: '#f59e0b20', color: '#f59e0b',
+                            background: 'var(--warning-bg-soft)', color: 'var(--warning)',
                           }}>稀缺</span>
                         )}
-                        {isCritical && <AlertTriangle size={12} color="#ef4444" />}
-                        {isEmpty && <span style={{ fontSize: '10px', color: '#ef4444' }}>已耗尽</span>}
+                        {isCritical && <AlertTriangle size={12} color="var(--danger)" />}
+                        {isEmpty && <span style={{ fontSize: '10px', color: 'var(--danger)' }}>已耗尽</span>}
                       </span>
                       <span style={{
                         fontWeight: 600, fontSize: 'var(--font-size-sm)',
-                        color: isEmpty ? 'var(--text-muted)' : isCritical ? '#ef4444' : 'var(--text-primary)',
+                        color: isEmpty ? 'var(--text-muted)' : isCritical ? 'var(--danger)' : 'var(--text-primary)',
                       }}>
                         {res.amount}/{res.max}
                       </span>
@@ -285,7 +301,7 @@ export default function SurvivalOverlay({
                     {entry.changes.map((c, j) => (
                       <div key={j} style={{
                         display: 'flex', alignItems: 'center', gap: '4px',
-                        color: c.after < c.before ? '#ef4444' : c.after > c.before ? '#22c55e' : 'var(--text-muted)',
+                        color: c.after < c.before ? 'var(--danger)' : c.after > c.before ? 'var(--success)' : 'var(--text-muted)',
                       }}>
                         <span>{c.symbol}</span>
                         <span>{c.resourceName}</span>
@@ -327,14 +343,14 @@ function EvolutionStepCard({ step, index }: { step: ResourceEvolutionStep; index
 
       {/* 新增资源 */}
       {step.add && step.add.length > 0 && (
-        <div style={{ fontSize: '10px', color: '#22c55e' }}>
+        <div style={{ fontSize: '10px', color: 'var(--success)' }}>
           + 新增：{step.add.map(r => `${r.symbol}${r.name}`).join('、')}
         </div>
       )}
 
       {/* 淘汰资源 */}
       {step.remove && step.remove.length > 0 && (
-        <div style={{ fontSize: '10px', color: '#ef4444' }}>
+        <div style={{ fontSize: '10px', color: 'var(--danger)' }}>
           - 淘汰：{step.remove.join('、')}
         </div>
       )}

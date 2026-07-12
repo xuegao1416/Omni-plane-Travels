@@ -72,7 +72,7 @@ export default function GuidedChoiceOverlay({
         <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '1rem' }}>
           {s.error && (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <p style={{ color: '#ef4444', marginBottom: '1rem' }}>{s.error}</p>
+              <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{s.error}</p>
               <button onClick={s.handleRetry} style={primaryBtnStyle}>重试</button>
             </div>
           )}

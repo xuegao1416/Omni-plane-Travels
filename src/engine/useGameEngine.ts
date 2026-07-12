@@ -591,9 +591,21 @@ export function useGameEngine(
         const simRulesMod = currentWorldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled);
         const simRules = simRulesMod?.moduleConfig as import('../modules/schema').SimulationRules | undefined;
 
+        // 获取生存模块的资源演化蓝图（机械层触发，不经 AI 解读）
+        const survivalMod = currentWorldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled);
+        const resourceEvolution = (survivalMod?.moduleConfig as { resourceEvolution?: import('../modules/schema').ResourceEvolutionStep[] } | undefined)?.resourceEvolution;
+
         if (simEngine.shouldTick(gameTime, round) && simEngine.effectiveApiConfig) {
+          // 构建对话上下文：最近几轮 + 当前玩家消息，让演化 AI 知道玩家正在做什么
+          const recentConvParts = sanitizeForContext(messagesRef.current, round)
+            .slice(-4)
+            .map(m => m.content || '')
+            .filter(Boolean);
+          recentConvParts.push(`【玩家本轮消息】${userText}`);
+          const recentConversation = recentConvParts.join('\n\n');
+
           // 后台执行，不 await — 世界演化结果在下一轮对话生效
-          simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null)
+          simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null, recentConversation, resourceEvolution)
             .then((result) => {
               // 直接应用机械层效果（确定性，不经 AI）
               if (result?.mechanicalEffects && Object.keys(result.mechanicalEffects).length > 0) {
@@ -737,17 +749,18 @@ ${perspectiveInstruction}
           // getActivePreset() 已处理：用户自定义预设 / 内置预设 + 覆盖层 / 默认回退
           let preset = usePresetStore.getState().getActivePreset();
           // 叠加正文生图指令（独立于预设，当 inlineImageEnabled 时始终注入）
-          const inlineImageEnabled = useImageStore.getState().config.inlineImageEnabled;
-          if (inlineImageEnabled) {
+          const imageConfig = useImageStore.getState().config;
+          if (imageConfig.inlineImageEnabled) {
             const hasInlineImage = preset.prompts.some(p => p.identifier === 'inline_image_gen');
             if (!hasInlineImage) {
+              const inlineImageContent = imageConfig.inlineImagePromptTemplate?.trim() || PROMPT_INLINE_IMAGE;
               preset = {
                 ...preset,
                 prompts: [...preset.prompts, {
                   identifier: 'inline_image_gen',
                   name: '正文生图标签',
                   role: 'system' as const,
-                  content: PROMPT_INLINE_IMAGE,
+                  content: inlineImageContent,
                   enabled: true,
                   order: 1250,
                 }],
@@ -769,7 +782,7 @@ ${perspectiveInstruction}
           });
 
           // 正文生图：在系统提示末尾追加格式提醒（提高 Gemini 等模型的遵循率）
-          if (inlineImageEnabled) {
+          if (imageConfig.inlineImageEnabled) {
             systemPrompt += '\n\n【提醒】在 <contenttext> 正文中插入 image###英文提示词### 生图标签（1-2个）。';
           }
 

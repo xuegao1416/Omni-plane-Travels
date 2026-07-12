@@ -27,6 +27,10 @@ const ICON_NAME_MAP: Record<string, LucideIcon> = {
   Building2, Truck, Package, Store,
 };
 
+/** 全部世界图标列表（供图标选择器使用） */
+export const ALL_WORLD_ICONS: Array<{ name: string; icon: LucideIcon }> =
+  Object.entries(ICON_NAME_MAP).map(([name, icon]) => ({ name, icon }));
+
 /**
  * 根据 icon 名称解析 Lucide 图标组件
  * @param iconName Lucide 图标名称，如 "Cpu"、"Swords"

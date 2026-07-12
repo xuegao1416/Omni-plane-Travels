@@ -56,9 +56,9 @@ export function AssetCardExpandable({ asset, expanded, onToggle }: {
           </div>
           <div style={{ display: 'flex', gap: '12px', fontSize: 'var(--font-size-xs)', marginTop: '4px' }}>
             <span style={{ color: 'var(--text-muted)' }}>{asset.type}</span>
-            <span style={{ color: '#22c55e' }}>+{totalIncome}</span>
-            <span style={{ color: '#ef4444' }}>-{asset.maintenance ?? 0}</span>
-            <span style={{ color: net >= 0 ? 'var(--text-primary)' : '#ef4444', fontWeight: 600 }}>
+            <span style={{ color: 'var(--success)' }}>+{totalIncome}</span>
+            <span style={{ color: 'var(--danger)' }}>-{asset.maintenance ?? 0}</span>
+            <span style={{ color: net >= 0 ? 'var(--text-primary)' : 'var(--danger)', fontWeight: 600 }}>
               净{net >= 0 ? '+' : ''}{net}
             </span>
           </div>
@@ -84,9 +84,9 @@ export function AssetCardExpandable({ asset, expanded, onToggle }: {
             </p>
           )}
           <div className="grid-2" style={{ gap: '6px' }}>
-            <DetailItem icon={<TrendingUp size={13} color="#22c55e" />} label="基础收益" value={`${asset.income?.base ?? 0}/${asset.income?.cycle || '天'}`} />
-            <DetailItem icon={<TrendingUp size={13} color="#22c55e" />} label="每级加成" value={`+${asset.income?.perLevel ?? 0}`} />
-            <DetailItem icon={<TrendingDown size={13} color="#ef4444" />} label="维护费" value={`${asset.maintenance ?? 0}/${asset.income?.cycle || '天'}`} />
+            <DetailItem icon={<TrendingUp size={13} color="var(--success)" />} label="基础收益" value={`${asset.income?.base ?? 0}/${asset.income?.cycle || '天'}`} />
+            <DetailItem icon={<TrendingUp size={13} color="var(--success)" />} label="每级加成" value={`+${asset.income?.perLevel ?? 0}`} />
+            <DetailItem icon={<TrendingDown size={13} color="var(--danger)" />} label="维护费" value={`${asset.maintenance ?? 0}/${asset.income?.cycle || '天'}`} />
             <DetailItem icon={<DollarSign size={13} color="var(--accent)" />} label="净收益" value={`${net >= 0 ? '+' : ''}${net}`} />
           </div>
           {staff && (

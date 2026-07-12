@@ -42,7 +42,7 @@ export function StatModuleEditor({ data, onChange }: { data: StatModuleSchema; o
       {/* 特色属性（0~4个） */}
       <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: 4 }}>
         特色属性（0~4个，数值型）
-        {data.special.length >= 4 && <span style={{ color: '#ef4444', marginLeft: 4 }}>已达上限</span>}
+        {data.special.length >= 4 && <span style={{ color: 'var(--danger)', marginLeft: 4 }}>已达上限</span>}
       </div>
       {data.special.map((sp, i) => (
         <div key={sp.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -51,7 +51,7 @@ export function StatModuleEditor({ data, onChange }: { data: StatModuleSchema; o
           <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>~</span>
           <input style={{ ...inputStyle, width: 50 }} type="number" value={sp.range[1]} onChange={e => set(`special.${i}.range`, [sp.range[0], Number(e.target.value) || 0])} placeholder="最大" title="最大值" />
           <input style={{ ...inputStyle, flex: 1 }} value={sp.description} onChange={e => set(`special.${i}.description`, e.target.value)} placeholder="属性描述（如：领悟武学本质的境界）" />
-          <button onClick={() => removeSpecial(i)} style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}>✕</button>
+          <button onClick={() => removeSpecial(i)} style={{ border: 'none', background: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 12, padding: '2px 4px' }}>✕</button>
         </div>
       ))}
       {data.special.length < 4 && (

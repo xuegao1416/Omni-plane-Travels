@@ -1,6 +1,6 @@
 [package]
 name = "omni-plane-travels"
-version = "2.4.0"
+version = "2.5.0"
 description = "世界漫游指南 - AI 驱动的互动小说引擎"
 authors = ["xuegao1416"]
 license = "MIT"

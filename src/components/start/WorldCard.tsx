@@ -8,9 +8,9 @@ export function getWorldIcon(world: WorldDef) {
 
 /** 难度配置 */
 const DIFFICULTY_CONFIG: Record<string, { label: string; color: string }> = {
-  easy: { label: '简单', color: '#22c55e' },
-  medium: { label: '中等', color: '#f59e0b' },
-  hard: { label: '困难', color: '#ef4444' },
+  easy: { label: '简单', color: 'var(--difficulty-easy)' },
+  medium: { label: '中等', color: 'var(--difficulty-medium)' },
+  hard: { label: '困难', color: 'var(--difficulty-hard)' },
 };
 
 interface WorldCardProps {

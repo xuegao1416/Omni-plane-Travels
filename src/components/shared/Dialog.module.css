@@ -43,7 +43,7 @@
 }
 
 .iconBoxDanger {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--danger-bg);
 }
 
 .dialogTitle {
@@ -121,7 +121,7 @@
 }
 
 .confirmBtnDanger {
-  background: rgba(239, 68, 68, 0.9);
+  background: var(--danger-strong);
   color: var(--color-on-accent);
 }
 

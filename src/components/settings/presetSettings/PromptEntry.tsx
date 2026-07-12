@@ -32,7 +32,7 @@ export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onTog
         {/* 蓝灯/绿灯指示 */}
         <span style={{
           fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '4px',
-          background: p.triggerMode === 'green' ? 'var(--success-dim, #1a3a1a)' : 'var(--accent-dim, rgba(234,179,8,0.1))',
+          background: p.triggerMode === 'green' ? 'var(--success-dim)' : 'var(--accent-dim)',
           color: p.triggerMode === 'green' ? 'var(--success)' : 'var(--accent)',
         }}>
           {p.triggerMode === 'green' ? '🟢 关键词' : '🔵 常驻'}

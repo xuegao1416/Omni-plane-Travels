@@ -27,7 +27,7 @@ export default function ProxySettings() {
           <div>
             <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>代理地址（可选）</div>
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
-              解决网页端 CORS 跨域问题，桌面版无需设置
+              解决网页端 CORS 跨域问题，桌面版无需设置。同时适用于已开启的生图功能
             </div>
           </div>
           <button

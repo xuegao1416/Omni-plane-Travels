@@ -28,7 +28,7 @@ function LogRow({ entry, cycleName }: { entry: TransactionEntry; cycleName: stri
       {entry.amount != null && (
         <span style={{
           fontWeight: 600,
-          color: entry.amount >= 0 ? '#22c55e' : '#ef4444',
+          color: entry.amount >= 0 ? 'var(--success)' : 'var(--danger)',
         }}>
           {entry.amount >= 0 ? '+' : ''}{entry.amount}
         </span>

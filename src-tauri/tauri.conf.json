@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "世界漫游指南",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "identifier": "com.omni-plane-travels.app",
   "build": {
     "frontendDist": "../dist",
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob: https: http:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost https: wss:; media-src 'self' asset: data: blob:; frame-src 'self'"
     }
   },
   "bundle": {

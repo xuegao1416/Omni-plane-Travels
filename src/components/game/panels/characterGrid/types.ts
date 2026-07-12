@@ -21,10 +21,10 @@ export const DETAIL_TABS: { id: DetailTab; icon: LucideIcon; label: string }[] =
 ];
 
 export function favorClass(v: number) {
-  if (v >= 60) return { color: '#22c55e', label: '高' };
+  if (v >= 60) return { color: 'var(--success)', label: '高' };
   if (v >= 20) return { color: '#3b82f6', label: '中' };
   if (v >= -20) return { color: '#9ca3af', label: '平' };
-  return { color: '#ef4444', label: '低' };
+  return { color: 'var(--danger)', label: '低' };
 }
 
 export function categoryStyle(cat?: string) {

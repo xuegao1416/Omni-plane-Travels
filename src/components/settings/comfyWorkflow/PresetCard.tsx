@@ -52,9 +52,9 @@ export function PresetCard({
         {hasFatal ? (
           <XCircle size={14} color="var(--danger)" />
         ) : hasMissing ? (
-          <AlertTriangle size={14} color="var(--warning, #f59e0b)" />
+          <AlertTriangle size={14} color="var(--warning)" />
         ) : (
-          <CheckCircle size={14} color="var(--success, #10b981)" />
+          <CheckCircle size={14} color="var(--success)" />
         )}
         {isActive && (
           <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 500 }}>使用中</span>
