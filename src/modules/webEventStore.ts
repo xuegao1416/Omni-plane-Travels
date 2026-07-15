@@ -38,7 +38,7 @@ import {
   type WebEventRecord,
 } from './eventDb';
 
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.1';
 const ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
@@ -452,21 +452,24 @@ export async function savePackMeta(
  * 此处仅替换 rules 字段，保留同一文件中的 periodicRules（周期事件包由 EventConfigPanel 维护）。
  * 不存在该 pack 时抛 WebEventError（调用方应保证 eventPackId 来自已安装包）。
  */
-export async function saveRulesToPack(packId: string, rules: EventRule[]): Promise<void> {
+export async function saveRulesToPack(packId: string, rules: EventRule[], periodicRules?: PeriodicRule[]): Promise<void> {
   const rec = await getWebEvent(packId);
   if (!rec) throw new WebEventError('MOD_NOT_FOUND', `未找到事件包：${packId}`);
-  // 读取已有文件以保留 periodicRules（周期事件包由另一入口维护，避免互相覆盖）
-  let periodicRules: PeriodicRule[] = [];
-  const existing = rec.files['schema/rules.json'];
-  if (typeof existing === 'string') {
-    try {
-      const rf = JSON.parse(existing) as RuleFile;
-      periodicRules = rf.periodicRules ?? [];
-    } catch {
-      /* 旧文件损坏：丢弃，以新 rules 重建 */
+  // 若未显式传入 periodicRules，从已有文件读回（向后兼容旧调用方）
+  let effectivePeriodic = periodicRules;
+  if (effectivePeriodic === undefined) {
+    effectivePeriodic = [];
+    const existing = rec.files['schema/rules.json'];
+    if (typeof existing === 'string') {
+      try {
+        const rf = JSON.parse(existing) as RuleFile;
+        effectivePeriodic = rf.periodicRules ?? [];
+      } catch {
+        /* 旧文件损坏：丢弃，以新 rules 重建 */
+      }
     }
   }
-  const file: RuleFile = { version: 1, rules, periodicRules };
+  const file: RuleFile = { version: 1, rules, periodicRules: effectivePeriodic };
   rec.files['schema/rules.json'] = JSON.stringify(file, null, 2);
   await putWebEvent(rec);
 }
@@ -508,7 +511,7 @@ export async function createRulePack(): Promise<string> {
     description: '由事件中心创建的规则包。',
     engine: 'opt-event',
     schemaVersion: 1,
-    minAppVersion: '2.5.0',
+    minAppVersion: '2.6.1',
     type: 'rule',
     coverColor: '#3b82f6',
     icon: 'Zap',
@@ -547,7 +550,7 @@ export async function createEmptyPack(defaultName = '我的卡片事件包'): Pr
     description: '由事件中心创建的事件包。',
     engine: 'opt-event',
     schemaVersion: 1,
-    minAppVersion: '2.5.0',
+    minAppVersion: '2.6.1',
     type: 'card',
     coverColor: '#3b82f6',
     icon: 'FileText',
@@ -599,10 +602,10 @@ export async function createPackWithEvent(
   const manifest: Manifest = {
     id: meta.id,
     name: meta.name,
-    version: meta.version ?? '2.5.0',
+    version: meta.version ?? '2.6.1',
     author: '',
     schemaVersion: 1,
-    minAppVersion: meta.version ?? '2.5.0',
+    minAppVersion: meta.version ?? '2.6.1',
     type: meta.type,
     engine: 'opt-event',
     coverColor: meta.coverColor ?? '#3b82f6',
@@ -660,10 +663,12 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
   for (const pack of packs) {
     const existing = await getWebEvent(pack.id);
     if (existing) {
-      // 已存在：修正可能的旧数据（type 错误、builtin 缺失）
+      // 已存在：修正旧数据（type 错误、builtin 缺失）
       let needsUpdate = false;
-      if ((pack.periodicRules?.length ?? 0) > 0 && existing.manifest.type !== 'periodic') {
-        existing.manifest.type = 'periodic';
+      // 旧数据修正：有 periodicRules 的包，type 不是 'rule' 就修正
+      if ((pack.periodicRules?.length ?? 0) > 0 && existing.manifest.type !== 'rule') {
+        existing.manifest.type = 'rule';
+        existing.manifest.icon = 'Zap';
         needsUpdate = true;
       }
       if (!existing.builtin) {
@@ -678,16 +683,16 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
     // 构造 manifest
     const manifest: Manifest = {
       id: pack.id,
-      name: pack.name ?? `${world.name ?? world.id} 事件包`,
+      name: pack.name ?? `${world.name ?? world.id} 基础规则`,
       version: '1.0.0',
       author: '内置',
-      description: `${world.name ?? world.id} 的内置事件包`,
+      description: `${world.name ?? world.id} 的内置规则包`,
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.5.0',
-      type: 'periodic',
+      minAppVersion: '2.6.1',
+      type: 'rule',
       coverColor: '#6366f1',
-      icon: 'Repeat',
+      icon: 'Zap',
       enabledByDefault: true,
       loadOrder: 0,
       permissions: pack.permissions ?? ['modify_world_state'],

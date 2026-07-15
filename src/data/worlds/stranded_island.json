@@ -479,7 +479,7 @@
     "eventPacks": [
       {
         "id": "world:stranded_island",
-        "name": "孤岛求生 周期事件",
+        "name": "孤岛求生 基础规则",
         "periodicRules": [
           {
             "id": "daily_consumption",
@@ -534,7 +534,9 @@
             },
             "narrateToAI": true
           }
-        ]
+        ],
+        "type": "rule",
+        "rules": []
       }
     ]
   }

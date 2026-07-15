@@ -1207,7 +1207,7 @@
     "eventPacks": [
       {
         "id": "world:wuxia_world",
-        "name": "武林风云 周期事件",
+        "name": "武林风云 基础规则",
         "periodicRules": [
           {
             "id": "seasonal_gathering",
@@ -1243,7 +1243,9 @@
             },
             "narrateToAI": true
           }
-        ]
+        ],
+        "type": "rule",
+        "rules": []
       }
     ]
   }

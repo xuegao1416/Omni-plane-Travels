@@ -7,28 +7,26 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Package, FileText, Zap, BookOpen, Boxes, Repeat, Upload, Download, Eye, Plus,
+  Package, FileText, Zap, BookOpen, Boxes, Upload, Download, Eye,
 } from 'lucide-react';
 import * as eventApi from '../../modules/eventApi';
 import { useSaveStore } from '../../stores/saveStore';
-import { getWebEvent, putWebEvent, type WebEventRecord } from '../../modules/eventDb';
+import { getWebEvent } from '../../modules/eventDb';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
-import type { EventType, EventRegistryEntry, PeriodicRule, RuleFile, Manifest } from '../../modules/schema';
+import type { EventType, EventRegistryEntry } from '../../modules/schema';
 import EventPackPreview from './EventPackPreview';
 import type { WorldDef } from '../../data/worlds-schema';
-import PeriodicEventPackEditor from './PeriodicEventPackEditor';
 import EventSwitch from './EventSwitch';
 import { textOn } from './colorUtils';
 
-const TYPE_META: Record<EventType, { label: string; icon: typeof Package }> = {
+const TYPE_META: Record<string, { label: string; icon: typeof Package }> = {
   card: { label: '事件包', icon: FileText },
   rule: { label: '规则包', icon: Zap },
   worldbook: { label: '世界书', icon: BookOpen },
   bundle: { label: '合集', icon: Boxes },
-  periodic: { label: '周期包', icon: Repeat },
 };
 
-const TYPE_ORDER: EventType[] = ['card', 'rule', 'worldbook', 'bundle', 'periodic'];
+const TYPE_ORDER: EventType[] = ['card', 'rule', 'worldbook', 'bundle'];
 
 export default function EventConfigPanel({
   onClose,
@@ -42,7 +40,6 @@ export default function EventConfigPanel({
   const [toast, setToast] = useState<string | null>(null);
   const [previewPackId, setPreviewPackId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [periodicRulesById, setPeriodicRulesById] = useState<Record<string, PeriodicRule[]>>({});
 
   // sessionActivePacks: undefined = 全部用全局列表；[] 或具体列表 = 按列表来
   const sessionActivePacks = useSaveStore(s => s.sessionActivePacks);
@@ -128,91 +125,6 @@ export default function EventConfigPanel({
     }
   };
 
-  // ── 周期事件包：内联读取 / 创建 / 保存（复用 PeriodicEventPackEditor，不另建编辑器） ──
-  useEffect(() => {
-    const periodicList = grouped.get('periodic') ?? [];
-    if (periodicList.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const next: Record<string, PeriodicRule[]> = {};
-      for (const e of periodicList) {
-        try {
-          const rec = await getWebEvent(e.meta.id);
-          const raw = rec?.files['schema/rules.json'];
-          if (typeof raw === 'string') {
-            const rf = JSON.parse(raw) as RuleFile;
-            next[e.meta.id] = rf.periodicRules ?? [];
-          } else {
-            next[e.meta.id] = [];
-          }
-        } catch {
-          next[e.meta.id] = [];
-        }
-      }
-      if (!cancelled) setPeriodicRulesById(prev => ({ ...prev, ...next }));
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grouped]);
-
-  /** 创建空周期事件包并写入事件库；随后刷新列表使其出现在「周期」分区并可绑定 */
-  const createPeriodicPack = async () => {
-    const id = `periodic-${Date.now()}`;
-    const manifest: Manifest = {
-      id,
-      name: '我的周期事件包',
-      version: '1.0.0',
-      author: '匿名',
-      description: '由游戏内「模块」面板创建的周期事件包。',
-      engine: 'opt-event',
-      schemaVersion: 1,
-      minAppVersion: '2.5.0',
-      type: 'periodic',
-      coverColor: '#3b82f6',
-      icon: 'Repeat',
-      enabledByDefault: false,
-      loadOrder: 100,
-      permissions: ['register_tick'],
-      cards: [],
-    };
-    const rec: WebEventRecord = {
-      id,
-      manifest,
-      enabled: false,
-      status: 'installed',
-      installedAt: new Date().toISOString(),
-      files: {
-        'manifest.json': JSON.stringify(manifest, null, 2),
-        'schema/rules.json': JSON.stringify({ version: 1, rules: [], periodicRules: [] } as RuleFile, null, 2),
-      },
-    };
-    try {
-      await putWebEvent(rec);
-      setPeriodicRulesById(prev => ({ ...prev, [id]: [] }));
-      eventApi.invalidateModCache();
-      await refresh();
-      showToast('已创建周期事件包，点击「添加周期事件」即可编辑规则');
-    } catch (e) {
-      showToast('创建周期事件包失败：' + (e instanceof Error ? e.message : String(e)));
-    }
-  };
-
-  /** 保存某周期事件包内的 periodicRules 到 schema/rules.json（保留其它文件） */
-  const savePeriodicRules = async (packId: string, next: PeriodicRule[]) => {
-    setPeriodicRulesById(prev => ({ ...prev, [packId]: next }));
-    try {
-      const rec = await getWebEvent(packId);
-      if (!rec) return;
-      const files = {
-        ...rec.files,
-        'schema/rules.json': JSON.stringify({ version: 1, rules: [], periodicRules: next } as RuleFile, null, 2),
-      };
-      await putWebEvent({ ...rec, files });
-    } catch (e) {
-      showToast('保存周期事件失败：' + (e instanceof Error ? e.message : String(e)));
-    }
-  };
-
   const handleImport = async (file: File) => {
     try {
       const meta = await eventApi.importMod({ file });
@@ -276,67 +188,34 @@ export default function EventConfigPanel({
 
       {TYPE_ORDER.map((t) => {
         const list = grouped.get(t) ?? [];
-        // 周期分区必须始终渲染（空态 + 新建按钮）；其余类型无数据则跳过
-        if (list.length === 0 && t !== 'periodic') return null;
+        if (list.length === 0) return null;
         const Icon = TYPE_META[t].icon;
         return (
           <div key={t}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-2)', color: 'var(--text-secondary)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               <Icon size={14} style={{ color: 'var(--accent)' }} /> {TYPE_META[t].label}
-              {t === 'periodic' && (
-                <button
-                  className="btn-primary btn-sm"
-                  onClick={() => void createPeriodicPack()}
-                  style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, textTransform: 'none' }}
-                >
-                  <Plus size={14} /> 新建周期事件包
-                </button>
-              )}
             </div>
-
-            {t === 'periodic' && list.length === 0 ? (
-              <div style={{ padding: 'var(--space-5)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', background: 'var(--bg-secondary)', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <Repeat size={22} style={{ color: 'var(--text-muted)' }} />
-                <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)' }}>还没有周期事件包</div>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', maxWidth: 280 }}>
-                  周期事件包可设置「每隔若干轮自动结算」的资源 / 属性变动，无需玩家操作。点击下方按钮创建你的第一个。
-                </div>
-                <button className="btn-primary btn-sm" onClick={() => void createPeriodicPack()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <Plus size={14} /> 新建周期事件包
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {list.map((e) => {
-                  return (
-                    <div key={e.meta.id} style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: e.meta.coverColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: textOn(e.meta.coverColor || '#333'), flexShrink: 0 }}>
-                          <Icon size={15} />
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)' }}>{e.meta.name}</div>
-                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>v{e.meta.version} · {e.meta.id}</div>
-                        </div>
-                        {t === 'card' && (
-                          <button className="btn-ghost btn-sm" onClick={() => void handlePreview(e.meta.id)} aria-label="预览卡" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <Eye size={14} /> 预览
-                          </button>
-                        )}
-                        <EventSwitch checked={activeIds.has(e.meta.id)} onChange={(v) => toggle(e.meta.id, v)} label={activeIds.has(e.meta.id) ? '本局启用' : '本局禁用'} />
-                      </div>
-                      {t === 'periodic' && (
-                        <PeriodicEventPackEditor
-                          periodicEvents={periodicRulesById[e.meta.id] ?? []}
-                          onChange={(next) => void savePeriodicRules(e.meta.id, next)}
-                          worldDef={worldDef}
-                        />
-                      )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {list.map((e) => (
+                <div key={e.meta.id} style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: e.meta.coverColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: textOn(e.meta.coverColor || '#333'), flexShrink: 0 }}>
+                      <Icon size={15} />
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)' }}>{e.meta.name}</div>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>v{e.meta.version} · {e.meta.id}</div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    {t === 'card' && (
+                      <button className="btn-ghost btn-sm" onClick={() => void handlePreview(e.meta.id)} aria-label="预览卡" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Eye size={14} /> 预览
+                      </button>
+                    )}
+                    <EventSwitch checked={activeIds.has(e.meta.id)} onChange={(v) => toggle(e.meta.id, v)} label={activeIds.has(e.meta.id) ? '本局启用' : '本局禁用'} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
       })}

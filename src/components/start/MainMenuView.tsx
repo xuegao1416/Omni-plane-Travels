@@ -38,7 +38,7 @@ export default function MainMenuView({
     { label: beginLabel, icon: Play, onClick: onStartWizard },
     { label: '读取存档', icon: FolderOpen, onClick: onViewSaves, badge: allSaves.length > 0 ? String(allSaves.length) : undefined },
     { label: settingsLabel, icon: Settings, onClick: onSettings },
-    { label: '事件中心', icon: Boxes, onClick: onOpenMods },
+    { label: '事件中心', icon: Boxes, onClick: onOpenMods, badge: 'Beta测试' },
   ];
 
   return (
@@ -158,7 +158,7 @@ export default function MainMenuView({
         transition: 'opacity 1s ease 1.2s',
         letterSpacing: '0.05em',
       }}>
-        v2.6.0
+        v2.6.1
       </div>
       <BackgroundMusic />
     </div>

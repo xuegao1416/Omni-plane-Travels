@@ -638,7 +638,7 @@
     "eventPacks": [
       {
         "id": "world:desire_metropolis",
-        "name": "烟火人间 周期事件",
+        "name": "烟火人间 基础规则",
         "periodicRules": [
           {
             "id": "quarterly_rent",
@@ -695,7 +695,9 @@
             },
             "narrateToAI": true
           }
-        ]
+        ],
+        "type": "rule",
+        "rules": []
       }
     ]
   }

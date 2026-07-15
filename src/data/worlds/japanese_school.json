@@ -495,7 +495,7 @@
     "eventPacks": [
       {
         "id": "world:japanese_school",
-        "name": "日式校园 周期事件",
+        "name": "日式校园 基础规则",
         "periodicRules": [
           {
             "id": "midterm_exam",
@@ -553,7 +553,9 @@
             },
             "narrateToAI": true
           }
-        ]
+        ],
+        "type": "rule",
+        "rules": []
       }
     ]
   }

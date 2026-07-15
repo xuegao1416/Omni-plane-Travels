@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useReducer } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap, ReactFlowProvider,
   useNodesState, useEdgesState, addEdge, Handle, Position,
@@ -6,11 +6,12 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  ArrowLeft, Zap, GitBranch, Gauge, Swords, Globe, ShieldAlert,
-  Play, ShieldCheck, Braces, Plus, Trash2, X, AlertTriangle, Check, Dices, Save,
+  ArrowLeft, Zap, GitBranch, Gauge, Swords, Globe, ShieldAlert, Clock,
+  Play, ShieldCheck, Braces, Plus, Minus, Trash2, X, AlertTriangle, Check, Dices, Save,
+  Undo2, Redo2,
 } from 'lucide-react';
 import type {
-  EventGraph, EventGraphNode, EventNodeKind, Action, ActionKind, Literal, ValidationIssue, RuleFile,
+  EventGraph, EventGraphNode, EventNodeKind, Action, ActionKind, Literal, ValidationIssue, RuleFile, ModuleEffects,
 } from '../../modules/schema';
 import { evaluate } from '../../modules/ruleEngine';
 import { graphToRuleFile, ruleFileToGraph } from '../../modules/ruleGraph';
@@ -29,9 +30,10 @@ const NODE_META: Record<EventNodeKind, { label: string; icon: typeof Zap; color:
   event: { label: '事件', icon: Swords, color: 'var(--node-event)', hint: '主动生成 SimEvent' },
   worldState: { label: '世界状态', icon: Globe, color: 'var(--dim-geography)', hint: '更新状态轴' },
   guardrail: { label: '护栏', icon: ShieldAlert, color: 'var(--node-error)', hint: '叙事层安全边界' },
+  periodic: { label: '周期触发', icon: Clock, color: 'var(--node-periodic, #8b5cf6)', hint: '每 N 轮自动触发效果' },
 };
 
-const PALETTE: EventNodeKind[] = ['trigger', 'condition', 'effect', 'event', 'worldState', 'guardrail'];
+const PALETTE: EventNodeKind[] = ['trigger', 'condition', 'effect', 'event', 'worldState', 'guardrail', 'periodic'];
 
 const ALL_PERMISSIONS = [
   'read_world_state', 'modify_world_state', 'add_card', 'override_card', 'register_tick', 'emit_world_event', 'provide_assets',
@@ -63,10 +65,14 @@ function defaultDataFor(kind: EventNodeKind): EventGraphNode {
   switch (kind) {
     case 'trigger':
       return { ...base, when: { event: { type: 'dice_roll' } }, trigger: { eventType: 'dice_roll' }, priority: 10 };
+    case 'condition':
+      return { ...base, logicMode: 'and' as const, conditionInputCount: 2 } as EventGraphNode;
     case 'effect':
       return { ...base, actions: [{ addCard: { cardId: 'adventure' } }] };
     case 'guardrail':
       return { ...base, guardrail: { setAllowedVars: [] } };
+    case 'periodic':
+      return { ...base, intervalTicks: 30, offsetTicks: 0, effects: {}, narrateToAI: true, description: '' };
     default:
       return base;
   }
@@ -124,6 +130,26 @@ function fromModGraph(graph: EventGraph): { nodes: RFNode[]; edges: Edge[] } {
 const edgeStyleFor = (kind?: string) =>
   kind === 'constraint' ? { stroke: 'var(--node-error)', strokeDasharray: '6 4' } : { stroke: 'var(--node-trigger)' };
 
+/* ─── 连接合法性规则 ─── */
+const VALID_TARGETS: Record<EventNodeKind, EventNodeKind[]> = {
+  trigger:   ['condition', 'effect'],
+  periodic:  ['condition', 'effect'],
+  condition: ['condition', 'effect'],
+  effect:    ['effect', 'event', 'worldState', 'guardrail'],
+  event:     ['effect', 'event', 'worldState'],
+  worldState:['effect', 'event', 'worldState'],
+  guardrail: [],                       // 终点，无输出
+};
+
+function isValidConnection(sourceKind: EventNodeKind, targetKind: EventNodeKind): boolean {
+  return VALID_TARGETS[sourceKind]?.includes(targetKind) ?? false;
+}
+
+/** condition 节点输入端口数，默认 2 */
+function getConditionInputCount(data: EventGraphNode & Record<string, unknown>): number {
+  return (data.conditionInputCount as number) ?? 2;
+}
+
 export interface RuleEditorProps {
   eventPackId: string | null;
   onBack: () => void;
@@ -134,7 +160,7 @@ type Mode = 'visual' | 'json';
 export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
   const seed = useMemo(seedGraph, []);
   const [nodes, setNodes, onNodesChange] = useNodesState<RFNode>(seed.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(seed.edges);
+  const [edges, setEdges, rawOnEdgesChange] = useEdgesState<Edge>(seed.edges);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('visual');
   const [jsonText, setJsonText] = useState('');
@@ -145,6 +171,68 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
   const [eventType, setEventType] = useState('dice_roll');
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
+
+  // ── Undo/Redo 系统 ──
+  const undoStack = useRef<Array<{ nodes: RFNode[]; edges: Edge[] }>>([]);
+  const redoStack = useRef<Array<{ nodes: RFNode[]; edges: Edge[] }>>([]);
+  const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+  const pushHistory = useCallback(() => {
+    undoStack.current.push({ nodes: [...nodesRef.current], edges: [...edges] });
+    redoStack.current = [];
+    if (undoStack.current.length > 50) undoStack.current.shift();
+    forceUpdate();
+  }, [edges]);
+
+  const canUndo = undoStack.current.length > 0;
+  const canRedo = redoStack.current.length > 0;
+
+  const undo = useCallback(() => {
+    if (undoStack.current.length === 0) return;
+    const snapshot = undoStack.current.pop()!;
+    redoStack.current.push({ nodes: [...nodesRef.current], edges: [...edges] });
+    setNodes(snapshot.nodes);
+    setEdges(snapshot.edges);
+    forceUpdate();
+  }, [edges, setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+    const snapshot = redoStack.current.pop()!;
+    undoStack.current.push({ nodes: [...nodesRef.current], edges: [...edges] });
+    setNodes(snapshot.nodes);
+    setEdges(snapshot.edges);
+    forceUpdate();
+  }, [edges, setNodes, setEdges]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
+
+  /** 包装 onEdgesChange：删除边时自动保存历史 */
+  const onEdgesChange = useCallback<typeof rawOnEdgesChange>((changes) => {
+    if (changes.some((c) => c.type === 'remove')) pushHistory();
+    rawOnEdgesChange(changes);
+  }, [rawOnEdgesChange, pushHistory]);
+
+  /** 选中节点时高亮所有相关边 */
+  const displayEdges = useMemo(() => {
+    if (!selectedId) return edges;
+    return edges.map((e) => {
+      const isConnected = e.source === selectedId || e.target === selectedId;
+      if (!isConnected) return e;
+      return {
+        ...e,
+        style: { ...(e.style as object), strokeWidth: 2.5, filter: 'drop-shadow(0 0 6px var(--accent))' },
+        className: 'edge-highlighted',
+      };
+    });
+  }, [edges, selectedId]);
 
   // 打开「已安装」事件包：从落盘 schema/rules.json 还原节点图（残留#1）
   useEffect(() => {
@@ -170,19 +258,54 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
 
   const onConnect = useCallback(
     (c: Connection) => {
-      const src = nodesRef.current.find((n) => n.id === c.source);
-      const kind = (src?.data as unknown as EventGraphNode)?.kind === 'guardrail' ? 'constraint' : 'flow';
+      /* ── 连接合法性检查 ── */
+      // 自连
+      if (c.source === c.target) return;
+
+      const srcNode = nodesRef.current.find((n) => n.id === c.source);
+      const tgtNode = nodesRef.current.find((n) => n.id === c.target);
+      if (!srcNode || !tgtNode) return;
+
+      const srcKind = (srcNode.data as unknown as EventGraphNode).kind;
+      const tgtKind = (tgtNode.data as unknown as EventGraphNode).kind;
+
+      // 规则合法性
+      if (!isValidConnection(srcKind, tgtKind)) return;
+
+      // 重复连接（同 source→target 对 + 同 targetHandle）
+      const isDuplicate = edges.some(
+        (e) => e.source === c.source && e.target === c.target && e.targetHandle === c.targetHandle,
+      );
+      if (isDuplicate) return;
+
+      // condition 输入端口容量
+      if (tgtKind === 'condition') {
+        const maxInputs = getConditionInputCount(tgtNode.data as unknown as EventGraphNode & Record<string, unknown>);
+        const currentInputs = edges.filter((e) => e.target === c.target).length;
+        if (currentInputs >= maxInputs) return;
+      }
+
+      // guardrail 约束边 vs 普通流边
+      const kind = tgtKind === 'guardrail' ? 'constraint' : 'flow';
+      pushHistory();
       setEdges((eds) =>
         addEdge(
-          { ...c, id: `e-${c.source}-${c.target}-${Date.now().toString(36)}`, type: 'default', data: { kind }, style: edgeStyleFor(kind) } as Edge,
+          {
+            ...c,
+            id: `e-${c.source}-${c.target}-${Date.now().toString(36)}`,
+            type: 'default',
+            data: { kind },
+            style: edgeStyleFor(kind),
+          } as Edge,
           eds,
         ),
       );
     },
-    [setEdges],
+    [setEdges, edges],
   );
 
   const addNode = (kind: EventNodeKind) => {
+    pushHistory();
     const id = `${kind}-${Date.now().toString(36)}`;
     const data = { ...defaultDataFor(kind), id } as RFNodeData;
     const node: RFNode = { id, type: kind, position: { x: 120 + Math.random() * 220, y: 80 + Math.random() * 200 }, data };
@@ -191,10 +314,12 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
   };
 
   const updateNodeData = (id: string, patch: Partial<EventGraphNode>) => {
+    pushHistory();
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...(n.data as object), ...patch } as RFNodeData } : n)));
   };
 
   const removeNode = (id: string) => {
+    pushHistory();
     setNodes((nds) => nds.filter((n) => n.id !== id));
     setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
     if (selectedId === id) setSelectedId(null);
@@ -250,13 +375,13 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
     });
   };
 
-  // 写回规则图到 schema/rules.json（P0-2 修复：此前编辑器零写入、返回即丢失）
+  // 写回规则图到 schema/rules.json（同时保存 rules + periodicRules）
   const handleSave = useCallback(async (): Promise<boolean> => {
     if (!eventPackId) return false;
     setSaving(true);
     try {
       const rf = graphToRuleFile(toModGraph(nodes, edges));
-      await saveRulesToPack(eventPackId, rf.rules);
+      await saveRulesToPack(eventPackId, rf.rules, rf.periodicRules);
       setIssues([]);
       return true;
     } catch (err) {
@@ -287,6 +412,8 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
         <button className="btn-ghost btn-sm" onClick={() => void handleBack()} style={{ minHeight: 'var(--touch-min)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} /> 返回</button>
         <h1 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, fontFamily: 'var(--font-display)' }}>规则编辑器</h1>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
+          <button className="btn-ghost btn-sm" onClick={undo} disabled={!canUndo} title="撤销 (Ctrl+Z)" style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 6px', opacity: canUndo ? 1 : 0.35 }}><Undo2 size={15} /></button>
+          <button className="btn-ghost btn-sm" onClick={redo} disabled={!canRedo} title="重做 (Ctrl+Y)" style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 6px', opacity: canRedo ? 1 : 0.35 }}><Redo2 size={15} /></button>
           <button className="btn-primary btn-sm" onClick={() => void handleSave()} disabled={saving || !eventPackId} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Save size={15} /> {saving ? '保存中…' : '保存'}</button>
           <button className="btn-secondary btn-sm" onClick={runValidate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> 校验</button>
           <button className="btn-primary btn-sm" onClick={runSim} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Play size={15} /> 模拟运行</button>
@@ -347,7 +474,7 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
               );
             })}
             <div style={{ marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)', borderTop: '1px dashed var(--border)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              周期事件为事件包编辑器内的「周期事件」子标签（与叙事卡同属一个事件包），规则图不再产出周期节点。
+              周期节点：每 N 轮自动结算效果，可连接条件门做前置判断。独立于触发器，不需要外部事件驱动。
             </div>
           </div>
 
@@ -356,7 +483,7 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
             <ReactFlowProvider>
               <ReactFlow
                 nodes={nodes}
-                edges={edges}
+                edges={displayEdges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
@@ -388,32 +515,101 @@ export default function RuleEditor({ eventPackId, onBack }: RuleEditorProps) {
 }
 
 const nodeTypes: NodeTypes = {
-  trigger: RuleNode, condition: RuleNode, effect: RuleNode, event: RuleNode, worldState: RuleNode, guardrail: RuleNode,
+  trigger: RuleNode, condition: RuleNode, effect: RuleNode, event: RuleNode, worldState: RuleNode, guardrail: RuleNode, periodic: RuleNode,
 };
 
 function RuleNode({ data, selected }: NodeProps) {
-  const d = data as unknown as EventGraphNode;
+  const d = data as unknown as (EventGraphNode & Record<string, unknown>);
   const meta = NODE_META[d.kind];
   const Icon = meta.icon;
+
+  const isStart = d.kind === 'trigger' || d.kind === 'periodic';
+  const isEnd = d.kind === 'guardrail';
+  const isCondition = d.kind === 'condition';
+  const inputCount = isCondition ? getConditionInputCount(d) : 1;
+
+  /* condition 节点根据输入端口数自适应高度 */
+  const nodeStyle: React.CSSProperties = {
+    minWidth: 160,
+    padding: 'var(--space-2) var(--space-3)',
+    borderRadius: 'var(--radius-md)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--node-border)',
+    borderLeft: isStart ? `4px solid ${meta.color}` : `3px solid ${meta.color}`,
+    borderRight: isEnd ? `4px solid ${meta.color}` : undefined,
+    boxShadow: selected ? 'var(--shadow-glow)' : 'var(--shadow-sm)',
+    color: 'var(--text-primary)',
+    position: 'relative',
+    minHeight: isCondition ? Math.max(56, 28 + inputCount * 22) : undefined,
+  };
+
   return (
-    <div
-      style={{
-        minWidth: 150,
-        padding: 'var(--space-2) var(--space-3)',
-        borderRadius: 'var(--radius-md)',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--node-border)',
-        borderLeft: `3px solid ${meta.color}`,
-        boxShadow: selected ? 'var(--shadow-glow)' : 'var(--shadow-sm)',
-        color: 'var(--text-primary)',
-      }}
-    >
-      <Handle type="target" position={Position.Left} style={{ background: 'var(--text-muted)' }} />
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>
+    <div style={nodeStyle}>
+      {/* ── 输入端口（左侧） ── */}
+      {!isStart && isCondition && (
+        <>
+          {Array.from({ length: inputCount }, (_, i) => (
+            <Handle
+              key={`cond-in-${i}`}
+              type="target"
+              id={`condition-${i}`}
+              position={Position.Left}
+              style={{
+                background: 'var(--accent)',
+                width: 8,
+                height: 8,
+                border: '2px solid var(--bg-secondary)',
+                top: `${((i + 1) / (inputCount + 1)) * 100}%`,
+              }}
+            />
+          ))}
+          {/* 端口标签 */}
+          {Array.from({ length: inputCount }, (_, i) => (
+            <span
+              key={`cond-label-${i}`}
+              style={{
+                position: 'absolute',
+                left: 12,
+                top: `${((i + 1) / (inputCount + 1)) * 100}%`,
+                transform: 'translateY(-50%)',
+                fontSize: '9px',
+                color: 'var(--text-muted)',
+                pointerEvents: 'none',
+                lineHeight: 1,
+              }}
+            >
+              {String.fromCharCode(65 + i)}
+            </span>
+          ))}
+        </>
+      )}
+      {!isStart && !isCondition && (
+        <Handle
+          type="target"
+          id="target"
+          position={Position.Left}
+          style={{ background: 'var(--text-muted)' }}
+        />
+      )}
+
+      {/* ── 节点内容 ── */}
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-sm)', fontWeight: 600, marginLeft: isCondition ? 8 : 0 }}>
         <Icon size={14} style={{ color: meta.color }} /> {d.label || meta.label}
       </div>
-      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{meta.label}</div>
-      <Handle type="source" position={Position.Right} style={{ background: 'var(--text-muted)' }} />
+      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginLeft: isCondition ? 8 : 0 }}>
+        {meta.label}
+        {isCondition && ` · ${(d.logicMode ?? 'and').toUpperCase()} · ${inputCount}入/1出`}
+      </div>
+
+      {/* ── 输出端口（右侧） ── */}
+      {!isEnd && (
+        <Handle
+          type="source"
+          id="source"
+          position={Position.Right}
+          style={{ background: isStart ? meta.color : 'var(--text-muted)' }}
+        />
+      )}
     </div>
   );
 }
@@ -457,6 +653,66 @@ function NodeProperties({
 
       <label style={fieldLabel}>显示名<input value={d.label} onChange={(e) => onChange({ label: e.target.value })} style={inputStyle} /></label>
 
+      {d.kind === 'condition' && (
+        <>
+          <label style={fieldLabel}>
+            逻辑模式
+            <select
+              value={d.logicMode ?? 'and'}
+              onChange={(e) => {
+                const mode = e.target.value as 'and' | 'or' | 'not';
+                const patch: Partial<EventGraphNode> = { logicMode: mode } as Partial<EventGraphNode>;
+                // NOT 门强制 1 个输入端口
+                if (mode === 'not') (patch as Record<string, unknown>).conditionInputCount = 1;
+                onChange(patch);
+              }}
+              style={inputStyle}
+            >
+              <option value="and">AND — 所有条件都满足</option>
+              <option value="or">OR — 任一条件满足</option>
+              <option value="not">NOT — 取反（锁定 1 条入边）</option>
+            </select>
+          </label>
+          <div style={fieldLabel}>
+          输入端口数
+          {d.logicMode === 'not' ? (
+            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-muted)', padding: '4px 0' }}>
+              1（NOT 门固定）
+            </div>
+          ) : (
+            <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                className="btn-ghost btn-xs"
+                onClick={() => {
+                  const cur = getConditionInputCount(d as EventGraphNode & Record<string, unknown>);
+                  if (cur > 1) onChange({ conditionInputCount: cur - 1 } as Partial<EventGraphNode>);
+                }}
+                style={{ padding: 2 }}
+              >
+                <Minus size={14} />
+              </button>
+              <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, minWidth: 20, textAlign: 'center' }}>
+                {getConditionInputCount(d as EventGraphNode & Record<string, unknown>)}
+              </span>
+              <button
+                className="btn-ghost btn-xs"
+                onClick={() => {
+                  const cur = getConditionInputCount(d as EventGraphNode & Record<string, unknown>);
+                  if (cur < 6) onChange({ conditionInputCount: cur + 1 } as Partial<EventGraphNode>);
+                }}
+                style={{ padding: 2 }}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>每个输入可连入一条前置条件</span>
+            </>
+          )}
+        </div>
+        </>
+      )}
+
       {d.kind === 'trigger' && (
         <>
           <label style={fieldLabel}>事件类型<input value={d.trigger?.eventType ?? ''} onChange={(e) => onChange({ trigger: { ...(d.trigger ?? {}), eventType: e.target.value } })} style={inputStyle} /></label>
@@ -480,6 +736,10 @@ function NodeProperties({
           <label style={fieldLabel}>授权 set 变量（逗号分隔）<input value={(d.guardrail?.setAllowedVars ?? []).join(', ')} onChange={(e) => onChange({ guardrail: { ...(d.guardrail ?? {}), setAllowedVars: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) } })} style={inputStyle} /></label>
           <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={!!d.guardrail?.allowCreateResources} onChange={(e) => onChange({ guardrail: { ...(d.guardrail ?? {}), allowCreateResources: e.target.checked } })} /> 允许动态创建资源</label>
         </>
+      )}
+
+      {d.kind === 'periodic' && (
+        <PeriodicNodeProps node={d} onChange={onChange} />
       )}
 
       {d.kind === 'worldState' && (
@@ -508,6 +768,98 @@ function NodeProperties({
         <button className="btn-primary btn-sm" onClick={onSimulate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}><Play size={15} /> 运行模拟</button>
       </div>
     </div>
+  );
+}
+
+/** 周期节点专属属性面板：interval / offset / description / effects */
+function PeriodicNodeProps({ node, onChange }: { node: EventGraphNode; onChange: (p: Partial<EventGraphNode>) => void }) {
+  const effects = node.effects ?? {};
+  const resEntries = Object.entries(effects.survival?.resources ?? {});
+  const statEntries = Object.entries(effects.stats?.changes ?? {});
+  const [newRes, setNewRes] = useState('');
+  const [newStat, setNewStat] = useState('');
+
+  const patchEffects = (patch: Partial<ModuleEffects>) => {
+    onChange({ effects: { ...effects, ...patch } });
+  };
+
+  const setResDelta = (name: string, delta: number) => {
+    const next = { ...(effects.survival?.resources ?? {}) };
+    next[name] = { delta };
+    patchEffects({ survival: { ...(effects.survival ?? {}), resources: next } });
+  };
+  const removeRes = (name: string) => {
+    const next = { ...(effects.survival?.resources ?? {}) };
+    delete next[name];
+    patchEffects({ survival: { ...(effects.survival ?? {}), resources: next } });
+  };
+  const addRes = () => {
+    const n = newRes.trim();
+    if (!n) return;
+    setResDelta(n, 0);
+    setNewRes('');
+  };
+
+  const setStatDelta = (name: string, delta: number) => {
+    const next = { ...(effects.stats?.changes ?? {}) };
+    next[name] = { delta };
+    patchEffects({ stats: { ...(effects.stats ?? {}), changes: next } });
+  };
+  const removeStat = (name: string) => {
+    const next = { ...(effects.stats?.changes ?? {}) };
+    delete next[name];
+    patchEffects({ stats: { ...(effects.stats ?? {}), changes: next } });
+  };
+  const addStat = () => {
+    const n = newStat.trim();
+    if (!n) return;
+    setStatDelta(n, 0);
+    setNewStat('');
+  };
+
+  return (
+    <>
+      <label style={fieldLabel}>触发间隔（tick）<input type="number" min={1} value={node.intervalTicks ?? 30} onChange={(e) => onChange({ intervalTicks: Math.max(1, Number(e.target.value)) })} style={inputStyle} /></label>
+      <label style={fieldLabel}>首次偏移（tick）<input type="number" min={0} value={node.offsetTicks ?? 0} onChange={(e) => onChange({ offsetTicks: Math.max(0, Number(e.target.value)) })} style={inputStyle} /></label>
+      <label style={fieldLabel}>描述<textarea value={node.description ?? ''} onChange={(e) => onChange({ description: e.target.value })} rows={2} style={{ ...inputStyle, resize: 'vertical' }} placeholder="描述这个周期事件..." /></label>
+      <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={node.narrateToAI !== false} onChange={(e) => onChange({ narrateToAI: e.target.checked })} /> 结算后喂给 AI 叙事</label>
+
+      {/* 生存资源效果 */}
+      <div style={fieldLabel}>
+        生存资源效果
+        {resEntries.map(([name, cfg]) => (
+          <div key={name} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ flex: 1, fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)' }}>{name}</span>
+            <input type="number" value={cfg.delta} onChange={(e) => setResDelta(name, Number(e.target.value))} style={{ ...inputStyle, width: 70 }} />
+            <button className="btn-ghost btn-xs" onClick={() => removeRes(name)} style={{ color: 'var(--danger)', padding: 2 }}><X size={12} /></button>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input value={newRes} onChange={(e) => setNewRes(e.target.value)} placeholder="资源名" style={{ ...inputStyle, flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && addRes()} />
+          <button className="btn-ghost btn-xs" onClick={addRes}><Plus size={12} /></button>
+        </div>
+      </div>
+
+      {/* 数值属性效果 */}
+      <div style={fieldLabel}>
+        数值属性效果
+        {statEntries.map(([name, cfg]) => (
+          <div key={name} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ flex: 1, fontSize: 'var(--font-size-xs)', color: 'var(--text-primary)' }}>{name}</span>
+            <input type="number" value={cfg.delta} onChange={(e) => setStatDelta(name, Number(e.target.value))} style={{ ...inputStyle, width: 70 }} />
+            <button className="btn-ghost btn-xs" onClick={() => removeStat(name)} style={{ color: 'var(--danger)', padding: 2 }}><X size={12} /></button>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input value={newStat} onChange={(e) => setNewStat(e.target.value)} placeholder="属性名" style={{ ...inputStyle, flex: 1 }} onKeyDown={(e) => e.key === 'Enter' && addStat()} />
+          <button className="btn-ghost btn-xs" onClick={addStat}><Plus size={12} /></button>
+        </div>
+      </div>
+
+      {/* 资金/经验效果 */}
+      <label style={fieldLabel}>资金变化<input type="number" value={effects.business?.fundsDelta ?? 0} onChange={(e) => patchEffects({ business: { ...(effects.business ?? {}), fundsDelta: Number(e.target.value) } })} style={inputStyle} /></label>
+      <label style={fieldLabel}>经验变化<input type="number" value={effects.progression?.xpDelta ?? 0} onChange={(e) => patchEffects({ progression: { ...(effects.progression ?? {}), xpDelta: Number(e.target.value) } })} style={inputStyle} /></label>
+    </>
   );
 }
 

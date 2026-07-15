@@ -1,29 +1,27 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Lock, Layers, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Lock, Layers } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { ensureModListener } from '../../modules/eventApi';
-import type { EventRegistryEntry, EventType, PeriodicRule, RuleFile } from '../../modules/schema';
-import { getWebEvent } from '../../modules/eventDb';
-import { savePeriodicRulesToPack, createRulePack, createEmptyPack } from '../../modules/webEventStore';
+import type { EventRegistryEntry, EventType } from '../../modules/schema';
+import { createRulePack, createEmptyPack } from '../../modules/webEventStore';
 import { useEvents } from './useEvents';
 import EventCenter from './EventCenter';
 import EventLibrary from './EventLibrary';
 import CardEditor from './CardEditor';
 import EventErrorBoundary from './EventErrorBoundary';
 import RuleEditor from './RuleEditor';
-import PeriodicEventPackEditor from './PeriodicEventPackEditor';
 import { WorldBookBrowser } from './WorldBookPicker';
 import EventImportWizard from './EventImportWizard';
 import './mod.css';
 
-type SubView = 'center' | 'library' | 'card' | 'rule' | 'worldbook' | 'wizard' | 'periodic';
+type SubView = 'center' | 'library' | 'card' | 'rule' | 'worldbook' | 'wizard';
 
 /** 按事件类型决定跳转的占位子视图（Part 2 已实现真实编辑页） */
 function subViewForType(type: EventType): SubView {
   if (type === 'rule') return 'rule';
   if (type === 'worldbook') return 'worldbook';
-  // P1-8：周期包走专属编辑器视图，不再错送空白 CardEditor
-  if (type === 'periodic') return 'periodic';
+  // 周期包合并进规则画布：periodic → rule（画布统一编辑 rules + periodicRules）
+  if (type === 'periodic') return 'rule';
   return 'card'; // card / bundle 落入统一事件包编辑器
 }
 
@@ -184,79 +182,6 @@ export default function EventsScreen() {
           <EventErrorBoundary onBack={goCenter}>
             <EventImportWizard eventApi={eventApi} eventPackId={selectedModId} onClose={goCenter} />
           </EventErrorBoundary>
-        )}
-        {subView === 'periodic' && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-            <EventErrorBoundary onBack={goCenter}>
-              <PeriodicPackView packId={selectedModId ?? ''} onBack={goCenter} />
-            </EventErrorBoundary>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * 周期包专属视图（P1-8）：从 schema/rules.json 读取 periodicRules，
- * 用 PeriodicEventPackEditor 编辑，保存时写回（保留同文件中的 rules）。
- * 不再把周期包错送进空白 CardEditor。
- */
-function PeriodicPackView({ packId, onBack }: { packId: string; onBack: () => void }) {
-  const [rules, setRules] = useState<PeriodicRule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const rec = await getWebEvent(packId).catch(() => undefined);
-        const raw = rec?.files['schema/rules.json'];
-        const next = typeof raw === 'string'
-          ? ((JSON.parse(raw) as RuleFile).periodicRules ?? [])
-          : [];
-        if (!cancelled) setRules(next);
-      } catch {
-        if (!cancelled) setRules([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [packId]);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await savePeriodicRulesToPack(packId, rules);
-    } catch (e) {
-      console.error('[PeriodicPackView] 保存周期规则失败：', e);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0 }}>
-        <button className="btn-ghost btn-sm" onClick={onBack} style={{ minHeight: 'var(--touch-min)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <ArrowLeft size={16} /> 返回
-        </button>
-        <h1 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, fontFamily: 'var(--font-display)' }}>周期事件包</h1>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
-          <button className="btn-primary btn-sm" onClick={() => void save()} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Save size={15} /> {saving ? '保存中…' : '保存'}
-          </button>
-        </div>
-      </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)' }}>
-        {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 'var(--space-8)', color: 'var(--text-muted)' }}>
-            <Loader2 size={18} className="event-spin" /> 加载中…
-          </div>
-        ) : (
-          <PeriodicEventPackEditor periodicEvents={rules} onChange={setRules} worldDef={null} />
         )}
       </div>
     </div>

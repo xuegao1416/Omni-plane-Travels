@@ -383,8 +383,12 @@ export interface PeriodicRule {
   intervalTicks: number;
   /** 首次触发偏移（避免所有周期事件同轮爆发） */
   offsetTicks?: number;
+  /** 可选守卫条件（每 N tick 触发时先检查 when，满足才执行 effects/actions） */
+  when?: Condition;
   /** 变量影响（与原 PeriodicEvent.effects 同源，复用机械层合并逻辑） */
   effects: ModuleEffects;
+  /** 可选动作序列（当 periodic 连接到 effect 节点时，effect 的 actions 写入此处） */
+  actions?: Action[];
   /** 事件描述（编辑器/AI 叙事用，引擎忽略） */
   description?: string;
   /** 结算后是否喂给 AI 做叙事渲染 */
@@ -592,7 +596,8 @@ export type EventNodeKind =
   | 'effect'     // Gauge 变量变更
   | 'event'      // Swords 主动生成 SimEvent
   | 'worldState' // Globe  更新状态轴
-  | 'guardrail'; // ShieldAlert 叙事层安全边界
+  | 'guardrail'  // ShieldAlert 叙事层安全边界
+  | 'periodic';  // Clock 周期触发器（每 N tick 静默结算）
 
 /** 框架无关的图节点数据（ruleGraph 负责与 @xyflow/react 互转） */
 export interface EventGraphNode {
@@ -613,6 +618,12 @@ export interface EventGraphNode {
   };
   /** 周期触发间隔（periodic 节点 / 带 interval 的 trigger） */
   intervalTicks?: number;
+  /** 周期首次偏移（避免所有周期事件同轮爆发） */
+  offsetTicks?: number;
+  /** 周期事件描述（编辑器/AI 叙事用） */
+  description?: string;
+  /** 结算后是否喂给 AI 做叙事渲染 */
+  narrateToAI?: boolean;
   /** 周期性 / 事件效果（module 层变量） */
   effects?: ModuleEffects;
   /** 事件节点产出的 SimEvent 片段 */
@@ -625,6 +636,8 @@ export interface EventGraphNode {
   priority?: number;
   once?: boolean;
   cooldownTicks?: number;
+  /** condition 节点的逻辑模式（默认 'and'）：多入边条件按此模式组合 */
+  logicMode?: 'and' | 'or' | 'not';
 }
 
 export type EventEdgeKind = 'flow' | 'constraint';

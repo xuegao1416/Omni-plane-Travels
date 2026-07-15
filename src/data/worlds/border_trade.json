@@ -400,7 +400,7 @@
     "eventPacks": [
       {
         "id": "world:border_trade",
-        "name": "绥芬边贸 周期事件",
+        "name": "绥芬边贸 基础规则",
         "periodicRules": [
           {
             "id": "border_fee",
@@ -438,7 +438,9 @@
             },
             "narrateToAI": true
           }
-        ]
+        ],
+        "type": "rule",
+        "rules": []
       }
     ]
   }

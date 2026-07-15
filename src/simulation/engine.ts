@@ -27,6 +27,7 @@ import type { GameState, NPCData } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
 import { eventWorldEvolution, collectAddCardEvents, getPeriodicRules } from '../modules/eventIntegration';
+import { checkCondition, applyAction } from '../modules/ruleEngine';
 import { resolvePendingChoices } from '../modules/eventChoiceState';
 import { useSaveStore } from '../stores/saveStore';
 import type { WorldContext } from '../modules/schema';
@@ -886,8 +887,38 @@ export class WorldSimulationEngine {
 
       // 到达触发时间
       if (effectiveCounter > 0 && effectiveCounter % periodic.intervalTicks === 0) {
-        // 合并效果
+        // 条件守卫：如果周期规则有 when 条件，先检查是否满足
+        if (periodic.when) {
+          const ctx = gameState as unknown as WorldContext;
+          if (!checkCondition(periodic.when, ctx)) {
+            // 条件不满足，跳过本次周期触发
+            continue;
+          }
+        }
+
+        // 合并 effects（ModuleEffects：资源/属性/资金/经验变化）
         this.mergeModuleEffects(mergedEffects, periodic.effects);
+
+        // 执行 actions（Action[]：set/emit/addCard/modifyResource 等）
+        if (periodic.actions && periodic.actions.length > 0) {
+          const ctx = gameState as unknown as WorldContext;
+          const applied: import('../modules/ruleEngine').AppliedAction[] = [];
+          for (const action of periodic.actions) {
+            try {
+              applyAction(action, ctx, applied, periodic.id);
+            } catch (e) {
+              console.warn(`[周期规则] 动作执行失败 (${periodic.id}):`, e);
+            }
+          }
+          // addCard 动作广播到 CardOverlay
+          for (const a of applied) {
+            if (a.kind === 'addCard') {
+              try {
+                eventBus.emit(EVENTS.EVENT_CARD, { cardId: (a.detail as { cardId?: string }).cardId ?? '', eventPackId: periodic.id });
+              } catch { /* 隔离 */ }
+            }
+          }
+        }
 
         // 记录日志
         effectLog.push(...this.createEffectLogEntries(

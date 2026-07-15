@@ -153,7 +153,7 @@ interface StepRef {
   aborted: boolean;
 }
 
-function evalCondition(
+export function evalCondition(
   cond: Condition,
   ctx: WorldContext,
   events: Array<{ type: string; where?: Record<string, Literal> }>,
@@ -202,7 +202,7 @@ function actionKindOf(a: Action): ActionKind | null {
   return null;
 }
 
-function applyAction(
+export function applyAction(
   action: Action,
   ctx: WorldContext,
   applied: AppliedAction[],
@@ -236,6 +236,19 @@ function applyAction(
  *   每 mod ≤128 规则 / 每 tick 求值集 ≤1024 / 条件树深 ≤6 /
  *   单规则 ≤16 动作 / 每 tick ≤8192 步 或 墙钟 ≤8ms。
  */
+/**
+ * 公共 API：检查单个条件是否满足。
+ * 供 engine.ts 的周期规则守卫等外部调用，提供合理默认值。
+ */
+export function checkCondition(
+  cond: Condition,
+  ctx: WorldContext,
+  events: Array<{ type: string; where?: Record<string, Literal> }> = [],
+): boolean {
+  const stepRef: StepRef = { steps: 0, aborted: false };
+  return evalCondition(cond, ctx, events, 0, DEFAULT_LIMITS, stepRef);
+}
+
 export function evaluate(
   ctxIn: WorldContext,
   rulesIn: EventRule[],
