@@ -10,13 +10,13 @@ import { DEFAULT_SIM_CONFIG } from '../../../../simulation/types';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 import { loadPresets } from '../../../settings/apiPresetUtils';
 import { SIM_API_PRESET_KEY } from './constants';
-import type { SimulationRules } from '../../../../modules/schema';
+import type { WorldDynamicsConfig } from '../../../../modules/schema';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import SimulationRuleEditor from './SimulationRuleEditor';
 
 interface SimSettingsProps {
   worldDef?: WorldDef | null;
-  onRulesChange?: (rules: SimulationRules) => void;
+  onRulesChange?: (rules: WorldDynamicsConfig) => void;
 }
 
 export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
@@ -25,11 +25,11 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
   const presets = loadPresets();
   const [showRules, setShowRules] = useState(false);
 
-  // 从世界定义获取当前的 SimulationRules
+  // 从世界定义获取当前的世界动态配置
   const simMod = worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled);
-  const currentRules = (simMod?.moduleConfig as unknown as SimulationRules) ?? null;
+  const currentRules = (simMod?.moduleConfig as unknown as WorldDynamicsConfig) ?? null;
 
-  const handleRulesChange = (rules: SimulationRules) => {
+  const handleRulesChange = (rules: WorldDynamicsConfig) => {
     if (onRulesChange) {
       onRulesChange(rules);
     }
@@ -170,7 +170,7 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
         <div>待处理交互: {(simState.pendingInteractions ?? []).length}</div>
       </div>
 
-      {/* ── 演化规则配置 ── */}
+      {/* ── 世界动态配置 ── */}
       <div style={{
         borderTop: '1px solid var(--border)',
         paddingTop: '12px',
@@ -186,13 +186,8 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
         >
           {showRules ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
-            演化规则配置
+            世界动态配置
           </span>
-          {currentRules && (
-            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-              ({currentRules.eventEffects.length}个事件, {currentRules.periodicEvents.length}个周期)
-            </span>
-          )}
         </button>
 
         {showRules && currentRules && (
@@ -200,7 +195,6 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
             <SimulationRuleEditor
               rules={currentRules}
               onChange={handleRulesChange}
-              worldDef={worldDef ?? null}
             />
           </div>
         )}
@@ -212,7 +206,7 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
             fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
             textAlign: 'center',
           }}>
-            当前世界未启用世界演化模块
+            当前世界未启用世界动态模块
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@
  */
 
 import type { GameState } from '../../../../schema/variables';
-import type { SimulationRules } from '../../../../modules/schema';
+import type { WorldDynamicsConfig } from '../../../../modules/schema';
 import type { WorldDef } from '../../../../data/worlds-schema';
 
 export interface WorldDynamicsPanelProps {
@@ -13,5 +13,5 @@ export interface WorldDynamicsPanelProps {
   /** 当前世界定义（用于规则编辑器读取其他模块配置） */
   worldDef?: WorldDef | null;
   /** 规则变更回调 */
-  onRulesChange?: (rules: SimulationRules) => void;
+  onRulesChange?: (rules: WorldDynamicsConfig) => void;
 }

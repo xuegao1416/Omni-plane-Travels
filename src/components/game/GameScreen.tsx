@@ -16,7 +16,13 @@ import { MemorySettingsOverlay } from '../settings/memory/MemorySettingsOverlay'
 import WorldDynamicsPanel from './panels/WorldDynamicsPanel';
 import { findWorldDef } from '../../data/worldLoader';
 import { eventBus, EVENTS } from '../../engine/eventBus';
-import type { WorldSystemData, DiceRoll, BusinessModuleSchema, SimulationRules } from '../../modules/schema';
+import type { WorldSystemData, DiceRoll, BusinessModuleSchema, WorldDynamicsConfig, PeriodicRule, ModuleEffects, EventRule, RuleFile } from '../../modules/schema';
+import { useSaveStore } from '../../stores/saveStore';
+import { eventWorldEvolution } from '../../modules/eventIntegration';
+import { getWebEvent } from '../../modules/eventDb';
+import { installWorldEventPacks, getWebEnabledEventIds } from '../../modules/webEventStore';
+import CardOverlay from '../event/CardOverlay';
+import EventConfigPanel from '../event/EventConfigPanel';
 import type { OverlayPanel } from './gameScreen/types';
 import { navButtons, buildMobileNavItems } from './gameScreen/navConfig';
 import DesktopLayout from './gameScreen/DesktopLayout';
@@ -90,6 +96,122 @@ export default function GameScreen() {
   // ── Extracted hooks ──
   const bumpVersion = useCallback(() => setStateVersion(v => v + 1), []);
   const { isSimulating, handleManualTick } = useSimulation(engine, worldDef, apiConfig);
+
+  // ── 事件包注册（二级开关：sessionActivePacks 优先，否则用全局已启用列表） ──
+  const sessionActivePacks = useSaveStore(s => s.sessionActivePacks);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // 1. 安装世界关联的事件包进 IndexedDB（幂等，已存在跳过）
+      if (worldDef) {
+        try {
+          await installWorldEventPacks(worldDef);
+        } catch (e) {
+          console.warn('[事件包] 世界事件包安装失败（已跳过）:', e);
+        }
+      }
+      if (cancelled) return;
+
+      // 2. 兼容旧自定义世界：moduleConfig.periodicEvents → 临时注册
+      const hasWorldPacks = (worldDef?.eventPacks?.length ?? 0) > 0;
+      if (!hasWorldPacks) {
+        const legacy = (worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled)?.moduleConfig as Record<string, unknown> | undefined)?.periodicEvents as Array<Record<string, unknown>> | undefined;
+        if (legacy && legacy.length > 0) {
+          const periodicRules: PeriodicRule[] = legacy.map((p) => ({
+            id: String(p.id ?? `legacy_${Math.random().toString(36).slice(2)}`),
+            name: typeof p.name === 'string' ? p.name : undefined,
+            intervalTicks: Number(p.intervalTicks ?? 1),
+            offsetTicks: typeof p.offsetTicks === 'number' ? p.offsetTicks : undefined,
+            effects: (p.effects as ModuleEffects) ?? {},
+            description: typeof p.description === 'string' ? p.description : undefined,
+            narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
+          }));
+          eventWorldEvolution.register({
+            eventPackId: 'world:periodic',
+            rules: [],
+            periodicRules,
+            permissions: ['modify_world_state'],
+            runtime: { onceFired: {}, cooldownRemaining: {} },
+            displayName: '世界周期事件（自定义）',
+            source: 'world',
+          });
+        }
+      }
+
+      // 3. 确定本局要注册的事件包列表（二级开关优先，否则用全局已启用列表）
+      let enabledIds: string[];
+      if (sessionActivePacks !== undefined) {
+        enabledIds = sessionActivePacks;
+      } else {
+        try {
+          enabledIds = await getWebEnabledEventIds();
+        } catch {
+          enabledIds = [];
+        }
+      }
+      if (cancelled) return;
+
+      // 防残留：先清空再按当前绑定注册
+      eventWorldEvolution.clear();
+
+      // 重新注册旧自定义世界的周期事件（上面 clear 了）
+      if (!hasWorldPacks) {
+        const legacy = (worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled)?.moduleConfig as Record<string, unknown> | undefined)?.periodicEvents as Array<Record<string, unknown>> | undefined;
+        if (legacy && legacy.length > 0) {
+          const periodicRules: PeriodicRule[] = legacy.map((p) => ({
+            id: String(p.id ?? `legacy_${Math.random().toString(36).slice(2)}`),
+            name: typeof p.name === 'string' ? p.name : undefined,
+            intervalTicks: Number(p.intervalTicks ?? 1),
+            offsetTicks: typeof p.offsetTicks === 'number' ? p.offsetTicks : undefined,
+            effects: (p.effects as ModuleEffects) ?? {},
+            description: typeof p.description === 'string' ? p.description : undefined,
+            narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
+          }));
+          eventWorldEvolution.register({
+            eventPackId: 'world:periodic',
+            rules: [],
+            periodicRules,
+            permissions: ['modify_world_state'],
+            runtime: { onceFired: {}, cooldownRemaining: {} },
+            displayName: '世界周期事件（自定义）',
+            source: 'world',
+          });
+        }
+      }
+
+      for (const id of enabledIds) {
+        if (cancelled) break;
+        try {
+          const rec = await getWebEvent(id).catch(() => undefined);
+          if (!rec) continue;
+          const rules: EventRule[] = [];
+          const periodicRules: PeriodicRule[] = [];
+          const raw = rec.files['schema/rules.json'];
+          if (typeof raw === 'string') {
+            const rf = JSON.parse(raw) as RuleFile;
+            if (rf.rules) rules.push(...rf.rules);
+            if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
+          }
+          if (rules.length > 0 || periodicRules.length > 0) {
+            eventWorldEvolution.register({
+              eventPackId: id,
+              rules,
+              periodicRules,
+              permissions: rec.manifest.permissions ?? [],
+              runtime: { onceFired: {}, cooldownRemaining: {} },
+              source: rec.builtin ? 'world' : 'mod',
+            });
+          }
+        } catch (e) {
+          console.warn(`[事件包] 规则注册失败（已跳过）: ${id}`, e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      eventWorldEvolution.clear();
+    };
+  }, [worldDef?.id, sessionActivePacks]);
   const {
     runtimeRecipes, isGeneratingRecipe,
     handleSurvivalCraft, handleSurvivalGenerateRecipe, handleSurvivalDeleteRecipe,
@@ -121,7 +243,7 @@ export default function GameScreen() {
     return ok;
   }, [engine, apiConfig, bumpVersion]);
   // ── Simulation rules change handler ──
-  const handleSimulationRulesChange = useCallback((rules: SimulationRules) => {
+  const handleSimulationRulesChange = useCallback((rules: WorldDynamicsConfig) => {
     if (!worldDef) return;
     // 更新世界定义中的 simulation 模块配置
     const simModIndex = worldDef.modules?.findIndex(m => m.moduleId === 'simulation' && m.enabled);
@@ -141,6 +263,7 @@ export default function GameScreen() {
       case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
       case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => {}} mode="inline" />;
       case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
+      case 'modules': return <EventConfigPanel onClose={onClose} worldDef={worldDef} />;
       default: return null;
     }
   };
@@ -248,6 +371,7 @@ export default function GameScreen() {
         changeLog={getSurvivalChangeLog()}
         onClose={() => setSurvivalOverlayOpen(false)}
       />}
+      <CardOverlay gameState={gameState} />
       {notification && (
         <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 200, animation: 'fadeIn 0.2s ease' }}>
           {notification}

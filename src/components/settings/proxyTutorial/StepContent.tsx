@@ -42,7 +42,7 @@ export function StepContent({ step, copiedCode, onCopyCode }: {
     <>
       {step.content.steps?.map((s, i) => (
         <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-xs)', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>{i + 1}</div>
+          <div style={{ width: '24px', height: '24px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-xs)', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>{i + 1}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: 1.6 }}>
               {s.text}

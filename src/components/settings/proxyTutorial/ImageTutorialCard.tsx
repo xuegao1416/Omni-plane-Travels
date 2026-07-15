@@ -64,7 +64,7 @@ export function ImageTutorialCard() {
                   <span style={{
                     width: '22px',
                     height: '22px',
-                    borderRadius: '50%',
+                    borderRadius: 'var(--radius-md)',
                     background: 'var(--accent)',
                     color: '#fff',
                     display: 'inline-flex',

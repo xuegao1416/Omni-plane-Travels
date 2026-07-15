@@ -108,6 +108,8 @@ interface GameSave {
   customWorld?: Record<string, unknown>;
   /** 世界推演模拟状态（每个存档独立，解决串存档问题） */
   simulationState?: SimulationState;
+  /** 按存档绑定的启用 mod 列表（内置世界无 customWorld，绑定落在此处） */
+  enabledMods?: string[];
 }
 
 /** 轻量元数据（写入 global store，运行时缓存用于列表展示） */
@@ -277,6 +279,15 @@ export async function updateSaveHead(saveId: string, patch: { name?: string; tim
   if (patch.name !== undefined) record.name = patch.name;
   if (patch.timestamp !== undefined) record.timestamp = patch.timestamp;
 
+  await db.put(SAVES_STORE, record);
+}
+
+/** 更新单个存档的「按存档绑定启用 mod 列表」（游戏内模块面板开关后持久化） */
+export async function updateSaveEnabledMods(saveId: string, ids: string[]): Promise<void> {
+  const db = await getDB();
+  const record = await db.get(SAVES_STORE, saveId);
+  if (!record) return;
+  record.enabledMods = ids;
   await db.put(SAVES_STORE, record);
 }
 
@@ -479,6 +490,7 @@ export async function remigrateSave(saveId: string): Promise<boolean> {
       variableConfig: oldSave.variableConfig,
       customWorld: oldSave.customWorld,
       simulationState: oldSave.simulationState,
+      enabledMods: oldSave.enabledMods,
       messageCount: messages.length,
       lastMessageSeq: messages.length - 1,
     };
@@ -605,6 +617,8 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
+  /** 按存档绑定的启用 mod 列表 */
+  enabledMods?: string[];
   messageCount: number;
   lastMessageSeq: number;
   estBytes?: number;
@@ -644,6 +658,7 @@ export function planV2ToV3Migration(oldSave: GameSave): {
     variableConfig: oldSave.variableConfig,
     customWorld: oldSave.customWorld,
     simulationState: oldSave.simulationState,
+    enabledMods: oldSave.enabledMods,
     messageCount: messages.length,
     lastMessageSeq: messages.length > 0 ? messages.length - 1 : -1,
   };
@@ -811,6 +826,7 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
         variableConfig: compactHead.variableConfig,
         customWorld: compactHead.customWorld,
         simulationState: compactHead.simulationState,
+        enabledMods: compactHead.enabledMods,
       };
     }
 
@@ -842,6 +858,7 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
             variableConfig: compactHead.variableConfig,
             customWorld: compactHead.customWorld,
             simulationState: compactHead.simulationState,
+            enabledMods: compactHead.enabledMods,
           };
         }
       }
@@ -965,6 +982,7 @@ export function optimizeSnapshots(messages: ChatMessage[]): ChatMessage[] {
 
 /** 导出存档为 JSON Blob（不包含 API 配置，API 是应用级设置）
  *  注意：导出全量消息，不走 loadGame 的 200 条限制
+ *  事件包：导出全局已启用的事件包完整内容（排重用），同时保留 enabledMods 兼容旧版
  */
 export async function exportSave(saveId: string): Promise<Blob> {
   const db = await getDB();
@@ -980,6 +998,16 @@ export async function exportSave(saveId: string): Promise<Blob> {
   } else {
     // 老格式：直接用内联的 messages
     messages = (record as GameSave).messages || [];
+  }
+
+  // 收集全局已启用的事件包完整内容（供导入时排重恢复）
+  let eventPacks: Array<{ id: string; manifest: unknown; files: Record<string, string | Blob> }> = [];
+  try {
+    const { collectPacksForExport, getWebEnabledEventIds } = await import('../modules/webEventStore');
+    const enabledIds = await getWebEnabledEventIds();
+    eventPacks = await collectPacksForExport(enabledIds);
+  } catch {
+    /* 非 Tauri 环境或 IndexedDB 不可用时静默降级 */
   }
 
   const exportData = {
@@ -1000,6 +1028,8 @@ export async function exportSave(saveId: string): Promise<Blob> {
       vectorMemory: record.vectorMemory,
       customWorld: record.customWorld,
       simulationState: record.simulationState,
+      enabledMods: record.enabledMods, // 兼容旧版
+      eventPacks, // 新版：事件包完整内容
     },
   };
 
@@ -1030,6 +1060,16 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     throw new Error('文件中未找到有效存档数据');
   }
 
+  // 导入事件包到 IndexedDB（排重：同 ID 跳过）
+  if (Array.isArray(save.eventPacks) && save.eventPacks.length > 0) {
+    try {
+      const { importPacksFromSave } = await import('../modules/webEventStore');
+      await importPacksFromSave(save.eventPacks);
+    } catch (e) {
+      console.warn('[导入] 事件包同步失败（已跳过）:', e);
+    }
+  }
+
   // 生成新 ID 避免冲突
   const metas = await getAllSaveMeta();
   let finalId = String(save.id || '').trim() || generateSaveId();
@@ -1058,6 +1098,7 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     variableConfig: save.variableConfig || undefined,
     customWorld: save.customWorld || undefined,
     simulationState: save.simulationState || undefined,
+    enabledMods: save.enabledMods || undefined, // 兼容旧版
   };
 
   // 如果导入的存档包含自建世界，注册到 localStorage 以便 findWorldDef 能找到

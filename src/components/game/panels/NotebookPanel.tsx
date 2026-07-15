@@ -62,7 +62,7 @@ export default function NotebookPanel({ gameState }: Props) {
                 borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-base)', display: 'flex', alignItems: 'center', gap: '8px',
               }}>
                 <span style={{
-                  width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+                  width: '10px', height: '10px', borderRadius: 'var(--radius-md)', flexShrink: 0,
                   background: done ? 'var(--success)' : priorityColor(t.优先级),
                 }} />
                 <div style={{ flex: 1, opacity: done ? 0.5 : 1 }}>

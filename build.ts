@@ -17,6 +17,9 @@ const jsResult = await Bun.build({
   entrypoints: ['./src/main.tsx'],
   target: 'browser',
   format: 'esm',
+  // P1-5：开启分包，使 React.lazy 的动态 import（EventsScreen / @xyflow/react / jszip 等）
+  // 从主包剥离为独立 chunk，首屏不再为事件中心重依赖买单。
+  splitting: true,
   minify: true,
   define: { 'process.env.NODE_ENV': '"production"' },
 });

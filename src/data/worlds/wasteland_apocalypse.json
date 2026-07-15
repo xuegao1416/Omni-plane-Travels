@@ -592,7 +592,7 @@
           "xpFormula": {
             "baseXP": 200,
             "exponent": 1.7,
-            "scaleFactor": 1.0
+            "scaleFactor": 1
           },
           "currentTierIndex": 0,
           "currentXP": 0
@@ -604,245 +604,6 @@
         "description": "末日废土的不确定因素：辐射风暴、变异兽潮、掠夺者袭击、资源枯竭……",
         "enabled": true,
         "moduleConfig": {
-          "eventEffects": [
-            {
-              "id": "radiation_storm",
-              "priority": 30,
-              "stackStrategy": "override",
-              "trigger": {
-                "tags": [
-                  "radiation",
-                  "storm"
-                ],
-                "keywords": [
-                  "辐射风暴",
-                  "辐射尘",
-                  "核冬天",
-                  "辐射云"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -20,
-                      "min": 0
-                    },
-                    "辐射抗性": {
-                      "delta": -3,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "mutant_attack",
-              "priority": 25,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": [
-                  "mutant",
-                  "attack"
-                ],
-                "keywords": [
-                  "变异兽",
-                  "攻击",
-                  "异形",
-                  "怪物",
-                  "变异体"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -15,
-                      "min": 0
-                    },
-                    "体力": {
-                      "delta": -10,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "raider_ambush",
-              "priority": 20,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": [
-                  "raider",
-                  "ambush"
-                ],
-                "keywords": [
-                  "掠夺者",
-                  "伏击",
-                  "抢劫",
-                  "强盗",
-                  "袭击"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -10,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "resource_find",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": [
-                  "resource",
-                  "discovery"
-                ],
-                "keywords": [
-                  "发现",
-                  "废墟",
-                  "搜索",
-                  "物资",
-                  "补给"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "体力": {
-                      "delta": 10,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "psychic_awakening",
-              "priority": 15,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": [
-                  "psychic",
-                  "awakening"
-                ],
-                "keywords": [
-                  "觉醒",
-                  "异能",
-                  "超能力",
-                  "能力",
-                  "突破"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "异能觉醒度": {
-                      "delta": 5,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "trader_visit",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": {
-                "tags": [
-                  "trade",
-                  "merchant"
-                ],
-                "keywords": [
-                  "商人",
-                  "交易",
-                  "买卖",
-                  "流浪商队",
-                  "以物易物"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": 5,
-                      "min": 0
-                    },
-                    "体力": {
-                      "delta": 5,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "periodicEvents": [
-            {
-              "id": "radiation_sickness",
-              "name": "辐射病发作",
-              "description": "长期暴露在辐射环境中，身体会周期性出现辐射病症状。",
-              "intervalTicks": 14,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -10,
-                      "min": 0
-                    },
-                    "体力": {
-                      "delta": -15,
-                      "min": 0
-                    }
-                  }
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "supply_scarcity",
-              "name": "资源枯竭",
-              "description": "周边资源被搜刮殆尽，需要前往更危险的区域寻找物资。",
-              "intervalTicks": 30,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "体力": {
-                      "delta": -10,
-                      "min": 0
-                    }
-                  }
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "settlement_conflict",
-              "name": "聚落冲突",
-              "description": "不同聚落之间的资源争夺，可能被卷入其中。",
-              "intervalTicks": 20,
-              "offsetTicks": 10,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -15,
-                      "min": 0
-                    }
-                  }
-                }
-              },
-              "narrateToAI": true
-            }
-          ],
           "worldStateRules": [],
           "worldStateAxes": {
             "辐射强度": [
@@ -869,6 +630,70 @@
       }
     ],
     "createdAt": "2026-07-06T10:51:50.823Z",
-    "version": "2.1.1"
+    "version": "2.1.1",
+    "eventPacks": [
+      {
+        "id": "world:wasteland_apocalypse",
+        "name": "余烬废土 周期事件",
+        "periodicRules": [
+          {
+            "id": "radiation_sickness",
+            "name": "辐射病发作",
+            "description": "长期暴露在辐射环境中，身体会周期性出现辐射病症状。",
+            "intervalTicks": 14,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "生命": {
+                    "delta": -10,
+                    "min": 0
+                  },
+                  "体力": {
+                    "delta": -15,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "supply_scarcity",
+            "name": "资源枯竭",
+            "description": "周边资源被搜刮殆尽，需要前往更危险的区域寻找物资。",
+            "intervalTicks": 30,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "体力": {
+                    "delta": -10,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "settlement_conflict",
+            "name": "聚落冲突",
+            "description": "不同聚落之间的资源争夺，可能被卷入其中。",
+            "intervalTicks": 20,
+            "offsetTicks": 10,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "生命": {
+                    "delta": -15,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          }
+        ]
+      }
+    ]
   }
 ]

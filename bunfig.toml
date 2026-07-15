@@ -1,0 +1,6 @@
+# Bun 配置
+# 测试套件 preload：在 Node 测试环境（无浏览器 localStorage）下，
+# 于 globalThis 安装 in-memory localStorage 垫片，使 saveStore 等模块可正常初始化。
+# 仅在 localStorage 未定义时生效，浏览器 / 生产构建不受影响。
+[test]
+preload = ["./scripts/test-localStorage-shim.ts"]

@@ -203,7 +203,7 @@ const styles: Record<string, React.CSSProperties> = {
   title: { margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' },
   subtitle: { margin: '4px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' },
   closeBtn: {
-    width: '28px', height: '28px', borderRadius: '50%',
+    width: '28px', height: '28px', borderRadius: 'var(--radius-md)',
     border: '1px solid var(--border)', background: 'transparent',
     color: 'var(--text-muted)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -238,7 +238,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 'var(--font-size-sm)', fontWeight: 600,
   },
   retrySmallBtn: {
-    width: '24px', height: '24px', borderRadius: '50%',
+    width: '24px', height: '24px', borderRadius: 'var(--radius-md)',
     border: '1px solid var(--border)', background: 'transparent',
     color: 'var(--text-muted)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',

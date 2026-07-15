@@ -17,11 +17,12 @@ import { loadWorldBook, applyWorld } from './worldPersonality';
 import { findWorldDef } from '../data/worldLoader';
 import type { WorldDef } from '../data/worlds-schema';
 import { getSimulationEngine, restoreEngineState } from '../simulation/SimulationApi';
-import { createDefaultSurvivalModule, createDefaultBusinessModule, createDefaultDiceModule, createDefaultTalentModule } from '../modules/defaults';
+import { createDefaultSurvivalModule, createDefaultBusinessModule, createDefaultDiceModule, createDefaultTalentModule, createDefaultWorldDynamics } from '../modules/defaults';
 import { PipelineExecutor } from './pipelineExecutor';
 import { loadPipelineConfig, type PipelineStatus, type PipelineTaskId } from './pipelineTypes';
 import type { ChatMessage, GameEngine } from './types';
 import { PROMPT_INLINE_IMAGE } from '../data/builtinPresets';
+import { getPlayerDecisionContext } from '../modules/playerDecisionLog';
 import { usePresetStore } from '../stores/presetStore';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { useImageStore } from '../stores/imageStore';
@@ -587,9 +588,10 @@ export function useGameEngine(
         const currentWorldDef = findWorldDef(selectedWorld);
         const worldDesc = currentWorldDef?.description ?? currentWorldDef?.name ?? '未知世界';
 
-        // 获取仿真规则
+        // 获取仿真规则（世界演化不再作为可选模块暴露，但 5 层后台必须始终运行；
+        // 缺少 simulation 模块时回退到默认规则兜底，兼容仍含该模块的旧世界文件）
         const simRulesMod = currentWorldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled);
-        const simRules = simRulesMod?.moduleConfig as import('../modules/schema').SimulationRules | undefined;
+        const simRules = (simRulesMod?.moduleConfig as import('../modules/schema').WorldDynamics | undefined) ?? createDefaultWorldDynamics();
 
         // 获取生存模块的资源演化蓝图（机械层触发，不经 AI 解读）
         const survivalMod = currentWorldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled);
@@ -747,6 +749,9 @@ ${perspectiveInstruction}
 
           // 使用结构化预设 + 宏引擎组装系统提示
           // getActivePreset() 已处理：用户自定义预设 / 内置预设 + 覆盖层 / 默认回退
+          // 注入玩家决策记录（选择卡路径 C）：取最近若干 aiNote 作为下一轮叙事上下文
+          const playerDecisionContext = getPlayerDecisionContext();
+
           let preset = usePresetStore.getState().getActivePreset();
           // 叠加正文生图指令（独立于预设，当 inlineImageEnabled 时始终注入）
           const imageConfig = useImageStore.getState().config;
@@ -779,6 +784,7 @@ ${perspectiveInstruction}
             macroEngine,
             compiledMemoryContext,  // ← 注入记忆上下文
             simulationBrief,  // ← 注入世界模拟简报
+            playerDecisionContext,  // ← 注入玩家决策记录（选择卡路径 C）
           });
 
           // 正文生图：在系统提示末尾追加格式提醒（提高 Gemini 等模型的遵循率）

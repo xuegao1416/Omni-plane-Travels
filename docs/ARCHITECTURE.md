@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-**项目名称**: 世界漫游指南 (Omniplane Travels) v2.5.0
+**项目名称**: 世界漫游指南 (Omniplane Travels) v2.6.0
 
 **项目定位**: AI 驱动的互动小说引擎 (AI-Powered Interactive Fiction Engine)，支持多世界观、多阶段管线、编译式记忆系统。
 

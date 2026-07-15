@@ -168,7 +168,7 @@ export function SystemsTab({ world }: { world: WorldDef }) {
   const modulesRaw = world.modules as any[] | undefined;
   const isStringArray = Array.isArray(modulesRaw) && modulesRaw.length > 0 && typeof modulesRaw[0] === 'string';
   const enabledModules = isStringArray ? (modulesRaw as string[]) : [];
-  const MODULE_NAMES: Record<string, string> = { stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', simulation: '世界演化' };
+  const MODULE_NAMES: Record<string, string> = { stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', simulation: '世界动态' };
 
   if (isStringArray && !statData && !progData && !survData) {
     return (

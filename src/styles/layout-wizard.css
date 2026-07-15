@@ -31,7 +31,7 @@
 .wizard-sidebar-dot {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -238,7 +238,7 @@
   width: 32px; height: 32px;
   border: 3px solid var(--border);
   border-top-color: var(--accent);
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   animation: spin 0.8s linear infinite;
 }
 
@@ -518,6 +518,19 @@
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);
 }
+/* 选择卡单选高亮（同时作用于正文选项与卡片浮层） */
+.action-option-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  box-shadow: var(--shadow-glow, 0 0 0 1px var(--accent));
+}
+.action-option-preview {
+  margin-top: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
 .message-html-content .action-option-card-title {
   font-size: var(--font-size-base);
   font-weight: 600;
@@ -770,7 +783,7 @@
   border-color: var(--accent); color: var(--accent);
   background: var(--accent-dim);
 }
-.diff-dot { width: 5px; height: 5px; border-radius: 50%; }
+.diff-dot { width: 5px; height: 5px; border-radius: var(--radius-md); }
 
 /* 卡片网格 */
 .world-card-grid {
@@ -1167,7 +1180,7 @@
 .tier-number {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--color-on-accent);
   font-size: var(--font-size-sm);
@@ -2153,7 +2166,7 @@
 .wbe-entry-type-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   background: var(--success);
   flex-shrink: 0;
 }

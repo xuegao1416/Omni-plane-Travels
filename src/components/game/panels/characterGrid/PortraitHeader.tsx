@@ -72,14 +72,14 @@ export function PortraitHeader({ npc, npcId, onClose }: {
             <Avatar name={npc.姓名 || npcId} size="lg" imageSrc={portraitUrl} />
           </div>
           <button onClick={handleGeneratePortrait} title={portraitUrl ? '重新生成画像' : '生成画像'} style={{
-            position: 'absolute', bottom: -2, right: -2, width: '20px', height: '20px', borderRadius: '50%',
+            position: 'absolute', bottom: -2, right: -2, width: '20px', height: '20px', borderRadius: 'var(--radius-md)',
             background: 'var(--accent)', border: '2px solid var(--bg-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
           }}>
             <ImageIcon size={10} color="#fff" />
           </button>
           <button onClick={() => fileInputRef.current?.click()} title="上传自定义头像" style={{
-            position: 'absolute', top: -2, right: -2, width: '20px', height: '20px', borderRadius: '50%',
+            position: 'absolute', top: -2, right: -2, width: '20px', height: '20px', borderRadius: 'var(--radius-md)',
             background: 'var(--bg-tertiary)', border: '2px solid var(--bg-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
           }}>

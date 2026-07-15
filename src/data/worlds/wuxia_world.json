@@ -1183,200 +1183,6 @@
         "description": "江湖中的不确定因素：武林大会、门派冲突、奇遇机缘、魔教入侵……",
         "enabled": true,
         "moduleConfig": {
-          "eventEffects": [
-            {
-              "id": "martial_arts_duel",
-              "priority": 20,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "比武",
-                  "决斗",
-                  "挑战",
-                  "切磋",
-                  "论剑"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -15,
-                      "min": 0
-                    },
-                    "体力": {
-                      "delta": -10,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "inner_energy_gain",
-              "priority": 15,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "修炼",
-                  "内功",
-                  "突破",
-                  "领悟",
-                  "顿悟"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "dim3": {
-                      "delta": 2,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "injury",
-              "priority": 25,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "受伤",
-                  "中毒",
-                  "暗器",
-                  "走火入魔",
-                  "经脉受损"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -20,
-                      "min": 0
-                    },
-                    "dim2": {
-                      "delta": -3,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "treasure_find",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "秘籍",
-                  "宝物",
-                  "灵药",
-                  "机缘",
-                  "奇遇"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "dim1": {
-                      "delta": 3,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "social_event",
-              "priority": 8,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "武林大会",
-                  "英雄宴",
-                  "结拜",
-                  "拜师",
-                  "收徒"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "dim5": {
-                      "delta": 3,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            },
-            {
-              "id": "sect_conflict",
-              "priority": 18,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "门派",
-                  "围攻",
-                  "灭门",
-                  "叛变",
-                  "内斗"
-                ]
-              },
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "生命": {
-                      "delta": -10,
-                      "min": 0
-                    },
-                    "体力": {
-                      "delta": -15,
-                      "min": 0
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "periodicEvents": [
-            {
-              "id": "seasonal_gathering",
-              "name": "武林大会",
-              "description": "每季度一次的武林盛会，各路高手齐聚一堂。",
-              "intervalTicks": 30,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "dim5": {
-                      "delta": 2,
-                      "min": 0
-                    }
-                  }
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "jianghu_rumor",
-              "name": "江湖传闻",
-              "description": "江湖中流传的各种消息和传闻。",
-              "intervalTicks": 7,
-              "effects": {
-                "stats": {
-                  "changes": {
-                    "dim4": {
-                      "delta": 1,
-                      "min": 0
-                    }
-                  }
-                }
-              },
-              "narrateToAI": true
-            }
-          ],
           "worldStateRules": [],
           "worldStateAxes": {
             "江湖局势": [
@@ -1397,6 +1203,48 @@
         }
       }
     ],
-    "createdAt": "2026-07-05T09:06:17.082Z"
+    "createdAt": "2026-07-05T09:06:17.082Z",
+    "eventPacks": [
+      {
+        "id": "world:wuxia_world",
+        "name": "武林风云 周期事件",
+        "periodicRules": [
+          {
+            "id": "seasonal_gathering",
+            "name": "武林大会",
+            "description": "每季度一次的武林盛会，各路高手齐聚一堂。",
+            "intervalTicks": 30,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "dim5": {
+                    "delta": 2,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "jianghu_rumor",
+            "name": "江湖传闻",
+            "description": "江湖中流传的各种消息和传闻。",
+            "intervalTicks": 7,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "dim4": {
+                    "delta": 1,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          }
+        ]
+      }
+    ]
   }
 ]

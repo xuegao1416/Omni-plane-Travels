@@ -61,7 +61,7 @@ export default function BackgroundMusic() {
         zIndex: 9999,
         width: '36px',
         height: '36px',
-        borderRadius: '50%',
+        borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border)',
         background: 'var(--bg-elevated)',
         color: 'var(--accent)',

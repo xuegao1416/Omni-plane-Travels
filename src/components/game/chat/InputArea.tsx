@@ -98,7 +98,7 @@ export default function InputArea({ onSend, onCancel, isGenerating, pipelineStat
           {pipelineStatus && !isAllDone(pipelineStatus) && (
             <span style={{
               position: 'absolute', top: '2px', right: '2px',
-              width: '6px', height: '6px', borderRadius: '50%',
+              width: '6px', height: '6px', borderRadius: 'var(--radius-md)',
               background: 'var(--accent)',
               animation: 'pulse 1.5s ease-in-out infinite',
             }} />

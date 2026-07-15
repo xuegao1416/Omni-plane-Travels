@@ -7,6 +7,8 @@
   ],
   "permissions": [
     "core:default",
-    "http:default"
+    "http:default",
+    "dialog:default",
+    "fs:default"
   ]
 }

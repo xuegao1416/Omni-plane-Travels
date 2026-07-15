@@ -3,6 +3,8 @@
 //  框架层零指向性，所有世界相关内容由AI生成时注入
 // ============================================================
 
+import type { WorldBookEntryDef } from '../data/worlds-schema';
+
 // ─── 数值属性模块 ───
 
 /** 六维单个属性 */
@@ -368,22 +370,24 @@ export interface EventEffect {
 }
 
 /**
- * 周期性事件 — 每隔固定轮次触发
+ * 周期规则 — 事件系统中唯一一类周期单元。
+ * 由 eventWorldEvolution 每 tick 按 intervalTicks 静默结算（无 UI）。
+ * 两种创作来源共享此类型：世界内置节拍（world.eventPacks）与可分享事件包（RuleFile.periodicRules）。
  */
-export interface PeriodicEvent {
-  /** 事件 ID */
+export interface PeriodicRule {
+  /** 规则 ID */
   id: string;
-  /** 事件名称 */
-  name: string;
-  /** 事件描述 */
-  description: string;
+  /** 事件名称（用于日志） */
+  name?: string;
   /** 触发间隔（轮次） */
   intervalTicks: number;
   /** 首次触发偏移（避免所有周期事件同轮爆发） */
   offsetTicks?: number;
-  /** 变量影响 */
+  /** 变量影响（与原 PeriodicEvent.effects 同源，复用机械层合并逻辑） */
   effects: ModuleEffects;
-  /** 周期事件结算后是否喂给 AI 做叙事渲染 */
+  /** 事件描述（编辑器/AI 叙事用，引擎忽略） */
+  description?: string;
+  /** 结算后是否喂给 AI 做叙事渲染 */
   narrateToAI?: boolean;
 }
 
@@ -420,20 +424,20 @@ export interface NarrativeGuardrails {
 }
 
 /**
- * 世界演化规则（静态配置，存 WorldDef.modules[]，moduleId: 'simulation'）
+ * 世界动态配置（静态配置，存 WorldDef.modules[]，moduleId: 'simulation'）
+ * 周期事件（periodicEvents）已作为「周期卡」搬入事件/卡片系统（eventWorldEvolution），
+ * 此处仅保留与「世界演化」语义解耦后的两项：世界状态规则 / 叙事护栏。
+ * （原"状态轴 worldStateAxes"为死字段——运行时无任何读取，已从类型移除；历史世界 JSON 中残留的同名字段属惰性数据，不影响运行。）
  */
-export interface SimulationRules {
-  /** 事件 → 变量映射 */
-  eventEffects: EventEffect[];
-  /** 周期性事件 */
-  periodicEvents: PeriodicEvent[];
+export interface WorldDynamics {
   /** 世界状态更新规则 */
   worldStateRules: WorldStateRule[];
-  /** 该世界定义的状态轴（替代写死的字段） */
-  worldStateAxes?: Record<string, string[]>;
   /** AI 叙事层的安全护栏 */
   narrativeGuardrails: NarrativeGuardrails;
 }
+
+/** 世界动态配置（编辑器 / 加载层用的别名，等同于 WorldDynamics；period 等已迁至事件系统，不再含 periodicEvents） */
+export type WorldDynamicsConfig = WorldDynamics;
 
 /**
  * 效果日志条目（可观测性）
@@ -499,7 +503,492 @@ export interface WorldSystemData {
   经营资产?: BusinessModuleSchema;
   骰子检定?: DiceModuleSchema;
   天赋体系?: TalentModuleSchema;
-  世界演化?: SimulationRules;
+  世界动态?: WorldDynamics;
   /** 保留扩展性：自定义模块数据 */
   [key: string]: unknown;
 }
+
+// ============================================================
+//  模块客制化 / Mod 系统 — 单一数据源类型
+//  架构层持有，UI / 规则引擎 / 图编辑器均 import 自此文件。
+//  规则 DSL 为声明式白名单，解释器永不执行玩家代码。
+// ============================================================
+
+// ─── 基础枚举 ───
+
+/** 用户面分类；数据层(card/worldbook) / 逻辑层(rule) / 混合(bundle) / 周期(periodic) 归属由 type 推导 */
+export type EventType = 'card' | 'rule' | 'worldbook' | 'bundle' | 'periodic';
+
+/** 声明所需能力；规则引擎仅执行被授权的动作类型 */
+export type Permission =
+  | 'read_world_state'
+  | 'modify_world_state'
+  | 'add_card'
+  | 'override_card'
+  | 'register_tick'
+  | 'emit_world_event'
+  | 'provide_assets';
+
+export type AssetKind = 'image' | 'text' | 'data' | 'audio';
+
+// ─── 规则 DSL（白名单，非图灵完备） ───
+
+export type Comparator = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'in' | 'contains';
+
+/** Literal 仅基础值，禁止函数 / 引用 / 外部 IO */
+export type Literal = string | number | boolean | string[];
+
+export type Condition =
+  | { all: Condition[] }
+  | { any: Condition[] }
+  | { not: Condition }
+  | { state: { path: string; op: Comparator; value: Literal } }
+  | { event: { type: string; where?: Record<string, Literal> } };
+
+export type ActionKind =
+  | 'set'
+  | 'emit'
+  | 'addCard'
+  | 'overrideCard'
+  | 'modifyResource'
+  | 'scheduleTick';
+
+export type Action =
+  | { set: { path: string; value: Literal } }
+  | { emit: { type: string; payload?: Record<string, Literal> } }
+  | { addCard: { cardId: string } }
+  | { overrideCard: { cardId: string; patch: Record<string, unknown> } }
+  | { modifyResource: { key: string; delta: number } }
+  | { scheduleTick: { after: number; payload?: Record<string, unknown> } };
+
+/** 单条规则；每 mod ≤128 条、单规则 then ≤16 动作、条件树深 ≤6 */
+export interface EventRule {
+  id: string;
+  priority?: number;
+  once?: boolean;
+  cooldownTicks?: number;
+  when: Condition;
+  then: Action[];
+}
+
+/**
+ * 规则文件（schema/rules.json 落盘形态）。
+ * 任务 A 称其为 SimulationRules { version, rules: EventRule[] } —— 即 Mod 规则 DSL 文件。
+ * 注意：世界演化内核消费的「SimulationRules」(eventEffects/periodicEvents/...) 另见上文，
+ * 二者命名相近但形态不同，请勿混淆。
+ */
+export interface RuleFile {
+  version: number;
+  rules: EventRule[];
+  /** 周期规则（与 rules 平级，随事件包分享；运行时注册进 eventWorldEvolution 按 tick 静默结算） */
+  periodicRules?: PeriodicRule[];
+}
+
+// ─── React Flow 节点图（规则编辑器） ───
+
+export type EventNodeKind =
+  | 'trigger'    // Zap   世界事件/关键词/层级触发
+  | 'condition'  // GitBranch 与/或 逻辑门
+  | 'effect'     // Gauge 变量变更
+  | 'event'      // Swords 主动生成 SimEvent
+  | 'worldState' // Globe  更新状态轴
+  | 'guardrail'; // ShieldAlert 叙事层安全边界
+
+/** 框架无关的图节点数据（ruleGraph 负责与 @xyflow/react 互转） */
+export interface EventGraphNode {
+  id: string;
+  kind: EventNodeKind;
+  label: string;
+  /** 触发条件（trigger / condition 节点承载，对应 EventRule.when） */
+  when?: Condition;
+  /** 动作序列（effect 节点承载，对应 EventRule.then） */
+  actions?: Action[];
+  /** EventEffect.trigger 语义字段（trigger 节点承载） */
+  trigger?: {
+    tags?: string[];
+    eventType?: string;
+    eventLevel?: string;
+    severityMin?: number;
+    keywords?: string[];
+  };
+  /** 周期触发间隔（periodic 节点 / 带 interval 的 trigger） */
+  intervalTicks?: number;
+  /** 周期性 / 事件效果（module 层变量） */
+  effects?: ModuleEffects;
+  /** 事件节点产出的 SimEvent 片段 */
+  event?: Partial<SimEvent>;
+  /** 世界状态轴更新（worldState 节点） */
+  updates?: Record<string, Record<string, string>>;
+  /** 叙事护栏（guardrail 节点） */
+  guardrail?: Partial<NarrativeGuardrails>;
+  /** 规则元数据（trigger 节点承载，对应 EventRule 顶层字段） */
+  priority?: number;
+  once?: boolean;
+  cooldownTicks?: number;
+}
+
+export type EventEdgeKind = 'flow' | 'constraint';
+
+export interface EventGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  /** constraint = 护栏→效果 的虚线约束边（非执行流） */
+  kind?: EventEdgeKind;
+}
+
+export interface EventGraph {
+  nodes: EventGraphNode[];
+  edges: EventGraphEdge[];
+}
+
+// ─── 世界事件（Swords 节点产出） ───
+export interface SimEvent {
+  id: string;
+  title: string;
+  level: string;
+  severity: number;
+  affectedFactions: string[];
+  affectedNpcIds: string[];
+  childEventIds: string[];
+}
+
+// ─── Manifest（manifest.json 落盘形态 = validate_mod 入参） ───
+export interface Manifest {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description?: string;
+  homepage?: string | null;
+  engine: 'opt-event';
+  schemaVersion: number;
+  minAppVersion: string;
+  type: EventType;
+  coverColor: string;
+  icon: string;
+  enabledByDefault?: boolean;
+  loadOrder?: number;
+  dependencies?: string[];
+  conflicts?: string[];
+  permissions?: Permission[];
+  rules?: string[];
+  cards?: string[];
+  assets?: { path: string; kind: AssetKind; size: number }[];
+  checksum?: { manifest: string; assets: Record<string, string> };
+  signature?: string | null;
+}
+
+// ─── 发现态 / 注册表 / 校验 / 详情 ───
+
+export interface EventMeta {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description?: string;
+  type: EventType;
+  coverColor: string;
+  icon: string;
+  schemaVersion: number;
+  minAppVersion: string;
+  loadOrder: number;
+  enabledByDefault: boolean;
+  homepage?: string | null;
+  diskSizeBytes?: number;
+  discoveredAt?: string;
+}
+
+export type EventRegistryStatus = 'installed' | 'enabled' | 'disabled';
+
+export interface EventRegistryEntry {
+  meta: EventMeta;
+  enabled: boolean;
+  status: EventRegistryStatus;
+  registeredAt: string;
+  lastEnabledAt?: string | null;
+  /** 内置标记：来自世界树关联的事件包，不可删除 */
+  builtin?: boolean;
+}
+
+export interface ValidationIssue {
+  code: string;
+  field?: string;
+  message: string;
+  /** 关联的图节点 id（用于 UI 点跳定位） */
+  nodeId?: string;
+}
+
+export interface ValidationResult {
+  ok: boolean;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+}
+
+export interface RuleSummary {
+  id: string;
+  file: string;
+  priority: number;
+  once: boolean;
+  cooldownTicks: number;
+  when: Condition;
+  actionKinds: ActionKind[];
+  actionCount: number;
+}
+
+export interface CardSummary {
+  id: string;
+  title: string;
+  file: string;
+  kind: 'add' | 'override';
+  overrideTarget?: string;
+}
+
+export interface WorldbookEntrySummary {
+  id: string;
+  title: string;
+  category?: string;
+  file: string;
+}
+
+export interface DepIssue {
+  id: string;
+  satisfied: boolean;
+  reason?: string;
+  requiredVersion?: string;
+  actualVersion?: string | null;
+}
+
+export interface ConflictStatus {
+  id: string;
+  active: boolean;
+}
+
+export interface EventRuntimeState {
+  onceFired: Record<string, boolean>;
+  cooldownRemaining: Record<string, number>;
+  lastTick?: number;
+  worldbook?: Record<string, boolean>;
+  custom?: Record<string, unknown>;
+}
+
+export interface EventDetail {
+  meta: EventRegistryEntry;
+  manifest: Manifest;
+  rulesSummary: RuleSummary[];
+  cardsSummary: CardSummary[];
+  worldbookSummary?: WorldbookEntrySummary[];
+  dependencyStatus: DepIssue[];
+  conflictStatus: ConflictStatus[];
+  runtimeState?: EventRuntimeState;
+}
+
+// ─── 统一错误信封（invoke 失败时 reject 的对象） ───
+export type EventErrorCode =
+  | 'MOD_NOT_FOUND'
+  | 'MOD_ALREADY_INSTALLED'
+  | 'MANIFEST_INVALID'
+  | 'MANIFEST_MISSING_FIELD'
+  | 'CHECKSUM_MISMATCH'
+  | 'APP_VERSION_INCOMPATIBLE'
+  | 'DEPENDENCY_UNSATISFIED'
+  | 'CONFLICT_DETECTED'
+  | 'PERMISSION_DENIED'
+  | 'ZIP_INVALID'
+  | 'ZIP_BOMB'
+  | 'PATH_INVALID'
+  | 'IO_ERROR'
+  | 'EXPORT_FAILED'
+  | 'IMPORT_CANCELLED';
+
+export interface EventError {
+  code: EventErrorCode;
+  message: string;
+  context?: Record<string, unknown>;
+}
+
+// ─── 卡片文件（Puck 产物） ───
+export interface PuckData {
+  root: { props?: Record<string, unknown> };
+  components: Record<string, Array<{ id: string; props: Record<string, unknown> }>>;
+}
+
+export interface CardDef {
+  id: string;
+  componentId: string;
+  title: string;
+  category?: string;
+  kind?: 'add' | 'override';
+  overrideTarget?: string;
+}
+
+/**
+ * 选择卡选项的效果（路径 C 反馈）。
+ * - statId：指向 GameState.玩家.生存状态 的扁平 key（如「生命」「dim1.value」），二选一。
+ * - resourcePath：资源路径，支持三类世界自定义资源（与 statId 二选一）：
+ *     经营资产.资金        → 玩家.经营资产.资金（clamp >= 0）
+ *     货币资源.主货币      → 玩家.货币资源.主货币.数量（clamp >= 0）
+ *     生存资源.<key>       → 玩家.生存资源.<key>.数量（复用 skip-unknown：无该资源则 warn+跳过）
+ */
+export interface ChoiceEffect {
+  statId?: string;
+  resourcePath?: string;
+  delta: number;
+}
+
+/** 选择卡单个选项；从旧版 string 升级为带 effect/aiNote 的对象。 */
+export interface ChoiceOption {
+  /** 选项标题（必填） */
+  label: string;
+  /** 机械层效果：选中后下一 tick 结算时写入对应 stat 的 delta */
+  effect?: ChoiceEffect;
+  /** 给下一轮 AI 续写的决策上下文（玩家决策日志） */
+  aiNote?: string;
+}
+
+/**
+ * @deprecated 旧版「单文件卡片」落盘形态（schema/card.json）。
+ * 修正后的数据模型改用 OptEventFile（聚合事件包，见下）。
+ * 保留此类型仅用于向后兼容：CardEditor / CardRenderer / 旧存档仍产出/消费此形态。
+ * 新消费端请改用 EventDef + OptEventFile，并用 cardFileToOptEvent() 做迁移桥接。
+ */
+export interface CardFile {
+  version: number;
+  puck: PuckData;
+  cards: CardDef[];
+}
+
+// ─── 修正后的事件数据模型（PACK 持有多个事件；卡片是事件的子单元） ───
+
+/**
+ * 事件定义（PACK 的子单元）。
+ * 一个事件（EventDef）由多张「卡片（CardDef）」组成 —— 卡片是事件的子单元，而非平级于包。
+ * 事件还可携带自己的规则（rules）与世界书（worldbook）。
+ */
+export interface EventDef {
+  /** 事件 ID（唯一标识） */
+  id: string;
+  /** 事件名（用于日志 / 编辑器展示） */
+  name: string;
+  /** 卡片：一个事件由多张卡片组成（卡片是事件的子单元） */
+  cards: CardDef[];
+  /** Puck 可视化布局数据（additive；与 CardFile.puck 同源，供 CardRenderer/CardOverlay 渲染卡片实际 props）。无布局数据时可为空。 */
+  puck?: PuckData;
+  /** 事件专属规则（可选） */
+  rules?: EventRule[];
+  /** 事件专属世界书条目（可选） */
+  worldbook?: WorldBookEntryDef[];
+}
+
+/**
+ * 事件包（PACK）落盘形态 —— 修正后的统一数据模型。
+ * 一个 PACK 持有多个「事件（EventDef）」；周期规则（PeriodicRule）与事件平级（siblings），
+ * 由 eventWorldEvolution 每 tick 静默结算（与 RuleFile.periodicRules 同源）。
+ * 包级 worldbook 与 events 内各自携带的 worldbook 平级合并。
+ *
+ * 与旧「拆分单文件」形态（CardFile / RuleFile / WorldBookFile 分别落盘为
+ * schema/card.json / schema/rules.json / schema/worldbook.json）不同，OptEventFile 是聚合形态。
+ * 引擎上层请用 flattenOptEvent() 把多个事件的 cards/rules/worldbook 展平后消费，
+ * 从而无需改读取逻辑即可在「修正后的数据模型」下运行。
+ */
+export interface OptEventFile {
+  /** 版本号 */
+  version: number;
+  /** 包名（可选） */
+  name?: string;
+  /** 事件列表（每个事件包含其卡片 / 规则 / 世界书） */
+  events: EventDef[];
+  /** 周期规则（与 events 平级，运行时注册进 eventWorldEvolution 按 tick 静默结算） */
+  periodic?: PeriodicRule[];
+  /** 包级世界书（与 events 平级，可选；events 内也可各自带 worldbook） */
+  worldbook?: WorldBookEntryDef[];
+}
+
+/**
+ * 把 OptEventFile 展平成引擎可直接消费的扁平结构。
+ * 遍历所有 events，拼接其 cards / rules / worldbook；再并入包级 worldbook。
+ * 返回结构保持与旧消费端（读 CardFile.cards / RuleFile.rules / WorldBookFile.entries）一致，
+ * 以便引擎在「修正后的数据模型」下无需改读取逻辑。
+ */
+export function flattenOptEvent(file: OptEventFile): {
+  cards: CardDef[];
+  rules: EventRule[];
+  worldbook: WorldBookEntryDef[];
+} {
+  const cards: CardDef[] = [];
+  const rules: EventRule[] = [];
+  const worldbook: WorldBookEntryDef[] = [];
+
+  for (const ev of file.events ?? []) {
+    if (ev.cards) cards.push(...ev.cards);
+    if (ev.rules) rules.push(...ev.rules);
+    if (ev.worldbook) worldbook.push(...ev.worldbook);
+  }
+  // 包级 worldbook 追加（与事件内 worldbook 平级合并）
+  if (file.worldbook) worldbook.push(...file.worldbook);
+
+  return { cards, rules, worldbook };
+}
+
+/**
+ * 迁移辅助：把旧版 CardFile（单文件卡片形态）包装为一个 OptEventFile。
+ * 将 cf.cards 包裹进一个 EventDef；事件名取自 manifest.name（缺失则回退 'event'）；
+ * 事件 ID 使用 crypto.randomUUID() 生成（保证唯一）。
+ *
+ * 用法：旧存档/旧导出（schema/card.json）经此函数转成 OptEventFile 后，
+ * 即可走 flattenOptEvent() 与修正后的引擎读取逻辑统一。
+ */
+export function cardFileToOptEvent(cf: CardFile, manifest: Manifest): OptEventFile {
+  const eventId = crypto.randomUUID();
+  const eventName = manifest?.name ?? 'event';
+  return {
+    version: cf.version,
+    name: manifest?.name ?? undefined,
+    events: [
+      {
+        id: eventId,
+        name: eventName,
+        cards: cf.cards,
+      },
+    ],
+  };
+}
+
+/**
+ * 迁移辅助（cardFileToOptEvent 的逆操作）：把单个 EventDef 还原为 CardFile（带 puck），
+ * 供 CardRenderer / CardOverlay 等仍消费 CardFile 的 UI 兼容。
+ * - version 固定为 1（EventDef 不携带 version，UI 渲染不依赖）。
+ * - puck 取自 event.puck（additive 字段）；缺失时给一个空 PuckData，保证 CardFile 形态合法。
+ *
+ * 与 flattenOptEvent 互补：flattenOptEvent 展平供「引擎注册」消费（只取 cards/rules/worldbook，不渲染）；
+ * 本函数供「卡片渲染」消费（需要 puck 携带实际 props），二者职责不同、互不冲突。
+ */
+export function optEventToCardFile(event: EventDef): CardFile {
+  return {
+    version: 1,
+    puck: event.puck ?? { root: {}, components: {} },
+    cards: event.cards,
+  };
+}
+
+// ─── 世界书文件 ───
+export interface WorldBookFile {
+  version: number;
+  entries: WorldBookEntryDef[];
+}
+
+// ─── 校验参考：当前世界可用变量白名单（validateEvent 引用完整性） ───
+export interface WorldDefLike {
+  /** 合法 statId 集合（如 attrA.current / dim1.value / special.<id>） */
+  statIds: string[];
+  /** 合法 resourceId 集合（生存资源 id） */
+  resourceIds: string[];
+  /** 合法 moduleId 集合（business/assets 等） */
+  moduleIds?: string[];
+}
+
+// ─── 规则引擎求值上下文（XState context 的简化视图） ───
+export type WorldContext = Record<string, unknown>;
+
+export const WORLD_STATE_AXES_TYPE = 'Record<string, string[]>';
+export type WorldStateAxes = Record<string, string[]>;

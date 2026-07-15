@@ -59,6 +59,8 @@ export interface AssemblerContext {
   compiledMemoryContext?: string;
   /** 世界模拟简报（世界动态 + 角色暗线摘要，来自 WorldSimulationEngine） */
   simulationBrief?: string;
+  /** 玩家决策记录（选择卡路径 C 的 aiNote，喂给下一轮 AI 叙事） */
+  playerDecisionContext?: string;
   /** 世界书 atDepth 条目（需要插入到聊天历史中的指定深度） */
   atDepthEntries?: Array<{ depth: number; content: string }>;
 }
@@ -128,6 +130,11 @@ export function assembleSystemPrompt(
   // 注入世界模拟简报（世界动态 + 角色暗线摘要）
   if (ctx.simulationBrief) {
     parts.push(ctx.simulationBrief);
+  }
+
+  // 注入玩家决策记录（选择卡路径 C 的 aiNote，不影响既有人格/世界书逻辑）
+  if (ctx.playerDecisionContext) {
+    parts.push(ctx.playerDecisionContext);
   }
 
   parts.push(presetBody);

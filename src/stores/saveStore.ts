@@ -34,6 +34,8 @@ interface SaveState {
   savesMeta: SaveMeta[];
   currentSaveId: string | null;
   currentSaveName: string;
+  /** 本局激活的事件包 id 列表（二级开关：undefined = 用全局已启用列表，[] = 全部关掉） */
+  sessionActivePacks: string[] | undefined;
 
   // 初始化（加载元数据）
   initialize: () => Promise<void>;
@@ -49,6 +51,9 @@ interface SaveState {
 
   // 保存（写入 DB + 更新元数据）
   performSave: (saveData: GameSave) => Promise<void>;
+
+  /** 设置本局激活的事件包列表（二级开关） */
+  setSessionActivePacks: (packs: string[] | undefined) => void;
 
   // Coalescing save（防并发）
   saveGame: (buildSaveData: () => GameSave | null) => Promise<void>;
@@ -66,6 +71,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
   savesMeta: [],
   currentSaveId: validateSaveId(localStorage.getItem(ACTIVE_SAVE_KEY)),
   currentSaveName: '',
+  sessionActivePacks: undefined,
 
   initialize: async () => {
     try {
@@ -78,7 +84,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
 
   createNewGame: async (saveName) => {
     const { savesMeta } = get();
-    if (savesMeta.some(s => s.name === saveName)) {
+    if (savesMeta.some((s) => s.name === saveName)) {
       throw new Error('存档名称已存在');
     }
 
@@ -350,6 +356,11 @@ export const useSaveStore = create<SaveState>((set, get) => ({
     }
     await get().saveGame(buildSaveData);
   },
+
+  setSessionActivePacks: (packs) => {
+    set({ sessionActivePacks: packs });
+  },
+
 }));
 
 // ─── 自动存档 builder（由 GameContext 注入） ───

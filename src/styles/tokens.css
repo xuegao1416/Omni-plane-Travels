@@ -116,7 +116,16 @@
   --drawer-width: clamp(280px, 80vw, 560px);
   --overlay-max: 92vw;
   --space-inline: clamp(8px, 2vw, 16px);
-  --grid-card-min: 140px;
+  --grid-card-min: 360px; /* 事件库卡片最小宽度：用户请求由 240px 加宽至 360px（1.5× 原 240px），解决包名截断；仍为 EventLibrary.tsx:155 消费的唯一 min-width 规范 token */
+
+  /* ─── 编辑器专用 Token（Mod 系统：卡片画布 / 规则节点图）───
+     全部派生自基础 Token，自动跟随 4 主题，无独立重写 */
+  --canvas-grid:  color-mix(in srgb, var(--border) 40%, transparent);
+  --node-border:  var(--border);
+  --node-trigger: var(--accent);
+  --node-effect:  var(--success);
+  --node-event:   var(--warning);
+  --node-error:   var(--danger);
 
   /* 语义色：状态标签（自动跟随4主题） */
   --status-brewing-bg: var(--warning-bg);

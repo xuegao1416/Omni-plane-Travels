@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, FolderOpen, Settings } from 'lucide-react';
+import { Play, FolderOpen, Settings, Boxes } from 'lucide-react';
 import type { SaveMeta } from '../../storage/db';
 import BackgroundMusic from '../BackgroundMusic';
 
@@ -8,6 +8,7 @@ interface MainMenuViewProps {
   onStartWizard: () => void;
   onViewSaves: () => void;
   onSettings: () => void;
+  onOpenMods: () => void;
   title: string;
   subtitle: string;
   beginLabel: string;
@@ -19,10 +20,11 @@ interface MenuItem {
   icon: typeof Play;
   onClick: () => void;
   badge?: string;
+  disabled?: boolean;
 }
 
 export default function MainMenuView({
-  allSaves, onStartWizard, onViewSaves, onSettings,
+  allSaves, onStartWizard, onViewSaves, onSettings, onOpenMods,
   title, subtitle, beginLabel, settingsLabel,
 }: MainMenuViewProps) {
   const [ready, setReady] = useState(false);
@@ -36,6 +38,7 @@ export default function MainMenuView({
     { label: beginLabel, icon: Play, onClick: onStartWizard },
     { label: '读取存档', icon: FolderOpen, onClick: onViewSaves, badge: allSaves.length > 0 ? String(allSaves.length) : undefined },
     { label: settingsLabel, icon: Settings, onClick: onSettings },
+    { label: '事件中心', icon: Boxes, onClick: onOpenMods },
   ];
 
   return (
@@ -155,7 +158,7 @@ export default function MainMenuView({
         transition: 'opacity 1s ease 1.2s',
         letterSpacing: '0.05em',
       }}>
-        v2.5.0
+        v2.6.0
       </div>
       <BackgroundMusic />
     </div>
@@ -176,12 +179,14 @@ function MenuItemButton({
 
   return (
     <button
-      onClick={item.onClick}
+      onClick={item.disabled ? undefined : item.onClick}
+      disabled={item.disabled}
       className="menu-item-btn"
       style={{
-        opacity: ready ? 1 : 0,
+        opacity: ready ? (item.disabled ? 0.35 : 1) : 0,
         transform: ready ? 'translateY(0)' : 'translateY(-12px)',
         transitionDelay: `${delay}s, ${delay}s, 0s, 0s, 0s, 0s`,
+        cursor: item.disabled ? 'not-allowed' : undefined,
       }}
     >
       <Icon size={18} strokeWidth={1.5} className="menu-item-icon" />

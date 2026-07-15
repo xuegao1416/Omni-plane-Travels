@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 import {
-  BarChart3, TrendingUp, Leaf, Briefcase, Dice6, Star, Globe,
+  BarChart3, TrendingUp, Leaf, Briefcase, Dice6, Star,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -61,13 +61,6 @@ export const MODULE_OPTIONS: ModuleOption[] = [
     description: '天赋大类与具体天赋，角色固有特质与觉醒机制',
     icon: Star,
     aiInstruction: '生成天赋体系，包含天赋大类和具体天赋，品质分为普通/精良/稀有/史诗/传说五档，天赋效果为纯文本描述',
-  },
-  {
-    id: 'simulation',
-    name: '世界演化',
-    description: '事件触发、周期推演、世界状态变化（游戏内配置规则）',
-    icon: Globe,
-    aiInstruction: '不生成具体规则，用户在游戏内配置',
   },
 ];
 

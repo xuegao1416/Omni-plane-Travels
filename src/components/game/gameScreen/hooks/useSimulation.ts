@@ -7,13 +7,20 @@ import { eventBus, EVENTS } from '../../../../engine/eventBus';
 import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
-import type { SimulationRules } from '../../../../modules/schema';
+import type { WorldDynamics } from '../../../../modules/schema';
+import { createDefaultWorldDynamics } from '../../../../modules/defaults';
 
-/** 从世界定义中获取仿真规则 */
-function getSimRules(worldDef: WorldDef | undefined): SimulationRules | null {
-  if (!worldDef?.modules) return null;
+/**
+ * 从世界定义中获取仿真规则。
+ * 世界演化不再作为可选模块暴露给用户（建世界时不勾选「世界演化」），
+ * 但 5 层后台（周期事件 / 世界状态规则 / 叙事护栏 / 资源自然漂移 / 成长体系）
+ * 必须始终运行，故缺少 simulation 模块时回退到默认规则兜底。
+ * 旧世界文件若仍含 simulation 模块，则照常读取其 moduleConfig。
+ */
+function getSimRules(worldDef: WorldDef | undefined): WorldDynamics {
+  if (!worldDef?.modules) return createDefaultWorldDynamics();
   const simMod = worldDef.modules.find(m => m.moduleId === 'simulation' && m.enabled);
-  return (simMod?.moduleConfig as unknown as SimulationRules) ?? null;
+  return (simMod?.moduleConfig as unknown as WorldDynamics) ?? createDefaultWorldDynamics();
 }
 
 export function useSimulation(

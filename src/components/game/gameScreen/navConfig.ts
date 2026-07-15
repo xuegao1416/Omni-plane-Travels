@@ -1,4 +1,4 @@
-import { Home, User, Users, BookOpen, Settings, Layers, Brain, BookMarked, Globe } from 'lucide-react';
+import { Home, User, Users, BookOpen, Settings, Layers, Brain, BookMarked, Globe, Package } from 'lucide-react';
 import type { NavButton, OverlayPanel, Screen } from './types';
 
 export const navButtons: NavButton[] = [
@@ -10,6 +10,7 @@ export const navButtons: NavButton[] = [
   { id: 'worldbook', icon: BookMarked, labelKey: 'nav.worldbook' },
   { id: 'dynamics', icon: Globe, labelKey: 'nav.dynamics' },
   { id: 'memory', icon: Brain, labelKey: 'nav.memory' },
+  { id: 'modules', icon: Package, labelKey: 'nav.modules' },
 ];
 
 export interface MobileNavItem {
@@ -35,6 +36,7 @@ export function buildMobileNavItems(opts: {
     { id: 'worldbook', icon: BookMarked, labelKey: 'nav.worldbook', action: () => { close(); setMobileActivePanel('worldbook'); } },
     { id: 'dynamics', icon: Globe, labelKey: 'nav.dynamics', action: () => { close(); setMobileActivePanel('dynamics'); } },
     { id: 'memory', icon: Brain, labelKey: 'nav.memory', action: () => { close(); setMobileActivePanel('memory'); } },
+    { id: 'modules', icon: Package, labelKey: 'nav.modules', action: () => { close(); setMobileActivePanel('modules'); } },
     { id: 'settings', icon: Settings, labelKey: 'nav.settings', action: () => { close(); navigate('settings'); } },
   ];
 }

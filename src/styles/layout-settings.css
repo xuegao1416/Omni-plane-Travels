@@ -106,7 +106,7 @@
 .toggle-switch-knob {
   width: 18px;
   height: 18px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--color-on-accent);
   position: absolute;
   top: 2px;

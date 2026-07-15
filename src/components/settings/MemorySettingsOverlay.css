@@ -135,7 +135,7 @@
   flex-shrink: 0;
 }
 .ms-header-icon {
-  width: 40px; height: 40px; border-radius: var(--radius-full);
+  width: 40px; height: 40px; border-radius: var(--radius-md);
   background: var(--accent-dim);
   display: flex; align-items: center; justify-content: center;
   color: var(--accent); flex-shrink: 0;
@@ -202,7 +202,7 @@
 /* ─── 总开关 ─── */
 .ms-toggle-btn {
   position: relative; width: 44px; height: 24px;
-  border: none; border-radius: var(--radius-full); cursor: pointer;
+  border: none; border-radius: var(--radius-md); cursor: pointer;
   background: var(--bg-tertiary); transition: background var(--duration-fast);
   flex-shrink: 0;
 }
@@ -210,7 +210,7 @@
 .ms-toggle-btn.disabled, .ms-toggle-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .ms-toggle-thumb {
   position: absolute; top: 3px; left: 3px;
-  width: 18px; height: 18px; border-radius: var(--radius-full);
+  width: 18px; height: 18px; border-radius: var(--radius-md);
   background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   transition: left var(--duration-fast);
 }
@@ -310,7 +310,7 @@
 .ms-editor-title { font-size: var(--font-size-lg); font-weight: 700; color: var(--text-primary); }
 .ms-editor-subtitle { font-size: var(--font-size-sm); color: var(--text-muted); margin-top: 2px; }
 .ms-editor-close {
-  width: 32px; height: 32px; border-radius: var(--radius-full);
+  width: 32px; height: 32px; border-radius: var(--radius-md);
   border: 1px solid var(--border); background: var(--bg-secondary);
   color: var(--text-muted); font-size: 14px;
   cursor: pointer; display: flex; align-items: center; justify-content: center;

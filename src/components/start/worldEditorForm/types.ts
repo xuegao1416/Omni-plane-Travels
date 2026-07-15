@@ -2,7 +2,6 @@ import type { WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
 import {
   createDefaultStatModule, createDefaultProgressionModule, createDefaultSurvivalModule,
   createDefaultBusinessModule, createDefaultDiceModule, createDefaultTalentModule,
-  createDefaultSimulationRules,
 } from '../../../modules/defaults';
 import { createBuildContext } from '../../../modules/buildContext';
 import { generateWorldBookEntries } from '../../../modules/buildPipeline';
@@ -35,11 +34,10 @@ export const DEFAULT_MODULE_FACTORIES: Record<string, () => unknown> = {
   stat: createDefaultStatModule, progression: createDefaultProgressionModule,
   survival: createDefaultSurvivalModule, business: createDefaultBusinessModule,
   dice: createDefaultDiceModule, talent: createDefaultTalentModule,
-  simulation: createDefaultSimulationRules,
 };
 
 export const MODULE_NAME_MAP: Record<string, string> = {
-  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', simulation: '世界演化',
+  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系',
 };
 
 export const MUTEX: Record<string, string[]> = {

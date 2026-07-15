@@ -11,7 +11,7 @@ import type {
   DiceModuleSchema,
   TalentModuleSchema,
   WorldSystemData,
-  SimulationRules,
+  WorldDynamics,
 } from './schema';
 
 /** 数值属性模块默认值 */
@@ -124,63 +124,10 @@ export function createDefaultTalentModule(): TalentModuleSchema {
   };
 }
 
-/** 创建默认的世界演化规则（通用兜底规则） */
-export function createDefaultSimulationRules(): SimulationRules {
+/** 创建默认的世界动态配置（通用兜底规则，不含周期事件） */
+export function createDefaultWorldDynamics(): WorldDynamics {
   return {
-    eventEffects: [
-      // 通用：发现资源
-      {
-        id: 'default_resource_discovery',
-        priority: 10,
-        stackStrategy: 'add',
-        trigger: {
-          tags: ['resource', 'discovery'],
-          keywords: ['发现', '找到', '获得资源'],
-        },
-        effects: {
-          survival: {
-            resources: {}, // 具体资源由 AI 声明
-          },
-        },
-      },
-      // 通用：贸易事件
-      {
-        id: 'default_trade',
-        priority: 5,
-        stackStrategy: 'add',
-        trigger: {
-          tags: ['trade', 'caravan'],
-          keywords: ['商队', '贸易', '交易'],
-        },
-        effects: {
-          business: {
-            fundsDelta: 50,
-          },
-        },
-      },
-      // 通用：战斗事件
-      {
-        id: 'default_combat',
-        priority: 15,
-        stackStrategy: 'add',
-        trigger: {
-          tags: ['combat', 'battle'],
-          keywords: ['战斗', '交战', '遇敌'],
-        },
-        effects: {
-          stats: {
-            changes: {
-              hp: { delta: -10, min: 0 },
-            },
-          },
-        },
-      },
-    ],
-    periodicEvents: [],
     worldStateRules: [],
-    worldStateAxes: {
-      '社会环境': ['权力结构', '社会氛围'],
-    },
     narrativeGuardrails: {
       maxDeltaPerStat: {
         hp: 30,
@@ -247,7 +194,7 @@ export function createFallbackModule(moduleId: string, name: string): import('..
     case 'talent':
       return { ...base, moduleConfig: createDefaultTalentModule() as unknown as Record<string, unknown> };
     case 'simulation':
-      return { ...base, moduleConfig: createDefaultSimulationRules() as unknown as Record<string, unknown> };
+      return { ...base, moduleConfig: createDefaultWorldDynamics() as unknown as Record<string, unknown> };
     default:
       return base;
   }

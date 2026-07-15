@@ -3,6 +3,8 @@
 // 设计原则：worldBookEntries 是世界叙事内容的唯一真相源。
 // WorldDef 只保留纯 UI 元数据。详情页、编辑器、游戏引擎全部从 worldBookEntries 读取。
 
+import type { EventRule, PeriodicRule, Permission } from '../modules/schema';
+
 // ═══════════════════════════════════════════════════════════════
 //  通用子接口 —— 6 大结构化概念（供模块系统和 worldBookEntries.meta 使用）
 // ═══════════════════════════════════════════════════════════════
@@ -268,4 +270,26 @@ export interface WorldDef {
   // ─── 导入来源（v3：区分外部导入 vs 内部世界） ───
   /** 导入来源：'external' = 外部世界书 → 用条目编辑器；undefined = 内部世界 → 用 9-tab 详情 */
   source?: 'external';
+
+  // ─── 世界关联事件包（随世界定义打包，加载时自动安装进事件中心） ───
+  /** 世界自带的事件包；加载世界时自动写入 IndexedDB（builtin=true），在事件中心展示为「内置」。
+   *  存档导出时这些包会随存档一起打包，导入时排重写入。 */
+  eventPacks?: EmbeddedEventPack[];
+}
+
+/**
+ * 内嵌事件包 —— 直接写在 WorldDef 上的事件包，随世界定义一起分发。
+ * 形状对齐 eventWorldEvolution.register() 的入参（RegisteredEventRules）。
+ */
+export interface EmbeddedEventPack {
+  /** 全局唯一包 ID，建议 'world:<worldId>' */
+  id: string;
+  /** 包显示名（编辑器/日志用） */
+  name?: string;
+  /** 普通事件卡规则（when→then），未来扩展用，周期事件走 periodicRules */
+  rules?: EventRule[];
+  /** 周期规则（周期卡子类），由引擎每 tick 按 intervalTicks 静默结算 */
+  periodicRules?: PeriodicRule[];
+  /** 拥有的权限（如 modify_world_state） */
+  permissions?: Permission[];
 }

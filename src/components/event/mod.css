@@ -1,0 +1,37 @@
+/* 事件中心 UI — 局部动画与 reduced-motion 兜底（仅 event/ 目录组件使用） */
+
+@keyframes eventFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes eventFadeInReduced {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.event-fade-in {
+  animation: eventFadeIn var(--duration-normal) var(--ease-out) both;
+}
+
+@keyframes eventSpin {
+  to { transform: rotate(360deg); }
+}
+.event-spin {
+  animation: eventSpin 1s linear infinite;
+}
+
+/* 事件列表行：仅键盘聚焦（Tab）显示 accent 描边，鼠标点击不再画蓝框（根治点击残留多蓝框） */
+.event-row-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* reduced-motion：保留淡入（仅 opacity），关闭位移与旋转 */
+@media (prefers-reduced-motion: reduce) {
+  .event-fade-in {
+    animation: eventFadeInReduced var(--duration-normal) var(--ease-out) both;
+    transform: none;
+  }
+  .event-spin {
+    animation-duration: 2.4s;
+  }
+}

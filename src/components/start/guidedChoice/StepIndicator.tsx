@@ -40,7 +40,7 @@ export function StepIndicator({ currentDimIndex, selections, onJump }: StepIndic
                 style={{
                   width: '18px',
                   height: '18px',
-                  borderRadius: '50%',
+                  borderRadius: 'var(--radius-md)',
                   background: isActive ? 'rgba(255,255,255,0.3)' : isCompleted ? dim.color : 'var(--border)',
                   display: 'flex',
                   alignItems: 'center',

@@ -372,185 +372,6 @@
         "description": "绥芬河口岸的不确定因素：海关严查、物价波动、天气影响、俄商动态……",
         "enabled": true,
         "moduleConfig": {
-          "eventEffects": [
-            {
-              "id": "customs_crackdown",
-              "priority": 25,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "海关",
-                  "严查",
-                  "查扣",
-                  "罚款",
-                  "边检",
-                  "扣货",
-                  "没收"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": -200
-                }
-              }
-            },
-            {
-              "id": "deal_closed",
-              "priority": 15,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "成交",
-                  "买卖",
-                  "交易",
-                  "进货",
-                  "出货",
-                  "批发",
-                  "收购"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": 300
-                }
-              }
-            },
-            {
-              "id": "bribe_cost",
-              "priority": 18,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "打点",
-                  "疏通",
-                  "好处费",
-                  "送礼",
-                  "请客",
-                  "吃饭"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": -150
-                }
-              }
-            },
-            {
-              "id": "market_boom",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "涨价",
-                  "行情好",
-                  "供不应求",
-                  "抢购",
-                  "紧俏"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": 400
-                }
-              }
-            },
-            {
-              "id": "market_crash",
-              "priority": 12,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "暴跌",
-                  "滞销",
-                  "亏本",
-                  "砸手里",
-                  "行情差"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": -300
-                }
-              }
-            },
-            {
-              "id": "scam_loss",
-              "priority": 20,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "被骗",
-                  "上当",
-                  "假货",
-                  "赖账",
-                  "跑路"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": -400
-                }
-              }
-            },
-            {
-              "id": "connection_gain",
-              "priority": 8,
-              "stackStrategy": "add",
-              "trigger": {
-                "keywords": [
-                  "人脉",
-                  "关系",
-                  "认识",
-                  "介绍",
-                  "搭线",
-                  "牵线"
-                ]
-              },
-              "effects": {
-                "business": {
-                  "fundsDelta": 100
-                }
-              }
-            }
-          ],
-          "periodicEvents": [
-            {
-              "id": "border_fee",
-              "name": "口岸杂费",
-              "description": "每趟出关都需要缴纳过境费、检疫费等各种杂费。",
-              "intervalTicks": 3,
-              "effects": {
-                "business": {
-                  "fundsDelta": -60
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "market_fluctuation",
-              "name": "市场行情波动",
-              "description": "绥芬河口岸的商品价格随供需变化波动。",
-              "intervalTicks": 5,
-              "effects": {
-                "business": {
-                  "fundsDelta": 120
-                }
-              },
-              "narrateToAI": true
-            },
-            {
-              "id": "winter_cost",
-              "name": "冬季开销",
-              "description": "东北的冬天漫长寒冷，取暖、防寒服装、仓储保温都是额外开支。",
-              "intervalTicks": 8,
-              "effects": {
-                "business": {
-                  "fundsDelta": -80
-                }
-              },
-              "narrateToAI": true
-            }
-          ],
           "worldStateRules": [],
           "worldStateAxes": {
             "口岸形势": [
@@ -575,6 +396,50 @@
         }
       }
     ],
-    "createdAt": "2026-07-06T12:37:28.439Z"
+    "createdAt": "2026-07-06T12:37:28.439Z",
+    "eventPacks": [
+      {
+        "id": "world:border_trade",
+        "name": "绥芬边贸 周期事件",
+        "periodicRules": [
+          {
+            "id": "border_fee",
+            "name": "口岸杂费",
+            "description": "每趟出关都需要缴纳过境费、检疫费等各种杂费。",
+            "intervalTicks": 3,
+            "effects": {
+              "business": {
+                "fundsDelta": -60
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "market_fluctuation",
+            "name": "市场行情波动",
+            "description": "绥芬河口岸的商品价格随供需变化波动。",
+            "intervalTicks": 5,
+            "effects": {
+              "business": {
+                "fundsDelta": 120
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "winter_cost",
+            "name": "冬季开销",
+            "description": "东北的冬天漫长寒冷，取暖、防寒服装、仓储保温都是额外开支。",
+            "intervalTicks": 8,
+            "effects": {
+              "business": {
+                "fundsDelta": -80
+              }
+            },
+            "narrateToAI": true
+          }
+        ]
+      }
+    ]
   }
 ]

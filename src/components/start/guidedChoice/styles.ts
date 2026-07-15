@@ -80,7 +80,7 @@ export const spinnerStyle: React.CSSProperties = {
   height: '36px',
   border: '3px solid var(--border)',
   borderTopColor: 'var(--accent)',
-  borderRadius: '50%',
+  borderRadius: 'var(--radius-md)',
   animation: 'spin 0.8s linear infinite',
 };
 

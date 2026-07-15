@@ -20,20 +20,97 @@
         "description": "在城市里生活，你需要平衡健康、社交、厨艺……还有那张脸。",
         "enabled": true,
         "moduleConfig": {
-          "attrA": { "name": "体力", "max": 100 },
-          "attrB": { "name": "精力", "max": 100 },
-          "dim1": { "name": "健康", "range": [0, 100], "description": "身体状态，影响加班承受力、生病概率、熬夜后的恢复速度。" },
-          "dim2": { "name": "颜值", "range": [0, 100], "description": "外貌与气质，影响第一印象、相亲成功率、被搭讪概率。" },
-          "dim3": { "name": "情商", "range": [0, 100], "description": "读懂氛围、处理关系、说对话的能力。高情商让人舒服，低情商让人尴尬。" },
-          "dim4": { "name": "厨艺", "range": [0, 100], "description": "做饭水平，影响生活质量、招待朋友的效果、以及外卖支出。" },
-          "dim5": { "name": "社交", "range": [0, 100], "description": "朋友圈大小与质量，影响找人帮忙、获取信息、周末是否有约。" },
-          "dim6": { "name": "品味", "range": [0, 100], "description": "穿搭、审美、生活格调。高品味让人觉得你\"有质感\"，低品味让人觉得你\"凑合\"。" },
+          "attrA": {
+            "name": "体力",
+            "max": 100
+          },
+          "attrB": {
+            "name": "精力",
+            "max": 100
+          },
+          "dim1": {
+            "name": "健康",
+            "range": [
+              0,
+              100
+            ],
+            "description": "身体状态，影响加班承受力、生病概率、熬夜后的恢复速度。"
+          },
+          "dim2": {
+            "name": "颜值",
+            "range": [
+              0,
+              100
+            ],
+            "description": "外貌与气质，影响第一印象、相亲成功率、被搭讪概率。"
+          },
+          "dim3": {
+            "name": "情商",
+            "range": [
+              0,
+              100
+            ],
+            "description": "读懂氛围、处理关系、说对话的能力。高情商让人舒服，低情商让人尴尬。"
+          },
+          "dim4": {
+            "name": "厨艺",
+            "range": [
+              0,
+              100
+            ],
+            "description": "做饭水平，影响生活质量、招待朋友的效果、以及外卖支出。"
+          },
+          "dim5": {
+            "name": "社交",
+            "range": [
+              0,
+              100
+            ],
+            "description": "朋友圈大小与质量，影响找人帮忙、获取信息、周末是否有约。"
+          },
+          "dim6": {
+            "name": "品味",
+            "range": [
+              0,
+              100
+            ],
+            "description": "穿搭、审美、生活格调。高品味让人觉得你\"有质感\"，低品味让人觉得你\"凑合\"。"
+          },
           "special": [
-            { "id": "romance", "name": "暧昧值", "range": [0, 100], "description": "与异性互动时的氛围吸引力。不是颜值，是那种让人想靠近的感觉。" },
-            { "id": "happiness", "name": "幸福感", "range": [0, 100], "description": "对生活的综合满意度。高幸福感让人积极，低幸福感让人疲惫。" }
+            {
+              "id": "romance",
+              "name": "暧昧值",
+              "range": [
+                0,
+                100
+              ],
+              "description": "与异性互动时的氛围吸引力。不是颜值，是那种让人想靠近的感觉。"
+            },
+            {
+              "id": "happiness",
+              "name": "幸福感",
+              "range": [
+                0,
+                100
+              ],
+              "description": "对生活的综合满意度。高幸福感让人积极，低幸福感让人疲惫。"
+            }
           ]
         },
-        "initialState": { "attrA": 100, "attrB": 100, "dim1": 60, "dim2": 50, "dim3": 50, "dim4": 30, "dim5": 40, "dim6": 40, "special": { "romance": 0, "happiness": 50 } }
+        "initialState": {
+          "attrA": 100,
+          "attrB": 100,
+          "dim1": 60,
+          "dim2": 50,
+          "dim3": 50,
+          "dim4": 30,
+          "dim5": 40,
+          "dim6": 40,
+          "special": {
+            "romance": 0,
+            "happiness": 50
+          }
+        }
       },
       {
         "moduleId": "simulation",
@@ -41,84 +118,23 @@
         "description": "都市生活的固定节奏：季度涨租、每周聚餐、节假日催婚……",
         "enabled": true,
         "moduleConfig": {
-          "eventEffects": [
-            {
-              "id": "rent_increase",
-              "priority": 20,
-              "stackStrategy": "override",
-              "trigger": { "tags": ["rent", "housing"], "keywords": ["房租", "涨租", "房东", "续租", "搬家"] },
-              "effects": { "stats": { "changes": { "happiness": { "delta": -10 } } } }
-            },
-            {
-              "id": "social_gathering",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": { "tags": ["social", "gathering"], "keywords": ["聚餐", "聚会", "约饭", "喝酒", "KTV"] },
-              "effects": { "stats": { "changes": { "dim5": { "delta": 5, "min": 0 }, "happiness": { "delta": 5, "min": 0 } } } }
-            },
-            {
-              "id": "overtime_work",
-              "priority": 15,
-              "stackStrategy": "add",
-              "trigger": { "tags": ["work", "overtime"], "keywords": ["加班", "熬夜", "赶项目", "deadline", "通宵"] },
-              "effects": { "stats": { "changes": { "血量": { "delta": -15, "min": 0 }, "体力值": { "delta": -20, "min": 0 }, "dim1": { "delta": -5, "min": 0 } } } }
-            },
-            {
-              "id": "blind_date",
-              "priority": 10,
-              "stackStrategy": "add",
-              "trigger": { "tags": ["dating", "romance"], "keywords": ["相亲", "约会", "暧昧", "表白", "恋爱"] },
-              "effects": { "stats": { "changes": { "romance": { "delta": 10, "min": 0 } } } }
-            },
-            {
-              "id": "cooking_meal",
-              "priority": 5,
-              "stackStrategy": "add",
-              "trigger": { "tags": ["cooking", "meal"], "keywords": ["做饭", "下厨", "厨艺", "菜谱", "厨房"] },
-              "effects": { "stats": { "changes": { "dim4": { "delta": 3, "min": 0 }, "happiness": { "delta": 5, "min": 0 } } } }
-            },
-            {
-              "id": "family_pressure",
-              "priority": 15,
-              "stackStrategy": "add",
-              "trigger": { "tags": ["family", "pressure"], "keywords": ["催婚", "催生", "相亲对象", "过年", "回家"] },
-              "effects": { "stats": { "changes": { "happiness": { "delta": -15, "min": 0 } } } }
-            }
-          ],
-          "periodicEvents": [
-            {
-              "id": "quarterly_rent",
-              "name": "季度房租",
-              "description": "每三个月交一次房租，提醒你在这座城市的成本。",
-              "intervalTicks": 90,
-              "effects": { "stats": { "changes": { "happiness": { "delta": -5 } } } },
-              "narrateToAI": true
-            },
-            {
-              "id": "weekly_gathering",
-              "name": "周末聚餐",
-              "description": "和朋友或同事的周末聚餐，维持社交关系。",
-              "intervalTicks": 7,
-              "effects": { "stats": { "changes": { "dim5": { "delta": 3, "min": 0 }, "happiness": { "delta": 3, "min": 0 } } } },
-              "narrateToAI": true
-            },
-            {
-              "id": "holiday_family",
-              "name": "节假日回家",
-              "description": "过年过节回家，面对七大姑八大姨的灵魂拷问。",
-              "intervalTicks": 30,
-              "offsetTicks": 15,
-              "effects": { "stats": { "changes": { "happiness": { "delta": -10, "min": 0 } } } },
-              "narrateToAI": true
-            }
-          ],
           "worldStateRules": [],
           "worldStateAxes": {
-            "生活节奏": ["忙碌", "悠闲"],
-            "情感状态": ["单身", "暧昧", "恋爱", "已婚"]
+            "生活节奏": [
+              "忙碌",
+              "悠闲"
+            ],
+            "情感状态": [
+              "单身",
+              "暧昧",
+              "恋爱",
+              "已婚"
+            ]
           },
           "narrativeGuardrails": {
-            "maxDeltaPerStat": { "*": 15 },
+            "maxDeltaPerStat": {
+              "*": 15
+            },
             "maxDeltaPerResource": {},
             "setAllowedVars": [],
             "allowCreateResources": false
@@ -136,12 +152,22 @@
         "constant": true,
         "order": 1,
         "position": "before_char",
-        "meta": { "location": "某二线城市（公司附近/居住区/商圈/城市边缘）", "timePeriod": "当代，秋天", "atmosphere": "平凡、琐碎、偶尔疲惫、但总有小确幸" }
+        "meta": {
+          "location": "某二线城市（公司附近/居住区/商圈/城市边缘）",
+          "timePeriod": "当代，秋天",
+          "atmosphere": "平凡、琐碎、偶尔疲惫、但总有小确幸"
+        }
       },
       {
         "uid": 2,
         "entryType": "lore",
-        "key": ["公司", "写字楼", "办公室", "工位", "加班"],
+        "key": [
+          "公司",
+          "写字楼",
+          "办公室",
+          "工位",
+          "加班"
+        ],
         "comment": "写字楼·你的第二战场",
         "content": "你的工位在开放式办公区的中间位置，左边是摸鱼达人，右边是卷王。领导坐在角落的独立办公室，但他的目光能扫到每一个人。\n\n办公室有几条不成文的规矩：\n- 茶水间是消息集散地，但不要在那里说领导坏话。\n- 午休时间不要找人聊工作，除非你想被拉黑。\n- 下班时间是理论值，实际下班时间取决于领导走没走。\n- 周末的微信消息，可以假装没看到，但周一要解释\"手机没电了\"。\n\n写字楼的电梯是最尴尬的地方——和领导同乘一部电梯，聊什么？聊天气。聊完天气呢？沉默。沉默到几楼？沉默到领导先出电梯。",
         "constant": false,
@@ -151,7 +177,13 @@
       {
         "uid": 3,
         "entryType": "lore",
-        "key": ["小区", "出租屋", "租房", "公寓", "家"],
+        "key": [
+          "小区",
+          "出租屋",
+          "租房",
+          "公寓",
+          "家"
+        ],
         "comment": "出租屋·你的避风港",
         "content": "你的出租屋不大，可能是一室一厅，也可能是合租的单间。但它是最私密的空间——你可以在这里不穿裤子、不洗头、不化妆。\n\n出租屋的装修是房东十年前的审美，沙发套是上一任租客留下的，窗帘是你自己换的。墙上可能贴着爱豆海报，也可能什么都没贴——毕竟\"这是租的房子，不是家\"。\n\n但住了半年后，你会发现：牙刷有固定的位置，外卖备注不用再写地址，楼下保安认识你的脸。出租屋开始有了\"家\"的感觉——虽然你知道，可能下个季度就要搬走了。",
         "constant": false,
@@ -161,7 +193,13 @@
       {
         "uid": 4,
         "entryType": "lore",
-        "key": ["便利店", "小卖部", "买烟", "买水", "零食"],
+        "key": [
+          "便利店",
+          "小卖部",
+          "买烟",
+          "买水",
+          "零食"
+        ],
         "comment": "楼下便利店·深夜补给站",
         "content": "楼下那家便利店，你闭着眼都能找到货架上的泡面在哪。老板认识你，知道你买什么烟、喝什么饮料、半夜几点来买宵夜。\n\n便利店是都市人的深夜避难所。加班到凌晨，推开门，灯光亮得让人眯眼，货架上整整齐齐的零食让人莫名安心。买一罐冰可乐，站在门口喝完，然后回家继续改方案。\n\n老板偶尔会问：\"最近怎么又瘦了？\"你笑笑说\"减肥\"，他递过找零，不再多问。这种恰到好处的关心，是都市人最舒服的社交距离。",
         "constant": false,
@@ -177,128 +215,268 @@
         "constant": true,
         "order": 5,
         "position": "before_char",
-        "meta": { "powerSystem": "生活技能、社交能力、经济独立", "socialStructure": "同事、邻居、朋友、家人四个圈子", "specialRules": ["同事不是朋友，离职后大概率失联", "邻居保持点头之交，太近会变麻烦", "朋友贵精不贵多", "相亲第一次喝咖啡，方便撤退"] }
+        "meta": {
+          "powerSystem": "生活技能、社交能力、经济独立",
+          "socialStructure": "同事、邻居、朋友、家人四个圈子",
+          "specialRules": [
+            "同事不是朋友，离职后大概率失联",
+            "邻居保持点头之交，太近会变麻烦",
+            "朋友贵精不贵多",
+            "相亲第一次喝咖啡，方便撤退"
+          ]
+        }
       },
       {
         "uid": 6,
         "entryType": "factions",
-        "key": ["公司同事圈"],
+        "key": [
+          "公司同事圈"
+        ],
         "comment": "公司同事圈",
         "content": "每天相处时间最长的人。可以一起吃午饭、吐槽加班、拼奶茶。但记住：同事不是朋友，离职后大概率不再联系。圈子大小取决于你的职位——普通员工只认识本部门，管理层能跨部门社交。",
         "constant": false,
         "order": 6,
         "position": "before_char",
-        "meta": { "factions": [{ "name": "公司同事圈", "description": "每天相处时间最长的人，可以一起吃饭吐槽，但离职后大概率失联。", "alignment": "工作关系/中立" }] }
+        "meta": {
+          "factions": [
+            {
+              "name": "公司同事圈",
+              "description": "每天相处时间最长的人，可以一起吃饭吐槽，但离职后大概率失联。",
+              "alignment": "工作关系/中立"
+            }
+          ]
+        }
       },
       {
         "uid": 7,
         "entryType": "factions",
-        "key": ["小区邻里圈", "邻居圈"],
+        "key": [
+          "小区邻里圈",
+          "邻居圈"
+        ],
         "comment": "小区邻里圈",
         "content": "点头之交为主。楼下小卖部老板知道你买什么烟，保安知道你几点回家，邻居阿姨会问你\"怎么又这么晚\"。偶尔需要帮忙收快递、借个酱油。关系好的可以互相照应，关系差的只能忍耐噪音。",
         "constant": false,
         "order": 7,
         "position": "before_char",
-        "meta": { "factions": [{ "name": "小区邻里圈", "description": "点头之交为主，小卖部老板、保安、邻居阿姨构成的日常社交网。", "alignment": "居住关系/友善" }] }
+        "meta": {
+          "factions": [
+            {
+              "name": "小区邻里圈",
+              "description": "点头之交为主，小卖部老板、保安、邻居阿姨构成的日常社交网。",
+              "alignment": "居住关系/友善"
+            }
+          ]
+        }
       },
       {
         "uid": 8,
         "entryType": "factions",
-        "key": ["老友圈", "老友"],
+        "key": [
+          "老友圈",
+          "老友"
+        ],
         "comment": "老友圈",
         "content": "大学室友、高中同学、发小。见面频率不高（可能一年一两次），但见了面就能聊到半夜。这群人知道你的黑历史，是最后的退路。",
         "constant": false,
         "order": 8,
         "position": "before_char",
-        "meta": { "factions": [{ "name": "老友圈", "description": "大学室友、高中同学、发小，见面少但知道你黑历史的人。", "alignment": "学生时代遗留/亲密" }] }
+        "meta": {
+          "factions": [
+            {
+              "name": "老友圈",
+              "description": "大学室友、高中同学、发小，见面少但知道你黑历史的人。",
+              "alignment": "学生时代遗留/亲密"
+            }
+          ]
+        }
       },
       {
         "uid": 9,
         "entryType": "factions",
-        "key": ["兴趣社群圈", "健身", "读书会", "跑步团"],
+        "key": [
+          "兴趣社群圈",
+          "健身",
+          "读书会",
+          "跑步团"
+        ],
         "comment": "兴趣社群圈",
         "content": "健身房、读书会、宠物群、跑步团。因为共同爱好聚在一起，关系轻松无压力。可能发展成朋友，也可能只是\"点赞之交\"。这群人的特点是：见面聊得很开心，但不加微信也无所谓。",
         "constant": false,
         "order": 9,
         "position": "before_char",
-        "meta": { "factions": [{ "name": "兴趣社群圈", "description": "健身房、读书会、宠物群等因爱好聚在一起的轻松社交。", "alignment": "主动社交/轻松" }] }
+        "meta": {
+          "factions": [
+            {
+              "name": "兴趣社群圈",
+              "description": "健身房、读书会、宠物群等因爱好聚在一起的轻松社交。",
+              "alignment": "主动社交/轻松"
+            }
+          ]
+        }
       },
       {
         "uid": 10,
         "entryType": "factions",
-        "key": ["家庭亲戚圈", "父母", "亲戚", "七大姑八大姨"],
+        "key": [
+          "家庭亲戚圈",
+          "父母",
+          "亲戚",
+          "七大姑八大姨"
+        ],
         "comment": "家庭亲戚圈",
         "content": "父母、七大姑八大姨。过年过节必须见面，催婚催生是保留节目。关系好不好不重要，重要的是\"你得出现\"。你可以选择敷衍、硬刚、或者不回去，但不回去会被念叨一整年。",
         "constant": false,
         "order": 10,
         "position": "before_char",
-        "meta": { "factions": [{ "name": "家庭亲戚圈", "description": "父母、七大姑八大姨，过年过节必须面对，催婚催生是保留节目。", "alignment": "血缘关系/复杂" }] }
+        "meta": {
+          "factions": [
+            {
+              "name": "家庭亲戚圈",
+              "description": "父母、七大姑八大姨，过年过节必须面对，催婚催生是保留节目。",
+              "alignment": "血缘关系/复杂"
+            }
+          ]
+        }
       },
       {
         "uid": 11,
         "entryType": "npcs",
-        "key": ["房东", "中介"],
+        "key": [
+          "房东",
+          "中介"
+        ],
         "comment": "房东/中介",
         "content": "你的房东可能是本地拆迁户，也可能是投资客。平时不出现，涨租时准时联系。中介则是那个\"哥/姐你看这套房不错\"的人，签约前热情似火，签约后人间蒸发。",
         "constant": false,
         "order": 8,
         "position": "before_char",
-        "meta": { "npcs": [{ "name": "房东/中介", "role": "居住相关/涨租触发器", "description": "平时不出现，涨租时准时联系。中介签约前热情似火，签约后人间蒸发。", "personality": "房东：精明、算账清楚；中介：热情、有业绩压力" }] }
+        "meta": {
+          "npcs": [
+            {
+              "name": "房东/中介",
+              "role": "居住相关/涨租触发器",
+              "description": "平时不出现，涨租时准时联系。中介签约前热情似火，签约后人间蒸发。",
+              "personality": "房东：精明、算账清楚；中介：热情、有业绩压力"
+            }
+          ]
+        }
       },
       {
         "uid": 12,
         "entryType": "npcs",
-        "key": ["便利店老板"],
+        "key": [
+          "便利店老板"
+        ],
         "comment": "便利店老板",
         "content": "楼下小卖部或便利店的老板，知道你买什么烟、喝什么饮料、半夜几点来买泡面。偶尔赊账可以，但别超过一周。",
         "constant": false,
         "order": 9,
         "position": "before_char",
-        "meta": { "npcs": [{ "name": "便利店老板", "role": "日常补给/信息节点", "description": "知道你买什么烟、喝什么饮料、半夜几点来买泡面。偶尔可以赊账。", "personality": "热情、记性好、爱聊天" }] }
+        "meta": {
+          "npcs": [
+            {
+              "name": "便利店老板",
+              "role": "日常补给/信息节点",
+              "description": "知道你买什么烟、喝什么饮料、半夜几点来买泡面。偶尔可以赊账。",
+              "personality": "热情、记性好、爱聊天"
+            }
+          ]
+        }
       },
       {
         "uid": 13,
         "entryType": "npcs",
-        "key": ["同事", "领导"],
+        "key": [
+          "同事",
+          "领导"
+        ],
         "comment": "同事/领导",
         "content": "你的直属领导决定了你加班的频率和请假的难度。同事里有可以一起摸鱼的，也有背后捅刀子的。茶水间是消息集散地。",
         "constant": false,
         "order": 10,
         "position": "before_char",
-        "meta": { "npcs": [{ "name": "同事/领导", "role": "职场关系/工作触发器", "description": "直属领导决定加班频率，请假难度。同事里有可以摸鱼的，也有背后捅刀子的。", "personality": "因人而异，职场生态" }] }
+        "meta": {
+          "npcs": [
+            {
+              "name": "同事/领导",
+              "role": "职场关系/工作触发器",
+              "description": "直属领导决定加班频率，请假难度。同事里有可以摸鱼的，也有背后捅刀子的。",
+              "personality": "因人而异，职场生态"
+            }
+          ]
+        }
       },
       {
         "uid": 14,
         "entryType": "npcs",
-        "key": ["邻居"],
+        "key": [
+          "邻居"
+        ],
         "comment": "邻居",
         "content": "隔壁可能是独居老人、年轻情侣、或者养了三只猫的独居女生。偶尔互相帮忙收快递，但深夜的音乐声是个敏感话题。",
         "constant": false,
         "order": 11,
         "position": "before_char",
-        "meta": { "npcs": [{ "name": "邻居", "role": "居住社交/日常接触", "description": "隔壁可能是独居老人、年轻情侣、或养猫的独居女生。偶尔互相帮忙。", "personality": "友善但有距离感" }] }
+        "meta": {
+          "npcs": [
+            {
+              "name": "邻居",
+              "role": "居住社交/日常接触",
+              "description": "隔壁可能是独居老人、年轻情侣、或养猫的独居女生。偶尔互相帮忙。",
+              "personality": "友善但有距离感"
+            }
+          ]
+        }
       },
       {
         "uid": 15,
         "entryType": "npcs",
-        "key": ["相亲对象"],
+        "key": [
+          "相亲对象"
+        ],
         "comment": "相亲对象",
         "content": "通过朋友介绍、相亲APP、或者父母安排认识的异性。第一次见面通常在咖啡店，聊得来就加微信，聊不来就\"我有点事先走了\"。",
         "constant": false,
         "order": 12,
         "position": "before_char",
-        "meta": { "npcs": [{ "name": "相亲对象", "role": "情感线/随机触发", "description": "通过介绍或APP认识的异性，第一次见面通常在咖啡店。", "personality": "因人而异，第一次见面都是表演" }] }
+        "meta": {
+          "npcs": [
+            {
+              "name": "相亲对象",
+              "role": "情感线/随机触发",
+              "description": "通过介绍或APP认识的异性，第一次见面通常在咖啡店。",
+              "personality": "因人而异，第一次见面都是表演"
+            }
+          ]
+        }
       },
       {
         "uid": 16,
         "entryType": "economy",
-        "key": ["花钱", "消费", "买单", "价格", "买东西", "付钱", "工资", "收入"],
+        "key": [
+          "花钱",
+          "消费",
+          "买单",
+          "价格",
+          "买东西",
+          "付钱",
+          "工资",
+          "收入"
+        ],
         "comment": "经济系统",
         "content": "【货币】人民币（¥），每月工资到账日是最开心的一天。\n\n【生活成本】\n- **房租**：1500-3000元/月（看地段，合租便宜，整租贵）\n- **通勤**：地铁2-6元/次，打车15-50元/次\n- **外卖**：20-50元/餐，自己做饭可以省一半\n- **聚餐**：100-300元/次（AA或轮流请）\n- **咖啡**：15-35元/杯，奶茶10-25元/杯\n- **健身**：月卡200-500元，私教课200-500元/节\n- **宠物**：猫粮狗粮+疫苗+驱虫，每月500-1000元\n- **相亲**：咖啡30-60元，吃饭200-500元\n\n【经济压力】\n工资到账 → 交房租 → 还花呗 → 剩下的才是生活费。月底吃土是常态，但下个月又是一条好汉。",
         "constant": false,
         "order": 13,
         "position": "before_char",
-        "meta": { "currency": { "name": "人民币", "symbol": "¥", "description": "每月工资到账是最开心的一天" }, "priceLevel": "房租>聚餐>外卖>通勤>咖啡" }
+        "meta": {
+          "currency": {
+            "name": "人民币",
+            "symbol": "¥",
+            "description": "每月工资到账是最开心的一天"
+          },
+          "priceLevel": "房租>聚餐>外卖>通勤>咖啡"
+        }
       },
       {
         "uid": 17,
@@ -309,7 +487,52 @@
         "constant": true,
         "order": 14,
         "position": "before_char",
-        "meta": { "events": [{ "name": "季度涨租", "trigger": "每3个月", "description": "房东通知涨租，你可以接受、谈判、或搬家。", "significance": "major" }, { "name": "周末聚餐", "trigger": "每周", "description": "朋友或同事约饭，去了要花钱，不去会落单。", "significance": "minor" }, { "name": "节假日回家", "trigger": "过年过节", "description": "面对父母和亲戚的催婚催生。", "significance": "major" }, { "name": "深夜加班", "trigger": "随机", "description": "领导要求今晚改完方案。", "significance": "minor" }, { "name": "相亲局", "trigger": "随机", "description": "第一次见面在咖啡店。", "significance": "minor" }, { "name": "宠物生病", "trigger": "随机", "description": "带宠物去宠物医院。", "significance": "minor" }, { "name": "深夜emo", "trigger": "随机", "description": "凌晨两点突然觉得人生好难。", "significance": "minor" }] }
+        "meta": {
+          "events": [
+            {
+              "name": "季度涨租",
+              "trigger": "每3个月",
+              "description": "房东通知涨租，你可以接受、谈判、或搬家。",
+              "significance": "major"
+            },
+            {
+              "name": "周末聚餐",
+              "trigger": "每周",
+              "description": "朋友或同事约饭，去了要花钱，不去会落单。",
+              "significance": "minor"
+            },
+            {
+              "name": "节假日回家",
+              "trigger": "过年过节",
+              "description": "面对父母和亲戚的催婚催生。",
+              "significance": "major"
+            },
+            {
+              "name": "深夜加班",
+              "trigger": "随机",
+              "description": "领导要求今晚改完方案。",
+              "significance": "minor"
+            },
+            {
+              "name": "相亲局",
+              "trigger": "随机",
+              "description": "第一次见面在咖啡店。",
+              "significance": "minor"
+            },
+            {
+              "name": "宠物生病",
+              "trigger": "随机",
+              "description": "带宠物去宠物医院。",
+              "significance": "minor"
+            },
+            {
+              "name": "深夜emo",
+              "trigger": "随机",
+              "description": "凌晨两点突然觉得人生好难。",
+              "significance": "minor"
+            }
+          ]
+        }
       },
       {
         "uid": 18,
@@ -320,7 +543,38 @@
         "constant": true,
         "order": 15,
         "position": "before_char",
-        "meta": { "relationships": { "description": "都市人的关系由暧昧、恋爱、同事、老友、邻居、家人六种类型构成。", "mechanics": "关系需要主动维护：暧昧要主动、恋爱要经营、朋友要维护、家人要应付。", "types": [{ "name": "暧昧对象", "description": "有好感但未确认，每天聊天但谁都没捅破窗户纸。" }, { "name": "男/女朋友", "description": "确认关系的恋人。" }, { "name": "同事", "description": "工作关系，离职后大概率失联。" }, { "name": "老友", "description": "学生时代的朋友，知道你黑历史。" }, { "name": "邻居", "description": "点头之交，偶尔帮忙收快递。" }, { "name": "家人", "description": "父母、亲戚，催婚催生是保留节目。" }] } }
+        "meta": {
+          "relationships": {
+            "description": "都市人的关系由暧昧、恋爱、同事、老友、邻居、家人六种类型构成。",
+            "mechanics": "关系需要主动维护：暧昧要主动、恋爱要经营、朋友要维护、家人要应付。",
+            "types": [
+              {
+                "name": "暧昧对象",
+                "description": "有好感但未确认，每天聊天但谁都没捅破窗户纸。"
+              },
+              {
+                "name": "男/女朋友",
+                "description": "确认关系的恋人。"
+              },
+              {
+                "name": "同事",
+                "description": "工作关系，离职后大概率失联。"
+              },
+              {
+                "name": "老友",
+                "description": "学生时代的朋友，知道你黑历史。"
+              },
+              {
+                "name": "邻居",
+                "description": "点头之交，偶尔帮忙收快递。"
+              },
+              {
+                "name": "家人",
+                "description": "父母、亲戚，催婚催生是保留节目。"
+              }
+            ]
+          }
+        }
       },
       {
         "uid": 19,
@@ -331,12 +585,25 @@
         "constant": true,
         "order": 16,
         "position": "before_char",
-        "meta": { "highlights": ["每一天都是重复，但偶尔会有意外", "社交不是战斗，是试探", "生活的质感藏在细节里", "无论卷或躺，房租都要交"] }
+        "meta": {
+          "highlights": [
+            "每一天都是重复，但偶尔会有意外",
+            "社交不是战斗，是试探",
+            "生活的质感藏在细节里",
+            "无论卷或躺，房租都要交"
+          ]
+        }
       },
       {
         "uid": 20,
         "entryType": "culture",
-        "key": ["文化", "潜规则", "社交", "都市", "生活"],
+        "key": [
+          "文化",
+          "潜规则",
+          "社交",
+          "都市",
+          "生活"
+        ],
         "comment": "都市生存潜规则",
         "content": "都市生活有自己的潜规则，没人教你，但违反了会被默默拉黑。\n\n**第一条·微信消息不要秒回**：尤其是暧昧阶段，秒回显得你太闲。最佳回复间隔是5-15分钟。\n\n**第二条·朋友圈分组可见**：领导看不到你深夜蹦迪，父母看不到你酒吧买醉。朋友圈是表演，分组是保护。\n\n**第三条·AA是默认规则**：除非明确说\"我请\"，否则聚餐AA。\n\n**第四条·不要问工资**：问工资是社交禁忌。\n\n**第五条·深夜消息要谨慎**：晚上10点后发消息，除非是紧急事情，否则会被认为\"不懂规矩\"。\n\n**第六条·不要在公司交朋友**：可以一起吃饭、吐槽、摸鱼，但不要交心。",
         "constant": false,
@@ -346,12 +613,89 @@
       {
         "uid": -1,
         "entryType": "module_rule",
-        "key": ["体力", "精力", "健康", "颜值", "情商", "厨艺", "社交", "品味", "暧昧值", "幸福感", "属性", "数值", "状态"],
+        "key": [
+          "体力",
+          "精力",
+          "健康",
+          "颜值",
+          "情商",
+          "厨艺",
+          "社交",
+          "品味",
+          "暧昧值",
+          "幸福感",
+          "属性",
+          "数值",
+          "状态"
+        ],
         "comment": "数值属性规则",
         "content": "【数值属性更新规则】\n\n当角色受到伤害/恢复/消耗/提升时，更新对应属性：\n{\"玩家\":{\"生存状态\":{\"血量\":75}}}  // 体力变化\n{\"玩家\":{\"生存状态\":{\"体力值\":55}}}  // 精力变化\n{\"玩家\":{\"生存状态\":{\"dim1\":47}}}  // 六维变化\n{\"玩家\":{\"生存状态\":{\"romance\":15}}}  // 特色属性变化\n\n注意：\n- 只输出发生变化的属性，未变化的不要输出\n- 属性值不能超过 range[1] 上限\n- 属性值不能低于 range[0] 下限\n\n─── 属性体系 ───\n生命类：体力（上限100）——身体的续航能力，加班/熬夜/运动都会消耗\n能量类：精力（上限100）——处理工作和社交的心理能量，耗尽时会摆烂\n六维属性：\n- 健康（0-100）：身体状态，影响加班承受力、生病概率、熬夜后的恢复速度\n- 颜值（0-100）：外貌与气质，影响第一印象、相亲成功率、被搭讪概率\n- 情商（0-100）：读懂氛围、处理关系、说对话的能力\n- 厨艺（0-100）：做饭水平，影响生活质量、招待朋友的效果\n- 社交（0-100）：朋友圈大小与质量，影响找人帮忙、获取信息\n- 品味（0-100）：穿搭、审美、生活格调\n特色属性：\n- 暧昧值（0-100）：与异性互动时的氛围吸引力\n- 幸福感（0-100）：对生活的综合满意度",
         "constant": false,
         "order": 51,
         "position": "after_char"
+      }
+    ],
+    "eventPacks": [
+      {
+        "id": "world:desire_metropolis",
+        "name": "烟火人间 周期事件",
+        "periodicRules": [
+          {
+            "id": "quarterly_rent",
+            "name": "季度房租",
+            "description": "每三个月交一次房租，提醒你在这座城市的成本。",
+            "intervalTicks": 90,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "happiness": {
+                    "delta": -5
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "weekly_gathering",
+            "name": "周末聚餐",
+            "description": "和朋友或同事的周末聚餐，维持社交关系。",
+            "intervalTicks": 7,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "dim5": {
+                    "delta": 3,
+                    "min": 0
+                  },
+                  "happiness": {
+                    "delta": 3,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          },
+          {
+            "id": "holiday_family",
+            "name": "节假日回家",
+            "description": "过年过节回家，面对七大姑八大姨的灵魂拷问。",
+            "intervalTicks": 30,
+            "offsetTicks": 15,
+            "effects": {
+              "stats": {
+                "changes": {
+                  "happiness": {
+                    "delta": -10,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            "narrateToAI": true
+          }
+        ]
       }
     ]
   }

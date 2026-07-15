@@ -51,8 +51,8 @@ export function findWorldDef(worldId: string): WorldDef | undefined {
   return WORLDS.find(w => w.id === worldId);
 }
 
-/** 获取指定世界的嵌入式世界书条目（修复 entryId: null 问题） */
+/** 获取指定世界的嵌入式世界书条目（自建世界优先，内置兜底） */
 export function getWorldBookEntriesForWorld(worldId: string): WorldBookEntryDef[] {
-  const world = getWorldById(worldId);
+  const world = findWorldDef(worldId);
   return world?.worldBookEntries ?? [];
 }

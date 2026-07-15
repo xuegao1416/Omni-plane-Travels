@@ -8,6 +8,7 @@ import { useConfigStore } from '../stores/configStore';
 import { useMemoryStore } from '../memory/memoryStore';
 import { getEngineState } from '../simulation/SimulationApi';
 import { STORAGE_KEYS } from '../config/storageKeys';
+import { findWorldDef } from '../data/worldLoader';
 
 /** 创建带默认值的 PlayerProfile（旧存档缺失字段时兜底） */
 function withProfileDefaults(raw: Partial<PlayerProfile> | null | undefined): PlayerProfile | null {
@@ -21,7 +22,7 @@ function withProfileDefaults(raw: Partial<PlayerProfile> | null | undefined): Pl
   };
 }
 
-type Screen = 'start' | 'settings' | 'game';
+type Screen = 'start' | 'settings' | 'game' | 'mods';
 
 interface AppState {
   currentScreen: Screen;

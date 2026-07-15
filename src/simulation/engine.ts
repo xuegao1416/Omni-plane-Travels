@@ -19,13 +19,18 @@ import type {
   SimWorldContext, SimulationSnapshot,
 } from './types';
 import type {
-  SimulationRules, ModuleEffects, EffectLogEntry,
+  WorldDynamics, ModuleEffects, EffectLogEntry,
   SimulationRuntimeState, ResourceEvolutionStep,
 } from '../modules/schema';
 import { createEmptySimState, createDefaultWorldContext } from './types';
 import type { GameState, NPCData } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
+import { eventWorldEvolution, collectAddCardEvents, getPeriodicRules } from '../modules/eventIntegration';
+import { resolvePendingChoices } from '../modules/eventChoiceState';
+import { useSaveStore } from '../stores/saveStore';
+import type { WorldContext } from '../modules/schema';
+import { eventBus, EVENTS } from '../engine/eventBus';
 import { buildSimulationPrompt, parseSimulationResponse } from './llmIntegration';
 import { SIM_STORAGE_KEY } from './storage';
 
@@ -51,13 +56,6 @@ export class WorldSimulationEngine {
   private _worldContext: SimWorldContext | null = null;
   /** 状态变更回调（供 UI store 同步用） */
   onStateChange: ((state: SimulationState) => void) | null = null;
-
-  /** tag → rule 索引（性能优化，预建索引避免每轮遍历） */
-  private _tagRuleIndex: Map<string, SimulationRules['eventEffects']> = new Map();
-  /** keyword → rule 索引 */
-  private _keywordRuleIndex: Map<string, SimulationRules['eventEffects']> = new Map();
-  /** 当前规则的版本（用于检测规则变化，重建索引） */
-  private _rulesVersion: number = 0;
 
   constructor(state?: SimulationState) {
     this.state = state ?? createEmptySimState();
@@ -275,7 +273,7 @@ export class WorldSimulationEngine {
     round: number,
     worldSetting: string,
     preset?: SimPreset,
-    simRules?: SimulationRules | null,
+    simRules?: WorldDynamics | null,
     recentConversation?: string,
     resourceEvolution?: ResourceEvolutionStep[],
   ): Promise<SimGenerationResult | null> {
@@ -291,7 +289,7 @@ export class WorldSimulationEngine {
     this.advanceExistingEvents(gameState);
 
     // 2. 机械层结算（周期事件 + 事件效果匹配）
-    const { effects: mechanicalEffects, log: effectLog } = this.resolveMechanicalEffects(gameState, simRules ?? null);
+    const { effects: mechanicalEffects, log: effectLog } = this.resolveMechanicalEffects(gameState);
 
     // 3. 构建推演上下文
     const context = this.buildSimContext(gameState, gameTime, worldSetting, recentConversation);
@@ -361,6 +359,44 @@ export class WorldSimulationEngine {
       }
 
       this.saveState();
+
+      // 10. 应用按存档绑定的 mod 规则（每 tick 确定性求值；异常隔离，不拖垮内核）
+      //     gameState 即 varMgr 的实时状态引用，写回后变量自动生效。
+      try {
+        const { ctx: newCtx, results } = eventWorldEvolution.evaluateTick(
+          gameState as unknown as WorldContext,
+          this.state.tickCount,
+          [],
+        );
+        const live = gameState as unknown as Record<string, unknown>;
+        if (newCtx !== (gameState as unknown as WorldContext)) {
+          for (const k of Object.keys(newCtx)) {
+            live[k] = (newCtx as Record<string, unknown>)[k];
+          }
+        }
+        // 10.1 收集 addCard 动作并广播（CardOverlay 订阅后弹卡；逐条 try/catch 隔离）
+        try {
+          for (const ev of collectAddCardEvents(results)) {
+            eventBus.emit(EVENTS.EVENT_CARD, ev);
+          }
+        } catch (emitErr) {
+          console.warn('[WorldSim] Mod 卡片事件广播失败（已忽略）:', emitErr);
+        }
+
+        // 10.2 结算玩家待定的选择卡（路径 C）：应用最终选中项的 delta 到 stat，
+        //      并把 aiNote 记入玩家决策日志（供下一轮 AI 叙事）。逐条 try/catch 隔离。
+        try {
+          const saveId = useSaveStore.getState().currentSaveId ?? undefined;
+          if (saveId) {
+            resolvePendingChoices(gameState as unknown as GameState, saveId);
+          }
+        } catch (choiceErr) {
+          console.warn('[WorldSim] 选择卡结算失败（已忽略）:', choiceErr);
+        }
+      } catch (err) {
+        console.warn('[WorldSim] Mod 规则求值失败（已隔离，不影响内核）:', err);
+      }
+
       return generation;
     } catch (err) {
       console.error('[WorldSim] 推演失败:', err);
@@ -816,42 +852,10 @@ export class WorldSimulationEngine {
     this.saveState();
   }
 
-  // ─── 规则索引管理 ───
-
-  /**
-   * 构建 tag/keyword → rule 索引
-   * 当规则变化时调用，避免每轮遍历所有规则
-   */
-  buildRuleIndex(rules: SimulationRules): void {
-    this._tagRuleIndex.clear();
-    this._keywordRuleIndex.clear();
-
-    for (const effect of rules.eventEffects) {
-      // 索引 tag
-      if (effect.trigger.tags) {
-        for (const tag of effect.trigger.tags) {
-          const existing = this._tagRuleIndex.get(tag) ?? [];
-          existing.push(effect);
-          this._tagRuleIndex.set(tag, existing);
-        }
-      }
-
-      // 索引 keyword
-      if (effect.trigger.keywords) {
-        for (const keyword of effect.trigger.keywords) {
-          const lowerKeyword = keyword.toLowerCase();
-          const existing = this._keywordRuleIndex.get(lowerKeyword) ?? [];
-          existing.push(effect);
-          this._keywordRuleIndex.set(lowerKeyword, existing);
-        }
-      }
-    }
-  }
-
   // ─── 机械层结算 ───
 
   /**
-   * 机械层结算：周期事件 + 事件效果匹配
+   * 机械层结算：周期事件（事件效果匹配已移至事件包系统）
    * 不经 AI，直接确定性结算
    *
    * @param gameState 当前游戏状态
@@ -860,12 +864,7 @@ export class WorldSimulationEngine {
    */
   resolveMechanicalEffects(
     gameState: GameState,
-    rules: SimulationRules | null,
   ): { effects: ModuleEffects; log: EffectLogEntry[] } {
-    if (!rules) {
-      return { effects: {}, log: [] };
-    }
-
     const runtime = gameState.simulationRuntime;
     if (!runtime) {
       return { effects: {}, log: [] };
@@ -875,8 +874,8 @@ export class WorldSimulationEngine {
     const effectLog: EffectLogEntry[] = [];
     const currentTick = runtime.tick;
 
-    // 1. 周期事件结算
-    for (const periodic of rules.periodicEvents) {
+    // 1. 周期事件结算（从事件系统的周期注册表读取，沿用原计数器/merge 逻辑）
+    for (const periodic of getPeriodicRules()) {
       // 推进计数器
       const counter = (runtime.periodicCounters[periodic.id] ?? 0) + 1;
       runtime.periodicCounters[periodic.id] = counter;
@@ -897,42 +896,10 @@ export class WorldSimulationEngine {
       }
     }
 
-    // 2. 事件效果匹配（使用索引优化）
-    const activeEvents = Object.values(this.state.events)
-      .filter(e => e.status === 'active' || e.status === 'brewing');
-
-    // 如果规则变化，重建索引
-    const rulesHash = rules.eventEffects.length;
-    if (rulesHash !== this._rulesVersion) {
-      this.buildRuleIndex(rules);
-      this._rulesVersion = rulesHash;
-    }
-
-    // 使用索引匹配
-    const matchedEffectIds = new Set<string>();
-
-    for (const event of activeEvents) {
-      const eventText = `${event.title} ${event.description}`.toLowerCase();
-
-      // 按 keyword 匹配（使用索引）
-      for (const [keyword, effects] of this._keywordRuleIndex.entries()) {
-        if (eventText.includes(keyword)) {
-          for (const effect of effects) {
-            if (!matchedEffectIds.has(effect.id)) {
-              matchedEffectIds.add(effect.id);
-
-              // 检查其他条件（eventLevel, severityMin）
-              if (this.matchEventEffect(event, effect)) {
-                this.mergeModuleEffects(mergedEffects, effect.effects);
-                effectLog.push(...this.createEffectLogEntries(
-                  currentTick, 'rule', effect.id, effect.effects, `事件触发: ${event.title}`
-                ));
-              }
-            }
-          }
-        }
-      }
-    }
+    // 注：周期事件（periodicEvents）已作为周期卡搬入事件系统（eventWorldEvolution），
+    // 此处机械层仅负责从周期注册表读取并按 tick 静默结算（沿用 mergeModuleEffects）。
+    // 事件触发职责亦由事件包系统（事件卡）承担，内核不再内置 eventEffects 匹配，
+    // 避免与原生事件卡双触发（-400 坑）。
 
     return { effects: mergedEffects, log: effectLog };
   }
@@ -1020,48 +987,6 @@ export class WorldSimulationEngine {
     }
 
     return { effects: mergedEffects, log: effectLog };
-  }
-
-  /**
-   * 匹配事件与事件效果
-   */
-  private matchEventEffect(
-    event: SimEvent,
-    effect: { trigger: { tags?: string[]; eventType?: string; eventLevel?: string; severityMin?: number; keywords?: string[] } },
-  ): boolean {
-    const trigger = effect.trigger;
-
-    // 优先匹配 tag（如果事件有 tag）
-    if (trigger.tags && trigger.tags.length > 0) {
-      // 事件的 tag 可以从 description/title 中提取，或者事件本身有 tag 字段
-      // 这里暂时用 keyword 兜底
-    }
-
-    // 匹配 eventType
-    if (trigger.eventType && event.batchId !== trigger.eventType) {
-      return false;
-    }
-
-    // 匹配 eventLevel
-    if (trigger.eventLevel && event.level !== trigger.eventLevel) {
-      return false;
-    }
-
-    // 匹配 severityMin
-    if (trigger.severityMin && event.severity < trigger.severityMin) {
-      return false;
-    }
-
-    // 匹配 keywords（可选过滤条件）
-    if (trigger.keywords && trigger.keywords.length > 0) {
-      const text = `${event.title} ${event.description}`.toLowerCase();
-      if (!trigger.keywords.some(kw => text.includes(kw.toLowerCase()))) {
-        return false;
-      }
-    }
-
-    // 所有条件都通过（或无额外条件），视为匹配
-    return true;
   }
 
   /**
