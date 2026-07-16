@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Lock, Layers } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
-import { ensureModListener } from '../../modules/eventApi';
-import type { EventRegistryEntry, EventType } from '../../modules/schema';
-import { createRulePack, createEmptyPack } from '../../modules/webEventStore';
+import { ensureCacheListener } from '../../modules/eventApi';
+import type { EventRegistryEntry, EventPackType } from '../../modules/schema';
+import { createRule, createEmptyPack } from '../../modules/webEventStore';
 import { useEvents } from './useEvents';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import EventCenter from './EventCenter';
@@ -13,16 +13,14 @@ import EventErrorBoundary from './EventErrorBoundary';
 import RuleEditor from './RuleEditor';
 import { WorldBookBrowser } from './WorldBookPicker';
 import EventImportWizard from './EventImportWizard';
-import './mod.css';
+import './event.css';
 
 type SubView = 'center' | 'library' | 'card' | 'rule' | 'worldbook' | 'wizard';
 
-/** 按事件类型决定跳转的占位子视图（Part 2 已实现真实编辑页） */
-function subViewForType(type: EventType): SubView {
+/** 按事件包类型决定跳转的子视图 */
+function subViewForType(type: EventPackType): SubView {
   if (type === 'rule') return 'rule';
   if (type === 'worldbook') return 'worldbook';
-  // 周期包合并进规则画布：periodic → rule（画布统一编辑 rules + periodicRules）
-  if (type === 'periodic') return 'rule';
   return 'card'; // card / bundle 落入统一事件包编辑器
 }
 
@@ -30,37 +28,36 @@ export default function EventsScreen() {
   const { navigate } = useGame();
   const eventApi = useEvents();
   const [subView, setSubView] = useState<SubView>('center');
-  const [selectedModId, setSelectedModId] = useState<string | null>(null);
-  /** 事件中心内部 Tab：事件（默认，装全部 mod 管理 UI）/ 模块自定义（禁用占位，未来） */
+  const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
   const [centerTab, setCenterTab] = useState<'rules' | 'custom'>('rules');
   const isPhone = useIsPhone();
 
-  // 监听 mods:changed 自动失效缓存（非 Tauri 环境静默忽略）
+  // 监听 packs:changed 自动失效缓存（非 Tauri 环境静默忽略）
   useEffect(() => {
-    void ensureModListener();
+    void ensureCacheListener();
   }, []);
 
-  const handleOpenMod = (entry: EventRegistryEntry) => {
-    setSelectedModId(entry.meta.id);
+  const handleOpenPack = (entry: EventRegistryEntry) => {
+    setSelectedPackId(entry.meta.id);
     setSubView(subViewForType(entry.meta.type));
   };
 
-  // 新建事件包：立即创建一个空白且已落盘的事件包（类比「创建游戏存档」），随后打开编辑器往里加事件
-  const handleNewMod = async () => {
+  // 新建事件包：立即创建一个空白且已落盘的事件包，随后打开编辑器往里加事件
+  const handleNewPack = async () => {
     const packId = await createEmptyPack();
     void eventApi.refresh();
-    setSelectedModId(packId);
+    setSelectedPackId(packId);
     setSubView('card');
   };
 
-  // P1-8：新建规则包 → 落库后直接打开 RuleEditor
-  const handleNewRulePack = async () => {
+  // 新建规则 → 落库后直接打开 RuleEditor
+  const handleNewRule = async () => {
     try {
-      const id = await createRulePack();
-      setSelectedModId(id);
+      const id = await createRule();
+      setSelectedPackId(id);
       setSubView('rule');
     } catch (e) {
-      console.error('[EventsScreen] 新建规则包失败：', e);
+      console.error('[EventsScreen] 新建规则失败：', e);
     }
   };
 
@@ -143,9 +140,9 @@ export default function EventsScreen() {
               {centerTab === 'rules' ? (
               <EventCenter
                 eventApi={eventApi}
-                onOpenMod={handleOpenMod}
-                onNewMod={handleNewMod}
-                onNewRulePack={handleNewRulePack}
+                onOpenPack={handleOpenPack}
+                onNewPack={handleNewPack}
+                onNewRule={handleNewRule}
                 onGoImport={() => setSubView('wizard')}
               />
               ) : (
@@ -154,7 +151,7 @@ export default function EventsScreen() {
             </div>
           </div>
         )}
-        {subView === 'library' && <EventLibrary eventApi={eventApi} onOpenMod={handleOpenMod} />}
+        {subView === 'library' && <EventLibrary eventApi={eventApi} onOpenPack={handleOpenPack} />}
 
         {/* 全屏编辑器 / 抽屉 / 向导（自带头部与返回，覆盖外壳头部）
             每个路由包一层本地错误边界（P0-3）：任一面板渲染失败仅隔离自身，
@@ -162,14 +159,14 @@ export default function EventsScreen() {
         {subView === 'card' && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
             <EventErrorBoundary onBack={goCenter}>
-              <CardEditor eventPackId={selectedModId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
+              <CardEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
             </EventErrorBoundary>
           </div>
         )}
         {subView === 'rule' && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
             <EventErrorBoundary onBack={goCenter}>
-              <RuleEditor eventPackId={selectedModId} onBack={goCenter} />
+              <RuleEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
             </EventErrorBoundary>
           </div>
         )}
@@ -182,7 +179,7 @@ export default function EventsScreen() {
         )}
         {subView === 'wizard' && (
           <EventErrorBoundary onBack={goCenter}>
-            <EventImportWizard eventApi={eventApi} eventPackId={selectedModId} onClose={goCenter} />
+            <EventImportWizard eventApi={eventApi} eventPackId={selectedPackId} onClose={goCenter} />
           </EventErrorBoundary>
         )}
       </div>

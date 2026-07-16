@@ -108,8 +108,8 @@ interface GameSave {
   customWorld?: Record<string, unknown>;
   /** 世界推演模拟状态（每个存档独立，解决串存档问题） */
   simulationState?: SimulationState;
-  /** 按存档绑定的启用 mod 列表（内置世界无 customWorld，绑定落在此处） */
-  enabledMods?: string[];
+  /** 按存档绑定的启用事件包列表（内置世界无 customWorld，绑定落在此处） */
+  enabledMods?: string[]; // TODO: 下次存档格式升级时改名为 enabledEventPacks
 }
 
 /** 轻量元数据（写入 global store，运行时缓存用于列表展示） */
@@ -617,7 +617,7 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
-  /** 按存档绑定的启用 mod 列表 */
+  /** 按存档绑定的启用事件包列表 */
   enabledMods?: string[];
   messageCount: number;
   lastMessageSeq: number;

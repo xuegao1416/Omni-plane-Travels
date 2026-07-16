@@ -1,4 +1,4 @@
-//! The 10 Mod-system Tauri commands.
+//! The 10 event-system Tauri commands.
 //!
 //! Command names match `docs/api-mod-system.md` exactly. Each returns
 //! `Result<T, ModError>`; `ModError` is serialized into `error.message` so the
@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 use std::sync::mpsc;
 
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::mod_system::error::ModError;
@@ -25,7 +25,7 @@ use crate::mod_system::{emit_mods_changed, mod_dir, mods_root, now_iso, dir_size
 // 1. discover_mods
 // ===========================================================================
 #[tauri::command]
-pub fn discover_mods(app: AppHandle) -> Result<Vec<ModMeta>, ModError> {
+pub fn discover_events(app: AppHandle) -> Result<Vec<ModMeta>, ModError> {
     let root = mods_root(&app)?;
     std::fs::create_dir_all(&root)?;
     let mut out = Vec::new();
@@ -61,7 +61,7 @@ pub fn discover_mods(app: AppHandle) -> Result<Vec<ModMeta>, ModError> {
 // 2. list_mods
 // ===========================================================================
 #[tauri::command]
-pub fn list_mods(state: State<'_, ModRegistry>) -> Result<Vec<ModRegistryEntry>, ModError> {
+pub fn list_events(state: State<'_, ModRegistry>) -> Result<Vec<ModRegistryEntry>, ModError> {
     Ok(state.entries())
 }
 
@@ -69,7 +69,7 @@ pub fn list_mods(state: State<'_, ModRegistry>) -> Result<Vec<ModRegistryEntry>,
 // 3. validate_mod  (never throws except on infrastructure errors)
 // ===========================================================================
 #[tauri::command]
-pub fn validate_mod(
+pub fn validate_event(
     manifest: ModManifest,
     assets: Option<Vec<AssetBytes>>,
     assets_root: Option<String>,
@@ -142,16 +142,16 @@ pub fn validate_mod(
 // 4. install_mod
 // ===========================================================================
 #[tauri::command]
-pub fn install_mod(
+pub fn install_event(
     path: String,
     app: AppHandle,
     state: State<'_, ModRegistry>,
 ) -> Result<ModMeta, ModError> {
-    install_mod_impl(&path, &app, &state)
+    install_event_impl(&path, &app, &state)
 }
 
 /// Shared install core used by both `install_mod` and `import_mod`.
-fn install_mod_impl(
+fn install_event_impl(
     path: &str,
     app: &AppHandle,
     state: &ModRegistry,
@@ -221,7 +221,7 @@ fn install_mod_impl(
 // 5. uninstall_mod
 // ===========================================================================
 #[tauri::command]
-pub fn uninstall_mod(
+pub fn uninstall_event(
     id: String,
     app: AppHandle,
     state: State<'_, ModRegistry>,
@@ -247,7 +247,7 @@ pub fn uninstall_mod(
 // 6. enable_mod
 // ===========================================================================
 #[tauri::command]
-pub fn enable_mod(
+pub fn enable_event(
     id: String,
     app: AppHandle,
     state: State<'_, ModRegistry>,
@@ -299,7 +299,7 @@ pub fn enable_mod(
 // 7. disable_mod
 // ===========================================================================
 #[tauri::command]
-pub fn disable_mod(
+pub fn disable_event(
     id: String,
     app: AppHandle,
     state: State<'_, ModRegistry>,
@@ -315,7 +315,7 @@ pub fn disable_mod(
 // 8. import_mod  (optional path -> else native dialog)
 // ===========================================================================
 #[tauri::command]
-pub fn import_mod(
+pub fn import_event(
     path: Option<String>,
     app: AppHandle,
     state: State<'_, ModRegistry>,
@@ -327,14 +327,14 @@ pub fn import_mod(
             None => return Err(ModError::import_cancelled()),
         },
     };
-    install_mod_impl(&pkg, &app, &state)
+    install_event_impl(&pkg, &app, &state)
 }
 
 // ===========================================================================
 // 9. export_mod  (optional target -> else native save dialog)
 // ===========================================================================
 #[tauri::command]
-pub fn export_mod(
+pub fn export_event(
     id: String,
     target: Option<String>,
     app: AppHandle,
@@ -376,7 +376,7 @@ pub fn export_mod(
 // 10. get_mod_detail
 // ===========================================================================
 #[tauri::command]
-pub fn get_mod_detail(
+pub fn get_event_detail(
     id: String,
     app: AppHandle,
     state: State<'_, ModRegistry>,

@@ -113,7 +113,7 @@ export function useImageGen() {
 
           // 仅持久化分类（角色画像）保存到 IndexedDB
           if (isPersistent) {
-            await imageDb.saveBlob(taskId, result.blob, 'image/png');
+            await imageDb.saveBlob(taskId, result.blob, 'image/png', options.characterName);
           }
 
           // 正文图用 blob URL（刷新后失效，不占存储）

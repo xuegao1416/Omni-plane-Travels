@@ -10,6 +10,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
         .manage(registry)
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -29,16 +30,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            mod_system::commands::discover_mods,
-            mod_system::commands::list_mods,
-            mod_system::commands::validate_mod,
-            mod_system::commands::install_mod,
-            mod_system::commands::uninstall_mod,
-            mod_system::commands::enable_mod,
-            mod_system::commands::disable_mod,
-            mod_system::commands::import_mod,
-            mod_system::commands::export_mod,
-            mod_system::commands::get_mod_detail,
+            mod_system::commands::discover_events,
+            mod_system::commands::list_events,
+            mod_system::commands::validate_event,
+            mod_system::commands::install_event,
+            mod_system::commands::uninstall_event,
+            mod_system::commands::enable_event,
+            mod_system::commands::disable_event,
+            mod_system::commands::import_event,
+            mod_system::commands::export_event,
+            mod_system::commands::get_event_detail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

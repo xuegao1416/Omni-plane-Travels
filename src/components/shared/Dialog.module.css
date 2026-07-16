@@ -73,9 +73,11 @@
   background: var(--bg-tertiary, #2a2a3e);
   color: var(--text-primary, #e8e6e3);
   font-size: var(--font-size-md);
+  font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
   box-sizing: border-box;
+  resize: vertical;
 }
 
 .promptInput:focus {
@@ -127,4 +129,13 @@
 
 .confirmBtn:hover {
   opacity: 0.85;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinIcon {
+  animation: spin 1s linear infinite;
 }

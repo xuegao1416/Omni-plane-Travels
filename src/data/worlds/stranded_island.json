@@ -479,12 +479,44 @@
     "eventPacks": [
       {
         "id": "world:stranded_island",
-        "name": "孤岛求生 基础规则",
+        "name": "孤岛求生规则",
+        "type": "rule",
+        "permissions": ["modify_world_state"],
+        "rules": [
+          {
+            "id": "storm_trigger",
+            "when": { "state": { "path": "weather", "op": "contains", "value": "暴风雨" } },
+            "then": [
+              { "addEvent": { "eventId": "storm_hit", "eventPackId": "world:stranded_island:events" } },
+              { "modifyResource": { "key": "wood", "delta": -1 } }
+            ]
+          },
+          {
+            "id": "injury_trigger",
+            "when": { "state": { "path": "玩家.生存状态.血量", "op": "<", "value": 40 } },
+            "then": [
+              { "addEvent": { "eventId": "injury", "eventPackId": "world:stranded_island:events" } }
+            ]
+          },
+          {
+            "id": "water_crisis_trigger",
+            "when": { "state": { "path": "资源.water", "op": "<=", "value": 2 } },
+            "then": [
+              { "addEvent": { "eventId": "water_crisis", "eventPackId": "world:stranded_island:events" } }
+            ]
+          },
+          {
+            "id": "wild_animal_trigger",
+            "when": { "state": { "path": "资源.food", "op": ">", "value": 5 } },
+            "then": [
+              { "addEvent": { "eventId": "wild_animal", "eventPackId": "world:stranded_island:events" } }
+            ]
+          }
+        ],
         "periodicRules": [
           {
             "id": "daily_consumption",
             "name": "每日消耗",
-            "description": "每天消耗淡水和食物，资源不足时体力下降。",
             "intervalTicks": 1,
             "actions": [
               { "modifyResource": { "key": "water", "delta": -1 } },
@@ -494,8 +526,7 @@
           },
           {
             "id": "tide_cycle",
-            "name": "潮汐窗口",
-            "description": "每天两次退潮，露出礁石区，可捡拾贝类和海产。",
+            "name": "潮汐补给",
             "intervalTicks": 1,
             "offsetTicks": 1,
             "actions": [
@@ -504,18 +535,179 @@
             "narrateToAI": true
           },
           {
-            "id": "weather_change",
-            "name": "天气变化",
-            "description": "热带天气多变，可能突降暴雨或烈日暴晒。",
+            "id": "weather_damage",
+            "name": "风雨侵蚀",
             "intervalTicks": 5,
             "actions": [
               { "modifyResource": { "key": "wood", "delta": -1 } }
             ],
             "narrateToAI": true
           }
-        ],
-        "type": "rule",
-        "rules": []
+        ]
+      },
+      {
+        "id": "world:stranded_island:events",
+        "name": "孤岛求生事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "storm_hit",
+            "name": "暴风雨来袭",
+            "cards": [
+              { "id": "t_storm_hit", "componentId": "title", "title": "暴风雨来袭" },
+              { "id": "n_storm_hit", "componentId": "narrative", "title": "暴风雨来袭" },
+              { "id": "c_storm_hit", "componentId": "choice", "title": "暴风雨来袭" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [
+                  { "id": "t_storm_hit", "props": { "title": "暴风雨来袭" } }
+                ],
+                "narrative": [
+                  { "id": "n_storm_hit", "props": { "text": "天空骤然暗沉，狂风裹挟着暴雨席卷而来。你的庇护所在风中摇摇欲坠。" } }
+                ],
+                "choice": [
+                  {
+                    "id": "c_storm_hit",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "躲进庇护所",
+                          "effect": { "statId": "体力值", "delta": -10 },
+                          "aiNote": "选择躲避，体力消耗"
+                        },
+                        {
+                          "label": "加固棚屋",
+                          "effect": { "resourcePath": "生存资源.wood", "delta": -3 },
+                          "aiNote": "用木材加固，消耗资源"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "injury",
+            "name": "受伤了",
+            "cards": [
+              { "id": "t_injury", "componentId": "title", "title": "你受伤了" },
+              { "id": "n_injury", "componentId": "narrative", "title": "你受伤了" },
+              { "id": "c_injury", "componentId": "choice", "title": "你受伤了" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [
+                  { "id": "t_injury", "props": { "title": "你受伤了" } }
+                ],
+                "narrative": [
+                  { "id": "n_injury", "props": { "text": "你在攀爬礁石时滑倒，膝盖磕破了皮，鲜血直流。在这个没有医院的荒岛上，每一道伤口都可能是致命的。" } }
+                ],
+                "choice": [
+                  {
+                    "id": "c_injury",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "用草药敷伤口",
+                          "effect": { "resourcePath": "生存资源.herb", "delta": -2 },
+                          "aiNote": "用草药治疗，消耗草药"
+                        },
+                        {
+                          "label": "忍痛自愈",
+                          "effect": { "statId": "血量", "delta": -15 },
+                          "aiNote": "硬扛过去，血量下降"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "water_crisis",
+            "name": "淡水告急",
+            "cards": [
+              { "id": "t_water_crisis", "componentId": "title", "title": "淡水告急" },
+              { "id": "n_water_crisis", "componentId": "narrative", "title": "淡水告急" },
+              { "id": "c_water_crisis", "componentId": "choice", "title": "淡水告急" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [
+                  { "id": "t_water_crisis", "props": { "title": "淡水告急" } }
+                ],
+                "narrative": [
+                  { "id": "n_water_crisis", "props": { "text": "淡水储备已经见底了。你记得岛的另一侧有一条溪流，但那里地形复杂，上次去差点迷路。" } }
+                ],
+                "choice": [
+                  {
+                    "id": "c_water_crisis",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "冒险去溪流",
+                          "effect": { "resourcePath": "生存资源.water", "delta": 4 },
+                          "aiNote": "冒险取水成功，获得淡水"
+                        },
+                        {
+                          "label": "收集雨水",
+                          "effect": { "statId": "体力值", "delta": -5 },
+                          "aiNote": "等待下雨，体力消耗"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "wild_animal",
+            "name": "野兽出没",
+            "cards": [
+              { "id": "t_wild_animal", "componentId": "title", "title": "野兽出没" },
+              { "id": "n_wild_animal", "componentId": "narrative", "title": "野兽出没" },
+              { "id": "c_wild_animal", "componentId": "choice", "title": "野兽出没" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [
+                  { "id": "t_wild_animal", "props": { "title": "野兽出没" } }
+                ],
+                "narrative": [
+                  { "id": "n_wild_animal", "props": { "text": "夜幕降临，你听到灌木丛中传来低沉的咆哮声。一双发光的眼睛在黑暗中盯着你的食物储备。" } }
+                ],
+                "choice": [
+                  {
+                    "id": "c_wild_animal",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "大声驱赶",
+                          "effect": { "statId": "体力值", "delta": -5 },
+                          "aiNote": "驱赶野兽，消耗体力"
+                        },
+                        {
+                          "label": "分一些食物给它",
+                          "effect": { "resourcePath": "生存资源.food", "delta": -2 },
+                          "aiNote": "分享食物，避免冲突"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
     ]
   }

@@ -19,7 +19,7 @@ import { eventBus, EVENTS } from '../../engine/eventBus';
 import type { WorldSystemData, DiceRoll, BusinessModuleSchema, WorldDynamicsConfig, PeriodicRule, ModuleEffects, EventRule, RuleFile } from '../../modules/schema';
 import { useSaveStore } from '../../stores/saveStore';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
-import { getWebEvent } from '../../modules/eventDb';
+import { getWebEvent, allWebEvents } from '../../modules/eventDb';
 import { installWorldEventPacks, getWebEnabledEventIds } from '../../modules/webEventStore';
 import CardOverlay from '../event/CardOverlay';
 import EventConfigPanel from '../event/EventConfigPanel';
@@ -127,7 +127,7 @@ export default function GameScreen() {
             narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
           }));
           const savedRuntime0 = gameState.simulationRuntime?.eventRuntimes?.['world:periodic'];
-          eventWorldEvolution.register({
+          eventWorldEvolution.registerPack({
             eventPackId: 'world:periodic',
             rules: [],
             periodicRules,
@@ -150,6 +150,16 @@ export default function GameScreen() {
           enabledIds = [];
         }
       }
+      // 所有内置包必须绑定当前世界才加载（防止跨世界污染）
+      if (worldDef) {
+        const allRecs = await allWebEvents().catch(() => []);
+        const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId]));
+        enabledIds = enabledIds.filter(id => {
+          const wId = worldIdMap.get(id);
+          if (!wId) return true; // 无 worldId 的用户自建包正常加载
+          return wId === worldDef.id; // 有 worldId 的内置包必须匹配
+        });
+      }
       if (cancelled) return;
 
       // 防残留：先清空再按当前绑定注册
@@ -169,7 +179,7 @@ export default function GameScreen() {
             narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
           }));
           const savedRuntime0b = gameState.simulationRuntime?.eventRuntimes?.['world:periodic'];
-          eventWorldEvolution.register({
+          eventWorldEvolution.registerPack({
             eventPackId: 'world:periodic',
             rules: [],
             periodicRules,
@@ -196,13 +206,13 @@ export default function GameScreen() {
           }
           if (rules.length > 0 || periodicRules.length > 0) {
             const savedRuntime = gameState.simulationRuntime?.eventRuntimes?.[id];
-            eventWorldEvolution.register({
+            eventWorldEvolution.registerPack({
               eventPackId: id,
               rules,
               periodicRules,
               permissions: rec.manifest.permissions ?? [],
               runtime: savedRuntime ?? { onceFired: {}, cooldownRemaining: {} },
-              source: rec.builtin ? 'world' : 'mod',
+              source: rec.builtin ? 'world' : 'user',
             });
           }
         } catch (e) {

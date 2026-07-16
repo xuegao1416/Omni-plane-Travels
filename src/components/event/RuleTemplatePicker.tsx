@@ -3,7 +3,7 @@ import { ArrowLeft, FilePlus, Zap } from 'lucide-react';
 import { useIsPhone, useBreakpoint } from '../../hooks/useIsMobile';
 import { RULE_TEMPLATES, type RuleTemplate } from './ruleTemplates';
 import type { EventGraph } from '../../modules/schema';
-import { createRulePack } from '../../modules/webEventStore';
+import { createRule } from '../../modules/webEventStore';
 import { saveRulesToPack } from '../../modules/webEventStore';
 import { graphToRuleFile } from '../../modules/ruleGraph';
 
@@ -21,14 +21,14 @@ export default function RuleTemplatePicker({ onSelect, onBack }: RuleTemplatePic
   const handleSelect = async (graph: EventGraph | null) => {
     setCreating(true);
     try {
-      const packId = await createRulePack();
+      const packId = await createRule();
       if (graph) {
         const rf = graphToRuleFile(graph);
         await saveRulesToPack(packId, rf.rules, rf.periodicRules);
       }
       onSelect(packId);
     } catch (err) {
-      console.error('[RuleTemplatePicker] 创建规则包失败：', err);
+      console.error('[RuleTemplatePicker] 创建规则失败：', err);
     } finally {
       setCreating(false);
     }
@@ -101,9 +101,9 @@ export default function RuleTemplatePicker({ onSelect, onBack }: RuleTemplatePic
             gap: 'var(--space-3)',
           }}
         >
-          {/* 空白规则包（第一位） */}
+          {/* 空白规则（第一位） */}
           <TemplateCard
-            name="空白规则包"
+            name="空白规则"
             description="从零开始，自己搭建规则。"
             icon={FilePlus}
             difficulty="beginner"

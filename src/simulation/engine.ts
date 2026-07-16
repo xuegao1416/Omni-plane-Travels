@@ -31,6 +31,7 @@ import { getWebEvent } from '../modules/eventDb';
 import { checkCondition, applyAction } from '../modules/ruleEngine';
 import { moduleEffectsToActions } from '../modules/ruleGraph';
 import { resolvePendingChoices } from '../modules/eventChoiceState';
+import { useMemoryStore } from '../memory/memoryStore';
 import { useSaveStore } from '../stores/saveStore';
 import type { WorldContext } from '../modules/schema';
 import { eventBus, EVENTS } from '../engine/eventBus';
@@ -320,8 +321,9 @@ export class WorldSimulationEngine {
       this.applyGeneration(generation, gameState);
 
       // 5.5 资源演化蓝图机械结算（关键词动态 + 轮次兜底），合并进机械层效果
+      // 输入源：记忆系统运行时（事件卡、实体卡、场景锚点）
       if (resourceEvolution && resourceEvolution.length > 0) {
-        const evo = this.resolveResourceEvolution(gameState, resourceEvolution, recentConversation);
+        const evo = this.resolveResourceEvolution(gameState, resourceEvolution);
         if (evo.effects.survival) {
           this.mergeModuleEffects(mechanicalEffects, evo.effects);
         }
@@ -383,7 +385,7 @@ export class WorldSimulationEngine {
           }
         }
 
-        const { ctx: newCtx, results, modRuntimes } = eventWorldEvolution.evaluateTick(
+        const { ctx: newCtx, results, packRuntimes } = eventWorldEvolution.evaluateTick(
           gameState as unknown as WorldContext,
           this.state.tickCount,
           tickEvents,
@@ -394,9 +396,9 @@ export class WorldSimulationEngine {
             live[k] = (newCtx as Record<string, unknown>)[k];
           }
         }
-        // 10.0e 持久化 mod runtime（onceFired / cooldown）到 simulationRuntime
-        if (modRuntimes && gameState.simulationRuntime) {
-          gameState.simulationRuntime.eventRuntimes = modRuntimes;
+        // 10.0e 持久化包 runtime（onceFired / cooldown）到 simulationRuntime
+        if (packRuntimes && gameState.simulationRuntime) {
+          gameState.simulationRuntime.eventRuntimes = packRuntimes;
         }
         // 10.1 收集 addEvent 动作：查事件包获取全部卡片，逐张广播
         try {
@@ -1024,7 +1026,6 @@ export class WorldSimulationEngine {
   private resolveResourceEvolution(
     gameState: GameState,
     steps: ResourceEvolutionStep[] | undefined,
-    recentNarrative: string | undefined,
   ): { effects: ModuleEffects; log: EffectLogEntry[] } {
     const runtime = gameState.simulationRuntime;
     if (!runtime || !steps || steps.length === 0) {
@@ -1036,14 +1037,20 @@ export class WorldSimulationEngine {
     const currentTick = runtime.tick;
     const evolvedSteps = runtime.evolvedSteps ?? (runtime.evolvedSteps = []);
 
-    // 层A 文本来源：当前活跃事件文本 + 玩家本轮对话
-    const activeEvents = Object.values(this.state.events)
-      .filter(e => e.status === 'active' || e.status === 'brewing');
-    const eventsText = activeEvents
-      .map(e => `${e.title} ${e.description}`)
-      .join(' ')
-      .toLowerCase();
-    const narrativeText = (recentNarrative ?? '').toLowerCase();
+    // 层A 文本来源：记忆系统已编译上下文（上一轮状态，含事件卡、实体卡、资源状态等）
+    const compiled = useMemoryStore.getState().lastCompiledContext?.fullText;
+    let memoryText = '';
+    if (compiled) {
+      memoryText = compiled.toLowerCase();
+    } else {
+      // 兜底：记忆系统无编译文本时，回退到引擎内部事件状态
+      const activeEvents = Object.values(this.state.events)
+        .filter(e => e.status === 'active' || e.status === 'brewing');
+      memoryText = activeEvents
+        .map(e => `${e.title} ${e.description}`)
+        .join(' ')
+        .toLowerCase();
+    }
 
     for (const step of steps) {
       if (evolvedSteps.includes(step.id)) continue; // 已触发过，跳过
@@ -1057,14 +1064,14 @@ export class WorldSimulationEngine {
         reason = `演化蓝图【${step.id}】轮次兜底触发（第 ${currentTick} 轮 ≥ ${step.afterRounds}）`;
       }
 
-      // 层A：关键词动态触发（未命中轮次时也检查）
+      // 层A：关键词动态触发（从记忆系统文本中匹配）
       if (!triggered && step.trigger?.keywords?.length) {
         const hit = step.trigger.keywords
           .map(k => k.toLowerCase())
-          .find(k => eventsText.includes(k) || narrativeText.includes(k));
+          .find(k => memoryText.includes(k));
         if (hit) {
           triggered = true;
-          reason = `演化蓝图【${step.id}】关键词触发：「${hit}」`;
+          reason = `演化蓝图【${step.id}】记忆系统关键词触发：「${hit}」`;
         }
       }
 

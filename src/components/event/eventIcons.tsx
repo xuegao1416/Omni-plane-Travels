@@ -7,7 +7,7 @@ import {
   Tags, Gem, Coins, Landmark, Building2, BookOpenCheck, Newspaper,
   type LucideIcon,
 } from 'lucide-react';
-import type { EventType } from '../../modules/schema';
+import type { EventPackType } from '../../modules/schema';
 
 /**
  * manifest.icon 是自由字符串名（也可能直接是类型别名）。
@@ -25,22 +25,21 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Repeat,
 };
 
-/** 按 EventType 的兜底图标（与设计提示词 §页面5 一致） */
-const TYPE_FALLBACK: Record<EventType, LucideIcon> = {
+/** 按 EventPackType 的兜底图标 */
+const TYPE_FALLBACK: Record<EventPackType, LucideIcon> = {
   card: FileText,
   rule: Spline,
   worldbook: BookOpen,
   bundle: Boxes,
-  periodic: Repeat,
 };
 
 /** 由 manifest.icon 名解析 Lucide 组件；未命中则按类型兜底 */
-export function resolveEventIcon(iconName: string | undefined, type: EventType): LucideIcon {
+export function resolveEventIcon(iconName: string | undefined, type: EventPackType): LucideIcon {
   if (iconName && ICON_MAP[iconName]) return ICON_MAP[iconName];
   return TYPE_FALLBACK[type];
 }
 
 /** 取类型对应的兜底图标 */
-export function typeIcon(type: EventType): LucideIcon {
+export function typeIcon(type: EventPackType): LucideIcon {
   return TYPE_FALLBACK[type];
 }

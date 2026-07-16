@@ -1,6 +1,6 @@
-// Mod 接线测试：
-//   (a) 纯函数：注册一个假 mod rule → 调 runEventRulesOnTick → 断言 world context 被改
-//   (b) 集成：fake-indexeddb 支撑的 webEventStore 走通 导入 rule mod → getEventDetail + getWebEvent → 注册 → 生效
+// 事件包接线测试：
+//   (a) 纯函数：注册一个假规则 → 调 runEventRulesOnTick → 断言 world context 被改
+//   (b) 集成：fake-indexeddb 支撑的 webEventStore 走通 导入规则 → getEventDetail + getWebEvent → 注册 → 生效
 import 'fake-indexeddb/auto';
 import { test, expect } from 'bun:test';
 import JSZip from 'jszip';
@@ -8,7 +8,7 @@ import {
   eventWorldEvolution,
   runEventRulesOnTick,
 } from './eventIntegration';
-import { webImportFromFile, webGetEventDetail, webUninstallMod } from './webEventStore';
+import { webImportFromFile, webGetEventDetail, webUninstallPack } from './webEventStore';
 import { getWebEvent } from './eventDb';
 import type { Manifest, EventRule, RuleFile } from './schema';
 
@@ -19,7 +19,7 @@ const ruleManifest: Manifest = {
   author: 'tester',
   engine: 'opt-event',
   schemaVersion: 1,
-  minAppVersion: '2.6.2',
+  minAppVersion: '2.6.3',
   type: 'rule',
   coverColor: '#3b82f6',
   icon: 'Zap',
@@ -40,7 +40,7 @@ test('(a) 注册假 mod rule → runEventRulesOnTick 改变 world context', () =
   const rules: EventRule[] = [
     { id: 'r1', when: { all: [] }, then: [{ set: { path: 'mod_flag', value: 42 } }] },
   ];
-  eventWorldEvolution.register({
+  eventWorldEvolution.registerPack({
     eventPackId: 'fake',
     rules,
     permissions: ['modify_world_state'],
@@ -81,7 +81,7 @@ test('(b) fake-indexeddb: webEventStore 导入 rule mod → getEventDetail + 注
   expect(parsed.rules.length).toBe(1);
 
   // 注册
-  eventWorldEvolution.register({
+  eventWorldEvolution.registerPack({
     eventPackId: 'rule-mod-a',
     rules: parsed.rules,
     permissions: detail.manifest.permissions ?? [],
@@ -95,5 +95,5 @@ test('(b) fake-indexeddb: webEventStore 导入 rule mod → getEventDetail + 注
   eventWorldEvolution.clear();
 
   // 防止污染共享的 fake-indexeddb（后续测试文件依赖干净的 mod 列表）
-  await webUninstallMod('rule-mod-a').catch(() => {});
+  await webUninstallPack('rule-mod-a').catch(() => {});
 });

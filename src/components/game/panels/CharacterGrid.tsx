@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users } from 'lucide-react';
 import EmptyState from '../../shared/EmptyState';
 import { imageDb } from '../../../storage/imageDb';
@@ -10,6 +10,10 @@ export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, 
   const npcs = gameState.人物档案 ?? {};
   const [selected, setSelected] = useState<{ id: string; data: import('../../../schema/variables').NPCData } | null>(null);
   const [portraitUrls, setPortraitUrls] = useState<Record<string, string>>({});
+
+  const handlePortraitChange = useCallback((npcId: string, url: string) => {
+    setPortraitUrls(prev => ({ ...prev, [npcId]: url }));
+  }, []);
 
   const sorted = Object.entries(npcs).sort((a, b) => (b[1]?.关系数据?.好感度 ?? 0) - (a[1]?.关系数据?.好感度 ?? 0));
 
@@ -49,6 +53,7 @@ export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, 
           onUpdateChronicles={onUpdateChronicles}
           onMergeChronicles={onMergeChronicles}
           worldId={worldId}
+          onPortraitChange={handlePortraitChange}
         />
       )}
     </div>

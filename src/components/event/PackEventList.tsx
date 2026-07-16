@@ -2,7 +2,7 @@
 // 事件包内事件清单（3 级层级：事件库/已装列表 → 事件包 → 事件 → 卡片）
 //
 // 职责：给定一个事件包 id，读取其 WebEventRecord.files 中的
-//   - schema/events.json     → OptEventFile（事件索引：events[] + 包级 periodic）
+//   - schema/events.json     → EventPackFile（事件索引：events[] + 包级 periodicRules）
 //   - 旧包回退：schema/card.json → 包成单事件
 // 并渲染为「事件（tier2，name + 卡片数）」列表，每个事件可展开显示其
 // 「卡片（tier3）」。事件与卡片是两层结构，不再把卡片拍平成事件。
@@ -16,24 +16,24 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Layers, AlertTriangle, PackageX, ListTree, ChevronRight } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
-import type { EventDef, CardDef, OptEventFile, PeriodicRule } from '../../modules/schema';
+import type { EventDef, CardDef, EventPackFile, PeriodicRule } from '../../modules/schema';
 
 const OPT_EVENTS_INDEX = 'schema/events.json';
 
 interface PackEventView {
   events: EventDef[];
-  periodic: PeriodicRule[];
+  periodicRules: PeriodicRule[];
 }
 
 /** 解析事件包存储为「事件视图」；兼容旧包（无索引时把 schema/card.json 包成单事件）。 */
 function parseOptEvents(files: Record<string, string | Blob>): PackEventView {
-  const view: PackEventView = { events: [], periodic: [] };
+  const view: PackEventView = { events: [], periodicRules: [] };
   const idxRaw = files[OPT_EVENTS_INDEX];
   if (typeof idxRaw === 'string') {
     try {
-      const idx = JSON.parse(idxRaw) as OptEventFile;
+      const idx = JSON.parse(idxRaw) as EventPackFile;
       view.events = idx.events ?? [];
-      view.periodic = idx.periodic ?? [];
+      view.periodicRules = idx.periodicRules ?? [];
       return view;
     } catch {
       /* 索引损坏：走旧回退 */
@@ -124,9 +124,9 @@ export default function PackEventList({ packId }: PackEventListProps) {
 
   return (
     <div>
-      {view.periodic.length > 0 && (
+      {view.periodicRules.length > 0 && (
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
-          包级周期规则 {view.periodic.length} 条（与事件平级，每 tick 静默结算）
+          包级周期规则 {view.periodicRules.length} 条（与事件平级，每 tick 静默结算）
         </div>
       )}
       <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>

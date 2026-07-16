@@ -80,6 +80,8 @@ export interface MemoryPipelineContext {
   _hitDetails?: Array<{ title: string; hitRate: number; matchedKeywords: string[] }>;
   /** 降级阶段记录（标记哪些阶段执行失败后使用了降级策略） */
   _degradedStages?: string[];
+  /** 资源状态快照（从 GameState 提取，供编译阶段注入 AI 上下文） */
+  resourceState?: import('./compileFormatter').ResourceSnapshot[];
 }
 
 export interface MemorySystemHook {
@@ -630,7 +632,7 @@ export function useMemorySystem(): MemorySystemHook {
       ? ctx._retrievalKeywords
       : ctx.inputText.split(/[\s,，。！？、；：""''（）【】\n]+/).filter(w => w.length >= 2);
 
-    const result = formatRuntimeToCompiledText(runtime, queryKeywords, DEFAULT_COMPILE_BUDGET);
+    const result = formatRuntimeToCompiledText(runtime, queryKeywords, DEFAULT_COMPILE_BUDGET, ctx.resourceState);
     ctx._compiledContext = result.text;
 
     store.setCompiledContext({

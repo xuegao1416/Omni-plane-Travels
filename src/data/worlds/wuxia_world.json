@@ -1207,31 +1207,184 @@
     "eventPacks": [
       {
         "id": "world:wuxia_world",
-        "name": "武林风云 基础规则",
-        "periodicRules": [
+        "name": "武林风云规则",
+        "type": "rule",
+        "permissions": ["modify_world_state"],
+        "rules": [
           {
-            "id": "seasonal_gathering",
-            "name": "武林大会",
-            "description": "每季度一次的武林盛会，各路高手齐聚一堂。",
-            "intervalTicks": 30,
-            "actions": [
-              { "set": { "path": "stats.dim5", "value": 2 } }
-            ],
-            "narrateToAI": true
+            "id": "duel_trigger",
+            "when": { "state": { "path": "玩家.生存状态.血量", "op": ">", "value": 80 } },
+            "then": [{ "addEvent": { "eventId": "duel", "eventPackId": "world:wuxia_world:events" } }]
           },
           {
-            "id": "jianghu_rumor",
-            "name": "江湖传闻",
-            "description": "江湖中流传的各种消息和传闻。",
-            "intervalTicks": 7,
-            "actions": [
-              { "set": { "path": "stats.dim4", "value": 1 } }
-            ],
-            "narrateToAI": true
+            "id": "treasure_trigger",
+            "when": { "state": { "path": "玩家.生存状态.体力值", "op": ">", "value": 60 } },
+            "then": [{ "addEvent": { "eventId": "treasure_map", "eventPackId": "world:wuxia_world:events" } }]
+          },
+          {
+            "id": "poison_trigger",
+            "when": { "state": { "path": "玩家.生存状态.血量", "op": "<", "value": 50 } },
+            "then": [{ "addEvent": { "eventId": "poison", "eventPackId": "world:wuxia_world:events" } }]
           }
         ],
-        "type": "rule",
-        "rules": []
+        "periodicRules": [
+          {
+            "id": "qi_recovery",
+            "name": "内息恢复",
+            "intervalTicks": 3,
+            "actions": [{ "set": { "path": "玩家.生存状态.体力值", "value": 5 } }],
+            "narrateToAI": true,
+            "description": "每3轮恢复体力值5点，AI描述调息吐纳恢复内力的过程"
+          }
+        ]
+      },
+      {
+        "id": "world:wuxia_world:events",
+        "name": "武林风云事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "duel",
+            "name": "比武挑战",
+            "cards": [
+              { "id": "t_duel", "componentId": "title", "title": "比武挑战" },
+              { "id": "n_duel", "componentId": "narrative", "title": "比武挑战叙事" },
+              { "id": "c_duel", "componentId": "choice", "title": "比武挑战选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_duel", "props": { "title": "比武挑战" } }],
+                "narrative": [{ "id": "n_duel", "props": { "text": "一位身着白衣的剑客拦住了你的去路，手中长剑寒光闪闪。'久闻大名，今日特来讨教。'" } }],
+                "choice": [{ "id": "c_duel", "props": { "choices": [
+                  { "label": "应战", "effect": { "statId": "体力值", "delta": -20 }, "aiNote": "接受比武挑战，消耗体力" },
+                  { "label": "拒绝", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "婉拒比武，保持和平" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "treasure_map",
+            "name": "藏宝图",
+            "cards": [
+              { "id": "t_treasure", "componentId": "title", "title": "一张泛黄的地图" },
+              { "id": "n_treasure", "componentId": "narrative", "title": "藏宝图叙事" },
+              { "id": "c_treasure", "componentId": "choice", "title": "藏宝图选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_treasure", "props": { "title": "一张泛黄的地图" } }],
+                "narrative": [{ "id": "n_treasure", "props": { "text": "你在路边的茶摊上捡到一张泛黄的羊皮地图，上面标注着一个隐秘的山谷，据说藏着前朝的武功秘籍。" } }],
+                "choice": [{ "id": "c_treasure", "props": { "choices": [
+                  { "label": "组队探险", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "与同伴一起探险，消耗体力" },
+                  { "label": "独自前往", "effect": { "statId": "体力值", "delta": -25 }, "aiNote": "独自冒险，消耗更多体力但可能收获更大" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "poison",
+            "name": "中毒事件",
+            "cards": [
+              { "id": "t_poison", "componentId": "title", "title": "你中毒了！" },
+              { "id": "n_poison", "componentId": "narrative", "title": "中毒事件叙事" },
+              { "id": "c_poison", "componentId": "choice", "title": "中毒事件选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_poison", "props": { "title": "你中毒了！" } }],
+                "narrative": [{ "id": "n_poison", "props": { "text": "你在用膳时突然感到腹中剧痛，嘴唇发麻。有人在你的饭菜里下了毒！" } }],
+                "choice": [{ "id": "c_poison", "props": { "choices": [
+                  { "label": "用内功逼毒", "effect": { "statId": "体力值", "delta": -30 }, "aiNote": "用内功逼出毒素，消耗大量内力" },
+                  { "label": "找医馆", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "去医馆治疗，恢复生命" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "martial_arts_book",
+            "name": "秘籍出现",
+            "cards": [
+              { "id": "t_book", "componentId": "title", "title": "武功秘籍！" },
+              { "id": "n_book", "componentId": "narrative", "title": "秘籍出现叙事" },
+              { "id": "c_book", "componentId": "choice", "title": "秘籍出现选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_book", "props": { "title": "武功秘籍！" } }],
+                "narrative": [{ "id": "n_book", "props": { "text": "在一具枯骨旁边，你发现了一本破旧的手抄本。翻开一看，竟然是失传已久的武功心法！" } }],
+                "choice": [{ "id": "c_book", "props": { "choices": [
+                  { "label": "修炼秘籍", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "修炼秘籍，实力提升" },
+                  { "label": "卖掉换银子", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "卖掉秘籍获得碎银" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "hermit",
+            "name": "隐世高手",
+            "cards": [
+              { "id": "t_hermit", "componentId": "title", "title": "山中老人" },
+              { "id": "n_hermit", "componentId": "narrative", "title": "隐世高手叙事" },
+              { "id": "c_hermit", "componentId": "choice", "title": "隐世高手选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_hermit", "props": { "title": "山中老人" } }],
+                "narrative": [{ "id": "n_hermit", "props": { "text": "深山之中，一位白发苍苍的老人正在练功。他的招式行云流水，显然是一位绝世高手。" } }],
+                "choice": [{ "id": "c_hermit", "props": { "choices": [
+                  { "label": "上前拜师", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "拜师学习，消耗精力但获得指点" },
+                  { "label": "默默离开", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "没有打扰，保持现状" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "sect_conflict",
+            "name": "门派冲突",
+            "cards": [
+              { "id": "t_sect", "componentId": "title", "title": "门派纷争" },
+              { "id": "n_sect", "componentId": "narrative", "title": "门派冲突叙事" },
+              { "id": "c_sect", "componentId": "choice", "title": "门派冲突选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_sect", "props": { "title": "门派纷争" } }],
+                "narrative": [{ "id": "n_sect", "props": { "text": "江湖上两大门派因为一本武功秘籍的归属问题起了争执，双方都派人来拉拢你。" } }],
+                "choice": [{ "id": "c_sect", "props": { "choices": [
+                  { "label": "支持正派", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "站在正派一方，获得支持" },
+                  { "label": "保持中立", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "中立立场，两面不讨好" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "betrayal",
+            "name": "背叛",
+            "cards": [
+              { "id": "t_betrayal", "componentId": "title", "title": "背叛！" },
+              { "id": "n_betrayal", "componentId": "narrative", "title": "背叛叙事" },
+              { "id": "c_betrayal", "componentId": "choice", "title": "背叛选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_betrayal", "props": { "title": "背叛！" } }],
+                "narrative": [{ "id": "n_betrayal", "props": { "text": "你最信任的同伴突然在背后捅了你一刀。'对不起，我别无选择。'" } }],
+                "choice": [{ "id": "c_betrayal", "props": { "choices": [
+                  { "label": "原谅他", "effect": { "statId": "血量", "delta": -10 }, "aiNote": "选择原谅，但内心受伤" },
+                  { "label": "反击", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "反击背叛者，消耗体力" }
+                ] } }]
+              }
+            }
+          }
+        ]
       }
     ]
   }

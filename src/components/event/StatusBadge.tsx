@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { EventType } from '../../modules/schema';
+import type { EventPackType } from '../../modules/schema';
 import { typeIcon } from './eventIcons';
 
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
@@ -52,16 +52,15 @@ export function StatusBadge({
   );
 }
 
-const TYPE_LABEL: Record<EventType, string> = {
+const TYPE_LABEL: Record<EventPackType, string> = {
   card: '卡片',
   rule: '规则',
   worldbook: '世界书',
   bundle: '合集',
-  periodic: '周期',
 };
 
 /** Event 类型中性徽章（图标走 Lucide，按类型） */
-export function EventTypeBadge({ type }: { type: EventType }) {
+export function EventTypeBadge({ type }: { type: EventPackType }) {
   const Icon = typeIcon(type);
   return (
     <StatusBadge tone="neutral" icon={<Icon size={12} strokeWidth={2} />}>

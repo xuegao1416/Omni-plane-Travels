@@ -634,43 +634,157 @@
     "eventPacks": [
       {
         "id": "world:wasteland_apocalypse",
-        "name": "余烬废土 基础规则",
-        "periodicRules": [
+        "name": "余烬废土规则",
+        "type": "rule",
+        "rules": [
           {
-            "id": "radiation_sickness",
-            "name": "辐射病发作",
-            "description": "长期暴露在辐射环境中，身体会周期性出现辐射病症状。",
-            "intervalTicks": 14,
-            "actions": [
-              { "set": { "path": "stats.生命", "value": -10 } },
-              { "set": { "path": "stats.体力", "value": -15 } }
-            ],
-            "narrateToAI": true
+            "id": "radiation_storm_trigger",
+            "when": { "state": { "path": "玩家.生存状态.血量", "op": ">", "value": 50 } },
+            "then": [{ "addEvent": { "eventId": "radiation_storm", "eventPackId": "world:wasteland_apocalypse:events" } }]
           },
           {
-            "id": "supply_scarcity",
-            "name": "资源枯竭",
-            "description": "周边资源被搜刮殆尽，需要前往更危险的区域寻找物资。",
-            "intervalTicks": 30,
-            "actions": [
-              { "set": { "path": "stats.体力", "value": -10 } }
-            ],
-            "narrateToAI": true
+            "id": "mutant_trigger",
+            "when": { "state": { "path": "玩家.生存状态.体力值", "op": ">", "value": 30 } },
+            "then": [{ "addEvent": { "eventId": "mutant_fight", "eventPackId": "world:wasteland_apocalypse:events" } }]
           },
           {
-            "id": "settlement_conflict",
-            "name": "聚落冲突",
-            "description": "不同聚落之间的资源争夺，可能被卷入其中。",
-            "intervalTicks": 20,
-            "offsetTicks": 10,
-            "actions": [
-              { "set": { "path": "stats.生命", "value": -15 } }
-            ],
-            "narrateToAI": true
+            "id": "supply_trigger",
+            "when": { "state": { "path": "玩家.生存状态.血量", "op": "<", "value": 50 } },
+            "then": [{ "addEvent": { "eventId": "supply_cache", "eventPackId": "world:wasteland_apocalypse:events" } }]
           }
         ],
-        "type": "rule",
-        "rules": []
+        "periodicRules": [
+          {
+            "id": "radiation_tick",
+            "name": "辐射侵蚀",
+            "intervalTicks": 14,
+            "actions": [
+              { "set": { "path": "玩家.生存状态.血量", "value": -10 } },
+              { "set": { "path": "玩家.生存状态.体力值", "value": -15 } }
+            ],
+            "narrateToAI": true,
+            "description": "每14天辐射侵蚀身体，血量和体力下降"
+          },
+          {
+            "id": "supply_decay",
+            "name": "物资耗竭",
+            "intervalTicks": 30,
+            "actions": [
+              { "set": { "path": "玩家.生存状态.体力值", "value": -10 } }
+            ],
+            "narrateToAI": true,
+            "description": "每30天物资逐渐耗竭，体力下降"
+          }
+        ],
+        "permissions": ["modify_world_state"]
+      },
+      {
+        "id": "world:wasteland_apocalypse:events",
+        "name": "余烬废土事件",
+        "type": "card",
+        "events": [
+          {
+            "id": "radiation_storm",
+            "name": "辐射风暴",
+            "cards": [
+              { "id": "t_radiation_storm", "componentId": "title", "title": "辐射风暴来袭" },
+              { "id": "n_radiation_storm", "componentId": "narrative", "title": "辐射风暴叙事" },
+              { "id": "c_radiation_storm", "componentId": "choice", "title": "辐射风暴选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_radiation_storm", "props": { "title": "辐射风暴来袭" } }],
+                "narrative": [{ "id": "n_radiation_storm", "props": { "text": "天空变成了诡异的绿色，空气中弥漫着刺鼻的味道。辐射风暴正在逼近，你必须立刻做出决定。" } }],
+                "choice": [{ "id": "c_radiation_storm", "props": { "choices": [
+                  { "label": "躲进废墟", "effect": { "statId": "血量", "delta": 0 }, "aiNote": "躲进废墟等待风暴过去" },
+                  { "label": "冒险前进", "effect": { "statId": "血量", "delta": -20 }, "aiNote": "冒险穿越辐射区，受到辐射伤害" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "mutant_fight",
+            "name": "变异体袭击",
+            "cards": [
+              { "id": "t_mutant_fight", "componentId": "title", "title": "变异体出现！" },
+              { "id": "n_mutant_fight", "componentId": "narrative", "title": "变异体叙事" },
+              { "id": "c_mutant_fight", "componentId": "choice", "title": "变异体选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_mutant_fight", "props": { "title": "变异体出现！" } }],
+                "narrative": [{ "id": "n_mutant_fight", "props": { "text": "一个扭曲的身影从废墟中爬出，它的身体布满了发光的纹路，发出低沉的嘶吼声。" } }],
+                "choice": [{ "id": "c_mutant_fight", "props": { "choices": [
+                  { "label": "正面战斗", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "与变异体战斗，消耗体力" },
+                  { "label": "逃跑", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "选择逃跑，消耗体力但避免战斗" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "supply_cache",
+            "name": "发现补给点",
+            "cards": [
+              { "id": "t_supply_cache", "componentId": "title", "title": "补给点！" },
+              { "id": "n_supply_cache", "componentId": "narrative", "title": "补给点叙事" },
+              { "id": "c_supply_cache", "componentId": "choice", "title": "补给点选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_supply_cache", "props": { "title": "补给点！" } }],
+                "narrative": [{ "id": "n_supply_cache", "props": { "text": "你在一栋倒塌的建筑里发现了一个标记着军用标志的储物柜。里面似乎还有东西。" } }],
+                "choice": [{ "id": "c_supply_cache", "props": { "choices": [
+                  { "label": "搜刮物资", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "找到了医疗物资，恢复生命" },
+                  { "label": "小心离开", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "谨慎起见，没有冒险" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "faction_encounter",
+            "name": "势力接触",
+            "cards": [
+              { "id": "t_faction_encounter", "componentId": "title", "title": "有人来了" },
+              { "id": "n_faction_encounter", "componentId": "narrative", "title": "势力接触叙事" },
+              { "id": "c_faction_encounter", "componentId": "choice", "title": "势力接触选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_faction_encounter", "props": { "title": "有人来了" } }],
+                "narrative": [{ "id": "n_faction_encounter", "props": { "text": "一队穿着统一制服的人出现在远处。他们举着白旗，似乎想和你谈谈。" } }],
+                "choice": [{ "id": "c_faction_encounter", "props": { "choices": [
+                  { "label": "上前交谈", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "与对方友好交流，获得帮助" },
+                  { "label": "保持警惕", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "保持距离观察，消耗精力" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "power_surge",
+            "name": "异能波动",
+            "cards": [
+              { "id": "t_power_surge", "componentId": "title", "title": "体内涌动的力量" },
+              { "id": "n_power_surge", "componentId": "narrative", "title": "异能波动叙事" },
+              { "id": "c_power_surge", "componentId": "choice", "title": "异能波动选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_power_surge", "props": { "title": "体内涌动的力量" } }],
+                "narrative": [{ "id": "n_power_surge", "props": { "text": "你感觉到体内有一股奇异的力量在涌动，仿佛有什么东西要破壳而出。这是异能觉醒的征兆。" } }],
+                "choice": [{ "id": "c_power_surge", "props": { "choices": [
+                  { "label": "尝试控制", "effect": { "statId": "体力值", "delta": -20 }, "aiNote": "努力控制异能，消耗大量精力" },
+                  { "label": "压制下去", "effect": { "statId": "血量", "delta": -10 }, "aiNote": "强行压制异能，身体受到反噬" }
+                ] } }]
+              }
+            }
+          }
+        ],
+        "permissions": ["add_card"]
       }
     ]
   }

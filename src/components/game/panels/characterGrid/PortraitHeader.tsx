@@ -2,21 +2,24 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Star, X, ImageIcon, Upload, Save } from 'lucide-react';
 import Avatar from '../../../shared/Avatar';
 import { useDialog } from '../../../shared/Dialog';
-import { useCharacterPortrait, buildPortraitPrompt } from '../../../../hooks/useCharacterPortrait';
+import { useCharacterPortrait, buildPortraitPrompt, translatePromptWithLLM } from '../../../../hooks/useCharacterPortrait';
 import { imageDb } from '../../../../storage/imageDb';
 import { saveNpcTemplate } from '../../../../storage/templateStore';
+import { usePortraitStore } from '../../../../stores/portraitStore';
 import type { NPCData } from '../../../../schema/variables';
 import { categoryStyle, npcDataToCustomNpc } from './types';
 
-export function PortraitHeader({ npc, npcId, onClose }: {
+export function PortraitHeader({ npc, npcId, onClose, onPortraitChange }: {
   npc: NPCData; npcId: string; onClose: () => void;
+  onPortraitChange?: (npcId: string, url: string) => void;
 }) {
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
   const [portraitStatus, setPortraitStatus] = useState('');
   const [showPortraitZoom, setShowPortraitZoom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { DialogUI, prompt: dlgPrompt, alert: dlgAlert } = useDialog();
+  const { DialogUI, prompt: dlgPrompt, alert: dlgAlert, loading: dlgLoading, close: dlgClose } = useDialog();
   const { generatePortrait } = useCharacterPortrait();
+  const setPortrait = usePortraitStore(s => s.setPortrait);
 
   const ext = npc as any;
   const cat = categoryStyle(npc.人物分类);
@@ -36,13 +39,42 @@ export function PortraitHeader({ npc, npcId, onClose }: {
   }, [ext.portraitBlobKey, npcId]);
 
   const handleGeneratePortrait = async () => {
-    const defaultPrompt = buildPortraitPrompt(npc);
+    // 1. 显示加载弹窗
+    dlgLoading('提示词翻译中，请稍候…', { title: '生成角色画像' });
+
+    // 2. 调用 LLM 翻译
+    let translatedPrompt: string;
+    try {
+      translatedPrompt = await translatePromptWithLLM(npc);
+    } catch (e) {
+      // LLM 失败时降级到本地字典翻译
+      console.warn('[PortraitHeader] LLM 翻译失败，降级为本地翻译:', e);
+      translatedPrompt = buildPortraitPrompt(npc);
+    }
+
+    // 3. 关闭加载弹窗，显示可编辑的翻译结果
+    dlgClose();
     const editedPrompt = await dlgPrompt('编辑画像提示词（英文 booru 标签）：', {
-      defaultValue: defaultPrompt, title: '生成角色画像',
+      defaultValue: translatedPrompt, title: '生成角色画像',
     });
     if (!editedPrompt?.trim()) return;
+
+    // 4. 生成画像
     const result = await generatePortrait(npc, setPortraitStatus, editedPrompt.trim());
-    if (result) { setPortraitUrl(result.url); ext.portraitBlobKey = result.blobKey; }
+    if (result) {
+      // 用固定的 portrait-{npcId} 作为 key 再存一份，确保持久化可找回
+      const stableKey = `portrait-${npcId}`;
+      try {
+        const blobData = await imageDb.getBlob(result.blobKey);
+        if (blobData?.blob) {
+          await imageDb.saveBlob(stableKey, blobData.blob, blobData.mimeType, npc.姓名 || npcId);
+        }
+      } catch (e) { console.warn('[PortraitHeader] 复制头像到稳定 key 失败:', e); }
+      setPortraitUrl(result.url);
+      ext.portraitBlobKey = stableKey;
+      setPortrait(npcId, result.url);
+      onPortraitChange?.(npcId, result.url);
+    }
   };
 
   const handleUploadPortrait = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,9 +82,12 @@ export function PortraitHeader({ npc, npcId, onClose }: {
     if (!file) return;
     const blobKey = `portrait-${npcId}`;
     try {
-      await imageDb.saveBlob(blobKey, file, file.type);
-      setPortraitUrl(URL.createObjectURL(file));
+      await imageDb.saveBlob(blobKey, file, file.type, npc.姓名 || npcId);
+      const url = URL.createObjectURL(file);
+      setPortraitUrl(url);
       ext.portraitBlobKey = blobKey;
+      setPortrait(npcId, url);
+      onPortraitChange?.(npcId, url);
     } catch (err) { console.error('上传头像失败:', err); }
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [npcId, ext]);

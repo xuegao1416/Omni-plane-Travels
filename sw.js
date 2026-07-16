@@ -7,7 +7,7 @@
 //
 // 注意：本 SW 只做「可安装性 + 离线壳」的最小保障，不作为离线卖点（见锁定 Spec §0.4）。
 
-const CACHE = 'omni-plane-v1';
+const CACHE = 'omni-plane-v2.6.3';
 const SHELL = ['/', '/index.html', '/main.js', '/main.css', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', (event) => {

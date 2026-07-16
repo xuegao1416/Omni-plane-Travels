@@ -279,17 +279,33 @@ export interface WorldDef {
 
 /**
  * 内嵌事件包 —— 直接写在 WorldDef 上的事件包，随世界定义一起分发。
- * 形状对齐 eventWorldEvolution.register() 的入参（RegisteredEventRules）。
+ * 形状对齐 eventWorldEvolution.registerPack() 的入参（RegisteredEventRules）。
  */
 export interface EmbeddedEventPack {
-  /** 全局唯一包 ID，建议 'world:<worldId>' */
+  /** 全局唯一包 ID，建议 'world:<worldId>' 或 'world:<worldId>:events' */
   id: string;
   /** 包显示名（编辑器/日志用） */
   name?: string;
-  /** 普通事件卡规则（when→then），未来扩展用，周期事件走 periodicRules */
+  /** 包类型：'rule'=规则包（when→then+周期），'card'=事件包（弹卡片） */
+  type: 'rule' | 'card';
+  /** 规则包：when→then 规则 */
   rules?: EventRule[];
-  /** 周期规则（周期卡子类），由引擎每 tick 按 intervalTicks 静默结算 */
+  /** 规则包：周期规则 */
   periodicRules?: PeriodicRule[];
-  /** 拥有的权限（如 modify_world_state） */
+  /** 事件包：事件定义列表（每个事件含卡片） */
+  events?: Array<{
+    id: string;
+    name: string;
+    cards: Array<{
+      id: string;
+      componentId: string;
+      title: string;
+    }>;
+    puck?: {
+      root: { props?: Record<string, unknown> };
+      components: Record<string, Array<{ id: string; props: Record<string, unknown> }>>;
+    };
+  }>;
+  /** 拥有的权限（如 modify_world_state, add_card） */
   permissions?: Permission[];
 }

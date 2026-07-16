@@ -3,9 +3,12 @@
 //  安全红线：additionalProperties:false（strict），无 code/script/eval 字段。
 // ============================================================
 import { z } from 'zod';
-import type { Manifest, EventType, Permission, AssetKind, EventRule, RuleFile } from './schema';
+import type { Manifest, EventPackType, Permission, AssetKind, EventRule, RuleFile } from './schema';
 
-export const modTypeSchema = z.enum(['card', 'rule', 'worldbook', 'bundle']);
+export const packTypeSchema = z.enum(['card', 'rule', 'worldbook', 'bundle']);
+
+/** @deprecated 请使用 packTypeSchema */
+export const modTypeSchema = packTypeSchema;
 
 export const permissionSchema = z.enum([
   'read_world_state',
@@ -34,7 +37,7 @@ export const manifestSchema = z
     engine: z.literal('opt-event'),
     schemaVersion: z.number().int().min(1),
     minAppVersion: z.string().regex(SEMVER_RE),
-    type: modTypeSchema,
+    type: packTypeSchema,
     coverColor: z.string().regex(HEX_RE, 'coverColor 需为六位 hex 实色块（禁止渐变）'),
     icon: z.string().min(1).max(48),
     enabledByDefault: z.boolean().optional().default(false),
@@ -83,4 +86,4 @@ export function parseRuleFile(input: unknown): { ok: boolean; data?: RuleFile; i
   return { ok: false, issues: res.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
 }
 
-export type { EventType, Permission, AssetKind, EventRule };
+export type { EventPackType, EventPackType as EventType, Permission, AssetKind, EventRule };

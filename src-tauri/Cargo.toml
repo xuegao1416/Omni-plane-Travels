@@ -1,6 +1,6 @@
 [package]
 name = "omni-plane-travels"
-version = "2.6.2"
+version = "2.6.3"
 description = "世界漫游指南 - AI 驱动的互动小说引擎"
 authors = ["xuegao1416"]
 license = "MIT"
@@ -15,19 +15,20 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3" }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3" }
+tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 
 # ---- mod_system 后端所需依赖（此前缺失，导致无法 cargo build）----
 # 对话框 / 文件系统插件：commands.rs 用 app.dialog() 选文件，lib.rs 初始化。
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
 # .wtgmod 解包/打包 + 防 zip-bomb；deflate 写入 Manifest 压缩需要该 feature。
 # zip 2.x 默认 features 已含 deflate，这里显式声明以防传递依赖关掉 default-features。
 zip = { version = "2", features = ["deflate"] }

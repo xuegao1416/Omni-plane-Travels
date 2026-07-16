@@ -5,7 +5,7 @@ import {
   Download, Save, Braces, Plus, Trash2, ArrowUp, ArrowDown, BookOpen, X, AlertTriangle, Check, Package,
   Layers, Loader2,
 } from 'lucide-react';
-import type { CardFile, PuckData, CardDef, Manifest, ValidationIssue, EventType, ChoiceOption, ChoiceEffect, PeriodicRule, RuleFile, EventDef, OptEventFile } from '../../modules/schema';
+import type { CardFile, PuckData, CardDef, Manifest, ValidationIssue, EventPackType, ChoiceOption, ChoiceEffect, PeriodicRule, RuleFile, EventDef, EventPackFile } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
 import { getAllWorldBookEntries, WorldBookPicker, type WorldBookSelection } from './WorldBookPicker';
 import { getWebEvent, putWebEvent } from '../../modules/eventDb';
@@ -19,7 +19,7 @@ import { textOn } from './colorUtils';
    产出 schema 兼容的 CardFile（puck: PuckData）。若后续接入真正的 React Puck 编辑器，
    仅需替换画布层，下面对外契约（CardFile / 导出 .opt-event）保持不变。 */
 
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.6.3';
 
 const BLOCK_TYPES = ['title', 'narrative', 'choice'] as const;
 type BlockType = (typeof BLOCK_TYPES)[number];
@@ -152,17 +152,17 @@ export function validateCardFile(file: CardFile, manifest: ManifestDraft): Valid
  *  - 仅周期 → periodic
  *  - 否则 → card
  *  注意：rule/worldbook 为遗留枚举，本次不处理其创建路径。 */
-function computePackType(pack: OptEventFile): EventType {
+function computePackType(pack: EventPackFile): EventPackType {
   const events = pack.events ?? [];
   const hasCards = events.some((e) => (e.cards?.length ?? 0) > 0);
-  const hasPeriodic = (pack.periodic?.length ?? 0) > 0;
+  const hasPeriodic = (pack.periodicRules?.length ?? 0) > 0;
   const multiEvent = events.length > 1;
   if (multiEvent || (hasCards && hasPeriodic)) return 'bundle';
-  if (hasPeriodic) return 'periodic';
+  if (hasPeriodic) return 'rule';
   return 'card';
 }
 
-function buildManifest(d: ManifestDraft, pack: OptEventFile): Manifest {
+function buildManifest(d: ManifestDraft, pack: EventPackFile): Manifest {
   const type = computePackType(pack);
   const hasCards = (pack.events ?? []).some((e) => (e.cards?.length ?? 0) > 0);
   return {
@@ -275,21 +275,6 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
   // 删除事件确认模态目标（null = 关闭）
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  /** 当前事件改名落盘：仅当事件已保存才调 renameEventInPack；未落盘草稿仅本地 eventName，随保存写入 */
-  const commitRename = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (!currentPackId || !selectedEventId) return;
-    const isSaved = eventList.some((e) => e.id === selectedEventId);
-    if (!isSaved) return;
-    try {
-      await renameEventInPack(currentPackId, selectedEventId, trimmed);
-      await refreshEventList();
-    } catch (e) {
-      showSaveToast('改名失败：' + (e instanceof Error ? e.message : String(e)));
-    }
-  };
-
   /** 删除事件：已保存事件走 deleteEventFromPack + 刷新；删的是当前事件则自动切到相邻/首个或空白态 */
   const handleDeleteEvent = async (id: string) => {
     if (!currentPackId) return;
@@ -316,23 +301,6 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
     }
   };
 
-  /** 删除「当前事件」按钮：未保存草稿 = 本地丢弃进空白态；已保存 = 弹确认模态 */
-  const onDeleteCurrent = () => {
-    if (!selectedEventId) return;
-    const isSaved = eventList.some((e) => e.id === selectedEventId);
-    if (!isSaved) {
-      const newId = newEventId();
-      setSelectedEventId(newId);
-      setEditingEventId(newId);
-      setEventName('');
-      setBlocks([defaultBlock('title'), defaultBlock('narrative')]);
-      setSelected(null);
-      setSaved(false);
-      return;
-    }
-    setDeleteTarget(selectedEventId);
-  };
-
   const wbEntries = useMemo(() => getAllWorldBookEntries(), []);
 
   // 打开「已安装」事件包：从落盘记录回填 manifest + 事件列表 + 首个事件的卡片块 + 周期规则。
@@ -355,12 +323,12 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
           icon: m.icon ?? 'FileText',
         });
       }
-      // 读取事件索引（新模型 OptEventFile）
+      // 读取事件索引（新模型 EventPackFile）
       const idxRaw = rec.files['schema/events.json'];
       if (typeof idxRaw === 'string') {
-        const idx = JSON.parse(idxRaw) as OptEventFile;
+        const idx = JSON.parse(idxRaw) as EventPackFile;
         const evs = idx.events ?? [];
-        if (Array.isArray(idx.periodic)) setPeriodicRules(idx.periodic);
+        if (Array.isArray(idx.periodicRules)) setPeriodicRules(idx.periodicRules);
         setEventList(evs.map((e) => ({ id: e.id, name: e.name || '未命名事件', cardsLen: e.cards?.length ?? 0, saved: true })));
         const first = evs[0] ?? null;
         if (first) {
@@ -421,6 +389,22 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
     });
     return () => { cancelled = true; };
   }, [currentPackId]);
+
+  // 新建空包加载完成后，自动创建默认事件（对齐「创建世界即有默认事件」的 UX）
+  useEffect(() => {
+    if (!currentPackId) return;
+    if (editLoadedRef.current !== currentPackId) return; // 加载未完成
+    if (eventList.length > 0) return; // 已有事件，无需自动创建
+    if (selectedEventId) return; // 已有选中事件
+    const newId = newEventId();
+    setSelectedEventId(newId);
+    setEditingEventId(newId);
+    setEventName('未命名事件');
+    setBlocks([defaultBlock('title'), defaultBlock('narrative')]);
+    setSelected(null);
+    setSaved(false);
+    showSaveToast('已自动创建默认事件，请编辑后保存');
+  }, [currentPackId, eventList, selectedEventId]);
 
   // 任意编辑 → 标记未保存（载入回填已被 skipDirty 跳过）
   useEffect(() => {
@@ -536,8 +520,8 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
   // newEventId 已提升到模块级（废止 draft- 前缀，新建即真实 id）
 
   // ── 事件列表面板辅助 ──
-  /** 由当前编辑态构建完整 OptEventFile 快照（仅供类型推导：非当前事件以 cardsLen 占位卡片） */
-  const buildCurrentPackSnapshot = (): OptEventFile => {
+  /** 由当前编辑态构建完整 EventPackFile 快照（仅供类型推导：非当前事件以 cardsLen 占位卡片） */
+  const buildCurrentPackSnapshot = (): EventPackFile => {
     const currentRealId = selectedEventId ?? newEventId();
     const events: EventDef[] = eventList.map((entry) => {
       const isCurrent = entry.id === selectedEventId;
@@ -546,7 +530,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
       }
       return { id: entry.id, name: entry.name, cards: makePlaceholderCards(entry.cardsLen) };
     });
-    return { version: 1, name: manifest.name, events, periodic: periodicRules };
+    return { version: 1, name: manifest.name, events, periodicRules };
   };
 
   /** 读取并刷新事件列表（保存后用于同步卡片数 / 名称） */
@@ -563,7 +547,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
   };
 
   /** 回写 manifest.type（saveEventToPack 本身不更新 type，故此处每次保存补正） */
-  const persistPackType = async (packId: string, type: EventType) => {
+  const persistPackType = async (packId: string, type: EventPackType) => {
     try {
       const rec = await getWebEvent(packId);
       if (!rec || rec.manifest.type === type) return;
@@ -601,7 +585,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
         }
         const idxRaw = rec?.files['schema/events.json'];
         if (typeof idxRaw === 'string') {
-          const idx = JSON.parse(idxRaw) as OptEventFile;
+          const idx = JSON.parse(idxRaw) as EventPackFile;
           const evDef = idx.events?.find((e) => e.id === id);
           if (evDef) nameNext = evDef.name ?? '';
         }
@@ -631,12 +615,9 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
       await loadCurrentPack(currentPackId, () => false);
       editLoadedRef.current = currentPackId;
     }
-    // 根因修复：事件名（左栏「当前事件名」）未填写时，严禁静默写盘成「未命名事件」幽灵事件。
-    // 新建包首存、或用户只填了顶栏「事件包名称」漏填事件名时都会命中；改为明确拦截并提示，杜绝幽灵事件。
+    // 事件名为空时以「未命名事件」兜底（用户可后续双击事件列表重命名）
     if (!eventName.trim()) {
-      setMode('visual');
-      showSaveToast('请先填写「当前事件名」再保存事件包');
-      return false;
+      setEventName('未命名事件');
     }
     const cf = toCardFile(blocks);
     const errs = validateCardFile(cf, manifest);
@@ -694,22 +675,17 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
     }
   };
 
-  /** 在当前包内新建一个事件：仅当当前「已命名」事件有未保存内容才先存盘（避免丢失），
-   *  否则直接丢弃草稿（不落盘，根治空白/未命名事件累积）。未命名草稿即便有内容也不预存——
-   *  否则会在用户只想要一条事件时偷偷多写一条「未命名事件」。列表只显示已保存事件。 */
+  /** 在当前包内新建一个事件：直接生成「未命名事件」+ 默认卡片，无需手动填名。
+   *  当前未保存的已命名事件会自动先存盘（避免丢失），未命名草稿直接丢弃。 */
   const handleNewEvent = async () => {
-    // 仅在「加载已完成」时自动预存当前草稿，避免 loadCurrentPack 尚未回填、editingEventId 仍为 null 时，
-    // 竞态守卫重新 loadCurrentPack 把 id 重置为 null → handleSaveEvent 用幽灵 id 误写一条「未命名事件」。
-    // 加载未完成（即新建包后手快点「新建事件」）时：未保存草稿直接丢弃，不偷偷落盘。
     if (!saved && eventName.trim().length > 0 && currentPackId && editLoadedRef.current === currentPackId) {
       const ok = await handleSaveEvent();
-      if (!ok) return; // 校验失败：中止新建，保留当前事件
+      if (!ok) return;
     }
-    // 开全新空白事件（真实 evt- id，不往列表塞草稿行）
     const newId = newEventId();
     setSelectedEventId(newId);
     setEditingEventId(newId);
-    setEventName('');
+    setEventName('未命名事件');
     setBlocks([defaultBlock('title'), defaultBlock('narrative')]);
     setSelected(null);
     setSaved(false);
@@ -856,32 +832,6 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
                 <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>事件</span>
                 <button className="btn-secondary btn-sm" onClick={() => void handleNewEvent()} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)' }}><Plus size={14} /> 新建事件</button>
               </div>
-              {/* 当前事件：改名（编辑区内，不放在顶部面包屑）+ 删除当前事件 */}
-              <div style={{ padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  <Pencil size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="可编辑" />
-                  <input
-                    value={eventName}
-                    onChange={(e) => setEventName(e.target.value)}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = 'transparent'; void commitRename(eventName); }}
-                    placeholder="当前事件名"
-                    aria-label="当前事件名"
-                    title="修改当前事件名称，失焦后保存"
-                    style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', border: '1px solid transparent', background: 'transparent', borderRadius: 'var(--radius-sm)', padding: '2px 6px', outline: 'none' }}
-                    onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
-                  />
-                  <button
-                    type="button"
-                    onClick={onDeleteCurrent}
-                    disabled={!selectedEventId}
-                    aria-label="删除当前事件"
-                    title="删除当前事件"
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0, borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent', color: 'var(--danger)', cursor: !selectedEventId ? 'not-allowed' : 'pointer', opacity: !selectedEventId ? 0.4 : 1 }}
-                    onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--danger-bg-soft)'; }}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  ><Trash2 size={16} /></button>
-                </div>
-              </div>
               {eventList.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-2)', textAlign: 'center' }}>
                   <Layers size={32} style={{ color: 'var(--text-muted)' }} />
@@ -900,6 +850,10 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
                       disabled={saving || eventsLoading}
                       onSelect={() => void selectEvent(ev.id)}
                       onDelete={() => setDeleteTarget(ev.id)}
+                      onRename={(name) => {
+                        setEventName(name);
+                        if (currentPackId) void renameEventInPack(currentPackId, ev.id, name).then(() => void refreshEventList());
+                      }}
                     />
                   ))}
                 </div>
@@ -1111,17 +1065,39 @@ function SubTab({ active, onClick, children }: { active: boolean; onClick: () =>
   );
 }
 
-/** 事件列表单条行（六态齐备：Default / Hover / Focus-visible / Active / Disabled / Loading） */
-function EventRow({ event, selected, loading, disabled, onSelect, onDelete }: {
+/** 事件列表单条行（六态齐备：Default / Hover / Focus-visible / Active / Disabled / Loading）
+ *  双击事件名进入重命名模式，Enter 确认，Escape 取消，失焦确认。 */
+function EventRow({ event, selected, loading, disabled, onSelect, onDelete, onRename }: {
   event: EventListItem;
   selected: boolean;
   loading: boolean;
   disabled: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onRename: (name: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [active, setActive] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [editName, setEditName] = useState(event.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = () => {
+    setEditName(event.name);
+    setRenaming(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const commitRename = () => {
+    const trimmed = editName.trim();
+    if (trimmed && trimmed !== event.name) onRename(trimmed);
+    setRenaming(false);
+  };
+
+  const cancelRename = () => {
+    setRenaming(false);
+    setEditName(event.name);
+  };
 
   const isDisabled = disabled || loading;
   const selStyle: React.CSSProperties = {
@@ -1165,7 +1141,8 @@ function EventRow({ event, selected, loading, disabled, onSelect, onDelete }: {
         disabled={isDisabled}
         aria-busy={loading || undefined}
         aria-current={selected ? 'true' : undefined}
-        onClick={() => { if (!isDisabled) onSelect(); }}
+        onClick={() => { if (!isDisabled && !renaming) onSelect(); }}
+        onDoubleClick={(e) => { e.stopPropagation(); if (!isDisabled) startRename(); }}
         className="event-row-btn"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => { setHovered(false); setActive(false); }}
@@ -1178,9 +1155,21 @@ function EventRow({ event, selected, loading, disabled, onSelect, onDelete }: {
         ) : (
           <Layers size={16} style={{ flexShrink: 0, color: selected ? 'var(--accent)' : 'var(--text-secondary)' }} />
         )}
-        <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {event.name || '未命名事件'}
-        </span>
+        {renaming ? (
+          <input
+            ref={inputRef}
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') cancelRename(); e.stopPropagation(); }}
+            onBlur={() => commitRename()}
+            onClick={(e) => e.stopPropagation()}
+            style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', background: 'var(--bg-primary)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', padding: '1px 6px', outline: 'none' }}
+          />
+        ) : (
+          <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {event.name || '未命名事件'}
+          </span>
+        )}
         <span style={{ flexShrink: 0, fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', borderRadius: 999, padding: '1px 8px', whiteSpace: 'nowrap' }}>
           {event.cardsLen} 卡片
         </span>

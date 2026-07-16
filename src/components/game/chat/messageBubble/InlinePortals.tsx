@@ -4,6 +4,8 @@ import type { ChatMessage } from '../../../../engine/types';
 import type { WorldSystemData, DiceRoll } from '../../../../modules/schema';
 import type { RenderedContent } from './renderPipeline';
 import { useImageStore } from '../../../../stores/imageStore';
+import { usePortraitStore } from '../../../../stores/portraitStore';
+import { imageDb } from '../../../../storage/imageDb';
 
 /** 延迟卸载 React root，避免在 React commit 阶段同步 unmount 导致竞态警告 */
 function deferredUnmount(roots: Root[]) {
@@ -161,13 +163,24 @@ export function useInlinePortals(
 
     const mountDialogueCards = async () => {
       const { default: InlineDialogueCardComponent } = await import('../InlineDialogueCard');
+      const setPortrait = usePortraitStore.getState().setPortrait;
 
-      placeholders.forEach(el => {
-        const avatarUrl = el.getAttribute('data-avatar') || '';
+      for (const el of Array.from(placeholders)) {
+        let avatarUrl = el.getAttribute('data-avatar') || '';
         const name = el.getAttribute('data-name') || '';
+        const npcId = el.getAttribute('data-npcid') || name; // 优先用 npcId，回退到 name
         const title = el.getAttribute('data-title') || '';
         const text = el.getAttribute('data-text') || '';
         const action = el.getAttribute('data-action') || '';
+
+        // AI 未填充头像时，按 NPC 名字从 imageDb 查找
+        if (!avatarUrl && name) {
+          try {
+            avatarUrl = (await imageDb.findPortraitUrlByName(name)) || '';
+            // 写入 store，后续头像变化时自动更新
+            if (avatarUrl) setPortrait(npcId, avatarUrl);
+          } catch { /* ignore */ }
+        }
 
         const container = document.createElement('div');
         el.replaceWith(container);
@@ -176,13 +189,14 @@ export function useInlinePortals(
           <InlineDialogueCardComponent
             avatarUrl={avatarUrl}
             name={name}
+            npcId={npcId}
             title={title}
             text={text}
             action={action}
           />
         );
         dialogueRootsRef.current.push(root);
-      });
+      }
     };
 
     mountDialogueCards();

@@ -140,7 +140,7 @@ function seedGraph(): { nodes: RFNode[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
-function toModGraph(nodes: RFNode[], edges: Edge[]): EventGraph {
+function toEventGraph(nodes: RFNode[], edges: Edge[]): EventGraph {
   return {
     nodes: nodes.map((n) => ({ ...(n.data as unknown as EventGraphNode) })),
     edges: edges.map((e) => ({
@@ -152,7 +152,7 @@ function toModGraph(nodes: RFNode[], edges: Edge[]): EventGraph {
   };
 }
 
-function fromModGraph(graph: EventGraph): { nodes: RFNode[]; edges: Edge[] } {
+function fromEventGraph(graph: EventGraph): { nodes: RFNode[]; edges: Edge[] } {
   const nodes: RFNode[] = graph.nodes.map((n, i) => ({
     id: n.id,
     type: n.kind,
@@ -198,21 +198,51 @@ export interface RuleEditorProps {
   onBack: () => void;
   gameState?: GameState;
   worldDef?: WorldDef;
+  /** 保存成功后回调（用于事件中心刷新） */
+  onSaved?: () => void;
 }
 
 type Mode = 'visual' | 'json';
 
-export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: worldDefProp }: RuleEditorProps) {
+export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: worldDefProp, onSaved }: RuleEditorProps) {
   const seed = useMemo(seedGraph, []);
   const [nodes, setNodes, onNodesChange] = useNodesState<RFNode>(seed.nodes);
   const [edges, setEdges, rawOnEdgesChange] = useEdgesState<Edge>(seed.edges);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  /** 从当前图中提取所有已使用的事件类型（用于下拉建议），加上常用默认值 */
+  const knownEventTypes = useMemo(() => {
+    const types = new Set<string>([
+      // 常用默认事件类型
+      'dice_roll', 'combat', 'dialogue', 'exploration',
+      'craft', 'trade', 'rest', 'travel',
+      'random_encounter', 'weather_change', 'resource_gather',
+    ]);
+    for (const n of nodes) {
+      const d = n.data as unknown as EventGraphNode;
+      if (d.trigger?.eventType) types.add(d.trigger.eventType);
+      if (d.when && 'event' in d.when) types.add(d.when.event.type);
+      if (d.when && 'all' in d.when) {
+        for (const child of d.when.all) {
+          if ('event' in child) types.add(child.event.type);
+        }
+      }
+      if (d.when && 'any' in d.when) {
+        for (const child of d.when.any) {
+          if ('event' in child) types.add(child.event.type);
+        }
+      }
+    }
+    return [...types].sort();
+  }, [nodes]);
   const [mode, setMode] = useState<Mode>('visual');
   const [jsonText, setJsonText] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [sim, setSim] = useState<{ applied: string[]; warnings: string[]; aborted: boolean; reason?: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const showSaveToast = (m: string) => { setSaveToast(m); setTimeout(() => setSaveToast(null), 2500); };
   const [eventType, setEventType] = useState('dice_roll');
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
@@ -343,7 +373,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
         if (typeof raw !== 'string') return;
         const rf = JSON.parse(raw) as RuleFile;
         const g = ruleFileToGraph(rf);
-        const { nodes: n, edges: e } = fromModGraph(g);
+        const { nodes: n, edges: e } = fromEventGraph(g);
         if (n.length > 0) { setNodes(n); setEdges(e); }
       } catch (err) {
         // 损坏数据可见化（P0-3）：暴露给用户而非静默保留种子图
@@ -423,7 +453,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
   };
 
   const enterJson = () => {
-    setJsonText(JSON.stringify(toModGraph(nodes, edges), null, 2));
+    setJsonText(JSON.stringify(toEventGraph(nodes, edges), null, 2));
     setJsonError(null);
     setMode('json');
   };
@@ -432,7 +462,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
     try {
       const parsed = JSON.parse(jsonText) as EventGraph;
       if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) throw new Error('nodes / edges 必须为数组');
-      const { nodes: n, edges: e } = fromModGraph(parsed);
+      const { nodes: n, edges: e } = fromEventGraph(parsed);
       setNodes(n);
       setEdges(e);
       setSelectedId(null);
@@ -452,7 +482,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
   };
 
   const runValidate = () => {
-    const g = toModGraph(nodes, edges);
+    const g = toEventGraph(nodes, edges);
     const graphIssues = validateRuleGraph(g);
     const simIssues: ValidationIssue[] = [];
     setIssues([...graphIssues, ...simIssues]);
@@ -460,7 +490,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
   };
 
   const runSim = () => {
-    const g = toModGraph(nodes, edges);
+    const g = toEventGraph(nodes, edges);
     const rules = graphToRuleFile(g).rules;
     const events = eventType.trim() ? [{ type: eventType.trim() }] : [];
     const res = evaluate(buildSimCtx(gameState), rules, { tick: 1, permissions: [...ALL_PERMISSIONS], events });
@@ -477,17 +507,21 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
     if (!eventPackId) return false;
     setSaving(true);
     try {
-      const rf = graphToRuleFile(toModGraph(nodes, edges));
+      const rf = graphToRuleFile(toEventGraph(nodes, edges));
       await saveRulesToPack(eventPackId, rf.rules, rf.periodicRules);
       setIssues([]);
+      showSaveToast('已保存规则');
+      onSaved?.();
       return true;
     } catch (err) {
-      setIssues([{ code: 'SAVE_FAILED', field: 'rules.json', message: '保存失败：' + (err instanceof Error ? err.message : String(err)) }]);
+      const msg = '保存失败：' + (err instanceof Error ? err.message : String(err));
+      setIssues([{ code: 'SAVE_FAILED', field: 'rules.json', message: msg }]);
+      showSaveToast(msg);
       return false;
     } finally {
       setSaving(false);
     }
-  }, [eventPackId, nodes, edges]);
+  }, [eventPackId, nodes, edges, onSaved]);
 
   // 返回前自动保存，避免误退出丢失编辑（同 CardEditor 的保存即落盘语义）
   const handleBack = useCallback(async () => {
@@ -585,7 +619,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
             style={{ flex: 1, width: '100%', resize: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6, color: jsonError ? 'var(--danger)' : 'var(--text-primary)', background: jsonError ? 'var(--danger-bg-soft)' : 'var(--bg-secondary)', border: `1px solid ${jsonError ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}
           />
           <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
-            <button className="btn-secondary btn-sm" onClick={() => setJsonText(JSON.stringify(toModGraph(nodes, edges), null, 2))}>重置为画布</button>
+            <button className="btn-secondary btn-sm" onClick={() => setJsonText(JSON.stringify(toEventGraph(nodes, edges), null, 2))}>重置为画布</button>
             <button className="btn-primary btn-sm" onClick={backToVisual} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check size={15} /> 应用并返回可视化</button>
           </div>
         </div>
@@ -660,7 +694,7 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
               {!selectedNode ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>选中一个节点以编辑属性</div>
               ) : (
-                <NodeProperties node={selectedNode} onChange={(p) => updateNodeData(selectedNode.id, p)} onRemove={() => removeNode(selectedNode.id)} eventType={eventType} setEventType={setEventType} onSimulate={runSim} gameState={gameState} eventPackId={eventPackId} worldDef={worldDef} />
+                <NodeProperties node={selectedNode} onChange={(p) => updateNodeData(selectedNode.id, p)} onRemove={() => removeNode(selectedNode.id)} eventType={eventType} setEventType={setEventType} onSimulate={runSim} gameState={gameState} eventPackId={eventPackId} worldDef={worldDef} knownEventTypes={knownEventTypes} />
               )}
             </div>
           )}
@@ -701,10 +735,15 @@ export default function RuleEditor({ eventPackId, onBack, gameState, worldDef: w
                   <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>节点属性</span>
                   <button onClick={() => setMobilePropsPanel(false)} aria-label="关闭" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 }}><X size={18} /></button>
                 </div>
-                <NodeProperties node={selectedNode} onChange={(p) => updateNodeData(selectedNode.id, p)} onRemove={() => { removeNode(selectedNode.id); setMobilePropsPanel(false); }} eventType={eventType} setEventType={setEventType} onSimulate={runSim} gameState={gameState} eventPackId={eventPackId} worldDef={worldDef} />
+                <NodeProperties node={selectedNode} onChange={(p) => updateNodeData(selectedNode.id, p)} onRemove={() => { removeNode(selectedNode.id); setMobilePropsPanel(false); }} eventType={eventType} setEventType={setEventType} onSimulate={runSim} gameState={gameState} eventPackId={eventPackId} worldDef={worldDef} knownEventTypes={knownEventTypes} />
               </div>
             </>
           )}
+        </div>
+      )}
+      {saveToast && (
+        <div style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 'var(--font-size-sm)', boxShadow: 'var(--shadow-md)' }}>
+          {saveToast}
         </div>
       )}
     </div>
@@ -835,7 +874,7 @@ const ACTION_KIND_LABELS: Record<ActionKind, string> = {
 };
 
 function NodeProperties({
-  node, onChange, onRemove, eventType, setEventType, onSimulate, gameState, eventPackId, worldDef,
+  node, onChange, onRemove, eventType, setEventType, onSimulate, gameState, eventPackId, worldDef, knownEventTypes,
 }: {
   node: RFNode;
   onChange: (p: Partial<EventGraphNode>) => void;
@@ -846,6 +885,7 @@ function NodeProperties({
   gameState?: GameState;
   eventPackId?: string | null;
   worldDef?: WorldDef;
+  knownEventTypes?: string[];
 }) {
   const d = node.data as unknown as EventGraphNode;
   const meta = NODE_META[d.kind];
@@ -864,7 +904,7 @@ function NodeProperties({
 
       {d.kind === 'condition' && (
         <>
-          <WhenConditionEditor when={d.when} onChange={(when) => onChange({ when } as Partial<EventGraphNode>)} worldDef={worldDef} />
+          <WhenConditionEditor when={d.when} onChange={(when) => onChange({ when } as Partial<EventGraphNode>)} worldDef={worldDef} knownEventTypes={knownEventTypes} />
           <label style={fieldLabel}>
             逻辑模式
             <select
@@ -925,7 +965,29 @@ function NodeProperties({
 
       {d.kind === 'trigger' && (
         <>
-          <label style={fieldLabel}>事件类型<input value={d.trigger?.eventType ?? ''} onChange={(e) => onChange({ trigger: { ...(d.trigger ?? {}), eventType: e.target.value } })} style={inputStyle} /></label>
+          <label style={fieldLabel}>
+            事件类型
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>用于世界状态规则匹配 AI 生成的事件</span>
+            {knownEventTypes && knownEventTypes.length > 0 ? (
+              <select
+                value={d.trigger?.eventType ?? ''}
+                onChange={(e) => onChange({ trigger: { ...(d.trigger ?? {}), eventType: e.target.value } })}
+                style={inputStyle}
+              >
+                <option value="">未设置</option>
+                {knownEventTypes.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={d.trigger?.eventType ?? ''}
+                onChange={(e) => onChange({ trigger: { ...(d.trigger ?? {}), eventType: e.target.value } })}
+                placeholder="事件类型（如 dice_roll）"
+                style={inputStyle}
+              />
+            )}
+          </label>
           <label style={fieldLabel}>优先级<input type="number" value={d.priority ?? 0} onChange={(e) => onChange({ priority: Number(e.target.value) })} style={inputStyle} /></label>
           <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={!!d.once} onChange={(e) => onChange({ once: e.target.checked })} /> 仅触发一次</label>
           <label style={fieldLabel}>冷却（tick）<input type="number" value={d.cooldownTicks ?? 0} onChange={(e) => onChange({ cooldownTicks: Number(e.target.value) })} style={inputStyle} /></label>
@@ -971,10 +1033,23 @@ function NodeProperties({
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>模拟注入事件</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <input value={eventType} onChange={(e) => setEventType(e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="事件类型" />
-          <button className="btn-ghost btn-sm" onClick={() => setEventType('dice_roll')} title="骰子检定"><Dices size={15} /></button>
-        </div>
+        {knownEventTypes && knownEventTypes.length > 0 ? (
+          <select
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">选择事件类型...</option>
+            {knownEventTypes.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        ) : (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={eventType} onChange={(e) => setEventType(e.target.value)} style={{ ...inputStyle, flex: 1 }} placeholder="事件类型" />
+            <button className="btn-ghost btn-sm" onClick={() => setEventType('dice_roll')} title="骰子检定"><Dices size={15} /></button>
+          </div>
+        )}
         <button className="btn-primary btn-sm" onClick={onSimulate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}><Play size={15} /> 运行模拟</button>
       </div>
     </div>

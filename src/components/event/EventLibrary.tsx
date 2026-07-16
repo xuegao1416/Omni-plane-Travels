@@ -9,14 +9,15 @@ import {
   PackageOpen,
   AlertTriangle,
   ChevronRight,
+  FolderPlus,
 } from 'lucide-react';
-import type { EventRegistryEntry, EventMeta, EventType } from '../../modules/schema';
+import type { EventRegistryEntry, EventMeta, EventPackType } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
 import { resolveEventIcon } from './eventIcons';
 import EventSwitch from './EventSwitch';
 import EventPackBadge, {
   derivePackFlags,
-  parseOptEventFile,
+  parseEventPackFile,
   type EventPackFlags,
 } from './EventPackBadge';
 import { getWebEvent } from '../../modules/eventDb';
@@ -25,24 +26,27 @@ import { EmptyState } from './EmptyState';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import { isEventActive } from '../../modules/eventActivation';
 import { textOn } from './colorUtils';
+import CollectionCard from './CollectionCard';
+import CollectionCreateDialog from './CollectionCreateDialog';
 
 interface EventLibraryProps {
   eventApi: UseEventsResult;
-  onOpenMod: (entry: EventRegistryEntry) => void;
+  onOpenPack: (entry: EventRegistryEntry) => void;
 }
 
-export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps) {
-  const { mods, discovered, loading, error, enable, disable, uninstall, exportMod, importMod } = eventApi;
+export default function EventLibrary({ eventApi, onOpenPack }: EventLibraryProps) {
+  const { packs, discovered, loading, error, enable, disable, uninstall, exportPack, importPack, collections, createCollection, deleteCollection } = eventApi;
   const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<EventPackType | 'all' | 'collection'>('all');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const isPhone = useIsPhone();
 
   const entryById = useMemo(
-    () => new Map(mods.map((m) => [m.meta.id, m] as const)),
-    [mods],
+    () => new Map<string, EventRegistryEntry>(packs.map((m) => [m.meta.id, m])),
+    [packs],
   );
 
-  // 包内容构成标记缓存（id → flags），由事件包真实 OptEventFile 内容派生（与 EventPackBadge 同源，
+  // 包内容构成标记缓存（id → flags），由事件包真实 EventPackFile 内容派生（与 EventPackBadge 同源，
   // 而非只看陈旧的 meta.type 单一字段）。发现态包无内容摘要，需惰性读 IndexedDB。
   const [flagsMap, setFlagsMap] = useState<Record<string, EventPackFlags | null>>({});
 
@@ -59,7 +63,7 @@ export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps)
             const rec = await getWebEvent(m.id);
             // rec 不存在（如非 IndexedDB 环境）→ null，交由筛选回退到旧 type
             if (!rec) return [m.id, null] as const;
-            return [m.id, derivePackFlags(parseOptEventFile(rec.files))] as const;
+            return [m.id, derivePackFlags(parseEventPackFile(rec.files))] as const;
           } catch {
             return [m.id, null] as const;
           }
@@ -76,21 +80,33 @@ export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps)
     const q = query.trim().toLowerCase();
     return discovered.filter((m) => {
       if (q && !(m.name.toLowerCase().includes(q) || m.author.toLowerCase().includes(q))) return false;
-      if (typeFilter === 'all') return true;
+      if (typeFilter === 'all' || typeFilter === 'collection') return true;
       const f = flagsMap[m.id];
       if (f === undefined) return true; // 内容标记尚未就绪：先全部展示，避免列表闪烁，就绪后精确收敛
       if (f === null) return m.type === typeFilter; // 内容不可用：回退旧 meta.type
       // 已加载真实内容：按构成标记筛选
       switch (typeFilter) {
         case 'card': return f.hasCards;
-        case 'rule': return f.hasRules;
+        case 'rule': return f.hasRules || f.hasPeriodic;
         case 'worldbook': return f.hasWorldbook;
-        case 'periodic': return f.hasPeriodic;
         case 'bundle': return f.eventCount > 1;
         default: return true;
       }
     });
   }, [discovered, query, typeFilter, flagsMap]);
+
+  // 合集筛选
+  const filteredCollections = useMemo(() => {
+    if (typeFilter !== 'all' && typeFilter !== 'collection') return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return collections;
+    return collections.filter((c) => c.name.toLowerCase().includes(q));
+  }, [collections, query, typeFilter]);
+
+  // 是否只看合集
+  const showOnlyCollections = typeFilter === 'collection';
+  // 合集和包是否混合显示
+  const showMixed = typeFilter === 'all';
 
   return (
     <div
@@ -125,7 +141,7 @@ export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps)
         </div>
         <select
           value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as EventType | 'all')}
+          onChange={(e) => setTypeFilter(e.target.value as EventPackType | 'all' | 'collection')}
           className="input-field"
           style={{ minHeight: 'var(--touch-min)' }}
         >
@@ -135,8 +151,12 @@ export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps)
           <option value="worldbook">世界书</option>
           <option value="bundle">合集</option>
           <option value="periodic">周期</option>
+          <option value="collection">我的合集</option>
         </select>
-        <button className="btn-primary" onClick={() => importMod()}>
+        <button className="btn-secondary" onClick={() => setShowCreateDialog(true)} style={{ minHeight: 'var(--touch-min)' }}>
+          <FolderPlus size={16} /> {isPhone ? '合集' : '创建合集'}
+        </button>
+        <button className="btn-primary" onClick={() => importPack()}>
           <Upload size={16} /> 导入 .opt-event
         </button>
       </div>
@@ -171,15 +191,21 @@ export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps)
         >
           <Loader2 size={18} className="event-spin" /> 加载中…
         </div>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && filteredCollections.length === 0 ? (
         <EmptyState
           icon={PackageOpen}
-          title="事件库为空"
-          description="尚未导入任何事件，点击右上角「导入 .opt-event」选择本地包。"
+          title={showOnlyCollections ? '暂无合集' : '事件库为空'}
+          description={showOnlyCollections ? '点击右上角「创建合集」开始创建你的第一个合集。' : '尚未导入任何事件，点击右上角「导入 .opt-event」选择本地包。'}
           action={
-            <button className="btn-primary" onClick={() => importMod()}>
-              <Upload size={16} /> 导入 .opt-event
-            </button>
+            showOnlyCollections ? (
+              <button className="btn-primary" onClick={() => setShowCreateDialog(true)}>
+                <FolderPlus size={16} /> 创建合集
+              </button>
+            ) : (
+              <button className="btn-primary" onClick={() => importPack()}>
+                <Upload size={16} /> 导入 .opt-event
+              </button>
+            )
           }
         />
       ) : (
@@ -190,20 +216,55 @@ export default function EventLibrary({ eventApi, onOpenMod }: EventLibraryProps)
             gap: 'var(--space-3)',
           }}
         >
-          {filtered.map((m) => (
-            <LibraryCard
-              key={m.id}
-              meta={m}
-              entry={entryById.get(m.id)}
-              onEnable={enable}
-              onDisable={disable}
-              onUninstall={uninstall}
-              onExport={exportMod}
-              onOpen={onOpenMod}
-              onImport={() => { void importMod(); }}
-            />
-          ))}
+          {/* 合集卡片（all 模式或 collection 模式都显示） */}
+          {(showMixed || showOnlyCollections) &&
+            filteredCollections.map((col) => {
+              const memberEntries = col.memberIds
+                .map((id) => entryById.get(id))
+                .filter((e): e is EventRegistryEntry => !!e);
+              return (
+                <CollectionCard
+                  key={col.id}
+                  collection={col}
+                  memberEntries={memberEntries}
+                  onEdit={() => {
+                    /* TODO: 编辑弹窗 */
+                  }}
+                  onDelete={deleteCollection}
+                  onEnableMember={enable}
+                  onDisableMember={disable}
+                  onOpenMember={onOpenPack}
+                />
+              );
+            })}
+          {/* 事件包卡片 */}
+          {!showOnlyCollections &&
+            filtered.map((m) => (
+              <LibraryCard
+                key={m.id}
+                meta={m}
+                entry={entryById.get(m.id)}
+                onEnable={enable}
+                onDisable={disable}
+                onUninstall={uninstall}
+                onExport={exportPack}
+                onOpen={onOpenPack}
+                onImport={() => { void importPack(); }}
+              />
+            ))}
         </div>
+      )}
+
+      {/* 创建合集弹窗 */}
+      {showCreateDialog && (
+        <CollectionCreateDialog
+          installedPacks={packs}
+          onConfirm={async (data) => {
+            await createCollection(data);
+            setShowCreateDialog(false);
+          }}
+          onCancel={() => setShowCreateDialog(false)}
+        />
       )}
     </div>
   );

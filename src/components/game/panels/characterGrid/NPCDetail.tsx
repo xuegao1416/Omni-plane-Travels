@@ -101,11 +101,12 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
   );
 }
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId }: {
+export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId, onPortraitChange }: {
   npc: NPCData; npcId: string; onClose: () => void;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
   worldId?: string;
+  onPortraitChange?: (npcId: string, url: string) => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
@@ -128,7 +129,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         boxShadow: 'var(--shadow-lg)',
       }}>
-        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} />
+        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} />
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <div style={{

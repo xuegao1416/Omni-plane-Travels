@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import {
   ArrowLeft, Upload, FileCheck, ShieldCheck, AlertTriangle, Check, X, FileWarning, Package,
 } from 'lucide-react';
-import type { Manifest, ValidationResult, ValidationIssue, EventType } from '../../modules/schema';
+import type { Manifest, ValidationResult, ValidationIssue, EventPackType } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
 import { StatusBadge, EventTypeBadge } from './StatusBadge';
 import { EmptyState } from './EmptyState';
@@ -14,7 +14,7 @@ import { textOn } from './colorUtils';
    校验优先调用 eventApi.validate（Rust validate_event）；非 Tauri 环境下回退到本地结构化校验，
    二者合并展示。错误码沿用 API 文档的 EventErrorCode（MANIFEST_* 等）。 */
 
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.6.3';
 const ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 
@@ -69,8 +69,8 @@ export default function EventImportWizard({ eventApi, onClose }: EventImportWiza
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const existing = manifest ? eventApi.mods.find((m) => m.meta.id === manifest.id) : undefined;
-  const missingDeps = manifest?.dependencies?.filter((d) => !eventApi.mods.some((m) => m.meta.id === d)) ?? [];
+  const existing = manifest ? eventApi.packs.find((m) => m.meta.id === manifest.id) : undefined;
+  const missingDeps = manifest?.dependencies?.filter((d) => !eventApi.packs.some((m) => m.meta.id === d)) ?? [];
   const versionIncompatible = manifest ? !semverGte(APP_VERSION, manifest.minAppVersion) : false;
 
   const readFile = useCallback(async (f: File) => {
@@ -130,7 +130,7 @@ export default function EventImportWizard({ eventApi, onClose }: EventImportWiza
     setImporting(true);
     setResult(null);
     try {
-      const meta = await eventApi.import({ file: file ?? undefined });
+      const meta = await eventApi.importPack({ file: file ?? undefined });
       // import 在桌面端无文件 / 失败时会返回 null（useEvents 内部已吞掉错误并写入 error）
       if (!meta) {
         const reason = eventApi.error ?? '导入未完成，请重试。';
@@ -149,7 +149,7 @@ export default function EventImportWizard({ eventApi, onClose }: EventImportWiza
     }
   };
 
-  const Icon = manifest ? resolveEventIcon(manifest.icon, manifest.type as EventType) : Package;
+  const Icon = manifest ? resolveEventIcon(manifest.icon, manifest.type as EventPackType) : Package;
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)' }}>
@@ -277,7 +277,7 @@ export default function EventImportWizard({ eventApi, onClose }: EventImportWiza
                   <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>v{manifest.version} · {manifest.author}</div>
                   {manifest.description && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.5 }}>{manifest.description}</div>}
                 </div>
-                <EventTypeBadge type={manifest.type as EventType} />
+                <EventTypeBadge type={manifest.type as EventPackType} />
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                 <StatusBadge tone="neutral">id: {manifest.id}</StatusBadge>

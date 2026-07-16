@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { AlertTriangle, Info, HelpCircle, X } from 'lucide-react';
+import { AlertTriangle, Info, HelpCircle, X, Loader2 } from 'lucide-react';
 import { useConfigStore } from '../../stores/configStore';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import s from './Dialog.module.css';
 
 interface DialogOptions {
-  type: 'confirm' | 'alert' | 'info' | 'prompt';
+  type: 'confirm' | 'alert' | 'info' | 'prompt' | 'loading';
   title?: string;
   message: string;
   confirmText?: string;
@@ -53,6 +53,10 @@ export function useDialog() {
     });
   }, []);
 
+  const loading = useCallback((message: string, options?: Partial<Omit<DialogOptions, 'type' | 'message'>>): void => {
+    setDialog({ type: 'loading', message, open: true, resolve: () => {}, ...options });
+  }, []);
+
   const close = useCallback((result: boolean) => {
     if (dialog?.type === 'prompt') {
       dialog.resolve(result ? (dialog.inputValue ?? '') : null);
@@ -66,12 +70,11 @@ export function useDialog() {
     setDialog(prev => prev ? { ...prev, inputValue: val } : null);
   }, []);
 
-  // ESC 关闭 + Enter 确认
+  // ESC 关闭
   useEffect(() => {
     if (!dialog?.open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close(false);
-      if (e.key === 'Enter' && dialog.type === 'prompt') close(true);
+      if (e.key === 'Escape' && dialog.type !== 'loading') close(false);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -82,12 +85,13 @@ export function useDialog() {
     alert: AlertTriangle,
     info: Info,
     prompt: HelpCircle,
+    loading: Loader2,
   };
 
   useBodyScrollLock(!!dialog?.open);
 
   const DialogUI = dialog?.open ? (
-    <div ref={dialogRef} className={s.overlay} onClick={() => close(false)}>
+    <div ref={dialogRef} className={s.overlay} onClick={() => { if (dialog.type !== 'loading') close(false); }}>
       <div className={s.dialog} onClick={e => e.stopPropagation()}>
         {/* 头部 */}
         <div className={s.header}>
@@ -95,7 +99,11 @@ export function useDialog() {
             const Icon = iconMap[dialog.type];
             return (
               <div className={`${s.iconBox} ${dialog.danger ? s.iconBoxDanger : s.iconBoxDefault}`}>
-                <Icon size={16} color={dialog.danger ? 'var(--danger)' : 'var(--accent, #d4af37)'} />
+                <Icon
+                  size={16}
+                  color={dialog.danger ? 'var(--danger)' : 'var(--accent, #d4af37)'}
+                  className={dialog.type === 'loading' ? s.spinIcon : undefined}
+                />
               </div>
             );
           })()}
@@ -110,35 +118,37 @@ export function useDialog() {
         {/* Prompt 输入框 */}
         {dialog.type === 'prompt' && (
           <div className={s.promptWrap}>
-            <input
-              type="text"
+            <textarea
               value={dialog.inputValue || ''}
               onChange={e => setInputValue(e.target.value)}
               placeholder={dialog.placeholder || ''}
               autoFocus
               className={s.promptInput}
+              rows={4}
             />
           </div>
         )}
 
-        {/* 按钮 */}
-        <div className={s.actions}>
-          {(dialog.type === 'confirm' || dialog.type === 'prompt') && (
-            <button className={s.cancelBtn} onClick={() => close(false)}>
-              {dialog.cancelText || t('common.cancel')}
+        {/* 按钮（loading 类型不显示） */}
+        {dialog.type !== 'loading' && (
+          <div className={s.actions}>
+            {(dialog.type === 'confirm' || dialog.type === 'prompt') && (
+              <button className={s.cancelBtn} onClick={() => close(false)}>
+                {dialog.cancelText || t('common.cancel')}
+              </button>
+            )}
+            <button
+              onClick={() => close(true)}
+              autoFocus
+              className={`${s.confirmBtn} ${dialog.danger ? s.confirmBtnDanger : s.confirmBtnDefault}`}
+            >
+              {dialog.confirmText || (dialog.type === 'confirm' ? t('common.confirm') : t('dialog.gotIt'))}
             </button>
-          )}
-          <button
-            onClick={() => close(true)}
-            autoFocus
-            className={`${s.confirmBtn} ${dialog.danger ? s.confirmBtnDanger : s.confirmBtnDefault}`}
-          >
-            {dialog.confirmText || (dialog.type === 'confirm' ? t('common.confirm') : t('dialog.gotIt'))}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   ) : null;
 
-  return { DialogUI, confirm, alert, prompt };
+  return { DialogUI, confirm, alert, prompt, loading, close: () => close(false) };
 }

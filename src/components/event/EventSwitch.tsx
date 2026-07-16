@@ -15,7 +15,7 @@ export default function EventSwitch({ checked, onChange, disabled, label }: Even
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="mod-switch"
+      className="event-switch"
       style={{
         width: '40px',
         height: '22px',
