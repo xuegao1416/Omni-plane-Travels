@@ -59,15 +59,15 @@ export interface EvaluateResult {
   warnings: string[];
   aborted: boolean;
   reason?: string;
-  /** 来源 mod id（由 eventWorldEvolution.evaluateTick 注入，便于 addCard 等动作回溯归属） */
+  /** 来源 mod id（由 eventWorldEvolution.evaluateTick 注入，便于 addEvent 等动作回溯归属） */
   eventPackId?: string;
+  /** 本次求值中 scheduleTick 动作产出的延迟条目（写入 simulationRuntime，到期后注入 events） */
+  scheduledTickEntries?: Array<{ scheduledAt: number; ruleId: string; payload?: Record<string, unknown> }>;
 }
 
 const ACTION_KINDS: ActionKind[] = [
   'set',
-  'emit',
-  'addCard',
-  'overrideCard',
+  'addEvent',
   'modifyResource',
   'scheduleTick',
 ];
@@ -75,9 +75,7 @@ const ACTION_KINDS: ActionKind[] = [
 /** 动作 → 所需权限（能力最小化） */
 const ACTION_PERMISSION: Record<ActionKind, Permission> = {
   set: 'modify_world_state',
-  emit: 'emit_world_event',
-  addCard: 'add_card',
-  overrideCard: 'override_card',
+  addEvent: 'add_card',
   modifyResource: 'modify_world_state',
   scheduleTick: 'register_tick',
 };
@@ -194,9 +192,7 @@ export function evalCondition(
 
 function actionKindOf(a: Action): ActionKind | null {
   if ('set' in a) return 'set';
-  if ('emit' in a) return 'emit';
-  if ('addCard' in a) return 'addCard';
-  if ('overrideCard' in a) return 'overrideCard';
+  if ('addEvent' in a) return 'addEvent';
   if ('modifyResource' in a) return 'modifyResource';
   if ('scheduleTick' in a) return 'scheduleTick';
   return null;
@@ -211,18 +207,22 @@ export function applyAction(
   if ('set' in action) {
     setPath(ctx, action.set.path, action.set.value);
     applied.push({ ruleId, kind: 'set', detail: action.set });
-  } else if ('emit' in action) {
-    applied.push({ ruleId, kind: 'emit', detail: action.emit });
-  } else if ('addCard' in action) {
-    applied.push({ ruleId, kind: 'addCard', detail: { cardId: action.addCard.cardId } });
-  } else if ('overrideCard' in action) {
-    applied.push({ ruleId, kind: 'overrideCard', detail: action.overrideCard });
+  } else if ('addEvent' in action) {
+    applied.push({ ruleId, kind: 'addEvent', detail: { eventId: action.addEvent.eventId, eventPackId: action.addEvent.eventPackId } });
   } else if ('modifyResource' in action) {
-    const res = ctx.resources as Record<string, { amount: number }> | undefined;
     const key = action.modifyResource.key;
-    if (res && res[key]) {
-      const cur = Number(res[key].amount ?? 0);
-      res[key].amount = Math.max(0, cur + action.modifyResource.delta);
+    // 主路径：ctx.玩家.生存资源[key].数量（运行时游戏状态）
+    const playerRes = (ctx as Record<string, any>).玩家?.生存资源 as Record<string, { 数量: number }> | undefined;
+    if (playerRes && playerRes[key] != null) {
+      const cur = Number(playerRes[key].数量 ?? 0);
+      playerRes[key].数量 = Math.max(0, cur + action.modifyResource.delta);
+    } else {
+      // 回退路径：ctx.resources[key].amount（兼容已有英文 mock 测试）
+      const res = (ctx as Record<string, any>).resources as Record<string, { amount: number }> | undefined;
+      if (res && res[key]) {
+        const cur = Number(res[key].amount ?? 0);
+        res[key].amount = Math.max(0, cur + action.modifyResource.delta);
+      }
     }
     applied.push({ ruleId, kind: 'modifyResource', detail: action.modifyResource });
   } else if ('scheduleTick' in action) {
@@ -337,6 +337,19 @@ export function evaluate(
     if (nowMs() - start > limits.maxWallMs) stepRef.aborted = true;
   }
 
+  // 从 applied 中提取 scheduleTick 条目（不改变 applyAction 签名，保持纯函数）
+  const scheduledTickEntries: Array<{ scheduledAt: number; ruleId: string; payload?: Record<string, unknown> }> = [];
+  for (const a of applied) {
+    if (a.kind === 'scheduleTick') {
+      const detail = a.detail as { after: number; payload?: Record<string, unknown> };
+      scheduledTickEntries.push({
+        scheduledAt: options.tick + detail.after,
+        ruleId: a.ruleId,
+        payload: detail.payload,
+      });
+    }
+  }
+
   const aborted = stepRef.aborted || nowMs() - start > limits.maxWallMs;
   return {
     ctx,
@@ -344,5 +357,6 @@ export function evaluate(
     warnings,
     aborted,
     reason: aborted ? '超过步数 / 墙钟上限，本次求值中止并告警' : undefined,
+    scheduledTickEntries,
   };
 }

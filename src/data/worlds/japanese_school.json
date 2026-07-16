@@ -502,15 +502,9 @@
             "name": "期中考试",
             "description": "每学期第六周的大考，成绩影响座位选择和老师态度。",
             "intervalTicks": 42,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "幸福感": {
-                    "delta": -10
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.幸福感", "value": -10 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -519,16 +513,9 @@
             "description": "漫长的暑假，可以参加合宿、旅行、或者在家躺平。",
             "intervalTicks": 90,
             "offsetTicks": 60,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "幸福感": {
-                    "delta": 20,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.幸福感", "value": 20 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -537,20 +524,10 @@
             "description": "全校运动会，班级团结的考验。",
             "intervalTicks": 60,
             "offsetTicks": 30,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "社交": {
-                    "delta": 8,
-                    "min": 0
-                  },
-                  "幸福感": {
-                    "delta": 5,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.社交", "value": 8 } },
+              { "set": { "path": "stats.幸福感", "value": 5 } }
+            ],
             "narrateToAI": true
           }
         ],

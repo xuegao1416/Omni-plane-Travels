@@ -32,6 +32,48 @@ function defaultGuardrails(): NarrativeGuardrails {
   };
 }
 
+/**
+ * 将旧版 ModuleEffects 转换为统一的 Action[] 格式。
+ * 用于迁移旧数据（PeriodicRule.effects → actions）。
+ */
+export function moduleEffectsToActions(effects: ModuleEffects): Action[] {
+  const actions: Action[] = [];
+
+  // 生存资源 delta/set
+  if (effects.survival?.resources) {
+    for (const [name, cfg] of Object.entries(effects.survival.resources)) {
+      if (cfg.delta != null) {
+        actions.push({ modifyResource: { key: name, delta: cfg.delta } });
+      } else if (cfg.set != null) {
+        actions.push({ set: { path: `survival.resources.${name}.amount`, value: cfg.set } });
+      }
+    }
+  }
+
+  // 数值属性 delta/set
+  if (effects.stats?.changes) {
+    for (const [name, cfg] of Object.entries(effects.stats.changes)) {
+      if (cfg.delta != null) {
+        actions.push({ set: { path: `stats.${name}`, value: cfg.delta } });
+      } else if (cfg.set != null) {
+        actions.push({ set: { path: `stats.${name}`, value: cfg.set } });
+      }
+    }
+  }
+
+  // 经营资金
+  if (effects.business?.fundsDelta != null) {
+    actions.push({ set: { path: 'business.funds', value: effects.business.fundsDelta } });
+  }
+
+  // 成长经验
+  if (effects.progression?.xpDelta != null) {
+    actions.push({ set: { path: 'progression.xp', value: effects.progression.xpDelta } });
+  }
+
+  return actions;
+}
+
 /** 构建正向邻接表（只含 flow 边，排除 constraint 边） */
 function buildAdjacency(nodes: EventGraphNode[], edges: EventGraphEdge[]): Map<string, string[]> {
   const adj = new Map<string, string[]>();
@@ -200,7 +242,7 @@ export function graphToRuleFile(graph: EventGraph): RuleFile {
         if (n.kind === 'effect') {
           then.push(...(n.actions ?? []));
         } else if (n.kind === 'event' && n.event) {
-          then.push({ emit: { type: n.event.title ?? 'custom' } });
+          then.push({ addEvent: { eventId: n.event.title ?? 'custom' } });
         } else if (n.kind === 'worldState' && n.updates) {
           for (const [axis, fields] of Object.entries(n.updates)) {
             for (const [field, value] of Object.entries(fields)) {
@@ -222,11 +264,18 @@ export function graphToRuleFile(graph: EventGraph): RuleFile {
       const reachable = reachableNodes(node.id, adj, byId);
       const hasConditionChain = reachable.some(n => n.kind === 'condition');
 
+      // 收集所有 actions：节点自身的 effects 迁移 + 连线 effect 节点的 actions
+      const allActions: Action[] = [];
+
+      // 旧版 effects → 迁移为 actions
+      if (node.effects && Object.keys(node.effects).length > 0) {
+        allActions.push(...moduleEffectsToActions(node.effects));
+      }
+
       const pr: PeriodicRule = {
         id: node.id,
         name: node.label || '周期事件',
         intervalTicks: node.intervalTicks ?? 30,
-        effects: node.effects ?? {},
       };
       if (node.offsetTicks != null) pr.offsetTicks = node.offsetTicks;
       if (node.description != null) pr.description = node.description;
@@ -249,12 +298,13 @@ export function graphToRuleFile(graph: EventGraph): RuleFile {
 
       // 收集连线产出的 actions（从 effect 节点）
       const effectNodes = reachable.filter(n => n.kind === 'effect');
-      if (effectNodes.length > 0) {
-        pr.actions = effectNodes.flatMap(e => e.actions ?? []);
-        // 连线产出的 actions 覆盖节点自身的 effects（连线优先）
-        if (pr.actions.length > 0) {
-          pr.effects = {};
-        }
+      for (const en of effectNodes) {
+        allActions.push(...(en.actions ?? []));
+      }
+
+      // 统一存储为 actions
+      if (allActions.length > 0) {
+        pr.actions = allActions;
       }
 
       periodicRules.push(pr);
@@ -402,6 +452,16 @@ export function ruleFileToGraph(file: RuleFile): EventGraph {
 
   // 周期规则 → periodic 节点 + 可选 condition 链
   for (const pr of file.periodicRules ?? []) {
+    // 合并旧版 effects 和新版 actions 为统一的 actions
+    const nodeActions: Action[] = [];
+    if (pr.actions && pr.actions.length > 0) {
+      nodeActions.push(...pr.actions);
+    }
+    // 向后兼容：如果只有 effects 没有 actions，迁移 effects → actions
+    if ((!pr.actions || pr.actions.length === 0) && pr.effects && Object.keys(pr.effects).length > 0) {
+      nodeActions.push(...moduleEffectsToActions(pr.effects));
+    }
+
     nodes.push({
       id: pr.id,
       kind: 'periodic',
@@ -409,19 +469,19 @@ export function ruleFileToGraph(file: RuleFile): EventGraph {
       intervalTicks: pr.intervalTicks,
       offsetTicks: pr.offsetTicks,
       when: pr.when,
-      effects: pr.effects,
+      actions: nodeActions.length > 0 ? nodeActions : undefined,
       description: pr.description,
       narrateToAI: pr.narrateToAI,
     });
 
     // 如果有 actions，创建 effect 节点连接
-    if (pr.actions && pr.actions.length > 0) {
+    if (nodeActions.length > 0) {
       const effectId = `${pr.id}__fx`;
       nodes.push({
         id: effectId,
         kind: 'effect',
         label: '效果',
-        actions: pr.actions,
+        actions: nodeActions,
       });
 
       // 如果有 when 条件链，插入 condition 节点

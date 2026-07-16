@@ -1,6 +1,6 @@
 {
   "name": "omni-plane-travels",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "AI-Powered Interactive Fiction Engine — 多世界观、多阶段管线、编译式记忆系统",
   "type": "module",
   "private": true,

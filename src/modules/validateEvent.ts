@@ -51,6 +51,28 @@ function tarjanSCC(nodes: string[], adj: Map<string, string[]>): string[][] {
   return sccs;
 }
 
+/** 计算从源节点到目标节点的最长条件链深度 */
+function computeConditionDepth(nodeId: string, graph: EventGraph, adj: Map<string, string[]>): number {
+  const visited = new Set<string>();
+  let maxDepth = 0;
+
+  const dfs = (id: string, depth: number): void => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    maxDepth = Math.max(maxDepth, depth);
+
+    const node = graph.nodes.find(n => n.id === id);
+    const nextDepth = node?.kind === 'condition' ? depth + 1 : depth;
+
+    for (const next of adj.get(id) ?? []) {
+      dfs(next, nextDepth);
+    }
+  };
+
+  dfs(nodeId, 0);
+  return maxDepth;
+}
+
 /** 图结构 + 工作流校验 */
 export function validateRuleGraph(graph: EventGraph): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -145,6 +167,84 @@ export function validateRuleGraph(graph: EventGraph): ValidationIssue[] {
         field: `nodes.${node.id}`,
         message: `效果节点「${node.label}」没有上游触发器，不会被触发`,
       });
+    }
+
+    // ── INFO: 触发器直连效果（无条件） ──
+    if (node.kind === 'trigger' && outCount > 0) {
+      const hasDirectEffect = graph.edges.some(e => e.source === node.id && e.kind !== 'constraint');
+      const directEffectTarget = graph.edges
+        .filter(e => e.source === node.id && e.kind !== 'constraint')
+        .map(e => graph.nodes.find(n => n.id === e.target))
+        .find(n => n?.kind === 'effect');
+      if (directEffectTarget) {
+        issues.push({
+          code: 'DIRECT_TRIGGER_EFFECT',
+          nodeId: node.id,
+          field: `nodes.${node.id}`,
+          message: `触发器「${node.label}」直连效果节点，无条件守卫（合法但建议添加条件门）`,
+        });
+      }
+    }
+
+    // ── INFO: 周期直连效果（无条件） ──
+    if (node.kind === 'periodic' && outCount > 0) {
+      const directEffectTarget = graph.edges
+        .filter(e => e.source === node.id && e.kind !== 'constraint')
+        .map(e => graph.nodes.find(n => n.id === e.target))
+        .find(n => n?.kind === 'effect');
+      if (directEffectTarget) {
+        issues.push({
+          code: 'DIRECT_PERIODIC_EFFECT',
+          nodeId: node.id,
+          field: `nodes.${node.id}`,
+          message: `周期节点「${node.label}」直连效果节点，无条件守卫（每轮无条件触发）`,
+        });
+      }
+    }
+
+    // ── INFO: 触发器无自身条件 ──
+    if (node.kind === 'trigger') {
+      const hasWhen = node.when && Object.keys(node.when).length > 0;
+      const hasConditionDownstream = graph.edges.some(e => {
+        if (e.source !== node.id || e.kind === 'constraint') return false;
+        const target = graph.nodes.find(n => n.id === e.target);
+        return target?.kind === 'condition';
+      });
+      if (!hasWhen && !hasConditionDownstream) {
+        issues.push({
+          code: 'EMPTY_TRIGGER_WHEN',
+          nodeId: node.id,
+          field: `nodes.${node.id}`,
+          message: `触发器「${node.label}」无自身条件且无条件节点下游，将无条件触发`,
+        });
+      }
+    }
+
+    // ── ERROR: 条件链深度超限 ──
+    if (node.kind === 'condition') {
+      const depth = computeConditionDepth(node.id, graph, adj);
+      if (depth > 6) {
+        issues.push({
+          code: 'CONDITION_DEPTH_EXCEEDED',
+          nodeId: node.id,
+          field: `nodes.${node.id}`,
+          message: `条件链深度 ${depth} 超过上限 6，可能导致性能问题`,
+        });
+      }
+    }
+
+    // ── WARNING: addEvent 的 eventId 为空或占位符 ──
+    if ((node.kind === 'effect' || node.kind === 'periodic') && node.actions) {
+      for (const action of node.actions) {
+        if ('addEvent' in action && (!action.addEvent.eventId || action.addEvent.eventId.trim() === '' || action.addEvent.eventId === 'new')) {
+          issues.push({
+            code: 'UNKNOWN_CARD_ID',
+            nodeId: node.id,
+            field: `nodes.${node.id}`,
+            message: `事件 ID "${action.addEvent.eventId || '(空)'}" 看起来是占位符，请在下拉中选择实际事件`,
+          });
+        }
+      }
     }
   }
 

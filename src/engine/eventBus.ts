@@ -43,6 +43,8 @@ export const EVENTS = {
   CHAT_CHANGED: 'chat_changed',
   AUTO_SAVE: 'auto_save',
   PIPELINE_UPDATE: 'pipeline_update',
-  /** Mod 规则 addCard 命中：携带 { cardId, eventPackId }（web 端由 CardOverlay 订阅并弹卡） */
+  /** addEvent 触发：携带 { cardId, eventPackId }（CardOverlay 订阅并弹卡） */
   EVENT_CARD: 'mod:card',
+  /** addEvent 触发的覆盖卡片：携带 { cardId, patch, eventPackId } */
+  EVENT_CARD_OVERRIDE: 'mod:card:override',
 } as const;

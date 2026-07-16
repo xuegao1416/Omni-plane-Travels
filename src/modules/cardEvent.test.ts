@@ -1,14 +1,14 @@
 // 卡片 + Mod 事件 集成测试：
 //   (a) CardRenderer.cardFileToBlocks 按编辑器实际导出形态解析出有序 block
-//   (b) 注册含 addCard 的 rule → evaluateTick → collectAddCardEvents 命中 { cardId, eventPackId }
-//   (c) 通过 eventBus 模拟 tick 广播路径，断言订阅者收到 { cardId, eventPackId }
+//   (b) 注册含 addEvent 的 rule → evaluateTick → collectAddEventEvents 命中 { eventId, eventPackId }
+//   (c) 通过 eventBus 模拟 tick 广播路径，断言订阅者收到 { eventId, eventPackId }
 import 'fake-indexeddb/auto';
 import { test, expect } from 'bun:test';
 import type { CardFile, EventRule } from './schema';
 import { cardFileToBlocks } from '../components/event/CardRenderer';
 import {
   eventWorldEvolution,
-  collectAddCardEvents,
+  collectAddEventEvents,
 } from './eventIntegration';
 import { eventBus, EVENTS } from '../engine/eventBus';
 
@@ -39,14 +39,14 @@ test('(a) cardFileToBlocks 按 cards 顺序还原 3 块', () => {
   expect(blocks[2].props.choices).toEqual(['左转', '右转']);
 });
 
-test('(b)(c) 含 addCard 的 rule → 收集到 { cardId, eventPackId } 并经 eventBus 广播', () => {
+test('(b)(c) 含 addEvent 的 rule → 收集到 { eventId, eventPackId } 并经 eventBus 广播', () => {
   eventWorldEvolution.clear();
 
   const rules: EventRule[] = [
     {
       id: 'r1',
       when: { all: [] },
-      then: [{ addCard: { cardId: 'card-ccc' } }],
+      then: [{ addEvent: { eventId: 'card-ccc' } }],
     },
   ];
   eventWorldEvolution.register({
@@ -57,25 +57,25 @@ test('(b)(c) 含 addCard 的 rule → 收集到 { cardId, eventPackId } 并经 e
   });
 
   const { results } = eventWorldEvolution.evaluateTick({}, 1, []);
-  const events = collectAddCardEvents(results);
+  const events = collectAddEventEvents(results);
   expect(events.length).toBe(1);
-  expect(events[0]).toEqual({ cardId: 'card-ccc', eventPackId: 'card-mod-x' });
+  expect(events[0]).toEqual({ eventId: 'card-ccc', eventPackId: 'card-mod-x' });
 
-  // 模拟 engine.ts 的广播路径：订阅者收到 { cardId, eventPackId }
-  const received: Array<{ cardId: string; eventPackId: string }> = [];
-  const off = eventBus.on(EVENTS.EVENT_CARD, (e: { cardId: string; eventPackId: string }) => {
+  // 模拟 engine.ts 的广播路径：订阅者收到 { eventId, eventPackId }
+  const received: Array<{ eventId: string; eventPackId: string }> = [];
+  const off = eventBus.on(EVENTS.EVENT_CARD, (e: { eventId: string; eventPackId: string }) => {
     received.push(e);
   });
   for (const ev of events) eventBus.emit(EVENTS.EVENT_CARD, ev);
   off();
 
   expect(received.length).toBe(1);
-  expect(received[0]).toEqual({ cardId: 'card-ccc', eventPackId: 'card-mod-x' });
+  expect(received[0]).toEqual({ eventId: 'card-ccc', eventPackId: 'card-mod-x' });
 
-  // 无 mod 时 no-op：clean 后 evaluate 不产出任何 addCard
+  // 无 mod 时 no-op：clean 后 evaluate 不产出任何 addEvent
   eventWorldEvolution.clear();
   const { results: r2 } = eventWorldEvolution.evaluateTick({}, 2, []);
-  expect(collectAddCardEvents(r2).length).toBe(0);
+  expect(collectAddEventEvents(r2).length).toBe(0);
 
   eventWorldEvolution.clear();
 });

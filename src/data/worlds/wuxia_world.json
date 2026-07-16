@@ -1214,16 +1214,9 @@
             "name": "武林大会",
             "description": "每季度一次的武林盛会，各路高手齐聚一堂。",
             "intervalTicks": 30,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "dim5": {
-                    "delta": 2,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.dim5", "value": 2 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -1231,16 +1224,9 @@
             "name": "江湖传闻",
             "description": "江湖中流传的各种消息和传闻。",
             "intervalTicks": 7,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "dim4": {
-                    "delta": 1,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.dim4", "value": 1 } }
+            ],
             "narrateToAI": true
           }
         ],

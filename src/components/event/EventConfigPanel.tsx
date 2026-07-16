@@ -18,6 +18,7 @@ import EventPackPreview from './EventPackPreview';
 import type { WorldDef } from '../../data/worlds-schema';
 import EventSwitch from './EventSwitch';
 import { textOn } from './colorUtils';
+import { useIsPhone } from '../../hooks/useIsMobile';
 
 const TYPE_META: Record<string, { label: string; icon: typeof Package }> = {
   card: { label: '事件包', icon: FileText },
@@ -40,6 +41,7 @@ export default function EventConfigPanel({
   const [toast, setToast] = useState<string | null>(null);
   const [previewPackId, setPreviewPackId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const isPhone = useIsPhone();
 
   // sessionActivePacks: undefined = 全部用全局列表；[] 或具体列表 = 按列表来
   const sessionActivePacks = useSaveStore(s => s.sessionActivePacks);
@@ -159,11 +161,11 @@ export default function EventConfigPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        <button className="btn-secondary btn-sm" onClick={() => fileRef.current?.click()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <button className="btn-secondary btn-sm" onClick={() => fileRef.current?.click()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: isPhone ? 44 : undefined, flex: isPhone ? '1 1 auto' : undefined }}>
           <Upload size={15} /> 导入 .opt-event
         </button>
-        <button className="btn-secondary btn-sm" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button className="btn-secondary btn-sm" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: isPhone ? 44 : undefined, flex: isPhone ? '1 1 auto' : undefined }}>
           <Download size={15} /> 导出已启用
         </button>
         <input
@@ -197,18 +199,18 @@ export default function EventConfigPanel({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {list.map((e) => (
-                <div key={e.meta.id} style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                    <span style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: e.meta.coverColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: textOn(e.meta.coverColor || '#333'), flexShrink: 0 }}>
-                      <Icon size={15} />
+                <div key={e.meta.id} style={{ padding: isPhone ? 'var(--space-3)' : 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-2)' : 'var(--space-3)' }}>
+                    <span style={{ width: isPhone ? 36 : 28, height: isPhone ? 36 : 28, borderRadius: 'var(--radius-md)', background: e.meta.coverColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: textOn(e.meta.coverColor || '#333'), flexShrink: 0 }}>
+                      <Icon size={isPhone ? 18 : 15} />
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)' }}>{e.meta.name}</div>
-                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>v{e.meta.version} · {e.meta.id}</div>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>v{e.meta.version}{!isPhone && ` · ${e.meta.id}`}</div>
                     </div>
                     {t === 'card' && (
-                      <button className="btn-ghost btn-sm" onClick={() => void handlePreview(e.meta.id)} aria-label="预览卡" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <Eye size={14} /> 预览
+                      <button className="btn-ghost btn-sm" onClick={() => void handlePreview(e.meta.id)} aria-label="预览卡" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: isPhone ? 44 : undefined, minHeight: isPhone ? 44 : undefined, padding: isPhone ? '8px' : undefined }}>
+                        <Eye size={isPhone ? 18 : 14} />{!isPhone && ' 预览'}
                       </button>
                     )}
                     <EventSwitch checked={activeIds.has(e.meta.id)} onChange={(v) => toggle(e.meta.id, v)} label={activeIds.has(e.meta.id) ? '本局启用' : '本局禁用'} />

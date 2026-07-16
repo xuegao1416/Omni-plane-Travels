@@ -16,7 +16,7 @@ function deferredUnmount(roots: Root[]) {
 }
 
 /**
- * 内联 Portal 挂载 Hook：骰子卡片、天赋卡片、生图按钮。
+ * 内联 Portal 挂载 Hook：骰子卡片、天赋卡片、生图按钮、对话头像卡片。
  * 管理 createRoot / unmount 生命周期。
  */
 export function useInlinePortals(
@@ -30,6 +30,7 @@ export function useInlinePortals(
   const diceRootsRef = useRef<Root[]>([]);
   const talentRootsRef = useRef<Root[]>([]);
   const imageGenRootsRef = useRef<Root[]>([]);
+  const dialogueRootsRef = useRef<Root[]>([]);
 
   // ─── 骰子卡片 Portal ────────────────────────
   useEffect(() => {
@@ -147,4 +148,48 @@ export function useInlinePortals(
       imageGenRootsRef.current = [];
     };
   }, [renderedContent, inlineImageEnabled, isUser, message.streaming, message.id, messageHtmlRef]);
+
+  // ─── 对话头像卡片 Portal ────────────────────────
+  useEffect(() => {
+    deferredUnmount(dialogueRootsRef.current);
+    dialogueRootsRef.current = [];
+
+    if (!messageHtmlRef.current || isUser || message.streaming) return;
+
+    const placeholders = messageHtmlRef.current.querySelectorAll('.dialogue-avatar-placeholder');
+    if (placeholders.length === 0) return;
+
+    const mountDialogueCards = async () => {
+      const { default: InlineDialogueCardComponent } = await import('../InlineDialogueCard');
+
+      placeholders.forEach(el => {
+        const avatarUrl = el.getAttribute('data-avatar') || '';
+        const name = el.getAttribute('data-name') || '';
+        const title = el.getAttribute('data-title') || '';
+        const text = el.getAttribute('data-text') || '';
+        const action = el.getAttribute('data-action') || '';
+
+        const container = document.createElement('div');
+        el.replaceWith(container);
+        const root = createRoot(container);
+        root.render(
+          <InlineDialogueCardComponent
+            avatarUrl={avatarUrl}
+            name={name}
+            title={title}
+            text={text}
+            action={action}
+          />
+        );
+        dialogueRootsRef.current.push(root);
+      });
+    };
+
+    mountDialogueCards();
+
+    return () => {
+      deferredUnmount(dialogueRootsRef.current);
+      dialogueRootsRef.current = [];
+    };
+  }, [renderedContent, isUser, message.streaming, messageHtmlRef]);
 }

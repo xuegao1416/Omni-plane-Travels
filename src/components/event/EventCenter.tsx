@@ -5,7 +5,7 @@ import type { UseEventsResult } from './useEvents';
 import { isTauri } from '../../utils/nativeFetch';
 import EventListRow from './EventListRow';
 import { EmptyState } from './EmptyState';
-import { useIsPhone } from '../../hooks/useIsMobile';
+import { useIsPhone, useBreakpoint } from '../../hooks/useIsMobile';
 
 type CenterTab = 'installed' | 'worldbook';
 
@@ -21,6 +21,8 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
   const { mods, loading, error, enable, disable, uninstall, exportMod, importMod } = eventApi;
   const [tab, setTab] = useState<CenterTab>('installed');
   const isPhone = useIsPhone();
+  const breakpoint = useBreakpoint();
+  const isSmallPhone = breakpoint === 'xs' || breakpoint === 'sm';
 
   const total = mods.length;
   const enabledCount = mods.filter((m) => m.enabled).length;
@@ -46,26 +48,27 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
       }}
     >
       {/* 操作行：新建空白 / 新建周期 / 导入 */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-        <button className="btn-secondary" onClick={onNewMod}>
-          <FilePlus size={16} /> 新建事件包
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: isPhone ? 'var(--space-1)' : 'var(--space-2)', flexWrap: 'wrap' }}>
+        <button className="btn-secondary" onClick={onNewMod} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
+          <FilePlus size={14} /> {isPhone ? '事件包' : '新建事件包'}
         </button>
-        <button className="btn-secondary" onClick={onNewRulePack}>
-          <FilePlus size={16} /> 新建规则包
+        <button className="btn-secondary" onClick={onNewRulePack} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
+          <FilePlus size={14} /> {isPhone ? '规则包' : '新建规则包'}
         </button>
         <button
           className="btn-primary"
           onClick={() => (isTauri() ? importMod() : onGoImport())}
+          style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}
         >
-          <Upload size={16} /> 导入 .opt-event
+          <Upload size={14} /> {isPhone ? '导入' : '导入 .opt-event'}
         </button>
       </div>
 
       {/* 统计条 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)' }}>
-        <StatCard label="总计" value={total} />
-        <StatCard label="已启用" value={enabledCount} />
-        <StatCard label="冲突" value={'未计算'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: isPhone ? 'var(--space-2)' : 'var(--space-3)' }}>
+        <StatCard label="总计" value={total} compact={isPhone} />
+        <StatCard label="已启用" value={enabledCount} compact={isPhone} />
+        <StatCard label="冲突" value={'未计算'} compact={isPhone} />
       </div>
 
       {/* 选项卡 */}
@@ -82,6 +85,9 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
             onClick={() => setTab(t.id)}
             style={{
               padding: 'var(--space-2) var(--space-1)',
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -153,24 +159,24 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number | string }) {
+function StatCard({ label, value, compact }: { label: string; value: number | string; compact?: boolean }) {
   return (
     <div
       style={{
         background: 'var(--bg-secondary)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-3) var(--space-4)',
+        padding: compact ? 'var(--space-2) var(--space-3)' : 'var(--space-3) var(--space-4)',
       }}
     >
-      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ fontSize: compact ? 'var(--font-size-xs)' : 'var(--font-size-sm)', color: 'var(--text-muted)' }}>{label}</div>
       <div
         style={{
-          fontSize: 'var(--font-size-xl)',
+          fontSize: compact ? 'var(--font-size-lg)' : 'var(--font-size-xl)',
           fontWeight: 700,
           color: 'var(--text-primary)',
           fontFamily: 'var(--font-display)',
-          marginTop: 4,
+          marginTop: compact ? 2 : 4,
         }}
       >
         {value}

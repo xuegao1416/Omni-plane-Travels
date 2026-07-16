@@ -32,11 +32,25 @@ export default function CardOverlay({ gameState }: Props) {
   const [baseByBlock, setBaseByBlock] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const off = eventBus.on(EVENTS.EVENT_CARD, (evt: CardEvent) => {
+    const offCard = eventBus.on(EVENTS.EVENT_CARD, (evt: CardEvent) => {
       void openCard(evt);
     });
-    return off;
-  }, []);
+    const offOverride = eventBus.on(EVENTS.EVENT_CARD_OVERRIDE, (evt: { cardId: string; patch: Record<string, unknown>; eventPackId: string }) => {
+      // 当前正在展示的卡片被覆盖：按 patch 更新 block props
+      if (!current || !blocks) return;
+      if (current.cardId !== evt.cardId && current.eventPackId !== evt.eventPackId) return;
+      setBlocks(prev => {
+        if (!prev) return prev;
+        return prev.map(block => {
+          if (block.id === evt.cardId) {
+            return { ...block, props: { ...block.props, ...evt.patch } };
+          }
+          return block;
+        });
+      });
+    });
+    return () => { offCard(); offOverride(); };
+  }, [current, blocks]);
 
   async function openCard(evt: CardEvent): Promise<void> {
     try {

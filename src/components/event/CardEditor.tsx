@@ -19,7 +19,7 @@ import { textOn } from './colorUtils';
    产出 schema 兼容的 CardFile（puck: PuckData）。若后续接入真正的 React Puck 编辑器，
    仅需替换画布层，下面对外契约（CardFile / 导出 .opt-event）保持不变。 */
 
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.6.2';
 
 const BLOCK_TYPES = ['title', 'narrative', 'choice'] as const;
 type BlockType = (typeof BLOCK_TYPES)[number];

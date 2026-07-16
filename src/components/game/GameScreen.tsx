@@ -126,12 +126,13 @@ export default function GameScreen() {
             description: typeof p.description === 'string' ? p.description : undefined,
             narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
           }));
+          const savedRuntime0 = gameState.simulationRuntime?.eventRuntimes?.['world:periodic'];
           eventWorldEvolution.register({
             eventPackId: 'world:periodic',
             rules: [],
             periodicRules,
             permissions: ['modify_world_state'],
-            runtime: { onceFired: {}, cooldownRemaining: {} },
+            runtime: savedRuntime0 ?? { onceFired: {}, cooldownRemaining: {} },
             displayName: '世界周期事件（自定义）',
             source: 'world',
           });
@@ -167,12 +168,13 @@ export default function GameScreen() {
             description: typeof p.description === 'string' ? p.description : undefined,
             narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
           }));
+          const savedRuntime0b = gameState.simulationRuntime?.eventRuntimes?.['world:periodic'];
           eventWorldEvolution.register({
             eventPackId: 'world:periodic',
             rules: [],
             periodicRules,
             permissions: ['modify_world_state'],
-            runtime: { onceFired: {}, cooldownRemaining: {} },
+            runtime: savedRuntime0b ?? { onceFired: {}, cooldownRemaining: {} },
             displayName: '世界周期事件（自定义）',
             source: 'world',
           });
@@ -193,12 +195,13 @@ export default function GameScreen() {
             if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
           }
           if (rules.length > 0 || periodicRules.length > 0) {
+            const savedRuntime = gameState.simulationRuntime?.eventRuntimes?.[id];
             eventWorldEvolution.register({
               eventPackId: id,
               rules,
               periodicRules,
               permissions: rec.manifest.permissions ?? [],
-              runtime: { onceFired: {}, cooldownRemaining: {} },
+              runtime: savedRuntime ?? { onceFired: {}, cooldownRemaining: {} },
               source: rec.builtin ? 'world' : 'mod',
             });
           }

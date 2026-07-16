@@ -641,20 +641,10 @@
             "name": "辐射病发作",
             "description": "长期暴露在辐射环境中，身体会周期性出现辐射病症状。",
             "intervalTicks": 14,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "生命": {
-                    "delta": -10,
-                    "min": 0
-                  },
-                  "体力": {
-                    "delta": -15,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.生命", "value": -10 } },
+              { "set": { "path": "stats.体力", "value": -15 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -662,16 +652,9 @@
             "name": "资源枯竭",
             "description": "周边资源被搜刮殆尽，需要前往更危险的区域寻找物资。",
             "intervalTicks": 30,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "体力": {
-                    "delta": -10,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.体力", "value": -10 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -680,16 +663,9 @@
             "description": "不同聚落之间的资源争夺，可能被卷入其中。",
             "intervalTicks": 20,
             "offsetTicks": 10,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "生命": {
-                    "delta": -15,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.生命", "value": -15 } }
+            ],
             "narrateToAI": true
           }
         ],

@@ -1,6 +1,7 @@
 // 属性 id 选择器 —— 下拉规范键 + 自定义兜底,杜绝手打错 key 的沉默失败。
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { GameState } from '../../schema/variables';
+import type { WorldDef } from '../../data/worlds-schema';
 import {
   getStatOptionsFromState,
   CUSTOM_STAT_SENTINEL,
@@ -9,6 +10,8 @@ import {
 interface Props {
   value?: string;
   gameState?: GameState;
+  /** 世界定义（无 gameState 时从 worldDef.modules 提取属性列表） */
+  worldDef?: WorldDef;
   onChange: (v: string) => void;
 }
 
@@ -22,31 +25,52 @@ const selectStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)',
 };
 
-export default function StatIdSelect({ value, gameState, onChange }: Props) {
-  const options = getStatOptionsFromState(gameState);
-  const known = options.some((o) => o.value === value);
-  const [mode, setMode] = useState<'select' | 'custom'>(known || !value ? 'select' : 'custom');
-  const [custom, setCustom] = useState(!known && value ? value : '');
-
-  // 外部 value 变化且不在选项内 → 自动切到自定义并回填,避免旧数据丢失
-  useEffect(() => {
-    const k = options.some((o) => o.value === value);
-    if (!k && value) {
-      setMode('custom');
-      setCustom(value);
+export default function StatIdSelect({ value, gameState, worldDef, onChange }: Props) {
+  // 优先用 gameState，其次用 worldDef 提取属性选项
+  const worldOptions = useMemo(() => {
+    if (gameState || !worldDef?.modules) return null;
+    const base = [
+      { value: 'attrA', label: '生命 (attrA)' },
+      { value: 'attrB', label: '能量 (attrB)' },
+      { value: 'dim1', label: '六维 dim1' },
+      { value: 'dim2', label: '六维 dim2' },
+      { value: 'dim3', label: '六维 dim3' },
+      { value: 'dim4', label: '六维 dim4' },
+      { value: 'dim5', label: '六维 dim5' },
+      { value: 'dim6', label: '六维 dim6' },
+    ];
+    // 从 worldDef 补充特殊属性
+    for (const mod of worldDef.modules) {
+      if (mod.moduleId === 'stat' && mod.enabled && mod.moduleConfig) {
+        const special = mod.moduleConfig.special as Array<{ id: string; name: string }> | undefined;
+        if (special) {
+          for (const s of special) {
+            base.push({ value: s.id, label: `${s.name} (${s.id})` });
+          }
+        }
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, options.map((o) => o.value).join(',')]);
+    return base;
+  }, [gameState, worldDef]);
 
-  if (mode === 'custom') {
+  const options = worldOptions ?? getStatOptionsFromState(gameState);
+  const known = options.some((o) => o.value === value);
+  // 用户是否主动点了"自定义"
+  const [forceCustom, setForceCustom] = useState(false);
+
+  // 当 options 变化后，如果当前值现在已知，自动退出自定义模式
+  useEffect(() => {
+    if (forceCustom && known) setForceCustom(false);
+  }, [known, forceCustom]);
+
+  const showCustom = forceCustom && !known;
+
+  if (showCustom) {
     return (
       <input
-        value={custom}
+        value={value ?? ''}
         placeholder="属性键,如 attrA / dim1"
-        onChange={(e) => {
-          setCustom(e.target.value);
-          onChange(e.target.value);
-        }}
+        onChange={(e) => onChange(e.target.value)}
         style={selectStyle}
       />
     );
@@ -54,11 +78,11 @@ export default function StatIdSelect({ value, gameState, onChange }: Props) {
 
   return (
     <select
-      value={value ?? ''}
+      value={known ? (value ?? '') : ''}
       onChange={(e) => {
         if (e.target.value === CUSTOM_STAT_SENTINEL) {
-          setMode('custom');
-          setCustom('');
+          setForceCustom(true);
+          onChange('');
           return;
         }
         onChange(e.target.value);

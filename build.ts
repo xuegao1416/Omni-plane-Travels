@@ -17,9 +17,9 @@ const jsResult = await Bun.build({
   entrypoints: ['./src/main.tsx'],
   target: 'browser',
   format: 'esm',
-  // P1-5：开启分包，使 React.lazy 的动态 import（EventsScreen / @xyflow/react / jszip 等）
-  // 从主包剥离为独立 chunk，首屏不再为事件中心重依赖买单。
-  splitting: true,
+  // splitting 暂时关闭：Bun 1.3.14 在 Linux 上 splitting 行为与 Windows 不一致
+  // （Linux 产出 130+ chunk 且部分损坏，Windows 只有 5 个），待 Bun 修复后重新开启。
+  splitting: false,
   minify: true,
   define: { 'process.env.NODE_ENV': '"production"' },
 });
@@ -88,7 +88,7 @@ console.log('📝 生成 index.html...');
 const htmlTemplate = readFileSync('./index.html', 'utf-8');
 const prodHtml = htmlTemplate
   .replace('/src/index.css', '/main.css')
-  .replace('/app.js', '/main.js');
+  .replace('/src/main.tsx', '/main.js');
 writeFileSync(join(DIST, 'index.html'), prodHtml);
 console.log('   ✅ index.html');
 

@@ -36,6 +36,21 @@ export function getWorldById(id: string): WorldDef | undefined {
   return WORLDS.find(w => w.id === id);
 }
 
+/** 获取所有世界（自建 + 内置，自建在前，去重） */
+export function getAllWorlds(): WorldDef[] {
+  const customs: WorldDef[] = [];
+  try {
+    const raw: WorldDef[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
+    for (const w of raw) {
+      if (w.modules) w.modules = normalizeModules(w.modules);
+      customs.push(w);
+    }
+  } catch { /* ignore */ }
+  const builtinIds = new Set(WORLDS.map(w => w.id));
+  const builtin = WORLDS.filter(w => !customs.some(c => c.id === w.id));
+  return [...customs, ...builtin];
+}
+
 /** 按 id 查找世界（自建优先 + 内置兜底） */
 export function findWorldDef(worldId: string): WorldDef | undefined {
   // 先查 localStorage 中的自建/修改世界（优先级最高，确保修改后的内置世界不被原版覆盖）

@@ -486,18 +486,10 @@
             "name": "每日消耗",
             "description": "每天消耗淡水和食物，资源不足时体力下降。",
             "intervalTicks": 1,
-            "effects": {
-              "survival": {
-                "resources": {
-                  "water": {
-                    "delta": -1
-                  },
-                  "food": {
-                    "delta": -1
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "modifyResource": { "key": "water", "delta": -1 } },
+              { "modifyResource": { "key": "food", "delta": -1 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -506,16 +498,9 @@
             "description": "每天两次退潮，露出礁石区，可捡拾贝类和海产。",
             "intervalTicks": 1,
             "offsetTicks": 1,
-            "effects": {
-              "survival": {
-                "resources": {
-                  "food": {
-                    "delta": 1,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "modifyResource": { "key": "food", "delta": 1 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -523,15 +508,9 @@
             "name": "天气变化",
             "description": "热带天气多变，可能突降暴雨或烈日暴晒。",
             "intervalTicks": 5,
-            "effects": {
-              "survival": {
-                "resources": {
-                  "wood": {
-                    "delta": -1
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "modifyResource": { "key": "wood", "delta": -1 } }
+            ],
             "narrateToAI": true
           }
         ],

@@ -5,6 +5,7 @@ import { ensureModListener } from '../../modules/eventApi';
 import type { EventRegistryEntry, EventType } from '../../modules/schema';
 import { createRulePack, createEmptyPack } from '../../modules/webEventStore';
 import { useEvents } from './useEvents';
+import { useIsPhone } from '../../hooks/useIsMobile';
 import EventCenter from './EventCenter';
 import EventLibrary from './EventLibrary';
 import CardEditor from './CardEditor';
@@ -32,6 +33,7 @@ export default function EventsScreen() {
   const [selectedModId, setSelectedModId] = useState<string | null>(null);
   /** 事件中心内部 Tab：事件（默认，装全部 mod 管理 UI）/ 模块自定义（禁用占位，未来） */
   const [centerTab, setCenterTab] = useState<'rules' | 'custom'>('rules');
+  const isPhone = useIsPhone();
 
   // 监听 mods:changed 自动失效缓存（非 Tauri 环境静默忽略）
   useEffect(() => {
@@ -84,8 +86,8 @@ export default function EventsScreen() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 'var(--space-3)',
-            padding: '12px 16px',
+            gap: isPhone ? 'var(--space-2)' : 'var(--space-3)',
+            padding: isPhone ? '8px 12px' : '12px 16px',
             borderBottom: '1px solid var(--border)',
             background: 'var(--bg-secondary)',
             flexShrink: 0,
@@ -94,14 +96,14 @@ export default function EventsScreen() {
           <button
             className="btn-ghost btn-sm"
             onClick={() => navigate('start')}
-            style={{ minHeight: 'var(--touch-min)' }}
+            style={{ minHeight: 'var(--touch-min)', minWidth: isPhone ? 44 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <ArrowLeft size={16} /> 返回
+            <ArrowLeft size={16} />{!isPhone && ' 返回'}
           </button>
-          <h1 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 600, fontFamily: 'var(--font-display)' }}>
+          <h1 style={{ fontSize: isPhone ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 600, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap' }}>
             {title}
           </h1>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', marginLeft: 'auto' }}>
+          <div style={{ display: 'flex', gap: isPhone ? 'var(--space-2)' : 'var(--space-3)', marginLeft: 'auto' }}>
             <TabButton active={subView === 'center'} onClick={() => setSubView('center')}>
               事件中心
             </TabButton>
@@ -208,9 +210,13 @@ function TabButton({
         fontWeight: 600,
         color: active ? 'var(--accent)' : 'var(--text-secondary)',
         padding: 'var(--space-1) var(--space-2)',
+        minHeight: 44,
+        display: 'inline-flex',
+        alignItems: 'center',
         borderRadius: 'var(--radius-md)',
         borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
         transition: 'color var(--duration-fast) var(--ease-out)',
+        whiteSpace: 'nowrap',
       }}
     >
       {children}
@@ -243,6 +249,7 @@ function InnerTab({
         alignItems: 'center',
         gap: 6,
         padding: 'var(--space-2) var(--space-1)',
+        minHeight: 44,
         background: 'none',
         border: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   SquareArrowOutUpRight,
   Download,
@@ -49,6 +50,30 @@ export default function EventListRow({
   const coverText = textOn(meta.coverColor);
   const isPhone = useIsPhone();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+
+  const openMenu = useCallback(() => {
+    if (menuBtnRef.current) {
+      const rect = menuBtnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setMenuOpen(true);
+  }, []);
+
+  // 窗口变化时更新位置
+  useEffect(() => {
+    if (!menuOpen) return;
+    const update = () => {
+      if (menuBtnRef.current) {
+        const rect = menuBtnRef.current.getBoundingClientRect();
+        setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      }
+    };
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true); };
+  }, [menuOpen]);
   // 3 级层级：行本身为「事件包」(小类)，可展开显示包内「事件」(小小类)
   const [expanded, setExpanded] = useState(false);
   const isActive = isEventActive(entry.enabled);
@@ -56,24 +81,21 @@ export default function EventListRow({
   const actions = (
     <>
       {onOpen && (
-        <button className="btn-ghost btn-sm" onClick={() => onOpen(entry)} title="打开">
-          <SquareArrowOutUpRight size={15} />
-          {!isPhone && '打开'}
+        <button className="btn-ghost btn-sm" onClick={() => onOpen(entry)} title="打开" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px' }}>
+          <SquareArrowOutUpRight size={15} /> 打开
         </button>
       )}
-      <button className="btn-ghost btn-sm" onClick={() => onExport(meta.id)} title="导出">
-        <Download size={15} />
-        {!isPhone && '导出'}
+      <button className="btn-ghost btn-sm" onClick={() => onExport(meta.id)} title="导出" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px' }}>
+        <Download size={15} /> 导出
       </button>
       {!entry.builtin && (
         <button
           className="btn-ghost btn-sm"
           onClick={() => onUninstall(meta.id)}
           title="卸载"
-          style={{ color: 'var(--danger)' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', color: 'var(--danger)' }}
         >
-          <Trash2 size={15} />
-          {!isPhone && '卸载'}
+          <Trash2 size={15} /> 卸载
         </button>
       )}
     </>
@@ -85,8 +107,8 @@ export default function EventListRow({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--space-3)',
-          padding: 'var(--space-3) var(--space-4)',
+          gap: isPhone ? 'var(--space-2)' : 'var(--space-3)',
+          padding: isPhone ? 'var(--space-2) var(--space-3)' : 'var(--space-3) var(--space-4)',
           background: 'var(--bg-secondary)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
@@ -101,10 +123,10 @@ export default function EventListRow({
           onClick={() => setExpanded((o) => !o)}
           aria-expanded={expanded}
           aria-label={expanded ? '收起事件' : '展开事件'}
-          style={{ flexShrink: 0, color: 'var(--text-secondary)' }}
+          style={{ flexShrink: 0, color: 'var(--text-secondary)', padding: isPhone ? 2 : undefined }}
         >
           <ChevronRight
-            size={18}
+            size={isPhone ? 16 : 18}
             style={{
               transform: expanded ? 'rotate(90deg)' : 'none',
               transition: 'transform var(--duration-fast) var(--ease-out)',
@@ -115,8 +137,8 @@ export default function EventListRow({
         {/* 封面实色块（manifest.coverColor，schema 已拒绝渐变） */}
       <div
         style={{
-          width: '56px',
-          height: '56px',
+          width: isPhone ? 40 : 56,
+          height: isPhone ? 40 : 56,
           borderRadius: 'var(--radius-md)',
           background: meta.coverColor,
           flexShrink: 0,
@@ -126,18 +148,18 @@ export default function EventListRow({
           color: coverText,
         }}
       >
-        <Icon size={24} strokeWidth={1.75} />
+        <Icon size={isPhone ? 18 : 24} strokeWidth={1.75} />
       </div>
 
       {/* 信息 */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
           <span
             style={{
               flex: 1,
               minWidth: 0,
               fontFamily: 'var(--font-display)',
-              fontSize: 'var(--font-size-md)',
+              fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-md)',
               fontWeight: 600,
               color: 'var(--text-primary)',
               overflow: 'hidden',
@@ -147,7 +169,7 @@ export default function EventListRow({
           >
             {meta.name}
           </span>
-          <EventPackBadge packId={meta.id} />
+          {!isPhone && <EventPackBadge packId={meta.id} />}
           {entry.builtin && (
             <span style={{
               fontSize: 'var(--font-size-xs)',
@@ -155,74 +177,85 @@ export default function EventListRow({
               color: 'var(--accent)',
               border: '1px solid var(--accent-dim)',
               borderRadius: 'var(--radius-md)',
-              padding: '1px 6px',
+              padding: isPhone ? '0 4px' : '1px 6px',
               flexShrink: 0,
             }}>内置</span>
           )}
         </div>
         <div
           style={{
-            fontSize: 'var(--font-size-sm)',
+            fontSize: 'var(--font-size-xs)',
             color: 'var(--text-muted)',
-            marginTop: '2px',
+            marginTop: isPhone ? 0 : '2px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}
         >
           {meta.author} · v{meta.version}
+          {isPhone && entry.builtin && <EventPackBadge packId={meta.id} />}
         </div>
       </div>
 
       {/* 操作：桌面端内联，移动端收进「更多」 */}
       {isPhone ? (
-        <div style={{ position: 'relative' }}>
-          <button
-            className="btn-icon btn-icon-sm btn-ghost"
-            onClick={() => setMenuOpen((o) => !o)}
-            aria-label="更多操作"
-            aria-expanded={menuOpen}
-          >
-            <MoreHorizontal size={18} />
-          </button>
-          {menuOpen && (
-            <>
-              <div
-                onClick={() => setMenuOpen(false)}
-                style={{ position: 'fixed', inset: 0, zIndex: 9 }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '100%',
-                  marginTop: 'var(--space-1)',
-                  zIndex: 10,
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  padding: 'var(--space-1)',
-                  minWidth: '132px',
-                }}
-              >
-                {actions}
-              </div>
-            </>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flexShrink: 0 }}>
+          <div>
+            <button
+              ref={menuBtnRef}
+              className="btn-icon btn-icon-sm btn-ghost"
+              onClick={() => menuOpen ? setMenuOpen(false) : openMenu()}
+              aria-label="更多操作"
+              aria-expanded={menuOpen}
+              style={{ padding: 4 }}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen && createPortal(
+              <>
+                <div
+                  onClick={() => setMenuOpen(false)}
+                  style={{ position: 'fixed', inset: 0 }}
+                />
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: menuPos.top,
+                    right: menuPos.right,
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: 'var(--shadow-md)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: 'var(--space-1)',
+                    minWidth: '132px',
+                  }}
+                >
+                  {actions}
+                </div>
+              </>,
+              document.body,
+            )}
+          </div>
+          {/* 启用开关 */}
+          <EventSwitch
+            checked={isActive}
+            onChange={(next) => (next ? onEnable(meta.id) : onDisable(meta.id))}
+            label={`启用 ${meta.name}`}
+          />
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>{actions}</div>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>{actions}</div>
+          {/* 启用开关 */}
+          <EventSwitch
+            checked={isActive}
+            onChange={(next) => (next ? onEnable(meta.id) : onDisable(meta.id))}
+            label={`启用 ${meta.name}`}
+          />
+        </>
       )}
-
-      {/* 启用开关 */}
-      <EventSwitch
-        checked={isActive}
-        onChange={(next) => (next ? onEnable(meta.id) : onDisable(meta.id))}
-        label={`启用 ${meta.name}`}
-      />
       </div>
 
       {/* 事件包内事件（小小类）—— 展开后惰性读取并解析包内容 */}

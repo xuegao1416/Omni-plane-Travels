@@ -407,11 +407,9 @@
             "name": "口岸杂费",
             "description": "每趟出关都需要缴纳过境费、检疫费等各种杂费。",
             "intervalTicks": 3,
-            "effects": {
-              "business": {
-                "fundsDelta": -60
-              }
-            },
+            "actions": [
+              { "set": { "path": "business.funds", "value": -60 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -419,11 +417,9 @@
             "name": "市场行情波动",
             "description": "绥芬河口岸的商品价格随供需变化波动。",
             "intervalTicks": 5,
-            "effects": {
-              "business": {
-                "fundsDelta": 120
-              }
-            },
+            "actions": [
+              { "set": { "path": "business.funds", "value": 120 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -431,11 +427,9 @@
             "name": "冬季开销",
             "description": "东北的冬天漫长寒冷，取暖、防寒服装、仓储保温都是额外开支。",
             "intervalTicks": 8,
-            "effects": {
-              "business": {
-                "fundsDelta": -80
-              }
-            },
+            "actions": [
+              { "set": { "path": "business.funds", "value": -80 } }
+            ],
             "narrateToAI": true
           }
         ],

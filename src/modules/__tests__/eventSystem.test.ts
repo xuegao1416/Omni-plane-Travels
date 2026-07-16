@@ -18,7 +18,7 @@ const invokeImpl = async (cmd: string, args?: Record<string, unknown>): Promise<
             coverColor: '#3b82f6',
             icon: 'swords',
             schemaVersion: 1,
-            minAppVersion: '2.6.1',
+            minAppVersion: '2.6.2',
             loadOrder: 100,
             enabledByDefault: false,
           },
@@ -76,7 +76,7 @@ describe('ruleEngine — 确定性', () => {
       {
         id: 'r1',
         when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
-        then: [{ addCard: { cardId: 'adventure' } }, { set: { path: 'world.quest', value: 'active' } }],
+        then: [{ addEvent: { eventId: 'adventure' } }, { set: { path: 'world.quest', value: 'active' } }],
       },
     ];
     const opts = { permissions: ['add_card', 'modify_world_state'] as const, tick: 1 };
@@ -95,20 +95,20 @@ describe('ruleEngine — 确定性', () => {
 });
 
 describe('ruleEngine — AC-E1 骰子>4 触发奇遇卡片', () => {
-  it('骰子得 5 时触发 addCard 并改写世界状态', () => {
+  it('骰子得 5 时触发 addEvent 并改写世界状态', () => {
     const ctx = { dice: { lastRoll: { total: 5 } }, world: {} as Record<string, unknown> };
     const rules: EventRule[] = [
       {
         id: 'adventure-rule',
         when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
         then: [
-          { addCard: { cardId: 'adventure' } },
+          { addEvent: { eventId: 'adventure' } },
           { set: { path: 'world.quest', value: 'active' } },
         ],
       },
     ];
     const res = evaluate(ctx, rules, { permissions: ['add_card', 'modify_world_state'], tick: 3 });
-    expect(res.applied.some((a) => a.kind === 'addCard' && (a.detail as any).cardId === 'adventure')).toBe(true);
+    expect(res.applied.some((a) => a.kind === 'addEvent' && (a.detail as any).eventId === 'adventure')).toBe(true);
     expect((res.ctx.world as Record<string, unknown>).quest).toBe('active');
   });
 
@@ -118,7 +118,7 @@ describe('ruleEngine — AC-E1 骰子>4 触发奇遇卡片', () => {
       {
         id: 'adventure-rule',
         when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
-        then: [{ addCard: { cardId: 'adventure' } }],
+        then: [{ addEvent: { eventId: 'adventure' } }],
       },
     ];
     const res = evaluate(ctx, rules, { permissions: ['add_card'], tick: 1 });
@@ -129,7 +129,7 @@ describe('ruleEngine — AC-E1 骰子>4 触发奇遇卡片', () => {
 describe('ruleEngine — 权限 / 白名单', () => {
   it('缺少权限的动作被跳过并告警', () => {
     const ctx = {};
-    const rules: EventRule[] = [{ id: 'r', when: { all: [] }, then: [{ addCard: { cardId: 'x' } }] }];
+    const rules: EventRule[] = [{ id: 'r', when: { all: [] }, then: [{ addEvent: { eventId: 'x' } }] }];
     const res = evaluate(ctx, rules, { permissions: ['modify_world_state'], tick: 1 });
     expect(res.applied.length).toBe(0);
     expect(res.warnings.some((w) => w.includes('缺少权限'))).toBe(true);
@@ -197,7 +197,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.6.1',
+      minAppVersion: '2.6.2',
       type: 'rule',
       coverColor: '#3b82f6',
       icon: 'swords',
@@ -214,7 +214,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.6.1',
+      minAppVersion: '2.6.2',
       type: 'rule',
       coverColor: '#3b82f6',
       icon: 'swords',
@@ -232,7 +232,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.6.1',
+      minAppVersion: '2.6.2',
       type: 'rule',
       coverColor: 'linear-gradient(#7C3AED,#A855F7)',
       icon: 'swords',

@@ -176,6 +176,17 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
     markdownOnly: true,
     promptOnly: false,
   },
+  // --- 对话头像卡片（[SPEAK] 格式） ---
+  {
+    id: 'builtin_display_dialogue_avatar',
+    scriptName: '对话头像卡片',
+    findRegex: '\\[SPEAK\\]\\s*\\{(?=[\\s\\S]*?"img"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"who"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"sub"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"msg"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"act"\\s*:\\s*"([^"]*)")[\\s\\S]*?\\}',
+    replaceString: '<div class="dialogue-avatar-placeholder" data-avatar="$1" data-name="$2" data-title="$3" data-text="$4" data-action="$5"></div>',
+    placement: [2],
+    disabled: false,
+    markdownOnly: true,
+    promptOnly: false,
+  },
   // --- 八股词清理（安全网：即使 AI 生成了八股词，输出阶段自动删除） ---
   {
     id: 'builtin_display_anti_cliche',
@@ -1022,6 +1033,94 @@ const CLAUDE_PROMPTS: PresetPromptEntry[] = [
   ...ENHANCEMENT_PROMPT_ENTRIES,
 ];
 
+// ============ 对话头像预设 ============
+
+/** 对话头像预设的输出格式 — 用 [SPEAK] 替代 <contenttext> */
+const PROMPT_DIALOGUE_OUTPUT_FORMAT = `<OutputFormat>
+【强制输出格式 - 缺一不可】
+
+你必须严格按照以下格式输出，每次回复都必须包含以下内容，顺序固定：
+
+第一块：<thinking>你的思考过程</thinking>
+第二块：正文回复内容（使用 [SPEAK] 格式输出对话）
+第三块：行动选项（必须在正文末尾输出）
+
+⚠️ 重要警告：
+- 行动选项是必须的，缺少选项会导致系统无法解析你的回复
+- 必须提供3-5个行动选项
+- 选项应当涵盖：继续推进主线、探索/调查、与NPC互动、休息/准备、自由行动等不同方向
+- 即使剧情到了关键节点，也必须提供选项，不能省略
+
+【正文格式】
+正文内容直接输出，不需要任何标签包裹。叙事描写正常写，对话必须用 [SPEAK] 格式。
+
+【对话格式】
+除了用户角色外，所有剧情人物的对话都必须按照以下格式输出：
+
+[SPEAK]{"img":"", "who":"角色名", "sub":"称号", "msg":"对话内容", "act":"动作描述"}
+
+参数说明：
+- img: 头像URL，可以为角色找合适的图像链接，或者留空
+- who: 角色名称
+- sub: 称号、身份或神态（显示在名字旁边的小字标注）
+- msg: 对话正文内容
+- act: 动作神态或场景补充描述
+
+注意：如果有多段对话，请输出多个 [SPEAK] 格式，不要把所有对话放在一个格式中。
+
+【行动选项格式】
+在正文末尾按以下格式输出行动选项：
+
+[OPTION_START]
+[OPTION]{t: "选项标题", d: "选项详细描述"}
+[OPTION]{t: "选项标题", d: "选项详细描述"}
+[OPTION]{t: "选项标题", d: "选项详细描述"}
+[OPTION_END]
+
+【正确示例】
+<thinking>分析当前剧情走向...</thinking>
+艾莉丝站在城门口，阳光洒在她银色的长发上，闪闪发光。
+[SPEAK]{"img":"", "who":"艾莉丝", "sub":"银发少女", "msg":"你终于来了，我等你好久了。", "act":"她轻轻挥了挥手，脸上露出欣喜的笑容。"}
+[SPEAK]{"img":"", "who":"老村长", "sub":"白发苍苍", "msg":"年轻人，这条路可不好走啊。", "act":"他捋了捋胡须，目光深邃地望向远方。"}
+[OPTION_START]
+[OPTION]{t: "继续前进", d: "沿着道路继续探索未知区域"}
+[OPTION]{t: "与NPC对话", d: "和旁边的村民交谈获取信息"}
+[OPTION]{t: "检查周围环境", d: "仔细搜索附近是否有隐藏的宝箱"}
+[OPTION_END]
+</OutputFormat>`;
+
+/** 对话头像预设的完整提示词 */
+const DIALOGUE_PRESET_PROMPTS: PresetPromptEntry[] = [
+  // 变量上下文
+  { identifier: 'var_snapshot',      name: '变量上下文',    role: 'system', content: PROMPT_VAR_SNAPSHOT,      enabled: true, order: 50,  triggerMode: 'blue' },
+
+  // 基础规则
+  { identifier: 'task',              name: '任务指令',      role: 'system', content: PROMPT_TASK,              enabled: true, order: 100, triggerMode: 'blue' },
+  { identifier: 'narrative_rules',   name: '叙事规则与认知边界', role: 'system', content: PROMPT_NARRATIVE_RULES,  enabled: true, order: 200, triggerMode: 'blue' },
+
+  // 人物与情感
+  { identifier: 'emotional_balance', name: '情绪平衡与基调控制', role: 'system', content: PROMPT_EMOTIONAL_BALANCE, enabled: true, order: 300, triggerMode: 'blue' },
+  { identifier: 'figure_crafting',   name: '人物塑造规范',   role: 'system', content: PROMPT_FIGURE_CRAFTING,   enabled: true, order: 400, triggerMode: 'blue' },
+  { identifier: 'relationship_rules', name: '亲密关系规范', role: 'system', content: PROMPT_RELATIONSHIP_RULES, enabled: true, order: 500, triggerMode: 'blue' },
+
+  // 写作技巧
+  { identifier: 'writing_rules',     name: '写作规则',      role: 'system', content: PROMPT_WRITING_RULES,     enabled: true, order: 600, triggerMode: 'blue' },
+  { identifier: 'writing_style',     name: '写作风格',      role: 'system', content: PROMPT_WRITING_STYLE,     enabled: true, order: 700, triggerMode: 'blue' },
+  { identifier: 'perspective_boundary', name: '视角边界规范', role: 'system', content: PROMPT_PERSPECTIVE_BOUNDARY, enabled: true, order: 800, triggerMode: 'blue' },
+  { identifier: 'dialogue_balance',  name: '对话互动规范',   role: 'system', content: PROMPT_DIALOGUE_BALANCE,  enabled: true, order: 900, triggerMode: 'blue' },
+  { identifier: 'expression_rules',  name: '表达规范与禁用词', role: 'system', content: PROMPT_EXPRESSION_RULES, enabled: true, order: 1000, triggerMode: 'blue' },
+  { identifier: 'anti_formula',      name: '防八股规范',    role: 'system', content: PROMPT_ANTI_FORMULA,      enabled: true, order: 1050, triggerMode: 'blue' },
+
+  // 特殊内容
+  { identifier: 'nsfw_content',      name: 'NSFW内容规范',   role: 'system', content: PROMPT_NSFW_CONTENT,     enabled: true, order: 1100, triggerMode: 'blue' },
+
+  // 执行与输出（使用对话头像格式）
+  { identifier: 'thinking',          name: '思维链要求',    role: 'system', content: PROMPT_THINKING,          enabled: true, order: 1200, triggerMode: 'blue' },
+  { identifier: 'writing_process',   name: '创作流程',      role: 'system', content: PROMPT_WRITING_PROCESS,   enabled: true, order: 1300, triggerMode: 'blue' },
+  { identifier: 'output_format',     name: '输出格式规范',   role: 'system', content: PROMPT_DIALOGUE_OUTPUT_FORMAT, enabled: true, order: 2200, triggerMode: 'blue' },
+  { identifier: 'integrity_statement', name: '完整性声明',   role: 'system', content: PROMPT_INTEGRITY_STATEMENT, enabled: true, order: 1500, triggerMode: 'blue' },
+];
+
 const BUILTIN_PRESETS: BuiltinPreset[] = [
   {
     id: 'default',
@@ -1042,6 +1141,16 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     regexScripts: [...DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
     version: '2.0.0',
+  },
+  {
+    id: 'dialogue_avatar',
+    name: '对话头像预设',
+    description: '对话头像风格 - 所有对话都用 [SPEAK] 格式渲染带头像的对话卡片',
+    systemPrompt: DIALOGUE_PRESET_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
+    prompts: DIALOGUE_PRESET_PROMPTS,
+    regexScripts: [...DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
+    builtin: true,
+    version: '1.0.0',
   },
 ];
 

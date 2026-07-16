@@ -383,12 +383,19 @@ export interface PeriodicRule {
   intervalTicks: number;
   /** 首次触发偏移（避免所有周期事件同轮爆发） */
   offsetTicks?: number;
-  /** 可选守卫条件（每 N tick 触发时先检查 when，满足才执行 effects/actions） */
+  /** 可选守卫条件（每 N tick 触发时先检查 when，满足才执行 actions） */
   when?: Condition;
-  /** 变量影响（与原 PeriodicEvent.effects 同源，复用机械层合并逻辑） */
-  effects: ModuleEffects;
-  /** 可选动作序列（当 periodic 连接到 effect 节点时，effect 的 actions 写入此处） */
+  /**
+   * 动作序列（统一效果系统，所有效果通过 Action[] 表达）。
+   * 支持：set / addEvent / modifyResource / scheduleTick。
+   */
   actions?: Action[];
+  /**
+   * @deprecated 已废弃 — 请使用 actions 字段。
+   * 旧版 ModuleEffects 格式，引擎会自动转换为 Action[] 执行。
+   * 仅保留用于向后兼容旧数据，新数据不应使用此字段。
+   */
+  effects?: ModuleEffects;
   /** 事件描述（编辑器/AI 叙事用，引擎忽略） */
   description?: string;
   /** 结算后是否喂给 AI 做叙事渲染 */
@@ -466,6 +473,18 @@ export interface EffectLogEntry {
 }
 
 /**
+ * 延迟 tick 条目（scheduleTick 动作产出，到期后注入 events）
+ */
+export interface ScheduledTickEntry {
+  /** 应触发的 tick 序号（= 当时 tick + after） */
+  scheduledAt: number;
+  /** 产生该条目的规则 id */
+  ruleId: string;
+  /** 到期时注入的事件 payload（含 type / where 等） */
+  payload?: Record<string, unknown>;
+}
+
+/**
  * 世界演化运行时状态（进 GameState，随存档保存）
  */
 export interface SimulationRuntimeState {
@@ -479,6 +498,12 @@ export interface SimulationRuntimeState {
   triggeredPeriodicEvents: string[];
   /** 已触发过的资源演化蓝图 id（每个演化步骤仅触发一次） */
   evolvedSteps?: string[];
+  /** 延迟 tick 队列（scheduleTick 动作写入，每 tick 开始时消费到期条目） */
+  scheduledTicks?: ScheduledTickEntry[];
+  /** 周期规则产出的 addEvent 动作（同步段存入，async 段消费） */
+  pendingAddEvents?: Array<{ eventId: string; eventPackId: string }>;
+  /** 各 mod 的 onceFired / cooldown 持久化快照（随存档保存，重启后恢复） */
+  eventRuntimes?: Record<string, EventRuntimeState>;
 }
 
 /**
@@ -551,17 +576,13 @@ export type Condition =
 
 export type ActionKind =
   | 'set'
-  | 'emit'
-  | 'addCard'
-  | 'overrideCard'
+  | 'addEvent'
   | 'modifyResource'
   | 'scheduleTick';
 
 export type Action =
   | { set: { path: string; value: Literal } }
-  | { emit: { type: string; payload?: Record<string, Literal> } }
-  | { addCard: { cardId: string } }
-  | { overrideCard: { cardId: string; patch: Record<string, unknown> } }
+  | { addEvent: { eventId: string; eventPackId?: string } }
   | { modifyResource: { key: string; delta: number } }
   | { scheduleTick: { after: number; payload?: Record<string, unknown> } };
 
@@ -624,7 +645,10 @@ export interface EventGraphNode {
   description?: string;
   /** 结算后是否喂给 AI 做叙事渲染 */
   narrateToAI?: boolean;
-  /** 周期性 / 事件效果（module 层变量） */
+  /**
+   * @deprecated 已废弃 — 周期节点请通过连线 effect 节点产出 actions。
+   * 旧版 ModuleEffects 格式，图转换时自动迁移为 actions。
+   */
   effects?: ModuleEffects;
   /** 事件节点产出的 SimEvent 片段 */
   event?: Partial<SimEvent>;
@@ -638,6 +662,8 @@ export interface EventGraphNode {
   cooldownTicks?: number;
   /** condition 节点的逻辑模式（默认 'and'）：多入边条件按此模式组合 */
   logicMode?: 'and' | 'or' | 'not';
+  /** condition 节点的输入端口数（默认 2，NOT 门固定 1） */
+  conditionInputCount?: number;
 }
 
 export type EventEdgeKind = 'flow' | 'constraint';

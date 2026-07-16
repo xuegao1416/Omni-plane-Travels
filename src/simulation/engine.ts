@@ -20,14 +20,16 @@ import type {
 } from './types';
 import type {
   WorldDynamics, ModuleEffects, EffectLogEntry,
-  SimulationRuntimeState, ResourceEvolutionStep,
+  SimulationRuntimeState, ResourceEvolutionStep, Literal,
 } from '../modules/schema';
 import { createEmptySimState, createDefaultWorldContext } from './types';
 import type { GameState, NPCData } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
-import { eventWorldEvolution, collectAddCardEvents, getPeriodicRules } from '../modules/eventIntegration';
+import { eventWorldEvolution, collectAddEventEvents, collectScheduledTickEntries, getPeriodicRules } from '../modules/eventIntegration';
+import { getWebEvent } from '../modules/eventDb';
 import { checkCondition, applyAction } from '../modules/ruleEngine';
+import { moduleEffectsToActions } from '../modules/ruleGraph';
 import { resolvePendingChoices } from '../modules/eventChoiceState';
 import { useSaveStore } from '../stores/saveStore';
 import type { WorldContext } from '../modules/schema';
@@ -364,10 +366,27 @@ export class WorldSimulationEngine {
       // 10. 应用按存档绑定的 mod 规则（每 tick 确定性求值；异常隔离，不拖垮内核）
       //     gameState 即 varMgr 的实时状态引用，写回后变量自动生效。
       try {
-        const { ctx: newCtx, results } = eventWorldEvolution.evaluateTick(
+        // 10.0 收集本轮可用事件：到期的 scheduledTicks
+        const runtime10 = gameState.simulationRuntime;
+        const tickEvents: Array<{ type: string; where?: Record<string, Literal> }> = [];
+        if (runtime10) {
+          // 消费到期的 scheduledTicks
+          if (runtime10.scheduledTicks?.length) {
+            const due = runtime10.scheduledTicks.filter(e => e.scheduledAt <= this.state.tickCount);
+            const remaining = runtime10.scheduledTicks.filter(e => e.scheduledAt > this.state.tickCount);
+            for (const entry of due) {
+              const type = (entry.payload?.type as string) ?? 'scheduled';
+              const where = entry.payload?.where as Record<string, Literal> | undefined;
+              tickEvents.push({ type, where });
+            }
+            runtime10.scheduledTicks = remaining;
+          }
+        }
+
+        const { ctx: newCtx, results, modRuntimes } = eventWorldEvolution.evaluateTick(
           gameState as unknown as WorldContext,
           this.state.tickCount,
-          [],
+          tickEvents,
         );
         const live = gameState as unknown as Record<string, unknown>;
         if (newCtx !== (gameState as unknown as WorldContext)) {
@@ -375,13 +394,53 @@ export class WorldSimulationEngine {
             live[k] = (newCtx as Record<string, unknown>)[k];
           }
         }
-        // 10.1 收集 addCard 动作并广播（CardOverlay 订阅后弹卡；逐条 try/catch 隔离）
+        // 10.0e 持久化 mod runtime（onceFired / cooldown）到 simulationRuntime
+        if (modRuntimes && gameState.simulationRuntime) {
+          gameState.simulationRuntime.eventRuntimes = modRuntimes;
+        }
+        // 10.1 收集 addEvent 动作：查事件包获取全部卡片，逐张广播
         try {
-          for (const ev of collectAddCardEvents(results)) {
-            eventBus.emit(EVENTS.EVENT_CARD, ev);
+          const addEventActions = [
+            ...collectAddEventEvents(results),
+            ...(gameState.simulationRuntime?.pendingAddEvents ?? []),
+          ];
+          // 清空 pending
+          if (gameState.simulationRuntime) gameState.simulationRuntime.pendingAddEvents = [];
+          for (const ev of addEventActions) {
+            const rec = await getWebEvent(ev.eventPackId);
+            if (!rec) continue;
+            // 从 IndexedDB 文件中找事件定义
+            for (const [key, val] of Object.entries(rec.files)) {
+              if (typeof val !== 'string' || !key.startsWith('schema/event-')) continue;
+              try {
+                const parsed = JSON.parse(val);
+                const matchEvt = Array.isArray(parsed)
+                  ? parsed.find((e: { id?: string }) => e.id === ev.eventId)
+                  : parsed.id === ev.eventId ? parsed : null;
+                if (matchEvt?.cards) {
+                  for (const card of matchEvt.cards) {
+                    eventBus.emit(EVENTS.EVENT_CARD, { cardId: card.id, eventPackId: ev.eventPackId });
+                  }
+                }
+              } catch { /* 单文件隔离 */ }
+            }
           }
-        } catch (emitErr) {
-          console.warn('[WorldSim] Mod 卡片事件广播失败（已忽略）:', emitErr);
+        } catch (addEventErr) {
+          console.warn('[WorldSim] Mod 事件广播失败（已忽略）:', addEventErr);
+        }
+
+        // 10.1b 收集 scheduleTick 产出的延迟条目，写入 runtime
+        try {
+          const scheduled = collectScheduledTickEntries(results);
+          if (scheduled.length > 0) {
+            const rt = gameState.simulationRuntime;
+            if (rt) {
+              if (!rt.scheduledTicks) rt.scheduledTicks = [];
+              rt.scheduledTicks.push(...scheduled);
+            }
+          }
+        } catch (scheduledErr) {
+          console.warn('[WorldSim] Mod scheduleTick 收集失败（已忽略）:', scheduledErr);
         }
 
         // 10.2 结算玩家待定的选择卡（路径 C）：应用最终选中项的 delta 到 stat，
@@ -896,33 +955,47 @@ export class WorldSimulationEngine {
           }
         }
 
-        // 合并 effects（ModuleEffects：资源/属性/资金/经验变化）
-        this.mergeModuleEffects(mergedEffects, periodic.effects);
+        // 统一执行 actions（优先 actions，向后兼容 effects）
+        const periodicActions: import('../modules/schema').Action[] =
+          periodic.actions && periodic.actions.length > 0
+            ? periodic.actions
+            : periodic.effects && Object.keys(periodic.effects).length > 0
+              ? moduleEffectsToActions(periodic.effects)
+              : [];
 
-        // 执行 actions（Action[]：set/emit/addCard/modifyResource 等）
-        if (periodic.actions && periodic.actions.length > 0) {
+        if (periodicActions.length > 0) {
           const ctx = gameState as unknown as WorldContext;
           const applied: import('../modules/ruleEngine').AppliedAction[] = [];
-          for (const action of periodic.actions) {
+          for (const action of periodicActions) {
             try {
               applyAction(action, ctx, applied, periodic.id);
             } catch (e) {
               console.warn(`[周期规则] 动作执行失败 (${periodic.id}):`, e);
             }
           }
-          // addCard 动作广播到 CardOverlay
+          // addEvent 存入 pendingAddEvents（async 段统一处理）；scheduleTick 写入 runtime
           for (const a of applied) {
-            if (a.kind === 'addCard') {
-              try {
-                eventBus.emit(EVENTS.EVENT_CARD, { cardId: (a.detail as { cardId?: string }).cardId ?? '', eventPackId: periodic.id });
-              } catch { /* 隔离 */ }
-            }
+            try {
+              if (a.kind === 'addEvent') {
+                const eventId = (a.detail as { eventId?: string }).eventId ?? '';
+                if (eventId) {
+                  if (!runtime.pendingAddEvents) runtime.pendingAddEvents = [];
+                  runtime.pendingAddEvents.push({ eventId, eventPackId: periodic.id });
+                }
+              } else if (a.kind === 'scheduleTick') {
+                const d = a.detail as { after: number; payload?: Record<string, unknown> };
+                if (runtime) {
+                  if (!runtime.scheduledTicks) runtime.scheduledTicks = [];
+                  runtime.scheduledTicks.push({ scheduledAt: currentTick + d.after, ruleId: a.ruleId, payload: d.payload });
+                }
+              }
+            } catch { /* 逐条隔离 */ }
           }
         }
 
-        // 记录日志
+        // 记录日志（向后兼容：保留 effects 用于日志展示）
         effectLog.push(...this.createEffectLogEntries(
-          currentTick, 'periodic', periodic.id, periodic.effects, `周期事件: ${periodic.name}`
+          currentTick, 'periodic', periodic.id, periodic.effects ?? {}, `周期事件: ${periodic.name}`
         ));
       }
     }

@@ -25,6 +25,68 @@
   outline-offset: 1px;
 }
 
+/* ─── 底部抽屉滑入动画（移动端侧边面板） ─── */
+@keyframes eventSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes eventSlideUpReduced {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.event-slide-up {
+  animation: eventSlideUp 250ms var(--ease-out) both;
+}
+
+/* ─── 移动端工具栏溢出滚动 ─── */
+.event-toolbar-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.event-toolbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── 移动端侧边栏遮罩 ─── */
+.event-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ─── 移动端底部抽屉容器 ─── */
+.event-bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 41;
+  max-height: 60vh;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  overflow: auto;
+  animation: eventSlideUp 250ms var(--ease-out) both;
+}
+
+/* ─── 移动端右侧滑出面板 ─── */
+.event-right-sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  width: min(320px, 85vw);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  overflow: auto;
+}
+
 /* reduced-motion：保留淡入（仅 opacity），关闭位移与旋转 */
 @media (prefers-reduced-motion: reduce) {
   .event-fade-in {
@@ -33,5 +95,9 @@
   }
   .event-spin {
     animation-duration: 2.4s;
+  }
+  .event-slide-up,
+  .event-bottom-sheet {
+    animation: eventSlideUpReduced 250ms var(--ease-out) both;
   }
 }

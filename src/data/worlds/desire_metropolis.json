@@ -645,15 +645,9 @@
             "name": "季度房租",
             "description": "每三个月交一次房租，提醒你在这座城市的成本。",
             "intervalTicks": 90,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "happiness": {
-                    "delta": -5
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.happiness", "value": -5 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -661,20 +655,10 @@
             "name": "周末聚餐",
             "description": "和朋友或同事的周末聚餐，维持社交关系。",
             "intervalTicks": 7,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "dim5": {
-                    "delta": 3,
-                    "min": 0
-                  },
-                  "happiness": {
-                    "delta": 3,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.dim5", "value": 3 } },
+              { "set": { "path": "stats.happiness", "value": 3 } }
+            ],
             "narrateToAI": true
           },
           {
@@ -683,16 +667,9 @@
             "description": "过年过节回家，面对七大姑八大姨的灵魂拷问。",
             "intervalTicks": 30,
             "offsetTicks": 15,
-            "effects": {
-              "stats": {
-                "changes": {
-                  "happiness": {
-                    "delta": -10,
-                    "min": 0
-                  }
-                }
-              }
-            },
+            "actions": [
+              { "set": { "path": "stats.happiness", "value": -10 } }
+            ],
             "narrateToAI": true
           }
         ],

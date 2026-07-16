@@ -30,6 +30,8 @@ export interface TickEvaluation {
   ctx: WorldContext;
   results: EvaluateResult[];
   warnings: string[];
+  /** 各 mod 的 onceFired / cooldown 持久化快照（供引擎写入 simulationRuntime） */
+  modRuntimes?: Record<string, EventRuntimeState>;
 }
 
 /**
@@ -106,27 +108,46 @@ export class EventWorldEvolution {
       }
     }
 
-    return { ctx: current, results, warnings };
+    // 收集各 mod 的 runtime 快照（onceFired / cooldown 状态），供持久化
+    const modRuntimes: Record<string, EventRuntimeState> = {};
+    for (const mod of this.mods.values()) {
+      modRuntimes[mod.eventPackId] = {
+        onceFired: { ...mod.runtime.onceFired },
+        cooldownRemaining: { ...mod.runtime.cooldownRemaining },
+      };
+    }
+
+    return { ctx: current, results, warnings, modRuntimes };
   }
 }
 
-/** 单次 tick 求值后，从所有 mod 的 applied 动作中收集 addCard 事件。
- *  纯函数（便于单测），返回可广播的 { cardId, eventPackId } 列表。 */
-export interface AddCardEvent {
-  cardId: string;
+/** 从所有 mod 的 applied 动作中收集 addEvent 事件。
+ *  返回 { eventId, eventPackId } 列表，由调用方查 eventPack 获取全部卡片后逐张广播。 */
+export interface AddEventAction {
+  eventId: string;
   eventPackId: string;
 }
-export function collectAddCardEvents(results: EvaluateResult[]): AddCardEvent[] {
-  const out: AddCardEvent[] = [];
+export function collectAddEventEvents(results: EvaluateResult[]): AddEventAction[] {
+  const out: AddEventAction[] = [];
   for (const r of results) {
     for (const a of r.applied) {
-      if (a.kind === 'addCard') {
-        const detail = a.detail as { cardId?: string } | undefined;
-        if (detail?.cardId) {
-          out.push({ cardId: detail.cardId, eventPackId: r.eventPackId ?? '' });
+      if (a.kind === 'addEvent') {
+        const detail = a.detail as { eventId?: string; eventPackId?: string } | undefined;
+        if (detail?.eventId) {
+          // 优先用动作自带的 eventPackId（跨包引用），否则回退到产生该动作的包
+          out.push({ eventId: detail.eventId, eventPackId: detail.eventPackId || r.eventPackId || '' });
         }
       }
     }
+  }
+  return out;
+}
+
+/** 从所有 mod 的 EvaluateResult 中收集 scheduleTick 产出的延迟条目。 */
+export function collectScheduledTickEntries(results: EvaluateResult[]): Array<{ scheduledAt: number; ruleId: string; payload?: Record<string, unknown> }> {
+  const out: Array<{ scheduledAt: number; ruleId: string; payload?: Record<string, unknown> }> = [];
+  for (const r of results) {
+    if (r.scheduledTickEntries) out.push(...r.scheduledTickEntries);
   }
   return out;
 }

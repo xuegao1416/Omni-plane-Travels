@@ -1,19 +1,13 @@
 /**
  * 周期事件包编辑器 — 在「事件中心」中编辑世界内置事件包的周期事件。
  *
- * 与「世界动态配置」面板完全解耦：周期事件不再出现在世界动态里，
- * 而是作为事件包在事件中心管理（符合「事件包」独立成类的设计）。
  * 数据来源 = 运行时注册进 eventWorldEvolution 的 source:'world' 包。
- *
- * 同时被「事件包编辑器」(CardEditor) 的周期子标签复用：无世界上下文时，
- * 资源/属性名可自由填写（自定义世界包的资源/属性由创作者自行约定）。
+ * 使用统一的 Action[] 效果系统（不再使用旧版 ModuleEffects）。
  */
 
 import { useState } from 'react';
 import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Clock } from 'lucide-react';
-import type {
-  PeriodicRule, ModuleEffects,
-} from '../../modules/schema';
+import type { PeriodicRule, Action, Literal } from '../../modules/schema';
 import type { WorldDef } from '../../data/worlds-schema';
 
 interface PeriodicEventPackEditorProps {
@@ -32,7 +26,7 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
       name: '新周期事件',
       description: '',
       intervalTicks: 30,
-      effects: {},
+      actions: [],
       narrateToAI: true,
     };
     onChange([...periodicEvents, newPeriodic]);
@@ -50,18 +44,20 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
     onChange(periodicEvents.filter((_, i) => i !== index));
   };
 
-  const getEffectSummary = (effects: ModuleEffects): string => {
+  const getActionSummary = (actions?: Action[]): string => {
+    if (!actions || actions.length === 0) return '无效果';
     const parts: string[] = [];
-    if (effects.survival?.resources) {
-      const count = Object.keys(effects.survival.resources).length;
-      if (count > 0) parts.push(`资源×${count}`);
+    let modifyCount = 0;
+    let setCount = 0;
+    let addEventCount = 0;
+    for (const a of actions) {
+      if ('modifyResource' in a) modifyCount++;
+      else if ('set' in a) setCount++;
+      else if ('addEvent' in a) addEventCount++;
     }
-    if (effects.stats?.changes) {
-      const count = Object.keys(effects.stats.changes).length;
-      if (count > 0) parts.push(`属性×${count}`);
-    }
-    if (effects.business?.fundsDelta) parts.push(`资金${effects.business.fundsDelta > 0 ? '+' : ''}${effects.business.fundsDelta}`);
-    if (effects.progression?.xpDelta) parts.push(`经验+${effects.progression.xpDelta}`);
+    if (modifyCount > 0) parts.push(`资源×${modifyCount}`);
+    if (setCount > 0) parts.push(`状态×${setCount}`);
+    if (addEventCount > 0) parts.push(`事件×${addEventCount}`);
     return parts.join(', ') || '无效果';
   };
 
@@ -105,7 +101,7 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
                   每 {event.intervalTicks} 轮触发
                   {event.offsetTicks ? `（偏移 ${event.offsetTicks}）` : ''}
                   {' | '}
-                  效果: {getEffectSummary(event.effects)}
+                  效果: {getActionSummary(event.actions)}
                 </div>
               </div>
               <button
@@ -151,7 +147,7 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
   );
 }
 
-// ── 周期事件编辑弹窗 ──
+// ── 周期事件编辑弹窗（统一 Action 系统） ──
 function PeriodicEventEditModal({
   event, worldDef, onSave, onCancel,
 }: {
@@ -161,30 +157,15 @@ function PeriodicEventEditModal({
   onCancel: () => void;
 }) {
   const [data, setData] = useState<PeriodicRule>(JSON.parse(JSON.stringify(event)));
-  // 无世界上下文（事件库编辑器）时，允许创作者自由填写资源/属性名
-  const [customResources, setCustomResources] = useState<string[]>([]);
-  const [customStats, setCustomStats] = useState<string[]>([]);
-  const [newResName, setNewResName] = useState('');
-  const [newStatName, setNewStatName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // 与事件效果编辑弹窗同源的「资源/属性联动」逻辑（事件效果弹窗已随 eventEffects 移除）
-  const survivalMod = worldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled);
-  const statMod = worldDef?.modules?.find(m => m.moduleId === 'stat' && m.enabled);
-  const survivalConfig = survivalMod?.moduleConfig as any;
-  const statConfig = statMod?.moduleConfig as any;
+  // 向后兼容：如果只有 effects 没有 actions，迁移 effects → actions
+  const actions: Action[] = data.actions ?? [];
 
-  const availableResources = Array.isArray(survivalConfig?.resources)
-    ? survivalConfig.resources.map((r: any) => r.name || r.id)
-    : [];
-
-  const availableStats = [
-    statConfig?.attrA?.name,
-    statConfig?.attrB?.name,
-  ].filter(Boolean) as string[];
-
-  const effectiveResources = Array.from(new Set([...availableResources, ...customResources]));
-  const effectiveStats = Array.from(new Set([...availableStats, ...customStats]));
+  const setActions = (next: Action[]) => setData({ ...data, actions: next });
+  const addAction = () => setActions([...actions, { modifyResource: { key: '食物', delta: -1 } }]);
+  const updateAction = (i: number, a: Action) => { const next = [...actions]; next[i] = a; setActions(next); };
+  const removeAction = (i: number) => setActions(actions.filter((_, idx) => idx !== i));
 
   const handleSave = () => {
     if (!data.id.trim()) {
@@ -196,79 +177,9 @@ function PeriodicEventEditModal({
       return;
     }
     setError(null);
-    onSave(data);
-  };
-
-  const addResourceEffect = (defaultName?: string) => {
-    const newEffects = { ...data.effects };
-    if (!newEffects.survival) newEffects.survival = {};
-    if (!newEffects.survival.resources) newEffects.survival.resources = {};
-    const name = defaultName ?? availableResources[0] ?? '资源';
-    newEffects.survival.resources[name] = { delta: 0 };
-    setData({ ...data, effects: newEffects });
-  };
-
-  const addResourceEffectNamed = (name: string) => {
-    const newEffects = { ...data.effects };
-    if (!newEffects.survival) newEffects.survival = {};
-    if (!newEffects.survival.resources) newEffects.survival.resources = {};
-    newEffects.survival.resources[name] = { delta: 0 };
-    setData({ ...data, effects: newEffects });
-  };
-
-  const updateResourceEffect = (resourceName: string, field: string, value: number) => {
-    const newEffects = { ...data.effects };
-    if (newEffects.survival?.resources?.[resourceName]) {
-      newEffects.survival.resources[resourceName] = {
-        ...newEffects.survival.resources[resourceName],
-        [field]: value,
-      };
-      setData({ ...data, effects: newEffects });
-    }
-  };
-
-  const removeResourceEffect = (resourceName: string) => {
-    const newEffects = { ...data.effects };
-    if (newEffects.survival?.resources) {
-      delete newEffects.survival.resources[resourceName];
-      setData({ ...data, effects: newEffects });
-    }
-  };
-
-  const addStatEffect = (defaultName?: string) => {
-    const newEffects = { ...data.effects };
-    if (!newEffects.stats) newEffects.stats = {};
-    if (!newEffects.stats.changes) newEffects.stats.changes = {};
-    const name = defaultName ?? availableStats[0] ?? '属性';
-    newEffects.stats.changes[name] = { delta: 0 };
-    setData({ ...data, effects: newEffects });
-  };
-
-  const addStatEffectNamed = (name: string) => {
-    const newEffects = { ...data.effects };
-    if (!newEffects.stats) newEffects.stats = {};
-    if (!newEffects.stats.changes) newEffects.stats.changes = {};
-    newEffects.stats.changes[name] = { delta: 0 };
-    setData({ ...data, effects: newEffects });
-  };
-
-  const updateStatEffect = (statName: string, field: string, value: number) => {
-    const newEffects = { ...data.effects };
-    if (newEffects.stats?.changes?.[statName]) {
-      newEffects.stats.changes[statName] = {
-        ...newEffects.stats.changes[statName],
-        [field]: value,
-      };
-      setData({ ...data, effects: newEffects });
-    }
-  };
-
-  const removeStatEffect = (statName: string) => {
-    const newEffects = { ...data.effects };
-    if (newEffects.stats?.changes) {
-      delete newEffects.stats.changes[statName];
-      setData({ ...data, effects: newEffects });
-    }
+    // 保存时清除旧版 effects 字段
+    const { effects: _, ...clean } = data;
+    onSave(clean as PeriodicRule);
   };
 
   return (
@@ -354,126 +265,20 @@ function PeriodicEventEditModal({
           </span>
         </label>
 
-        {/* 生存资源效果 */}
+        {/* 动作列表（统一效果系统） */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>生存资源效果</label>
-            <button onClick={() => addResourceEffect()} className="btn-ghost btn-xs">
+            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>周期动作</label>
+            <button onClick={addAction} className="btn-ghost btn-xs">
               <Plus size={12} />
             </button>
           </div>
-          {Object.entries(data.effects.survival?.resources || {}).map(([name, config]) => (
-            <div key={name} style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
-              <select
-                value={name}
-                onChange={e => {
-                  const newResources = { ...data.effects.survival?.resources };
-                  delete newResources[name];
-                  newResources[e.target.value] = config;
-                  setData({
-                    ...data,
-                    effects: { ...data.effects, survival: { ...data.effects.survival, resources: newResources } },
-                  });
-                }}
-                className="input-field"
-                style={{ flex: 1 }}
-              >
-                {effectiveResources.map((r: string) => <option key={r} value={r}>{r}</option>)}
-                {!effectiveResources.includes(name) && <option value={name}>{name}</option>}
-              </select>
-              <input
-                type="number"
-                value={config.delta ?? config.set ?? config.min ?? 0}
-                onChange={e => updateResourceEffect(name, 'delta', parseInt(e.target.value) || 0)}
-                className="input-field"
-                style={{ width: '80px' }}
-              />
-              <button onClick={() => removeResourceEffect(name)} className="btn-ghost btn-xs" style={{ color: 'var(--danger)' }}>
-                <Trash2 size={12} />
-              </button>
-            </div>
+          {actions.map((a, i) => (
+            <SimpleActionRow key={i} action={a} onChange={(updated) => updateAction(i, updated)} onRemove={() => removeAction(i)} />
           ))}
-          {!worldDef && (
-            <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
-              <input
-                className="input-field"
-                value={newResName}
-                onChange={(e) => setNewResName(e.target.value)}
-                placeholder="自定义资源名（无世界时手动填写）"
-                style={{ flex: 1 }}
-              />
-              <button
-                className="btn-ghost btn-xs"
-                onClick={() => {
-                  const n = newResName.trim();
-                  if (!n) return;
-                  setCustomResources((p) => (p.includes(n) ? p : [...p, n]));
-                  addResourceEffectNamed(n);
-                  setNewResName('');
-                }}
-              >添加</button>
-            </div>
-          )}
-        </div>
-
-        {/* 数值属性效果 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>数值属性效果</label>
-            <button onClick={() => addStatEffect()} className="btn-ghost btn-xs">
-              <Plus size={12} />
-            </button>
-          </div>
-          {Object.entries(data.effects.stats?.changes || {}).map(([name, config]) => (
-            <div key={name} style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
-              <select
-                value={name}
-                onChange={e => {
-                  const newChanges = { ...data.effects.stats?.changes };
-                  delete newChanges[name];
-                  newChanges[e.target.value] = config;
-                  setData({
-                    ...data,
-                    effects: { ...data.effects, stats: { ...data.effects.stats, changes: newChanges } },
-                  });
-                }}
-                className="input-field"
-                style={{ flex: 1 }}
-              >
-                {effectiveStats.map(s => <option key={s} value={s}>{s}</option>)}
-                {!effectiveStats.includes(name) && <option value={name}>{name}</option>}
-              </select>
-              <input
-                type="number"
-                value={config.delta ?? config.set ?? config.min ?? 0}
-                onChange={e => updateStatEffect(name, 'delta', parseInt(e.target.value) || 0)}
-                className="input-field"
-                style={{ width: '80px' }}
-              />
-              <button onClick={() => removeStatEffect(name)} className="btn-ghost btn-xs" style={{ color: 'var(--danger)' }}>
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
-          {!worldDef && (
-            <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
-              <input
-                className="input-field"
-                value={newStatName}
-                onChange={(e) => setNewStatName(e.target.value)}
-                placeholder="自定义属性名（无世界时手动填写）"
-                style={{ flex: 1 }}
-              />
-              <button
-                className="btn-ghost btn-xs"
-                onClick={() => {
-                  const n = newStatName.trim();
-                  if (!n) return;
-                  setCustomStats((p) => (p.includes(n) ? p : [...p, n]));
-                  addStatEffectNamed(n);
-                  setNewStatName('');
-                }}
-              >添加</button>
+          {actions.length === 0 && (
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textAlign: 'center', padding: 'var(--space-2)' }}>
+              暂无动作，点击上方 + 添加
             </div>
           )}
         </div>
@@ -491,6 +296,111 @@ function PeriodicEventEditModal({
           <button onClick={handleSave} className="btn-primary btn-sm">保存</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── 简化版动作行（用于周期事件编辑弹窗） ──
+function SimpleActionRow({ action, onChange, onRemove }: { action: Action; onChange: (a: Action) => void; onRemove: () => void }) {
+  const kind = 'set' in action ? 'set'
+    : 'addEvent' in action ? 'addEvent'
+    : 'modifyResource' in action ? 'modifyResource'
+    : 'scheduleTick';
+
+  return (
+    <div style={{
+      border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+      padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 4,
+      background: 'var(--bg-primary)',
+    }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <select
+          value={kind}
+          onChange={e => {
+            const k = e.target.value;
+            if (k === 'modifyResource') onChange({ modifyResource: { key: 'food', delta: -1 } });
+            else if (k === 'set') onChange({ set: { path: 'flags.x', value: true } });
+            else if (k === 'addEvent') onChange({ addEvent: { eventId: 'new' } });
+            else if (k === 'scheduleTick') onChange({ scheduleTick: { after: 1 } });
+          }}
+          style={{ fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}
+        >
+          <option value="modifyResource">资源变化</option>
+          <option value="set">设置状态</option>
+          <option value="addEvent">触发事件</option>
+          <option value="scheduleTick">调度 tick</option>
+        </select>
+        <button onClick={onRemove} className="btn-ghost btn-xs" style={{ color: 'var(--danger)', padding: 2, marginLeft: 'auto' }}>
+          <Trash2 size={12} />
+        </button>
+      </div>
+
+      {/* modifyResource: key + delta */}
+      {kind === 'modifyResource' && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <input
+            value={(action as { modifyResource: { key: string; delta: number } }).modifyResource.key}
+            onChange={e => onChange({ modifyResource: { ...(action as { modifyResource: { key: string; delta: number } }).modifyResource, key: e.target.value } })}
+            placeholder="资源名"
+            style={{ flex: 1, fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+          />
+          <input
+            type="number"
+            value={(action as { modifyResource: { key: string; delta: number } }).modifyResource.delta}
+            onChange={e => onChange({ modifyResource: { ...(action as { modifyResource: { key: string; delta: number } }).modifyResource, delta: parseInt(e.target.value) || 0 } })}
+            style={{ width: 60, fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+          />
+        </div>
+      )}
+
+      {/* set: path + value */}
+      {kind === 'set' && (() => {
+        const a = action as { set: { path: string; value: Literal } };
+        return (
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input
+              value={a.set.path}
+              onChange={e => onChange({ set: { ...a.set, path: e.target.value } })}
+              placeholder="路径 (如 stats.hp)"
+              style={{ flex: 1, fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+            />
+            <input
+              value={String(a.set.value)}
+              onChange={e => {
+                const v = e.target.value;
+                const num = Number(v);
+                onChange({ set: { ...a.set, value: isNaN(num) ? v : num } });
+              }}
+              placeholder="值"
+              style={{ width: 80, fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+            />
+          </div>
+        );
+      })()}
+
+      {/* addEvent: eventId */}
+      {kind === 'addEvent' && (
+        <input
+          value={(action as { addEvent: { eventId: string } }).addEvent.eventId}
+          onChange={e => onChange({ addEvent: { eventId: e.target.value } })}
+          placeholder="事件 ID"
+          style={{ fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+        />
+      )}
+
+      {/* scheduleTick: after */}
+      {kind === 'scheduleTick' && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>延迟</span>
+          <input
+            type="number"
+            value={(action as { scheduleTick: { after: number } }).scheduleTick.after}
+            onChange={e => onChange({ scheduleTick: { after: parseInt(e.target.value) || 1 } })}
+            style={{ width: 60, fontSize: 'var(--font-size-xs)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+          />
+          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>轮次后触发</span>
+        </div>
+      )}
     </div>
   );
 }
