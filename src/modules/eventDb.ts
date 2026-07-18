@@ -4,11 +4,12 @@
 //   Web 端无 Tauri/Rust 文件系统，事件注册表与文件内容均落 IndexedDB。
 // ============================================================
 import { openDB, type IDBPDatabase } from 'idb';
-import type { Manifest, EventMeta, EventRegistryEntry, EventRegistryStatus } from './schema';
+import type { Manifest, EventMeta, EventRegistryEntry, EventRegistryStatus, Collection } from './schema';
 
 const DB_NAME = 'opt-events';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'events';
+const COLLECTION_STORE = 'collections';
 
 /** IndexedDB 中的一条事件记录（含内联文件内容，便于导出时重建 .opt-event） */
 export interface WebEventRecord {
@@ -30,9 +31,16 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 function getDb(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE)) {
-          db.createObjectStore(STORE, { keyPath: 'id' });
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: 'id' });
+          }
+        }
+        if (oldVersion < 2) {
+          if (!db.objectStoreNames.contains(COLLECTION_STORE)) {
+            db.createObjectStore(COLLECTION_STORE, { keyPath: 'id' });
+          }
         }
       },
     });
@@ -96,4 +104,28 @@ export function recordToEntry(rec: WebEventRecord): EventRegistryEntry {
 //  主流程（GameScreen 注册）已改为从 IndexedDB 读全局 rec.enabled。
 //  这些函数将逐步废弃。
 // ─────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────
+//  合集（Collection）CRUD — 数据层 API
+// ─────────────────────────────────────────────────────────────
+
+export async function putCollection(col: Collection): Promise<void> {
+  const db = await getDb();
+  await db.put(COLLECTION_STORE, col);
+}
+
+export async function getCollection(id: string): Promise<Collection | undefined> {
+  const db = await getDb();
+  return db.get(COLLECTION_STORE, id);
+}
+
+export async function deleteCollection(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(COLLECTION_STORE, id);
+}
+
+export async function allCollections(): Promise<Collection[]> {
+  const db = await getDb();
+  return db.getAll(COLLECTION_STORE);
+}
 

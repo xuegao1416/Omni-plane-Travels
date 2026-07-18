@@ -263,13 +263,23 @@ export function graphToRuleFile(graph: EventGraph): RuleFile {
       // 周期节点：检查是否连接了 condition→effect 链
       const reachable = reachableNodes(node.id, adj, byId);
       const hasConditionChain = reachable.some(n => n.kind === 'condition');
+      const reachableEffects = reachable.filter(n => n.kind === 'effect');
 
-      // 收集所有 actions：节点自身的 effects 迁移 + 连线 effect 节点的 actions
+      // actions 来源：优先连线 effect 节点，其次节点自身，最后旧版 effects
       const allActions: Action[] = [];
 
-      // 旧版 effects → 迁移为 actions
-      if (node.effects && Object.keys(node.effects).length > 0) {
-        allActions.push(...moduleEffectsToActions(node.effects));
+      if (reachableEffects.length > 0) {
+        // 有连线 effect 节点 → 只从 effect 节点收集（避免与节点自身 actions 重复）
+        for (const en of reachableEffects) {
+          allActions.push(...((en as EventGraphNode).actions ?? []));
+        }
+      } else {
+        // 无连线 effect 节点 → 从节点自身收集
+        if (node.actions && node.actions.length > 0) {
+          allActions.push(...node.actions);
+        } else if (node.effects && Object.keys(node.effects).length > 0) {
+          allActions.push(...moduleEffectsToActions(node.effects));
+        }
       }
 
       const pr: PeriodicRule = {
@@ -294,12 +304,6 @@ export function graphToRuleFile(graph: EventGraph): RuleFile {
           const condWhens = directConditions.map(c => buildConditionFromNode(c.id, byId, revAdj, adj));
           pr.when = { all: condWhens };
         }
-      }
-
-      // 收集连线产出的 actions（从 effect 节点）
-      const effectNodes = reachable.filter(n => n.kind === 'effect');
-      for (const en of effectNodes) {
-        allActions.push(...(en.actions ?? []));
       }
 
       // 统一存储为 actions
@@ -462,6 +466,7 @@ export function ruleFileToGraph(file: RuleFile): EventGraph {
       nodeActions.push(...moduleEffectsToActions(pr.effects));
     }
 
+    // periodic 节点自身不存 actions（actions 只放在连线的 effect 节点上，避免重复收集）
     nodes.push({
       id: pr.id,
       kind: 'periodic',
@@ -469,12 +474,11 @@ export function ruleFileToGraph(file: RuleFile): EventGraph {
       intervalTicks: pr.intervalTicks,
       offsetTicks: pr.offsetTicks,
       when: pr.when,
-      actions: nodeActions.length > 0 ? nodeActions : undefined,
       description: pr.description,
       narrateToAI: pr.narrateToAI,
     });
 
-    // 如果有 actions，创建 effect 节点连接
+    // 创建 effect 节点承载 actions
     if (nodeActions.length > 0) {
       const effectId = `${pr.id}__fx`;
       nodes.push({

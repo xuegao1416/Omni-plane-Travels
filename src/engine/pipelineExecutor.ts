@@ -270,10 +270,9 @@ export class PipelineExecutor {
         error: errMsg,
         attempts: maxAttempts,
       });
-      console.warn('[管线] 变量提取失败:', errMsg);
-      // 重新抛出：变量提取是管线最后一步，失败时不应保存未更新变量的快照
-      // sendMessage 的 catch 会处理此错误，在消息上追加错误提示
-      throw err;
+      console.warn('[管线] 变量提取失败（不影响正文和快照保存）:', errMsg);
+      // 不重新抛出：变量提取失败不应阻断管线，快照仍需保存以保持轮次连续性
+      // 变量状态保持上一轮的值，用户可通过单步重试恢复
     }
   }
 

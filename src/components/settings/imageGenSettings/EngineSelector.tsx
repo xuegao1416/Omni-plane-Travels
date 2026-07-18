@@ -1,10 +1,11 @@
-// 引擎选择器 — NovelAI / ComfyUI / 其他
+// 引擎选择器 — NovelAI / ComfyUI / Krea / 其他
 import { SegmentedControl } from '../SettingsUIComponents';
 import type { ImageEngine } from '@/api/imageGenTypes';
 
 const engineOptions = [
   { label: 'NovelAI', value: 'nai' },
   { label: 'ComfyUI', value: 'comfyui' },
+  { label: 'Krea', value: 'krea' },
   { label: '其他', value: 'openai_compatible' },
 ];
 

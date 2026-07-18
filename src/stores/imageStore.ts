@@ -9,12 +9,13 @@ const CONFIG_KEY = STORAGE_KEYS.IMAGE_CONFIG;
 
 // ─── 持久化读取 ───
 
-/** 加密含 apiKey 的字段（apiKey / openaiCompatibleApiKey），其余原样 */
+/** 加密含 apiKey 的字段（apiKey / openaiCompatibleApiKey / kreaApiKey），其余原样 */
 async function sealImageConfig(cfg: ImageGenConfig): Promise<ImageGenConfig> {
   return {
     ...cfg,
     apiKey: await seal(cfg.apiKey ?? ''),
     openaiCompatibleApiKey: await seal((cfg as any).openaiCompatibleApiKey ?? ''),
+    kreaApiKey: await seal((cfg as any).kreaApiKey ?? ''),
   };
 }
 
@@ -24,6 +25,7 @@ async function unsealImageConfig(cfg: ImageGenConfig): Promise<ImageGenConfig> {
     ...cfg,
     apiKey: await unseal(cfg.apiKey ?? ''),
     openaiCompatibleApiKey: await unseal((cfg as any).openaiCompatibleApiKey ?? ''),
+    kreaApiKey: await unseal((cfg as any).kreaApiKey ?? ''),
   };
 }
 
@@ -44,6 +46,7 @@ interface ImageStoreState {
   tasks: ImageTask[];
   comfyData: {
     models: string[];
+    unetModels: string[];
     samplers: string[];
     schedulers: string[];
     vaes: string[];
@@ -65,7 +68,7 @@ interface ImageStoreState {
 export const useImageStore = create<ImageStoreState>((set) => ({
   config: { ...DEFAULT_IMAGE_CONFIG }, // 由 initImageConfig 异步加载（解密）
   tasks: [],
-  comfyData: { models: [], samplers: [], schedulers: [], vaes: [], loras: [], objectInfo: {} },
+  comfyData: { models: [], unetModels: [], samplers: [], schedulers: [], vaes: [], loras: [], objectInfo: {} },
 
   updateConfig: (key, value) => {
     set((state) => {

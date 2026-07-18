@@ -1,41 +1,44 @@
-import { useMemo, useState } from 'react';
-import { Upload, FilePlus, Loader2, AlertTriangle, BookOpen } from 'lucide-react';
+import { useMemo } from 'react';
+import { Upload, FilePlus, Loader2, AlertTriangle } from 'lucide-react';
 import type { EventRegistryEntry } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
 import { isTauri } from '../../utils/nativeFetch';
 import EventListRow from './EventListRow';
+import CollectionGroup from './CollectionGroup';
 import { EmptyState } from './EmptyState';
 import { useIsPhone, useBreakpoint } from '../../hooks/useIsMobile';
 
-type CenterTab = 'installed' | 'worldbook';
-
 interface EventCenterProps {
   eventApi: UseEventsResult;
-  onOpenMod: (entry: EventRegistryEntry) => void;
-  onNewMod: () => void;
-  onNewRulePack: () => void;
+  onOpenPack: (entry: EventRegistryEntry) => void;
+  onNewPack: () => void;
+  onNewRule: () => void;
   onGoImport: () => void;
 }
 
-export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePack, onGoImport }: EventCenterProps) {
-  const { mods, loading, error, enable, disable, uninstall, exportMod, importMod } = eventApi;
-  const [tab, setTab] = useState<CenterTab>('installed');
+export default function EventCenter({ eventApi, onOpenPack, onNewPack, onNewRule, onGoImport }: EventCenterProps) {
+  const { packs, loading, error, enable, disable, uninstall, exportPack, importPack, collections, deleteCollection } = eventApi;
   const isPhone = useIsPhone();
   const breakpoint = useBreakpoint();
   const isSmallPhone = breakpoint === 'xs' || breakpoint === 'sm';
 
-  const total = mods.length;
-  const enabledCount = mods.filter((m) => m.enabled).length;
+  const total = packs.length;
+  const enabledCount = packs.filter((m) => m.enabled).length;
 
-  const visible = useMemo(() => {
-    if (tab === 'worldbook') return mods.filter((m) => m.meta.type === 'worldbook');
-    return mods;
-  }, [tab, mods]);
-
-  const tabs: { id: CenterTab; label: string }[] = [
-    { id: 'installed', label: '已安装' },
-    { id: 'worldbook', label: '世界书' },
-  ];
+  // 合集分组：收集所有合集成员 id，剩余为独立包
+  const { collectionGroups, ungroupedPacks } = useMemo(() => {
+    const entryById = new Map(packs.map((p) => [p.meta.id, p]));
+    const ms = new Set<string>();
+    const groups = collections.map((col) => {
+      const members = col.memberIds
+        .map((id) => entryById.get(id))
+        .filter((e): e is EventRegistryEntry => !!e);
+      col.memberIds.forEach((id) => ms.add(id));
+      return { collection: col, members };
+    });
+    const ungrouped = packs.filter((p) => !ms.has(p.meta.id));
+    return { collectionGroups: groups, ungroupedPacks: ungrouped };
+  }, [collections, packs]);
 
   return (
     <div
@@ -49,15 +52,15 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
     >
       {/* 操作行：新建空白 / 新建周期 / 导入 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: isPhone ? 'var(--space-1)' : 'var(--space-2)', flexWrap: 'wrap' }}>
-        <button className="btn-secondary" onClick={onNewMod} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
+        <button className="btn-secondary" onClick={onNewPack} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
           <FilePlus size={14} /> {isPhone ? '事件包' : '新建事件包'}
         </button>
-        <button className="btn-secondary" onClick={onNewRulePack} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
-          <FilePlus size={14} /> {isPhone ? '规则包' : '新建规则包'}
+        <button className="btn-secondary" onClick={onNewRule} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
+          <FilePlus size={14} /> {isPhone ? '规则' : '新建规则'}
         </button>
         <button
           className="btn-primary"
-          onClick={() => (isTauri() ? importMod() : onGoImport())}
+          onClick={() => (isTauri() ? importPack() : onGoImport())}
           style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}
         >
           <Upload size={14} /> {isPhone ? '导入' : '导入 .opt-event'}
@@ -69,39 +72,6 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
         <StatCard label="总计" value={total} compact={isPhone} />
         <StatCard label="已启用" value={enabledCount} compact={isPhone} />
         <StatCard label="冲突" value={'未计算'} compact={isPhone} />
-      </div>
-
-      {/* 选项卡 */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 'var(--space-4)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            style={{
-              padding: 'var(--space-2) var(--space-1)',
-              minHeight: 44,
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 600,
-              color: tab === t.id ? 'var(--accent)' : 'var(--text-secondary)',
-              borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: '-1px',
-              transition: 'color var(--duration-fast) var(--ease-out)',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
       {/* 错误横幅 */}
@@ -125,34 +95,57 @@ export default function EventCenter({ eventApi, onOpenMod, onNewMod, onNewRulePa
       {/* 内容 */}
       {loading ? (
         <LoadingBlock />
-      ) : visible.length === 0 ? (
+      ) : packs.length === 0 && collectionGroups.length === 0 ? (
         <EmptyState
-          icon={tab === 'worldbook' ? BookOpen : Upload}
-          title={tab === 'worldbook' ? '尚未创建任何世界书' : '尚未安装任何事件'}
-          description={
-            tab === 'worldbook'
-              ? '世界书条目来自各内置世界，不可在此新建；要在事件中引用，请在大纲编辑器的卡片块里使用「世界书」选择器。'
-              : '从本地导入 .opt-event 包，或创建你的第一个事件。'
-          }
+          icon={Upload}
+          title="尚未安装任何事件"
+          description="从本地导入 .opt-event 包，或创建你的第一个事件。"
           action={
-            <button className="btn-primary" onClick={() => (isTauri() ? importMod() : onGoImport())}>
+            <button className="btn-primary" onClick={() => (isTauri() ? importPack() : onGoImport())}>
               <Upload size={16} /> 导入 .opt-event
             </button>
           }
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {visible.map((m) => (
-            <EventListRow
-              key={m.meta.id}
-              entry={m}
-              onEnable={enable}
-              onDisable={disable}
-              onUninstall={uninstall}
-              onExport={exportMod}
-              onOpen={onOpenMod}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {/* 合集分组 */}
+          {collectionGroups.map(({ collection, members }) => (
+            <CollectionGroup
+              key={collection.id}
+              collection={collection}
+              memberEntries={members}
+              onToggleAll={(colId, enableAll) => {
+                // 批量开关成员的全局 enabled
+                for (const m of members) {
+                  if (enableAll) {
+                    void enable(m.meta.id);
+                  } else {
+                    void disable(m.meta.id);
+                  }
+                }
+              }}
+              onDelete={deleteCollection}
+              onEnableMember={enable}
+              onDisableMember={disable}
+              onOpenMember={onOpenPack}
             />
           ))}
+          {/* 独立包（不属于任何合集） */}
+          {ungroupedPacks.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {ungroupedPacks.map((m) => (
+                <EventListRow
+                  key={m.meta.id}
+                  entry={m}
+                  onEnable={enable}
+                  onDisable={disable}
+                  onUninstall={uninstall}
+                  onExport={exportPack}
+                  onOpen={onOpenPack}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

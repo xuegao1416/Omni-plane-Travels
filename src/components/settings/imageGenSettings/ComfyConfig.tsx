@@ -19,8 +19,9 @@ export default function ComfyConfig({ config, updateConfig }: ConfigSectionProps
     setConnectingComfy(true);
     try {
       const data = await loadComfyUIData(config.comfyUrl);
-      if (data?.models?.length && !config.comfyModel) {
-        updateConfig('comfyModel', data.models[0]);
+      if (!config.comfyModel) {
+        const firstModel = data?.models?.[0] || data?.unetModels?.[0];
+        if (firstModel) updateConfig('comfyModel', firstModel);
       }
       if (data?.samplers?.length && !config.comfySampler) {
         updateConfig('comfySampler', data.samplers[0]);
@@ -57,12 +58,28 @@ export default function ComfyConfig({ config, updateConfig }: ConfigSectionProps
       {/* 模型 / 采样器 / 调度器 / VAE */}
       <FieldGrid>
         <Field label="模型文件">
-          <Select
-            options={comfyData.models.map((m) => ({ label: m, value: m }))}
+          <select
+            className="input-field"
             value={config.comfyModel}
-            onChange={(v) => updateConfig('comfyModel', v)}
-            width="100%"
-          />
+            onChange={(e) => updateConfig('comfyModel', e.target.value)}
+            style={{ padding: '5px 10px', width: '100%', cursor: 'pointer' }}
+          >
+            <option value="">（选择模型）</option>
+            {comfyData.models.length > 0 && (
+              <optgroup label="Checkpoint">
+                {comfyData.models.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </optgroup>
+            )}
+            {comfyData.unetModels.length > 0 && (
+              <optgroup label="UNet">
+                {comfyData.unetModels.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
         </Field>
         <Field label="采样器">
           <Select

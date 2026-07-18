@@ -1,5 +1,5 @@
 export const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  active: { bg: 'var(--success)20', text: 'var(--success)', label: '营业中' },
+  active: { bg: 'color-mix(in srgb, var(--success) 20%, transparent)', text: 'var(--success)', label: '营业中' },
   idle: { bg: '#94a3b820', text: '#94a3b8', label: '闲置' },
   damaged: { bg: 'var(--danger-bg-soft)', text: 'var(--danger)', label: '受损' },
   destroyed: { bg: '#6b728020', text: '#6b7280', label: '已毁' },

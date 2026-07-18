@@ -15,6 +15,7 @@ import type {
   Manifest,
   ValidationResult,
   ValidationIssue,
+  Collection,
 } from './schema';
 // Web 端实现（!isTauri() 时委派；桌面端仍走下方 Tauri invoke）
 import * as web from './webEventStore';
@@ -68,18 +69,21 @@ let metaCache = new Map<string, EventMeta>();
 let listener: UnlistenFn | null = null;
 let initPromise: Promise<void> | null = null;
 
-export function invalidateModCache(): void {
+export function invalidateCache(): void {
   registryCache = null;
   metaCache.clear();
 }
 
-/** 监听 mods:changed，自动失效缓存（非 Tauri 环境静默忽略） */
-export function ensureModListener(): Promise<void> {
+/** @deprecated 请使用 invalidateCache */
+export const invalidateModCache = invalidateCache;
+
+/** 监听 packs:changed，自动失效缓存（非 Tauri 环境静默忽略） */
+export function ensureCacheListener(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     try {
       listener = await listen<{ id?: string; action?: string }>('mods:changed', () => {
-        invalidateModCache();
+        invalidateCache();
       });
     } catch {
       /* 非 Tauri 环境：无事件总线，忽略 */
@@ -88,24 +92,30 @@ export function ensureModListener(): Promise<void> {
   return initPromise;
 }
 
+/** @deprecated 请使用 ensureCacheListener */
+export const ensureModListener = ensureCacheListener;
+
 /** 手动卸载事件监听（应用卸载时调用） */
-export function disposeModListener(): void {
+export function disposeCacheListener(): void {
   listener?.();
   listener = null;
   initPromise = null;
 }
 
+/** @deprecated 请使用 disposeCacheListener */
+export const disposeModListener = disposeCacheListener;
+
 // ─── 10 个操作：桌面走 Tauri invoke，Web 走 IndexedDB 实现 ───
 
-export async function discoverMods(): Promise<EventMeta[]> {
-  if (!isTauri()) return web.webDiscoverMods();
+export async function discoverPacks(): Promise<EventMeta[]> {
+  if (!isTauri()) return web.webDiscoverPacks();
   return call<EventMeta[]>('discover_events');
 }
 
-export async function listMods(force = false): Promise<EventRegistryEntry[]> {
+export async function listPacks(force = false): Promise<EventRegistryEntry[]> {
   if (!force && registryCache) return registryCache;
   const r = !isTauri()
-    ? await web.webListMods()
+    ? await web.webListPacks()
     : await call<EventRegistryEntry[]>('list_events');
   registryCache = r;
   return r;
@@ -116,85 +126,102 @@ export async function validateEvent(
   _assets?: Array<{ path: string; bytes: number[] }>,
   _assetsRoot?: string,
 ): Promise<ValidationResult> {
-  if (!isTauri()) return web.webValidateMod(manifest);
+  if (!isTauri()) return web.webValidatePack(manifest);
   return call<ValidationResult>('validate_event', { manifest });
 }
 
-export async function installMod(_path: string): Promise<EventMeta> {
-  // 桌面端从路径安装；Web 端无此概念（安装即导入，见 importMod），
+export async function installPack(_path: string): Promise<EventMeta> {
+  // 桌面端从路径安装；Web 端无此概念（安装即导入，见 importPack），
   // 显式引导用户使用「导入 .opt-event」向导。
   if (!isTauri()) {
-    throw new EventApiError({ code: 'IO_ERROR', message: 'Web 端不支持 install_mod，请使用「导入 .opt-event」向导。' });
+    throw new EventApiError({ code: 'IO_ERROR', message: 'Web 端不支持 install，请使用「导入 .opt-event」向导。' });
   }
   const r = await call<EventMeta>('install_event', { path: _path });
-  invalidateModCache();
+  invalidateCache();
   return r;
 }
 
-export async function uninstallMod(id: string): Promise<void> {
+export async function uninstallPack(id: string): Promise<void> {
   if (!isTauri()) {
-    await web.webUninstallMod(id);
-    invalidateModCache();
+    await web.webUninstallPack(id);
+    invalidateCache();
     return;
   }
   await call<void>('uninstall_event', { id });
-  invalidateModCache();
+  invalidateCache();
 }
 
-export async function enableMod(id: string): Promise<void> {
+export async function enablePack(id: string): Promise<void> {
   if (!isTauri()) {
-    await web.webEnableMod(id);
-    invalidateModCache();
+    await web.webEnablePack(id);
+    invalidateCache();
     return;
   }
   await call<void>('enable_event', { id });
-  invalidateModCache();
+  invalidateCache();
 }
 
-export async function disableMod(id: string): Promise<void> {
+export async function disablePack(id: string): Promise<void> {
   if (!isTauri()) {
-    await web.webDisableMod(id);
-    invalidateModCache();
+    await web.webDisablePack(id);
+    invalidateCache();
     return;
   }
   await call<void>('disable_event', { id });
-  invalidateModCache();
+  invalidateCache();
 }
 
 /** 导入：桌面端从路径安装（原生对话框）；Web 端解析浏览器选择的 .opt-event 文件并落 IndexedDB */
-export async function importMod(input?: { path?: string; file?: File }): Promise<EventMeta> {
+export async function importPack(input?: { path?: string; file?: File }): Promise<EventMeta> {
   if (!isTauri()) {
     if (!input?.file) {
       throw new EventApiError({ code: 'IO_ERROR', message: 'Web 端导入需要传入 .opt-event 文件。' });
     }
     const meta = await web.webImportFromFile(input.file);
-    invalidateModCache();
+    invalidateCache();
     return meta;
   }
   const r = await call<EventMeta>('import_event', input?.path ? { path: input.path } : {});
-  invalidateModCache();
+  invalidateCache();
   return r;
 }
 
-export async function exportMod(id: string, _target?: string): Promise<void> {
+export async function exportPack(id: string, _target?: string): Promise<void> {
   if (!isTauri()) {
-    await web.webExportMod(id);
+    await web.webExportPack(id);
     return;
   }
   await call<void>('export_event', _target ? { id, target: _target } : { id });
-  invalidateModCache();
+  invalidateCache();
 }
+
+/** @deprecated 请使用 discoverPacks */
+export const discoverMods = discoverPacks;
+/** @deprecated 请使用 listPacks */
+export const listMods = listPacks;
+/** @deprecated 请使用 installPack */
+export const installMod = installPack;
+/** @deprecated 请使用 uninstallPack */
+export const uninstallMod = uninstallPack;
+/** @deprecated 请使用 enablePack */
+export const enableMod = enablePack;
+/** @deprecated 请使用 disablePack */
+export const disableMod = disablePack;
+/** @deprecated 请使用 importPack */
+export const importMod = importPack;
+/** @deprecated 请使用 exportPack */
+export const exportMod = exportPack;
 
 export async function getEventDetail(id: string): Promise<EventDetail> {
   if (!isTauri()) return web.webGetEventDetail(id);
   return call<EventDetail>('get_event_detail', { id });
 }
 
-/** 便捷：取单个 mod 的元数据（带缓存） */
+/** 便捷：取单个包的元数据（带缓存） */
 export async function getEventMeta(id: string): Promise<EventMeta | null> {
   if (metaCache.has(id)) return metaCache.get(id)!;
   try {
-    const list = await listMods();
+    const list = await listPacks();
     const found = list.find((e) => e.meta.id === id)?.meta ?? null;
     if (found) metaCache.set(id, found);
     return found;
@@ -204,3 +231,40 @@ export async function getEventMeta(id: string): Promise<EventMeta | null> {
 }
 
 export type { ValidationIssue };
+
+// ─── 合集（Collection）桥接层 ───
+// 当前无 Tauri 后端命令，统一委派 Web 端 IndexedDB 实现。
+
+export async function createCollection(
+  name: string,
+  coverColor: string,
+  icon: string,
+  memberIds: string[],
+): Promise<string> {
+  const id = await web.webCreateCollection(name, coverColor, icon, memberIds);
+  invalidateCache();
+  return id;
+}
+
+export async function updateCollection(
+  id: string,
+  updates: Partial<Pick<Collection, 'name' | 'coverColor' | 'icon' | 'memberIds'>>,
+): Promise<void> {
+  await web.webUpdateCollection(id, updates);
+  invalidateCache();
+}
+
+export async function removeCollection(id: string): Promise<void> {
+  await web.webRemoveCollection(id);
+  invalidateCache();
+}
+
+export async function listCollections(): Promise<Collection[]> {
+  return web.webListCollections();
+}
+
+export async function getCollectionDetail(
+  id: string,
+): Promise<{ collection: Collection; members: EventRegistryEntry[] } | null> {
+  return web.webGetCollectionDetail(id);
+}

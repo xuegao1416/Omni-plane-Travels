@@ -18,7 +18,7 @@ const invokeImpl = async (cmd: string, args?: Record<string, unknown>): Promise<
             coverColor: '#3b82f6',
             icon: 'swords',
             schemaVersion: 1,
-            minAppVersion: '2.6.2',
+            minAppVersion: '2.6.3',
             loadOrder: 100,
             enabledByDefault: false,
           },
@@ -197,7 +197,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.6.2',
+      minAppVersion: '2.6.3',
       type: 'rule',
       coverColor: '#3b82f6',
       icon: 'swords',
@@ -214,7 +214,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.6.2',
+      minAppVersion: '2.6.3',
       type: 'rule',
       coverColor: '#3b82f6',
       icon: 'swords',
@@ -232,7 +232,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.6.2',
+      minAppVersion: '2.6.3',
       type: 'rule',
       coverColor: 'linear-gradient(#7C3AED,#A855F7)',
       icon: 'swords',
@@ -275,14 +275,14 @@ describe('validateEvent — 图结构', () => {
 
 
 describe('eventApi — 缓存与错误解析', () => {
-  it('listMods 走缓存，写命令失效缓存', async () => {
+  it('listPacks 走缓存，写命令失效缓存', async () => {
     const eventApi = await import('../eventApi');
-    await eventApi.ensureModListener();
-    const list = await eventApi.listMods();
+    await eventApi.ensureCacheListener();
+    const list = await eventApi.listPacks();
     expect(list.length).toBe(1);
-    await eventApi.listMods(); // 应命中缓存
-    await eventApi.enableMod('demo-rule'); // 写命令失效
-    await eventApi.listMods();
+    await eventApi.listPacks(); // 应命中缓存
+    await eventApi.enablePack('demo-rule'); // 写命令失效
+    await eventApi.listPacks();
     expect(calls.some(([c]) => c === 'enable_event')).toBe(true);
     expect(calls.filter(([c]) => c === 'list_events').length).toBeGreaterThanOrEqual(2);
   });

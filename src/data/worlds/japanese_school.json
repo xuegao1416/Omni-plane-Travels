@@ -495,44 +495,152 @@
     "eventPacks": [
       {
         "id": "world:japanese_school",
-        "name": "日式校园 基础规则",
-        "periodicRules": [
+        "name": "日式校园规则",
+        "type": "rule",
+        "rules": [
           {
-            "id": "midterm_exam",
-            "name": "期中考试",
-            "description": "每学期第六周的大考，成绩影响座位选择和老师态度。",
-            "intervalTicks": 42,
-            "actions": [
-              { "set": { "path": "stats.幸福感", "value": -10 } }
-            ],
-            "narrateToAI": true
+            "id": "festival_trigger",
+            "when": { "state": { "path": "世界.时间系统.当前时间", "op": "contains", "value": "秋" } },
+            "then": [{ "addEvent": { "eventId": "festival", "eventPackId": "world:japanese_school:events" } }]
           },
           {
-            "id": "summer_vacation",
-            "name": "暑假",
-            "description": "漫长的暑假，可以参加合宿、旅行、或者在家躺平。",
-            "intervalTicks": 90,
-            "offsetTicks": 60,
-            "actions": [
-              { "set": { "path": "stats.幸福感", "value": 20 } }
-            ],
-            "narrateToAI": true
+            "id": "exam_trigger",
+            "when": { "state": { "path": "世界.时间系统.当前时间", "op": "contains", "value": "期末" } },
+            "then": [{ "addEvent": { "eventId": "exam", "eventPackId": "world:japanese_school:events" } }]
           },
           {
-            "id": "sports_festival",
-            "name": "运动会",
-            "description": "全校运动会，班级团结的考验。",
-            "intervalTicks": 60,
-            "offsetTicks": 30,
-            "actions": [
-              { "set": { "path": "stats.社交", "value": 8 } },
-              { "set": { "path": "stats.幸福感", "value": 5 } }
-            ],
-            "narrateToAI": true
+            "id": "confession_trigger",
+            "when": { "state": { "path": "人物档案.学生.关系数据.好感度", "op": ">=", "value": 70 } },
+            "then": [{ "addEvent": { "eventId": "confession", "eventPackId": "world:japanese_school:events" } }]
           }
         ],
-        "type": "rule",
-        "rules": []
+        "periodicRules": [
+          {
+            "id": "school_schedule",
+            "name": "校园日程",
+            "intervalTicks": 5,
+            "actions": [{ "set": { "path": "玩家.生存状态.体力值", "value": -5 } }],
+            "narrateToAI": true,
+            "description": "每5轮消耗体力，AI描述校园日常节奏"
+          },
+          {
+            "id": "seasonal_cycle",
+            "name": "季节轮转",
+            "intervalTicks": 30,
+            "actions": [],
+            "narrateToAI": true,
+            "description": "每30轮AI描述季节变化"
+          }
+        ],
+        "permissions": ["modify_world_state", "add_card"]
+      },
+      {
+        "id": "world:japanese_school:events",
+        "name": "日式校园事件",
+        "type": "card",
+        "events": [
+          {
+            "id": "festival",
+            "name": "文化祭",
+            "cards": [
+              { "id": "t_festival", "componentId": "title", "title": "文化祭来了！" },
+              { "id": "n_festival", "componentId": "narrative", "title": "文化祭叙事" },
+              { "id": "c_festival", "componentId": "choice", "title": "文化祭选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_festival", "props": { "title": "文化祭来了！" } }],
+                "narrative": [{ "id": "n_festival", "props": { "text": "一年一度的文化祭终于到了！校园里张灯结彩，各个班级和社团都在紧张地准备着自己的摊位和表演。空气中弥漫着章鱼烧和棉花糖的香气。" } }],
+                "choice": [{ "id": "c_festival", "props": { "choices": [
+                  { "label": "去逛同学的摊位", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "逛摊位，社交互动，心情愉快" },
+                  { "label": "帮忙执行委员会", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "帮忙组织活动，消耗体力但获得成长" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "exam",
+            "name": "期末考试",
+            "cards": [
+              { "id": "t_exam", "componentId": "title", "title": "期末考试！" },
+              { "id": "n_exam", "componentId": "narrative", "title": "期末考试叙事" },
+              { "id": "c_exam", "componentId": "choice", "title": "期末考试选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_exam", "props": { "title": "期末考试！" } }],
+                "narrative": [{ "id": "n_exam", "props": { "text": "期末考试周到了。教室里弥漫着紧张的气氛，同学们都在疯狂复习。你翻开课本，发现很多内容都还没看过。" } }],
+                "choice": [{ "id": "c_exam", "props": { "choices": [
+                  { "label": "临时抱佛脚", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "熬夜复习，体力消耗大" },
+                  { "label": "放弃治疗", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "放弃复习，反而轻松了" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "confession",
+            "name": "告白",
+            "cards": [
+              { "id": "t_confession", "componentId": "title", "title": "有人向你告白了！" },
+              { "id": "n_confession", "componentId": "narrative", "title": "告白叙事" },
+              { "id": "c_confession", "componentId": "choice", "title": "告白选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_confession", "props": { "title": "有人向你告白了！" } }],
+                "narrative": [{ "id": "n_confession", "props": { "text": "放学后，一个人红着脸走到你面前，递给你一封信就跑掉了。你打开信，上面写着'我喜欢你'。" } }],
+                "choice": [{ "id": "c_confession", "props": { "choices": [
+                  { "label": "接受告白", "effect": { "statId": "血量", "delta": 20 }, "aiNote": "接受了告白，心情很好" },
+                  { "label": "婉拒", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "婉拒了对方，保持单身" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "club_activity",
+            "name": "社团活动",
+            "cards": [
+              { "id": "t_club", "componentId": "title", "title": "社团活动时间" },
+              { "id": "n_club", "componentId": "narrative", "title": "社团活动叙事" },
+              { "id": "c_club", "componentId": "choice", "title": "社团活动选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_club", "props": { "title": "社团活动时间" } }],
+                "narrative": [{ "id": "n_club", "props": { "text": "放学后的社团活动时间到了。运动部在操场上训练，文艺部在教室里排练，你该去哪个？" } }],
+                "choice": [{ "id": "c_club", "props": { "choices": [
+                  { "label": "去运动部", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "参加运动，体力消耗但健康" },
+                  { "label": "去文艺部", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "参加文艺活动，放松心情" }
+                ] } }]
+              }
+            }
+          },
+          {
+            "id": "summer_festival",
+            "name": "夏日祭",
+            "cards": [
+              { "id": "t_summer", "componentId": "title", "title": "夏日祭！" },
+              { "id": "n_summer", "componentId": "narrative", "title": "夏日祭叙事" },
+              { "id": "c_summer", "componentId": "choice", "title": "夏日祭选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_summer", "props": { "title": "夏日祭！" } }],
+                "narrative": [{ "id": "n_summer", "props": { "text": "夏天到了，学校举办夏日祭。操场上搭起了摊位，有金鱼摊、苹果糖、捞水气球。远处还能看到烟花。" } }],
+                "choice": [{ "id": "c_summer", "props": { "choices": [
+                  { "label": "穿浴袍逛摊位", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "穿浴袍参加夏日祭，很开心" },
+                  { "label": "在家吹空调", "effect": { "statId": "体力值", "delta": 10 }, "aiNote": "待在家里休息，恢复体力" }
+                ] } }]
+              }
+            }
+          }
+        ],
+        "permissions": ["add_card"]
       }
     ]
   }

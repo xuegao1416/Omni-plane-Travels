@@ -3,7 +3,7 @@
 **AI 驱动的互动小说引擎** — 在自定义世界观中创建角色、展开冒险，与 AI 共同书写属于你的故事。
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/Bun-1.3-FBF0CF?logo=bun)](https://bun.sh/)
 [![Zustand](https://img.shields.io/badge/Zustand-5-3B3B3B)](https://zustand-demo.pmnd.rs/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -106,6 +106,49 @@ GameState
 
 模块在世界创建时勾选，AI 自动生成对应数据，游戏中自然融入叙事。天赋和骰子模块通过内联卡片增强交互体验。
 
+### <img src="https://unpkg.com/lucide-static@latest/icons/calendar-clock.svg" width="16" height="16" /> 事件系统
+
+事件包（Pack）→ 事件（Event）→ 卡片（Card）三级结构。事件包分四种类型：
+
+| 类型 | 存储 | 说明 |
+|------|------|------|
+| `card` | `schema/events.json` | 事件包，包含多个事件，每个事件含多张卡片 |
+| `rule` | `schema/rules.json` | 规则包，可视化节点图编辑器 |
+| `worldbook` | — | 世界书包 |
+| `bundle` | — | 混合包 |
+
+事件中心提供事件包管理和事件库浏览，支持 `.opt-event` 格式导入/导出。
+
+### <img src="https://unpkg.com/lucide-static@latest/icons/gavel.svg" width="16" height="16" /> 规则引擎
+
+基于 React Flow 的可视化节点图编辑器，节点类型：
+
+| 节点 | 说明 |
+|------|------|
+| <img src="https://unpkg.com/lucide-static@latest/icons/zap.svg" width="12" height="12" /> trigger | 事件触发器，匹配 AI 生成的事件类型 |
+| <img src="https://unpkg.com/lucide-static@latest/icons/git-branch.svg" width="12" height="12" /> condition | 条件门，AND/OR/NOT 逻辑组合 |
+| <img src="https://unpkg.com/lucide-static@latest/icons/gauge.svg" width="12" height="12" /> effect | 效果节点，修改变量/触发事件/资源变化 |
+| <img src="https://unpkg.com/lucide-static@latest/icons/swords.svg" width="12" height="12" /> event | 主动生成 SimEvent |
+| <img src="https://unpkg.com/lucide-static@latest/icons/globe.svg" width="12" height="12" /> worldState | 更新世界状态轴 |
+| <img src="https://unpkg.com/lucide-static@latest/icons/shield-alert.svg" width="12" height="12" /> guardrail | 叙事层安全边界（终点节点） |
+| <img src="https://unpkg.com/lucide-static@latest/icons/clock.svg" width="12" height="12" /> periodic | 周期触发器，每 N tick 自动触发，属于规则系统 |
+
+- **When 条件编辑器**：可视化配置触发条件（路径选择、比较运算符、值匹配）
+- **世界绑定**：规则与世界定义绑定，切换世界自动加载对应规则
+- **模拟运行**：内置确定性解释器（8ms/8192 步死循环保护），支持规则校验和模拟
+- **导入/导出**：规则 JSON 可复制到剪贴板，方便分享和复用
+
+### <img src="https://unpkg.com/lucide-static@latest/icons/refresh-cw.svg" width="16" height="16" /> 世界演化引擎
+
+注入玩家对话上下文，解决前后台叙事不同步问题。
+
+- **Simulation 模块**：创建世界时可选择"世界演化"模块，自动注入默认规则
+- **机械层结算器**：规则驱动的自动状态变化（资源消耗、属性变动等）
+- **叙事层护栏**：`validateNarrativeEffects` 校验 AI 越界声明
+- **可观测性**：EffectLog 面板展示变量变化日志
+- **性能索引**：tag→rule / keyword→rule 索引优化匹配速度
+- **三系统联动回滚**：世界演化快照与变量/记忆系统联动
+
 ### <img src="https://unpkg.com/lucide-static@latest/icons/hard-drive.svg" width="16" height="16" /> 完整存档管理
 
 | 能力 | 说明 |
@@ -192,6 +235,21 @@ src/
 │   ├── rateLimiter.ts          # 限流器（防止 429 错误）
 │   └── types.ts                # API 类型定义
 ├── components/                 # UI 组件
+│   ├── event/                  # 事件系统
+│   │   ├── EventsScreen.tsx        # 事件屏幕入口（中心/库/编辑器路由）
+│   │   ├── EventCenter.tsx         # 事件中心（包列表 + 合集分组）
+│   │   ├── EventLibrary.tsx        # 事件库浏览
+│   │   ├── RuleEditor.tsx          # 规则编辑器（React Flow 节点图）
+│   │   ├── CardEditor.tsx          # 卡片编辑器（事件包内容编辑）
+│   │   ├── CardRenderer.tsx        # 卡片渲染器
+│   │   ├── WhenConditionEditor.tsx # When 条件编辑器
+│   │   ├── WhenPathSelect.tsx      # 条件路径选择器
+│   │   ├── CollectionCard.tsx      # 合集卡片
+│   │   ├── CollectionGroup.tsx     # 合集分组
+│   │   ├── EventPackPreview.tsx    # 事件包预览
+│   │   ├── EventImportWizard.tsx   # 事件导入向导
+│   │   ├── WorldBookPicker.tsx     # 世界书选择器
+│   │   └── ...                     # 更多事件组件
 │   ├── start/                  # 开始界面
 │   │   ├── MainMenuView.tsx        # 主菜单
 │   │   ├── StartScreen.tsx         # 启动屏幕入口
@@ -369,6 +427,14 @@ src/
 │   ├── index.ts                # 世界书管理器（v2 扫描注入）
 │   ├── worldInfoEngine.ts      # SillyTavern 兼容扫描引擎
 │   └── npcWorldbook.ts         # NPC 世界书去重
+├── simulation/                 # 世界演化引擎
+│   ├── engine.ts               # 演化引擎核心
+│   ├── SimulationApi.ts        # 演化 API 调用
+│   ├── llmIntegration.ts       # LLM 集成
+│   ├── worldContext.ts         # 世界上下文构建
+│   ├── presets.ts              # 预设规则
+│   ├── storage.ts              # 演化数据存储
+│   └── types.ts                # 演化类型定义
 └── worldgen/                   # 世界生成管线（选择式）
     ├── types.ts                # 世界生成类型定义
     ├── index.ts                # 导出
@@ -389,6 +455,7 @@ src/
 │                        UI 层                                 │
 │  start/ (MainMenu/ModuleSelector/WorldEditor)                │
 │  game/ (chat/MessageBubble + InlineCards)  │  panels/modules │
+│  event/ (EventCenter/RuleEditor/CardEditor)                  │
 │  settings/ (Api/Memory/Variable)                             │
 └────────────────────────────────┬─────────────────────────────┘
                                  │
@@ -404,10 +471,10 @@ src/
 └────────┬───────────────┬───────────────┬──────────┬─────────┘
          │               │               │          │
 ┌────────▼───────┐ ┌─────▼──────┐ ┌──────▼───────┐ ┌▼────────────┐
-│ memory/*       │ │ worldbook/*│ │ modules/*    │ │ worldgen/*  │
-│ 9阶段记忆管线   │ │ 世界书引擎  │ │ 模块系统      │ │ 7阶段世界生成│
-│ (写入/摘要/向量 │ │ (SillyTavern│ │ (6个可选模块) │ │ (种子→骨架→ │
-│  /检索/编译)    │ │  兼容扫描)  │ │              │ │  维度→合成)  │
+│ memory/*       │ │ worldbook/*│ │ modules/*    │ │ simulation/*│
+│ 9阶段记忆管线   │ │ 世界书引擎  │ │ 模块系统      │ │ 世界演化引擎 │
+│ (写入/摘要/向量 │ │ (SillyTavern│ │ (6个可选模块) │ │ (规则驱动   │
+│  /检索/编译)    │ │  兼容扫描)  │ │              │ │  自动结算)  │
 └────────────────┘ └────────────┘ └──────────────┘ └─────────────┘
                                  │
 ┌────────────────────────────────▼─────────────────────────────┐
@@ -462,6 +529,17 @@ AI 生成回复
 ```
 种子分析 → 骨架生成 → 维度展开 → 一致性校验 → 深度描写 → 世界书条目 → 模块数据
 ```
+
+### <img src="https://unpkg.com/lucide-static@latest/icons/shield.svg" width="16" height="16" /> 安全特性
+
+| 特性 | 说明 |
+|------|------|
+| API Key 加密存储 | Web Crypto AES-GCM non-extractable + IndexedDB，密钥不可导出 |
+| iframe 沙箱净化 | DOMPurify 净化 + `sandbox=allow-scripts`，移除 `allow-same-origin` 防沙箱逃逸 |
+| Tauri CSP | 最小白名单 Content Security Policy |
+| 原型污染防护 | `isSafePath` / `containsDangerousKey` 校验 |
+| 流式超时保护 | 120s AbortController 真正 abort，消除永久卡死 |
+| 429 尊重 | Retry-After + 分桶限流，防止 API 滥用 |
 
 ---
 

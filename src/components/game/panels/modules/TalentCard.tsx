@@ -70,7 +70,7 @@ export default memo(function TalentCard({ data, title }: TalentCardProps) {
                           {talent.effects.map((eff, i) => (
                             <span key={i} style={{
                               fontSize: '10px', padding: '1px 6px', borderRadius: 8,
-                              background: 'var(--accent)15', color: 'var(--accent)',
+                              background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)',
                             }}>{eff}</span>
                           ))}
                         </div>

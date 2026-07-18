@@ -4,7 +4,7 @@ import type { DimensionChoice, DimensionGeneration, DimensionSelection } from '.
 import { generateWorldFromSelections, generateModuleEntries } from '../../../worldgen/choice';
 import { requestStreamWithRetry, requestCompletion } from '../../../api/client';
 import { GUIDED_DIMENSIONS } from './dimensions';
-import { generateGuidedOptions, extractJSON } from './helpers';
+import { generateGuidedOptions, regenerateDimensionOptions, extractJSON } from './helpers';
 
 export interface UseGuidedSelectionParams {
   visible: boolean;
@@ -27,6 +27,8 @@ export function useGuidedSelection({
   const [customTitle, setCustomTitle] = useState('');
   const [customSubtitle, setCustomSubtitle] = useState('');
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [generationHistory, setGenerationHistory] = useState<Record<string, DimensionGeneration[]>>({});
   const abortRef = useRef<AbortController | null>(null);
 
   const currentDim = GUIDED_DIMENSIONS[currentDimIndex];
@@ -215,6 +217,49 @@ ${customSubtitle.trim() ? `- 描述：${customSubtitle.trim()}` : ''}
     }
   };
 
+  const handleRegenerate = async () => {
+    if (!currentDim || isRegenerating) return;
+    setIsRegenerating(true);
+    try {
+      const callAI = createCallAI();
+      const prevSelections = selections.filter(s => s.dimensionKey !== currentDim.key);
+      const newGen = await regenerateDimensionOptions(userDesc, currentDim.key, currentDim.label, prevSelections, callAI);
+      // 把当前选项存入历史
+      if (currentGeneration) {
+        setGenerationHistory(prev => ({
+          ...prev,
+          [currentDim.key]: [...(prev[currentDim.key] || []), currentGeneration],
+        }));
+      }
+      // 替换当前选项
+      setAllOptions(prev => prev ? { ...prev, [currentDim.key]: newGen } : prev);
+      // 清除该维度的已选（因为选项换了）
+      setSelections(prev => prev.filter(s => s.dimensionKey !== currentDim.key));
+      setIsEditingCustom(false);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      console.warn('[重新生成] 失败:', err);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleUndoRegenerate = () => {
+    if (!currentDim) return;
+    const history = generationHistory[currentDim.key];
+    if (!history || history.length === 0) return;
+    const prev = history[history.length - 1];
+    setGenerationHistory(h => ({
+      ...h,
+      [currentDim.key]: h[currentDim.key]?.slice(0, -1) || [],
+    }));
+    setAllOptions(opts => opts ? { ...opts, [currentDim.key]: prev } : opts);
+    setSelections(sel => sel.filter(s => s.dimensionKey !== currentDim.key));
+    setIsEditingCustom(false);
+  };
+
+  const hasHistory = !!(currentDim && generationHistory[currentDim.key]?.length);
+
   const handleComplete = async () => {
     setPhase('generating');
     setError('');
@@ -260,8 +305,10 @@ ${customSubtitle.trim() ? `- 描述：${customSubtitle.trim()}` : ''}
     currentDim, isLastDimension, currentSelection, currentGeneration, canProceed,
     isEditingCustom, customTitle, customSubtitle, isCompleting,
     isCustomSelected, customChoice,
+    isRegenerating, hasHistory,
     handleSelect, handleSaveCustom, handleAIComplete, handleComplete,
     handleNext, handleClose, handleRetry,
+    handleRegenerate, handleUndoRegenerate,
     setCurrentDimIndex, setCustomTitle, setCustomSubtitle, setIsEditingCustom,
   };
 }

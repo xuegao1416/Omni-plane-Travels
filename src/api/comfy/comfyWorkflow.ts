@@ -684,6 +684,7 @@ function getSchemaValueOptions(schemaEntry: unknown): string[] | null {
 function getWorkflowAssetLabel(inputName = ''): string {
   const key = safeTrim(inputName);
   if (key === 'ckpt_name') return 'Checkpoint 模型';
+  if (key === 'unet_name') return 'UNet 模型';
   if (key === 'vae_name') return 'VAE';
   if (key === 'control_net_name') return 'ControlNet';
   if (key === 'lora_name') return 'Lora';
@@ -703,7 +704,7 @@ function resolveWorkflowEnumFallback(
 
   let candidate = '';
 
-  if (inputName === 'ckpt_name') {
+  if (inputName === 'ckpt_name' || inputName === 'unet_name') {
     candidate = safeTrim(runtime.model);
   } else if (inputName === 'vae_name') {
     candidate = runtime.vae === 'baked' ? '' : safeTrim(runtime.vae);
@@ -720,7 +721,7 @@ function resolveWorkflowEnumFallback(
   if (
     !candidate &&
     safeOptions.length === 1 &&
-    ['ckpt_name', 'vae_name', 'sampler_name', 'scheduler'].includes(inputName)
+    ['ckpt_name', 'unet_name', 'vae_name', 'sampler_name', 'scheduler'].includes(inputName)
   ) {
     return safeOptions[0];
   }
@@ -966,6 +967,17 @@ export function applyRuntimeValuesToApiPrompt(
   Object.values(nextPrompt).forEach((node) => {
     if (!isApiPromptNode(node)) return;
     updateSamplerRuntimeInputs(node, runtime);
+
+    // 注入 model 到各类模型加载器节点
+    if (isPlainObject(node.inputs) && safeTrim(runtime.model)) {
+      const inputs = node.inputs as Record<string, unknown>;
+      const classType = safeTrim(node.class_type);
+      if (/checkpoint.*loader/i.test(classType) && 'ckpt_name' in inputs) {
+        inputs.ckpt_name = safeTrim(runtime.model);
+      } else if (/unet.*loader/i.test(classType) && 'unet_name' in inputs) {
+        inputs.unet_name = safeTrim(runtime.model);
+      }
+    }
 
     if (isPlainObject(node.inputs)) {
       const inputs = node.inputs as Record<string, unknown>;

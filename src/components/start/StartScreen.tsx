@@ -14,7 +14,7 @@ export default function StartScreen() {
           onStartWizard={() => { h.setView('wizard'); h.setStep(1); }}
           onViewSaves={() => h.setView('saves')}
           onSettings={() => h.navigate('settings')}
-          onOpenMods={() => h.navigate('mods')}
+          onOpenEvents={() => h.navigate('events')}
           title={h.t('start.title')}
           subtitle={h.t('start.subtitle')}
           beginLabel={h.t('start.begin')}

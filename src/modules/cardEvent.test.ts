@@ -1,4 +1,4 @@
-// 卡片 + Mod 事件 集成测试：
+// 卡片 + 事件包 集成测试：
 //   (a) CardRenderer.cardFileToBlocks 按编辑器实际导出形态解析出有序 block
 //   (b) 注册含 addEvent 的 rule → evaluateTick → collectAddEventEvents 命中 { eventId, eventPackId }
 //   (c) 通过 eventBus 模拟 tick 广播路径，断言订阅者收到 { eventId, eventPackId }
@@ -49,7 +49,7 @@ test('(b)(c) 含 addEvent 的 rule → 收集到 { eventId, eventPackId } 并经
       then: [{ addEvent: { eventId: 'card-ccc' } }],
     },
   ];
-  eventWorldEvolution.register({
+  eventWorldEvolution.registerPack({
     eventPackId: 'card-mod-x',
     rules,
     permissions: ['add_card'],

@@ -221,6 +221,16 @@ function formatArchiveLine(a: NarrativeArchiveCard): string {
 
 // ─── 主编译函数 ───
 
+/** 资源状态快照（从 GameState.玩家.生存资源 提取） */
+export interface ResourceSnapshot {
+  id: string;
+  name: string;
+  symbol: string;
+  amount: number;
+  max?: number;
+  scarce?: boolean;
+}
+
 export interface CompiledOutput {
   text: string;
   tokenEstimate: number;
@@ -232,6 +242,7 @@ export function formatRuntimeToCompiledText(
   runtime: NarrativeMemoryRuntime,
   queryKeywords: string[],
   budget: CompileSectionBudget = DEFAULT_COMPILE_BUDGET,
+  resourceState?: ResourceSnapshot[],
 ): CompiledOutput {
   const hotSections: string[] = [];
   const focusedSections: string[] = [];
@@ -246,6 +257,23 @@ export function formatRuntimeToCompiledText(
       const trimmed = trimToTokenBudget(sceneText, budget.scene);
       hotSections.push(`【当前场景】\n${trimmed}`);
       sections.scene = trimmed;
+    }
+  }
+
+  // 资源状态（仅当有资源数据时显示）
+  if (resourceState && resourceState.length > 0) {
+    const resText = resourceState
+      .filter(r => r.amount > 0 || (r.max !== undefined && r.max > 0))
+      .map(r => {
+        const maxStr = r.max !== undefined ? `/${r.max}` : '';
+        const scarceStr = r.scarce ? ' ⚠稀缺' : '';
+        return `${r.symbol || '📦'} ${r.name}: ${r.amount}${maxStr}${scarceStr}`;
+      })
+      .join(' | ');
+    if (resText) {
+      const trimmed = trimToTokenBudget(resText, 80);
+      hotSections.push(`【当前资源】\n${trimmed}`);
+      sections.resources = trimmed;
     }
   }
 

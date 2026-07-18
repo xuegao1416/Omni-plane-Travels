@@ -47,7 +47,7 @@ export default memo(function SixDimCard({ data, title }: SixDimCardProps) {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '4px',
                   padding: '3px 8px', borderRadius: '10px',
-                  background: 'var(--accent)15', fontSize: 'var(--font-size-xs)',
+                  background: 'color-mix(in srgb, var(--accent) 15%, transparent)', fontSize: 'var(--font-size-xs)',
                 }}
                 title={sp.description}
               >

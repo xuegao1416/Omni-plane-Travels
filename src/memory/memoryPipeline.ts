@@ -490,7 +490,7 @@ export async function executeMemoryCompile(memStore: MemoryStore, ctx: MemoryPip
     ? ctx._retrievalKeywords
     : ctx.inputText.split(/[\s,，。！？、；：""''（）【】\n]+/).filter(w => w.length >= 2);
 
-  const result = formatRuntimeToCompiledText(runtime, queryKeywords, DEFAULT_COMPILE_BUDGET);
+  const result = formatRuntimeToCompiledText(runtime, queryKeywords, DEFAULT_COMPILE_BUDGET, ctx.resourceState);
 
   ctx._compiledContext = result.text;
   memStore.setCompiledContext({

@@ -280,7 +280,11 @@ pub struct ModDetail {
 struct RuleFile {
     #[allow(dead_code)]
     version: i64,
+    #[serde(default)]
     rules: Vec<RuleNode>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    periodic_rules: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -15,6 +15,7 @@ import EngineSelector from './imageGenSettings/EngineSelector';
 import NAIConfig from './imageGenSettings/NAIConfig';
 import ComfyConfig from './imageGenSettings/ComfyConfig';
 import OpenAIConfig from './imageGenSettings/OpenAIConfig';
+import KreaConfig from './imageGenSettings/KreaConfig';
 
 export default function ImageGenSettingsTab() {
   const config = useImageStore((s) => s.config);
@@ -91,6 +92,7 @@ export default function ImageGenSettingsTab() {
         <EngineSelector engine={config.engine} onEngineChange={(v) => updateConfig('engine', v)} />
         {config.engine === 'nai' && <NAIConfig config={config} updateConfig={updateConfig} />}
         {config.engine === 'comfyui' && <ComfyConfig config={config} updateConfig={updateConfig} />}
+        {config.engine === 'krea' && <KreaConfig config={config} updateConfig={updateConfig} />}
         {config.engine === 'openai_compatible' && <OpenAIConfig config={config} updateConfig={updateConfig} />}
       </Section>
 

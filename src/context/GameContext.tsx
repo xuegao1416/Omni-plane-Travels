@@ -22,7 +22,7 @@ function withProfileDefaults(raw: Partial<PlayerProfile> | null | undefined): Pl
   };
 }
 
-type Screen = 'start' | 'settings' | 'game' | 'mods';
+type Screen = 'start' | 'settings' | 'game' | 'events';
 
 interface AppState {
   currentScreen: Screen;

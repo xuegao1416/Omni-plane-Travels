@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { usePortraitStore } from '../../../stores/portraitStore';
 
 interface Props {
   avatarUrl: string;
   name: string;
+  npcId?: string;
   title: string;
   text: string;
   action: string;
@@ -12,9 +14,13 @@ interface Props {
  * 内联对话头像卡片 — 渲染 [SPEAK] 格式的对话
  * 气泡式布局：头像嵌入名称标签，对话内容在下方
  */
-export default function InlineDialogueCard({ avatarUrl, name, title, text, action }: Props) {
+export default function InlineDialogueCard({ avatarUrl: initialUrl, name, npcId, title, text, action }: Props) {
   const [imgError, setImgError] = useState(false);
   const handleImgError = useCallback(() => setImgError(true), []);
+
+  // 订阅 portrait store，头像变化时自动更新
+  const storeUrl = usePortraitStore(s => npcId ? s.portraits[npcId] : undefined);
+  const avatarUrl = storeUrl || initialUrl;
 
   const showAvatar = avatarUrl && !imgError;
   const initial = name ? name.charAt(0) : '?';

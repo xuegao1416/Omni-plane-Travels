@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { eventBus, EVENTS } from '../../engine/eventBus';
 import { getWebEvent } from '../../modules/eventDb';
-import type { CardFile } from '../../modules/schema';
+import type { CardFile, EventPackFile } from '../../modules/schema';
+import { flattenEventPack } from '../../modules/schema';
 import CardRenderer, { cardFileToBlocks, type CardBlockView } from './CardRenderer';
 import { useSaveStore } from '../../stores/saveStore';
 import { selectChoice } from '../../modules/eventChoiceState';
@@ -74,10 +75,12 @@ export default function CardOverlay({ gameState }: Props) {
         }
       }
 
-      // 回退：读合并的 card.json（旧格式 / 整包预览）
-      const raw = rec.files['schema/card.json'];
-      if (typeof raw !== 'string') return;
-      const file = JSON.parse(raw) as CardFile;
+      // 回退：读 events.json，展平取所有卡片
+      const evRaw = rec.files['schema/events.json'];
+      if (typeof evRaw !== 'string') return;
+      const evFile = JSON.parse(evRaw) as EventPackFile;
+      const flat = flattenEventPack(evFile);
+      const file: CardFile = { version: evFile.version, puck: { root: { props: {} }, components: {} }, cards: flat.cards };
       let view = cardFileToBlocks(file);
       // 命中指定卡片 id 时只渲染该 block；否则整卡预览
       if (evt.cardId) {

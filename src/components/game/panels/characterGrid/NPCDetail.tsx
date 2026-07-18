@@ -88,7 +88,7 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
                 padding: '3px 8px', borderRadius: '10px',
-                background: 'var(--accent)15', fontSize: 'var(--font-size-xs)',
+                background: 'color-mix(in srgb, var(--accent) 15%, transparent)', fontSize: 'var(--font-size-xs)',
               }}
             >
               <span style={{ color: 'var(--text-muted)' }}>{name}</span>
@@ -101,11 +101,12 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
   );
 }
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId }: {
+export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId, onPortraitChange }: {
   npc: NPCData; npcId: string; onClose: () => void;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
   worldId?: string;
+  onPortraitChange?: (npcId: string, url: string) => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
@@ -128,7 +129,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         boxShadow: 'var(--shadow-lg)',
       }}>
-        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} />
+        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} />
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <div style={{

@@ -502,7 +502,7 @@ export interface SimulationRuntimeState {
   scheduledTicks?: ScheduledTickEntry[];
   /** 周期规则产出的 addEvent 动作（同步段存入，async 段消费） */
   pendingAddEvents?: Array<{ eventId: string; eventPackId: string }>;
-  /** 各 mod 的 onceFired / cooldown 持久化快照（随存档保存，重启后恢复） */
+  /** 各包的 onceFired / cooldown 持久化快照（随存档保存，重启后恢复） */
   eventRuntimes?: Record<string, EventRuntimeState>;
 }
 
@@ -538,15 +538,18 @@ export interface WorldSystemData {
 }
 
 // ============================================================
-//  模块客制化 / Mod 系统 — 单一数据源类型
+//  事件包系统 — 单一数据源类型
 //  架构层持有，UI / 规则引擎 / 图编辑器均 import 自此文件。
 //  规则 DSL 为声明式白名单，解释器永不执行玩家代码。
 // ============================================================
 
 // ─── 基础枚举 ───
 
-/** 用户面分类；数据层(card/worldbook) / 逻辑层(rule) / 混合(bundle) / 周期(periodic) 归属由 type 推导 */
-export type EventType = 'card' | 'rule' | 'worldbook' | 'bundle' | 'periodic';
+/** 内容包分类：card = 事件包（弹卡片）/ rule = 规则（后台数值）/ worldbook = 世界书 / bundle = 混合包 */
+export type EventPackType = 'card' | 'rule' | 'worldbook' | 'bundle';
+
+/** @deprecated 请使用 EventPackType */
+export type EventType = EventPackType;
 
 /** 声明所需能力；规则引擎仅执行被授权的动作类型 */
 export type Permission =
@@ -586,7 +589,7 @@ export type Action =
   | { modifyResource: { key: string; delta: number } }
   | { scheduleTick: { after: number; payload?: Record<string, unknown> } };
 
-/** 单条规则；每 mod ≤128 条、单规则 then ≤16 动作、条件树深 ≤6 */
+/** 单条规则；每包 ≤128 条、单规则 then ≤16 动作、条件树深 ≤6 */
 export interface EventRule {
   id: string;
   priority?: number;
@@ -598,9 +601,7 @@ export interface EventRule {
 
 /**
  * 规则文件（schema/rules.json 落盘形态）。
- * 任务 A 称其为 SimulationRules { version, rules: EventRule[] } —— 即 Mod 规则 DSL 文件。
- * 注意：世界演化内核消费的「SimulationRules」(eventEffects/periodicEvents/...) 另见上文，
- * 二者命名相近但形态不同，请勿混淆。
+ * 规则的内部数据结构：when→then 规则 + 周期规则。
  */
 export interface RuleFile {
   version: number;
@@ -703,7 +704,7 @@ export interface Manifest {
   engine: 'opt-event';
   schemaVersion: number;
   minAppVersion: string;
-  type: EventType;
+  type: EventPackType;
   coverColor: string;
   icon: string;
   enabledByDefault?: boolean;
@@ -726,7 +727,7 @@ export interface EventMeta {
   version: string;
   author: string;
   description?: string;
-  type: EventType;
+  type: EventPackType;
   coverColor: string;
   icon: string;
   schemaVersion: number;
@@ -822,6 +823,19 @@ export interface EventDetail {
   runtimeState?: EventRuntimeState;
 }
 
+// ─── 合集（Collection）───
+
+/** 合集定义（组织层，引用多个事件包/规则包，不复制内容） */
+export interface Collection {
+  id: string;
+  name: string;
+  coverColor: string;
+  icon: string;
+  memberIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── 统一错误信封（invoke 失败时 reject 的对象） ───
 export type EventErrorCode =
   | 'MOD_NOT_FOUND'
@@ -887,9 +901,9 @@ export interface ChoiceOption {
 
 /**
  * @deprecated 旧版「单文件卡片」落盘形态（schema/card.json）。
- * 修正后的数据模型改用 OptEventFile（聚合事件包，见下）。
+ * 修正后的数据模型改用 EventPackFile（聚合事件包，见下）。
  * 保留此类型仅用于向后兼容：CardEditor / CardRenderer / 旧存档仍产出/消费此形态。
- * 新消费端请改用 EventDef + OptEventFile，并用 cardFileToOptEvent() 做迁移桥接。
+ * 新消费端请改用 EventDef + EventPackFile，并用 cardFileToEventPack() 做迁移桥接。
  */
 export interface CardFile {
   version: number;
@@ -920,36 +934,33 @@ export interface EventDef {
 }
 
 /**
- * 事件包（PACK）落盘形态 —— 修正后的统一数据模型。
- * 一个 PACK 持有多个「事件（EventDef）」；周期规则（PeriodicRule）与事件平级（siblings），
- * 由 eventWorldEvolution 每 tick 静默结算（与 RuleFile.periodicRules 同源）。
+ * 事件包落盘形态（schema/events.json）。
+ * 用于 type='card' 的事件包：持有多个事件（EventDef），每个事件含卡片。
  * 包级 worldbook 与 events 内各自携带的 worldbook 平级合并。
  *
- * 与旧「拆分单文件」形态（CardFile / RuleFile / WorldBookFile 分别落盘为
- * schema/card.json / schema/rules.json / schema/worldbook.json）不同，OptEventFile 是聚合形态。
- * 引擎上层请用 flattenOptEvent() 把多个事件的 cards/rules/worldbook 展平后消费，
- * 从而无需改读取逻辑即可在「修正后的数据模型」下运行。
+ * 规则（type='rule'）使用 RuleFile（schema/rules.json），不使用此类型。
  */
-export interface OptEventFile {
+export interface EventPackFile {
   /** 版本号 */
   version: number;
   /** 包名（可选） */
   name?: string;
   /** 事件列表（每个事件包含其卡片 / 规则 / 世界书） */
   events: EventDef[];
-  /** 周期规则（与 events 平级，运行时注册进 eventWorldEvolution 按 tick 静默结算） */
-  periodic?: PeriodicRule[];
+  /** 周期规则（仅规则使用，事件包不应有此字段） */
+  periodicRules?: PeriodicRule[];
   /** 包级世界书（与 events 平级，可选；events 内也可各自带 worldbook） */
   worldbook?: WorldBookEntryDef[];
 }
 
+/** @deprecated 请使用 EventPackFile */
+export type OptEventFile = EventPackFile;
+
 /**
- * 把 OptEventFile 展平成引擎可直接消费的扁平结构。
+ * 把事件包文件展平成引擎可直接消费的扁平结构。
  * 遍历所有 events，拼接其 cards / rules / worldbook；再并入包级 worldbook。
- * 返回结构保持与旧消费端（读 CardFile.cards / RuleFile.rules / WorldBookFile.entries）一致，
- * 以便引擎在「修正后的数据模型」下无需改读取逻辑。
  */
-export function flattenOptEvent(file: OptEventFile): {
+export function flattenEventPack(file: EventPackFile): {
   cards: CardDef[];
   rules: EventRule[];
   worldbook: WorldBookEntryDef[];
@@ -969,15 +980,15 @@ export function flattenOptEvent(file: OptEventFile): {
   return { cards, rules, worldbook };
 }
 
+/** @deprecated 请使用 flattenEventPack */
+export const flattenOptEvent = flattenEventPack;
+
 /**
- * 迁移辅助：把旧版 CardFile（单文件卡片形态）包装为一个 OptEventFile。
+ * 迁移辅助：把旧版 CardFile（单文件卡片形态）包装为一个 EventPackFile。
  * 将 cf.cards 包裹进一个 EventDef；事件名取自 manifest.name（缺失则回退 'event'）；
  * 事件 ID 使用 crypto.randomUUID() 生成（保证唯一）。
- *
- * 用法：旧存档/旧导出（schema/card.json）经此函数转成 OptEventFile 后，
- * 即可走 flattenOptEvent() 与修正后的引擎读取逻辑统一。
  */
-export function cardFileToOptEvent(cf: CardFile, manifest: Manifest): OptEventFile {
+export function cardFileToEventPack(cf: CardFile, manifest: Manifest): EventPackFile {
   const eventId = crypto.randomUUID();
   const eventName = manifest?.name ?? 'event';
   return {
@@ -993,6 +1004,9 @@ export function cardFileToOptEvent(cf: CardFile, manifest: Manifest): OptEventFi
   };
 }
 
+/** @deprecated 请使用 cardFileToEventPack */
+export const cardFileToOptEvent = cardFileToEventPack;
+
 /**
  * 迁移辅助（cardFileToOptEvent 的逆操作）：把单个 EventDef 还原为 CardFile（带 puck），
  * 供 CardRenderer / CardOverlay 等仍消费 CardFile 的 UI 兼容。
@@ -1002,13 +1016,16 @@ export function cardFileToOptEvent(cf: CardFile, manifest: Manifest): OptEventFi
  * 与 flattenOptEvent 互补：flattenOptEvent 展平供「引擎注册」消费（只取 cards/rules/worldbook，不渲染）；
  * 本函数供「卡片渲染」消费（需要 puck 携带实际 props），二者职责不同、互不冲突。
  */
-export function optEventToCardFile(event: EventDef): CardFile {
+export function eventDefToCardFile(event: EventDef): CardFile {
   return {
     version: 1,
     puck: event.puck ?? { root: {}, components: {} },
     cards: event.cards,
   };
 }
+
+/** @deprecated 请使用 eventDefToCardFile */
+export const optEventToCardFile = eventDefToCardFile;
 
 // ─── 世界书文件 ───
 export interface WorldBookFile {

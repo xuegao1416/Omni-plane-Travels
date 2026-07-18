@@ -400,41 +400,208 @@
     "eventPacks": [
       {
         "id": "world:border_trade",
-        "name": "绥芬边贸 基础规则",
-        "periodicRules": [
+        "name": "绥芬边贸规则",
+        "type": "rule",
+        "permissions": ["modify_world_state", "add_card"],
+        "rules": [
           {
-            "id": "border_fee",
-            "name": "口岸杂费",
-            "description": "每趟出关都需要缴纳过境费、检疫费等各种杂费。",
-            "intervalTicks": 3,
-            "actions": [
-              { "set": { "path": "business.funds", "value": -60 } }
-            ],
-            "narrateToAI": true
+            "id": "deal_trigger",
+            "when": { "state": { "path": "玩家.货币资源.主货币.数量", "op": ">", "value": 200 } },
+            "then": [
+              { "addEvent": { "eventId": "deal", "eventPackId": "world:border_trade:events" } }
+            ]
           },
           {
-            "id": "market_fluctuation",
-            "name": "市场行情波动",
-            "description": "绥芬河口岸的商品价格随供需变化波动。",
-            "intervalTicks": 5,
-            "actions": [
-              { "set": { "path": "business.funds", "value": 120 } }
-            ],
-            "narrateToAI": true
+            "id": "smuggle_trigger",
+            "when": { "state": { "path": "玩家.货币资源.主货币.数量", "op": "<", "value": 100 } },
+            "then": [
+              { "addEvent": { "eventId": "smuggle", "eventPackId": "world:border_trade:events" } }
+            ]
           },
           {
-            "id": "winter_cost",
-            "name": "冬季开销",
-            "description": "东北的冬天漫长寒冷，取暖、防寒服装、仓储保温都是额外开支。",
-            "intervalTicks": 8,
-            "actions": [
-              { "set": { "path": "business.funds", "value": -80 } }
-            ],
-            "narrateToAI": true
+            "id": "quality_trigger",
+            "when": { "state": { "path": "玩家.货币资源.主货币.数量", "op": ">", "value": 500 } },
+            "then": [
+              { "addEvent": { "eventId": "quality_issue", "eventPackId": "world:border_trade:events" } }
+            ]
           }
         ],
-        "type": "rule",
-        "rules": []
+        "periodicRules": [
+          {
+            "id": "market_fluctuation",
+            "name": "市场波动",
+            "intervalTicks": 5,
+            "actions": [],
+            "narrateToAI": true,
+            "description": "每5轮AI描述绥芬河市场行情波动：物价涨跌、热销品变化、卢布汇率浮动"
+          },
+          {
+            "id": "border_risk",
+            "name": "口岸形势",
+            "intervalTicks": 10,
+            "actions": [],
+            "narrateToAI": true,
+            "description": "每10轮AI描述绥芬河口岸形势变化：海关政策收紧或放松、俄商动态、边贸环境"
+          }
+        ]
+      },
+      {
+        "id": "world:border_trade:events",
+        "name": "绥芬边贸事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "deal",
+            "name": "大单生意",
+            "cards": [
+              { "id": "t_deal", "componentId": "title", "title": "一笔大生意" },
+              { "id": "n_deal", "componentId": "narrative", "title": "大单叙事" },
+              { "id": "c_deal", "componentId": "choice", "title": "大单选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_deal", "props": { "title": "一笔大生意" } }],
+                "narrative": [{ "id": "n_deal", "props": { "text": "一个俄罗斯商人找到了你，说有一批紧俏的电子产品要出手。价格比市场价低三成，但需要现金。" } }],
+                "choice": [{
+                  "id": "c_deal",
+                  "props": {
+                    "choices": [
+                      { "label": "高价收购", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "抓住机会进货，期待高价卖出" },
+                      { "label": "谨慎观望", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "没有冒险，保持现状" }
+                    ]
+                  }
+                }]
+              }
+            }
+          },
+          {
+            "id": "smuggle",
+            "name": "走私机会",
+            "cards": [
+              { "id": "t_smuggle", "componentId": "title", "title": "走私机会" },
+              { "id": "n_smuggle", "componentId": "narrative", "title": "走私叙事" },
+              { "id": "c_smuggle", "componentId": "choice", "title": "走私选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_smuggle", "props": { "title": "走私机会" } }],
+                "narrative": [{ "id": "n_smuggle", "props": { "text": "有人找到你，说可以通过一条秘密通道把货物运过边境，利润是正常的五倍，但风险也很大。" } }],
+                "choice": [{
+                  "id": "c_smuggle",
+                  "props": {
+                    "choices": [
+                      { "label": "冒险走私", "effect": { "statId": "血量", "delta": 20 }, "aiNote": "走私成功，获得高额利润" },
+                      { "label": "放弃", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "没有冒险，安全第一" }
+                    ]
+                  }
+                }]
+              }
+            }
+          },
+          {
+            "id": "russian_contact",
+            "name": "俄罗斯商人",
+            "cards": [
+              { "id": "t_russian_contact", "componentId": "title", "title": "新朋友" },
+              { "id": "n_russian_contact", "componentId": "narrative", "title": "俄商叙事" },
+              { "id": "c_russian_contact", "componentId": "choice", "title": "俄商选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_russian_contact", "props": { "title": "新朋友" } }],
+                "narrative": [{ "id": "n_russian_contact", "props": { "text": "在市场里，你遇到了一个热情的俄罗斯商人。他邀请你去他的仓库看看货。" } }],
+                "choice": [{
+                  "id": "c_russian_contact",
+                  "props": {
+                    "choices": [
+                      { "label": "建立关系", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "与俄罗斯商人建立长期合作关系" },
+                      { "label": "纯生意", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "只做一次性交易，拿到利润" }
+                    ]
+                  }
+                }]
+              }
+            }
+          },
+          {
+            "id": "quality_issue",
+            "name": "货物质量问题",
+            "cards": [
+              { "id": "t_quality_issue", "componentId": "title", "title": "退货风波" },
+              { "id": "n_quality_issue", "componentId": "narrative", "title": "质量叙事" },
+              { "id": "c_quality_issue", "componentId": "choice", "title": "质量选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_quality_issue", "props": { "title": "退货风波" } }],
+                "narrative": [{ "id": "n_quality_issue", "props": { "text": "你进的一批货出了质量问题，客户找上门来要求退货。你该怎么办？" } }],
+                "choice": [{
+                  "id": "c_quality_issue",
+                  "props": {
+                    "choices": [
+                      { "label": "退货退款", "effect": { "statId": "血量", "delta": -15 }, "aiNote": "退货退款，损失利润但保住口碑" },
+                      { "label": "低价甩卖", "effect": { "statId": "血量", "delta": -5 }, "aiNote": "低价处理，减少损失但口碑受损" }
+                    ]
+                  }
+                }]
+              }
+            }
+          },
+          {
+            "id": "customs_check",
+            "name": "海关检查",
+            "cards": [
+              { "id": "t_customs_check", "componentId": "title", "title": "海关来了！" },
+              { "id": "n_customs_check", "componentId": "narrative", "title": "海关叙事" },
+              { "id": "c_customs_check", "componentId": "choice", "title": "海关选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_customs_check", "props": { "title": "海关来了！" } }],
+                "narrative": [{ "id": "n_customs_check", "props": { "text": "海关人员突然来到你的仓库，说要例行检查。你的仓库里有一些没有正规手续的货物。" } }],
+                "choice": [{
+                  "id": "c_customs_check",
+                  "props": {
+                    "choices": [
+                      { "label": "坦然面对", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "配合检查，没有问题" },
+                      { "label": "塞红包", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "塞红包过关，但有风险" }
+                    ]
+                  }
+                }]
+              }
+            }
+          },
+          {
+            "id": "competitor",
+            "name": "竞争对手",
+            "cards": [
+              { "id": "t_competitor", "componentId": "title", "title": "新对手" },
+              { "id": "n_competitor", "componentId": "narrative", "title": "竞争叙事" },
+              { "id": "c_competitor", "componentId": "choice", "title": "竞争选择" }
+            ],
+            "puck": {
+              "root": { "props": {} },
+              "components": {
+                "title": [{ "id": "t_competitor", "props": { "title": "新对手" } }],
+                "narrative": [{ "id": "n_competitor", "props": { "text": "市场里新来了一个竞争对手，他的价格比你低，抢走了不少客户。" } }],
+                "choice": [{
+                  "id": "c_competitor",
+                  "props": {
+                    "choices": [
+                      { "label": "价格战", "effect": { "statId": "血量", "delta": -10 }, "aiNote": "打价格战，利润降低但保住客户" },
+                      { "label": "合作共赢", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "与对手合作，共同做大市场" }
+                    ]
+                  }
+                }]
+              }
+            }
+          }
+        ]
       }
     ]
   }

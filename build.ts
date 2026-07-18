@@ -98,10 +98,7 @@ if (existsSync('./manifest.json')) {
   copyFileSync('./manifest.json', join(DIST, 'manifest.json'));
   console.log('   ✅ manifest.json');
 }
-if (existsSync('./sw.js')) {
-  copyFileSync('./sw.js', join(DIST, 'sw.js'));
-  console.log('   ✅ sw.js');
-}
+
 if (existsSync('./icon.png')) {
   copyFileSync('./icon.png', join(DIST, 'icon.png'));
   console.log('   ✅ icon.png');
@@ -117,5 +114,4 @@ console.log('   ├── index.html');
 console.log('   ├── main.js');
 console.log('   ├── main.css');
 console.log('   ├── manifest.json (PWA 配置)');
-console.log('   ├── sw.js (Service Worker)');
 console.log('   └── icon.png (应用图标)');

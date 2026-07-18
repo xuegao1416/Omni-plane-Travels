@@ -471,6 +471,22 @@ export function formatSnapshotForMainAI(state: GameState): string {
     lines.push(`> ${parts.join(' | ')}`);
   }
 
+  // 状态轴（世界背景：社会环境、势力动态、区域事件等）
+  const stateAxes = (world as any).状态轴;
+  if (stateAxes && typeof stateAxes === 'object') {
+    for (const [axisName, axisData] of Object.entries(stateAxes)) {
+      if (!axisData || typeof axisData !== 'object') continue;
+      const entries = Object.entries(axisData as Record<string, string>)
+        .filter(([, v]) => v && typeof v === 'string' && v.trim());
+      if (entries.length > 0) {
+        lines.push(`### 【${axisName}】`);
+        for (const [k, v] of entries) {
+          lines.push(`> ${k}: ${v}`);
+        }
+      }
+    }
+  }
+
   // 玩家状态
   const player = state.玩家 ?? ({} as any);
   const playerName = player.姓名 ?? (player as any).name ?? '';

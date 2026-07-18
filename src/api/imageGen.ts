@@ -248,6 +248,80 @@ function resolveOpenAICompatibleSize(width: number, height: number) {
   return { width: 1024, height: 1536, size: '1024x1536' };
 }
 
+/**
+ * 获取 OpenAI 兼容生图服务的模型列表
+ * 用于验证 API 配置是否正确，以及让用户选择可用模型
+ */
+export async function fetchOpenAICompatibleModels(config: Partial<ImageGenConfig>): Promise<string[]> {
+  const provider = config.openaiCompatibleProvider || 'custom';
+  const apiUrl = String(config.openaiCompatibleApiUrl || '').trim();
+  const apiKey = String(config.openaiCompatibleApiKey || '').trim();
+
+  if (!apiUrl) throw new Error('请先配置 API 地址');
+  if (!apiKey) throw new Error('请先配置 API Key');
+
+  // 构建模型列表端点
+  const baseUrl = apiUrl.replace(/\/+$/, '');
+  let modelsUrl: string;
+
+  // 如果用户填的是完整的 images/generations 端点，回退到上级路径
+  if (/\/images\/generations\/?$/i.test(baseUrl)) {
+    modelsUrl = baseUrl.replace(/\/images\/generations\/?$/, '/models');
+  } else {
+    // 尝试常见的模型列表路径
+    modelsUrl = baseUrl.endsWith('/models') ? baseUrl : `${baseUrl}/models`;
+  }
+
+  const { url, headers } = withProxy(modelsUrl, {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  });
+
+  // 30秒超时
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const res = await nativeFetch(url, { headers, signal: controller.signal });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('API Key 无效或已过期');
+      }
+      if (res.status === 404) {
+        throw new Error('模型列表端点不存在，请检查 API 地址');
+      }
+      throw new Error(`获取模型列表失败: ${res.status} ${errText.slice(0, 200)}`);
+    }
+
+    const json = await res.json();
+    // 兼容多种响应格式
+    const models = json.data || json.models || [];
+    return models
+      .map((m: unknown) => {
+        if (typeof m === 'string') return m;
+        if (typeof m === 'object' && m !== null) {
+          const obj = m as Record<string, unknown>;
+          return (obj.id || obj.name || obj.model) as string;
+        }
+        return null;
+      })
+      .filter((id: string | null): id is string => Boolean(id));
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('请求超时(30秒)，请检查网络连接或 API 地址');
+    }
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+      throw new Error('网络请求失败，请检查 API 地址是否正确');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function createBlobFromBase64(base64Data: string, mimeType = 'image/png'): Blob {
   const binary = atob(String(base64Data || ''));
   const bytes = new Uint8Array(binary.length);
@@ -269,6 +343,11 @@ export function getGenerationConfigError(cfg: Partial<ImageGenConfig>): string {
     if (!cfg.openaiCompatibleModel) return '请先在文生图设置中配置其他生图模型';
     return '';
   }
+  if (cfg.engine === 'krea') {
+    if (!cfg.kreaApiKey) return '请先在文生图设置中配置 Krea API Key';
+    if (!cfg.kreaModel) return '请先在文生图设置中配置 Krea 模型';
+    return '';
+  }
   if (!cfg.apiKey) return '请先在文生图设置中配置 NovelAI API Key';
   return '';
 }
@@ -282,8 +361,22 @@ export async function fetchComfyUIData(apiUrl: string): Promise<ComfyUIData> {
   if (!res.ok) throw new Error('无法连接到 ComfyUI');
   const data = await res.json();
 
+  // UNet 模型：从所有含 unet_name 输入的节点收集（UNetLoader / CheckpointLoaderSimple 等）
+  const unetModels: string[] = [];
+  if (data && typeof data === 'object') {
+    for (const nodeInfo of Object.values(data)) {
+      const req = (nodeInfo as any)?.input?.required;
+      if (req?.unet_name?.[0]?.length) {
+        for (const name of req.unet_name[0]) {
+          if (!unetModels.includes(name)) unetModels.push(name);
+        }
+      }
+    }
+  }
+
   return {
     models: data.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [],
+    unetModels,
     samplers: data.KSampler?.input?.required?.sampler_name?.[0] || [],
     schedulers: data.KSampler?.input?.required?.scheduler?.[0] || [],
     vaes: data.VAELoader?.input?.required?.vae_name?.[0] || [],
@@ -1145,10 +1238,190 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
   };
 }
 
+// ─── Krea ───
+
+/**
+ * 获取 Krea 模型列表
+ */
+export async function fetchKreaModels(apiKey: string): Promise<string[]> {
+  if (!apiKey) throw new Error('请先配置 Krea API Key');
+
+  const { url, headers } = withProxy('https://api.krea.ai/models', {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  });
+
+  // 30秒超时
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const res = await nativeFetch(url, { headers, signal: controller.signal });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('API Key 无效或已过期');
+      }
+      throw new Error(`获取模型列表失败: ${res.status} ${errText.slice(0, 200)}`);
+    }
+
+    const json = await res.json();
+    // Krea 返回的格式可能是 { models: [...] } 或直接数组
+    const models = json.models || json.data || json || [];
+    return Array.isArray(models)
+      ? models
+          .map((m: unknown) => {
+            if (typeof m === 'string') return m;
+            if (typeof m === 'object' && m !== null) {
+              const obj = m as Record<string, unknown>;
+              return (obj.id || obj.name || obj.model) as string;
+            }
+            return null;
+          })
+          .filter((id): id is string => Boolean(id))
+      : [];
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('请求超时(30秒)，请检查网络连接');
+    }
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+      throw new Error('网络请求失败，请检查 API Key 是否正确');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function generateKreaImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
+  const apiKey = config.kreaApiKey;
+  if (!apiKey) throw new Error('未配置 Krea API Key');
+
+  const { positivePrompt } = resolvePromptsForEngine(prompt, {}, config);
+  if (!positivePrompt) throw new Error('正面提示词不能为空');
+
+  const model = config.kreaModel || 'krea/krea-2/medium';
+  const aspectRatio = config.kreaAspectRatio || '1:1';
+  const resolution = config.kreaResolution || '1K';
+  const creativity = config.kreaCreativity || 'medium';
+
+  // 构建请求体
+  const requestBody: Record<string, unknown> = {
+    prompt: positivePrompt,
+    aspect_ratio: aspectRatio,
+    resolution,
+    creativity,
+  };
+
+  // 调用 Krea API 创建生成任务
+  const { url:createUrl, headers: createHeaders } = withProxy(
+    `https://api.krea.ai/generate/image/${model}`,
+    {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+  );
+
+  const createRes = await nativeFetch(createUrl, {
+    method: 'POST',
+    headers: createHeaders,
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text().catch(() => '');
+    let errMsg = `Krea API 错误 (${createRes.status})`;
+    try {
+      const errData = JSON.parse(errText);
+      errMsg = errData.message || errData.error || errMsg;
+    } catch {
+      errMsg = errText || errMsg;
+    }
+    throw new Error(errMsg);
+  }
+
+  const createData = await createRes.json();
+  const jobId = createData.job_id;
+  if (!jobId) throw new Error('Krea API 未返回 job_id');
+
+  // 轮询等待任务完成
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const MAX_ATTEMPTS = 150; // 最多等待5分钟（每2秒轮询一次）
+    const poll = setInterval(async () => {
+      attempts += 1;
+      if (attempts > MAX_ATTEMPTS) {
+        clearInterval(poll);
+        reject(new Error('生成超时（5分钟）'));
+        return;
+      }
+
+      try {
+        const { url: statusUrl, headers: statusHeaders } = withProxy(
+          `https://api.krea.ai/jobs/${jobId}`,
+          {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        );
+
+        const statusRes = await nativeFetch(statusUrl, { headers: statusHeaders });
+        if (!statusRes.ok) {
+          console.warn(`[Krea] 状态查询失败 (${statusRes.status}), attempt ${attempts}`);
+          return;
+        }
+
+        const statusData = await statusRes.json();
+        const status = statusData.status;
+
+        if (status === 'completed') {
+          clearInterval(poll);
+          const imageUrl = statusData.result?.urls?.[0] || statusData.result?.url;
+          if (!imageUrl) {
+            reject(new Error('Krea 返回结果中未找到图片 URL'));
+            return;
+          }
+
+          // 下载图片
+          const { url: dlUrl, headers: dlHeaders } = withProxy(imageUrl);
+          const imgRes = await nativeFetch(dlUrl, { headers: dlHeaders });
+          if (!imgRes.ok) {
+            reject(new Error(`图片下载失败 (${imgRes.status})`));
+            return;
+          }
+          const blob = await imgRes.blob();
+
+          resolve({
+            blob,
+            seed: null,
+            prompt: positivePrompt,
+            negativePrompt: '',
+            width: 1024,
+            height: 1024,
+            model: `Krea: ${model}`,
+            sampler: 'Krea',
+            steps: null,
+            scale: null,
+          });
+        } else if (status === 'failed' || status === 'cancelled') {
+          clearInterval(poll);
+          reject(new Error(`Krea 生成失败: ${status}`));
+        }
+        // 其他状态（queued, processing）继续等待
+      } catch (e) {
+        clearInterval(poll);
+        reject(e);
+      }
+    }, 2000);
+  });
+}
+
 // ─── 路由函数 ───
 
 export async function generateConfiguredImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
   if (config.engine === 'comfyui') return generateComfyUIImage(prompt, config);
   if (config.engine === 'openai_compatible') return generateOpenAICompatibleImage(prompt, config);
+  if (config.engine === 'krea') return generateKreaImage(prompt, config);
   return generateNovelAIImage(prompt, config);
 }

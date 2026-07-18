@@ -264,7 +264,18 @@ export function useStartScreen() {
     };
     // 使用 performSave 保存存档（会同时更新 savesMeta 列表）
     const performSave = useSaveStore.getState().performSave;
-    await performSave(save);
+    try {
+      await performSave(save);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[开始游戏] 存档保存失败:', err);
+      // performSave 失败时已自动导出备份 JSON，提示用户
+      await showAlert(
+        `存档保存失败，已自动导出备份文件。\n\n错误信息：${errMsg}\n\n请通过「导入存档」加载备份文件进入游戏。`,
+        { title: '存档保存失败', danger: true },
+      );
+      return; // 不跳转，留在当前页面
+    }
     navigate(apiConfig ? 'game' : 'settings');
   };
 

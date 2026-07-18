@@ -5,7 +5,7 @@
 //! are rejected (security red line: never write outside the target root).
 
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -218,7 +218,7 @@ pub fn pack_mod(
 
     let file = std::fs::File::create(target)?;
     let mut writer = zip::ZipWriter::new(file);
-    let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+    let options: FileOptions<'_, ()> = FileOptions::default().compression_method(CompressionMethod::Deflated);
 
     for (name, bytes) in &to_pack {
         writer

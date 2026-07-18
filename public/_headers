@@ -1,0 +1,16 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/main.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/main.css
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache

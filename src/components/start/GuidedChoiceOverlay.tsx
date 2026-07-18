@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X, RefreshCw, Undo2 } from 'lucide-react';
 import type { WorldDef } from '../../data/worlds-schema';
 import { GUIDED_DIMENSIONS, getDimensionQuestion } from './guidedChoice/dimensions';
 import {
@@ -96,6 +96,40 @@ export default function GuidedChoiceOverlay({
                   </span>
                 )}
               </p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
+                <button
+                  onClick={s.handleRegenerate}
+                  disabled={s.isRegenerating}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.3rem',
+                    padding: '0.35rem 0.75rem', borderRadius: '8px',
+                    border: '1px solid var(--border)', background: 'var(--bg-secondary)',
+                    color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer',
+                    opacity: s.isRegenerating ? 0.6 : 1,
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="重新生成本维度的选项"
+                >
+                  <RefreshCw size={13} style={{ animation: s.isRegenerating ? 'spin 0.8s linear infinite' : 'none' }} />
+                  {s.isRegenerating ? '生成中...' : '换一批'}
+                </button>
+                {s.hasHistory && (
+                  <button
+                    onClick={s.handleUndoRegenerate}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.3rem',
+                      padding: '0.35rem 0.75rem', borderRadius: '8px',
+                      border: '1px solid var(--border)', background: 'var(--bg-secondary)',
+                      color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title="恢复上一批选项"
+                  >
+                    <Undo2 size={13} />
+                    上一批
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

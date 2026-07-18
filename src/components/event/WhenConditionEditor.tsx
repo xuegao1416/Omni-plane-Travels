@@ -1,5 +1,5 @@
 // When 条件编辑器 —— condition 节点的 when 字段编辑。
-// 支持多条件列表 + AND/OR 组合，每个条件 = 路径 + 操作符 + 值。
+// 支持 state 条件（路径+操作符+值）和 event 条件（事件类型+可选 where）。
 import React, { useCallback, useMemo } from 'react';
 import { Plus, X } from 'lucide-react';
 import type { Condition, Comparator, Literal } from '../../modules/schema';
@@ -11,13 +11,23 @@ interface Props {
   when?: Condition;
   onChange: (when: Condition | undefined) => void;
   worldDef?: WorldDef;
+  /** 当前图中已使用的事件类型（用于下拉建议） */
+  knownEventTypes?: string[];
 }
 
 interface StateCondition {
+  kind: 'state';
   path: string;
   op: Comparator;
   value: Literal;
 }
+
+interface EventCondition {
+  kind: 'event';
+  type: string;
+}
+
+type ConditionItem = StateCondition | EventCondition;
 
 const inputStyle: React.CSSProperties = {
   padding: '6px 8px',
@@ -41,131 +51,135 @@ const fieldLabel: React.CSSProperties = {
   color: 'var(--text-secondary)',
 };
 
-/** 从 Condition 树中提取所有 state 叶子条件 */
-function extractStateConditions(cond?: Condition): { conditions: StateCondition[]; logicMode: 'and' | 'or' } {
-  if (!cond) return { conditions: [], logicMode: 'and' };
+/** 从 Condition 树中提取所有可编辑的叶子条件 */
+function extractConditions(cond?: Condition): { items: ConditionItem[]; logicMode: 'and' | 'or' } {
+  if (!cond) return { items: [], logicMode: 'and' };
 
   if ('state' in cond) {
-    return { conditions: [{ path: cond.state.path, op: cond.state.op, value: cond.state.value }], logicMode: 'and' };
+    return { items: [{ kind: 'state', path: cond.state.path, op: cond.state.op, value: cond.state.value }], logicMode: 'and' };
+  }
+
+  if ('event' in cond) {
+    return { items: [{ kind: 'event', type: cond.event.type }], logicMode: 'and' };
   }
 
   if ('all' in cond) {
-    const conditions: StateCondition[] = [];
+    const items: ConditionItem[] = [];
     for (const child of cond.all) {
-      if ('state' in child) {
-        conditions.push({ path: child.state.path, op: child.state.op, value: child.state.value });
-      }
+      if ('state' in child) items.push({ kind: 'state', path: child.state.path, op: child.state.op, value: child.state.value });
+      else if ('event' in child) items.push({ kind: 'event', type: child.event.type });
     }
-    return { conditions, logicMode: 'and' };
+    return { items, logicMode: 'and' };
   }
 
   if ('any' in cond) {
-    const conditions: StateCondition[] = [];
+    const items: ConditionItem[] = [];
     for (const child of cond.any) {
-      if ('state' in child) {
-        conditions.push({ path: child.state.path, op: child.state.op, value: child.state.value });
-      }
+      if ('state' in child) items.push({ kind: 'state', path: child.state.path, op: child.state.op, value: child.state.value });
+      else if ('event' in child) items.push({ kind: 'event', type: child.event.type });
     }
-    return { conditions, logicMode: 'or' };
+    return { items, logicMode: 'or' };
   }
 
-  // not / event / 复杂嵌套 → 不可编辑，返回空
-  return { conditions: [], logicMode: 'and' };
+  // not / 复杂嵌套 → 不可编辑，返回空
+  return { items: [], logicMode: 'and' };
 }
 
 /** 把条件列表 + 逻辑模式 重建为 Condition */
-function buildCondition(conditions: StateCondition[], logicMode: 'and' | 'or'): Condition | undefined {
-  if (conditions.length === 0) return undefined;
+function buildCondition(items: ConditionItem[], logicMode: 'and' | 'or'): Condition | undefined {
+  if (items.length === 0) return undefined;
 
-  const stateConditions: Condition[] = conditions.map((c) => ({
-    state: { path: c.path, op: c.op, value: c.value },
-  }));
+  const conditions: Condition[] = items.map((item) => {
+    if (item.kind === 'event') {
+      return { event: { type: item.type } };
+    }
+    return { state: { path: item.path, op: item.op, value: item.value } };
+  });
 
-  if (stateConditions.length === 1) return stateConditions[0];
-  return logicMode === 'or' ? { any: stateConditions } : { all: stateConditions };
+  if (conditions.length === 1) return conditions[0];
+  return logicMode === 'or' ? { any: conditions } : { all: conditions };
 }
 
 /** 推断值的合理输入类型 */
 function inferInputType(path: string, op: Comparator): 'number' | 'boolean' | 'text' {
-  if (op === 'in') return 'text'; // in 操作符用逗号分隔列表
-  // flags 路径通常是布尔
+  if (op === 'in') return 'text';
   if (path.startsWith('flags.')) return 'boolean';
-  // 数值路径
   if (path.includes('amount') || path.includes('level') || path.includes('funds') ||
       path.startsWith('attr') || path.startsWith('dim')) return 'number';
   return 'text';
 }
 
-/** 把 Literal 转为字符串显示 */
 function literalToString(v: Literal): string {
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   if (Array.isArray(v)) return v.join(',');
   return String(v);
 }
 
-/** 把字符串解析回 Literal */
 function parseLiteral(s: string, type: 'number' | 'boolean' | 'text'): Literal {
   if (type === 'boolean') return s === 'true';
   if (type === 'number') {
     const n = Number(s);
     return isNaN(n) ? 0 : n;
   }
-  // in 操作符：逗号分隔 → string[]
   if (s.includes(',')) return s.split(',').map((x) => x.trim()).filter(Boolean);
   return s;
 }
 
-export default function WhenConditionEditor({ when, onChange, worldDef }: Props) {
-  const { conditions: initialConditions, logicMode: initialMode } = useMemo(
-    () => extractStateConditions(when),
+export default function WhenConditionEditor({ when, onChange, worldDef, knownEventTypes = [] }: Props) {
+  const { items: initialItems, logicMode: initialMode } = useMemo(
+    () => extractConditions(when),
     [when],
   );
 
-  const [conditions, setConditions] = React.useState<StateCondition[]>(initialConditions);
+  const [items, setItems] = React.useState<ConditionItem[]>(initialItems);
   const [logicMode, setLogicMode] = React.useState<'and' | 'or'>(initialMode);
 
-  // 同步外部 when 变化（只在 when 从外部被重置时）
   React.useEffect(() => {
-    const { conditions: ext, logicMode: extMode } = extractStateConditions(when);
-    // 只在外部 when 完全不同时同步（避免循环）
+    const { items: ext, logicMode: extMode } = extractConditions(when);
     const extKey = JSON.stringify(ext);
-    const curKey = JSON.stringify(conditions);
+    const curKey = JSON.stringify(items);
     if (extKey !== curKey) {
-      setConditions(ext);
+      setItems(ext);
       setLogicMode(extMode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [when]);
 
   const emitChange = useCallback(
-    (next: StateCondition[], mode: 'and' | 'or') => {
+    (next: ConditionItem[], mode: 'and' | 'or') => {
       const cond = buildCondition(next, mode);
       onChange(cond);
     },
     [onChange],
   );
 
-  const addCondition = () => {
-    const next = [...conditions, { path: '', op: '==' as Comparator, value: 0 }];
-    setConditions(next);
+  const addStateCondition = () => {
+    const next = [...items, { kind: 'state' as const, path: '', op: '==' as Comparator, value: 0 }];
+    setItems(next);
+    emitChange(next, logicMode);
+  };
+
+  const addEventCondition = () => {
+    const next = [...items, { kind: 'event' as const, type: '' }];
+    setItems(next);
     emitChange(next, logicMode);
   };
 
   const removeCondition = (index: number) => {
-    const next = conditions.filter((_, i) => i !== index);
-    setConditions(next);
+    const next = items.filter((_, i) => i !== index);
+    setItems(next);
     emitChange(next, logicMode);
   };
 
-  const updateCondition = (index: number, patch: Partial<StateCondition>) => {
-    const next = conditions.map((c, i) => (i === index ? { ...c, ...patch } : c));
-    setConditions(next);
+  const updateCondition = (index: number, patch: Partial<ConditionItem>) => {
+    const next = items.map((c, i) => (i === index ? { ...c, ...patch } as ConditionItem : c));
+    setItems(next);
     emitChange(next, logicMode);
   };
 
   const changeLogicMode = (mode: 'and' | 'or') => {
     setLogicMode(mode);
-    emitChange(conditions, mode);
+    emitChange(items, mode);
   };
 
   return (
@@ -174,7 +188,7 @@ export default function WhenConditionEditor({ when, onChange, worldDef }: Props)
         <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', fontWeight: 600 }}>
           When 条件
         </span>
-        {conditions.length > 1 && (
+        {items.length > 1 && (
           <select
             value={logicMode}
             onChange={(e) => changeLogicMode(e.target.value as 'and' | 'or')}
@@ -186,50 +200,79 @@ export default function WhenConditionEditor({ when, onChange, worldDef }: Props)
         )}
       </div>
 
-      {conditions.map((c, i) => {
-        const inputType = inferInputType(c.path, c.op);
-        return (
-          <div
-            key={i}
-            style={{
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-2)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-              background: 'var(--bg-primary)',
-            }}
-          >
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', minWidth: 16 }}>
-                {i + 1}.
-              </span>
+      {items.map((item, i) => (
+        <div
+          key={i}
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            background: item.kind === 'event' ? 'var(--bg-secondary)' : 'var(--bg-primary)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', minWidth: 16 }}>
+              {i + 1}.
+            </span>
+            {item.kind === 'event' ? (
+              // 事件条件：事件类型输入
+              <div style={{ flex: 1, display: 'flex', gap: 4, alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  事件
+                </span>
+                {knownEventTypes.length > 0 ? (
+                  <select
+                    value={item.type}
+                    onChange={(e) => updateCondition(i, { type: e.target.value })}
+                    style={inputStyle}
+                  >
+                    <option value="">选择事件类型...</option>
+                    {knownEventTypes.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                    <option value="__custom__">自定义...</option>
+                  </select>
+                ) : (
+                  <input
+                    value={item.type}
+                    onChange={(e) => updateCondition(i, { type: e.target.value })}
+                    placeholder="事件类型（如 dice_roll）"
+                    style={inputStyle}
+                  />
+                )}
+              </div>
+            ) : (
+              // 状态条件：路径选择
               <div style={{ flex: 1 }}>
                 <WhenPathSelect
-                  value={c.path}
+                  value={item.path}
                   onChange={(v) => updateCondition(i, { path: v })}
                   worldDef={worldDef}
                 />
               </div>
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => removeCondition(i)}
-                aria-label="删除条件"
-                style={{ color: 'var(--danger)', padding: 4, flexShrink: 0 }}
-              >
-                <X size={14} />
-              </button>
-            </div>
+            )}
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => removeCondition(i)}
+              aria-label="删除条件"
+              style={{ color: 'var(--danger)', padding: 4, flexShrink: 0 }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {item.kind === 'state' && (
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', minWidth: 16 }} />
               <ComparatorSelect
-                value={c.op}
+                value={item.op}
                 onChange={(v) => updateCondition(i, { op: v })}
               />
-              {inputType === 'boolean' ? (
+              {inferInputType(item.path, item.op) === 'boolean' ? (
                 <select
-                  value={String(c.value)}
+                  value={String(item.value)}
                   onChange={(e) => updateCondition(i, { value: e.target.value === 'true' })}
                   style={inputStyle}
                 >
@@ -238,27 +281,36 @@ export default function WhenConditionEditor({ when, onChange, worldDef }: Props)
                 </select>
               ) : (
                 <input
-                  type={inputType === 'number' ? 'number' : 'text'}
-                  value={literalToString(c.value)}
-                  onChange={(e) => updateCondition(i, { value: parseLiteral(e.target.value, inputType) })}
-                  placeholder={c.op === 'in' ? '值1,值2,值3' : '值'}
+                  type={inferInputType(item.path, item.op) === 'number' ? 'number' : 'text'}
+                  value={literalToString(item.value)}
+                  onChange={(e) => updateCondition(i, { value: parseLiteral(e.target.value, inferInputType(item.path, item.op)) })}
+                  placeholder={item.op === 'in' ? '值1,值2,值3' : '值'}
                   style={inputStyle}
                 />
               )}
             </div>
-          </div>
-        );
-      })}
+          )}
+        </div>
+      ))}
 
-      <button
-        className="btn-ghost btn-xs"
-        onClick={addCondition}
-        style={{ alignSelf: 'flex-start' }}
-      >
-        <Plus size={12} /> 添加条件
-      </button>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <button
+          className="btn-ghost btn-xs"
+          onClick={addStateCondition}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          <Plus size={12} /> 状态条件
+        </button>
+        <button
+          className="btn-ghost btn-xs"
+          onClick={addEventCondition}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          <Plus size={12} /> 事件条件
+        </button>
+      </div>
 
-      {conditions.length === 0 && (
+      {items.length === 0 && (
         <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
           无条件（始终通过）
         </div>

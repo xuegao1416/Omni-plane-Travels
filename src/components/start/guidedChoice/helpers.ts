@@ -1,4 +1,4 @@
-import type { DimensionGeneration } from '../../../worldgen/choice';
+import type { DimensionGeneration, DimensionSelection } from '../../../worldgen/choice';
 import { GUIDED_DIMENSIONS, DIMENSION_HINTS } from './dimensions';
 
 /** 增强版选项生成（包含 worldType 和 conflict 维度） */
@@ -88,6 +88,68 @@ ${jsonTemplate}
     }
   }
   return result;
+}
+
+/** 重新生成单个维度的选项 */
+export async function regenerateDimensionOptions(
+  userDesc: string,
+  dimKey: string,
+  dimLabel: string,
+  previousSelections: DimensionSelection[],
+  callAI: (messages: Array<{ role: string; content: string }>) => Promise<string>,
+): Promise<DimensionGeneration> {
+  const hint = DIMENSION_HINTS[dimKey] || '生成4个有明显差异的选项';
+
+  // 整理已选维度的上下文
+  const selectedContext = previousSelections.length > 0
+    ? '\n【已确定的维度】\n' + previousSelections.map(s => {
+        const chosen = s.choices || (s.choice ? [s.choice] : []);
+        const titles = chosen.map(c => c.title).join('、');
+        return `- ${s.dimensionLabel}：${titles}`;
+      }).join('\n')
+    : '';
+
+  const prompt = `你是一个世界构建专家，擅长根据用户描述生成丰富多样的设定选项。
+
+【用户描述】
+「${userDesc}」
+${selectedContext}
+
+当前需要为【${dimLabel}】维度重新生成4个选项。
+要求：${hint}
+
+核心要求：
+1. 紧扣用户描述的题材和氛围
+2. 4个选项要有真正差异，代表不同方向
+3. 标题2-4字，精准有力
+4. 副标题15-30字，具体生动，有画面感
+${selectedContext ? '5. 与上面已确定的维度保持逻辑一致，不要冲突' : ''}
+
+严格按以下JSON格式返回，不要任何额外文字：
+{
+  "narrative": "2-3句引导语，激发用户对该维度的想象",
+  "choices": [
+    { "id": "A", "title": "2-4字标题", "subtitle": "15-30字描述" },
+    { "id": "B", "title": "2-4字标题", "subtitle": "15-30字描述" },
+    { "id": "C", "title": "2-4字标题", "subtitle": "15-30字描述" },
+    { "id": "D", "title": "2-4字标题", "subtitle": "15-30字描述" }
+  ]
+}`;
+
+  const raw = await callAI([{ role: 'user', content: prompt }]);
+  const extracted = extractJSON(raw);
+  let data: any;
+  try {
+    data = JSON.parse(extracted);
+  } catch {
+    const repaired = repairTruncatedJSON(extracted);
+    data = JSON.parse(repaired);
+  }
+
+  return {
+    narrative: data.narrative || '',
+    choices: data.choices || [],
+  };
 }
 
 /** 修复截断的 JSON：补齐未闭合的括号和引号 */

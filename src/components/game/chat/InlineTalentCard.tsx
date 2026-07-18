@@ -18,10 +18,10 @@ interface InlineTalentCardProps {
 /** 品质颜色映射 */
 const RARITY_COLORS: Record<string, string> = {
   '普通': '#9ca3af',
-  '精良': 'var(--success)',
+  '精良': '#16a34a',
   '稀有': '#3b82f6',
   '史诗': '#a855f7',
-  '传说': 'var(--warning)',
+  '传说': '#d97706',
 };
 
 /** 品质背景色映射 */

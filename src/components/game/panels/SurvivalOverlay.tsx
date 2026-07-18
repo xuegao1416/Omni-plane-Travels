@@ -185,7 +185,7 @@ export default function SurvivalOverlay({
                     style={{
                       padding: '10px 12px', borderRadius: '8px',
                       border: `1px solid ${isCritical ? 'var(--danger-bg-soft)' : 'var(--border)'}`,
-                      background: isCritical ? 'var(--danger)08' : 'var(--bg-secondary)',
+                      background: isCritical ? 'color-mix(in srgb, var(--danger) 8%, transparent)' : 'var(--bg-secondary)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                     }}

@@ -377,6 +377,21 @@ export function useGameEngine(
     const presets = loadPresets();
     const defaultMemApi = { baseUrl: mainApiConfig.baseUrl, apiKey: mainApiConfig.apiKey, model: mainApiConfig.model };
     const memApiConfig = resolvePreset(presets, memConfig.apiPresetId) ?? defaultMemApi;
+
+    // 提取资源状态快照（供记忆编译阶段注入 AI 上下文）
+    const gs = varMgrRef.current.getState();
+    const survivalRes = gs.玩家?.生存资源;
+    const resourceState = survivalRes
+      ? Object.entries(survivalRes).map(([id, r]) => ({
+          id,
+          name: r.name ?? id,
+          symbol: r.symbol ?? '📦',
+          amount: r.数量,
+          max: r.最大值,
+          scarce: r.scarce,
+        }))
+      : undefined;
+
     return {
       floor, batchText, inputText, recentContext, playerName,
       apiConfig: memApiConfig,
@@ -385,6 +400,7 @@ export function useGameEngine(
       conflictJudgeApiConfig: resolvePreset(presets, memConfig.writePipeline.conflictJudgeApiPresetId) ?? undefined,
       retrievalApiConfig: resolvePreset(presets, memConfig.retrieval.plannerApiPresetId) ?? undefined,
       vectorApiConfig: resolvePreset(presets, memConfig.vectorExtractApiPresetId) ?? undefined,
+      resourceState,
     };
   }, []);
 

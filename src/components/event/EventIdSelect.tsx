@@ -5,7 +5,7 @@
 //   2. 关联世界的所有事件包的 schema/events.json（按包分组）
 import { useEffect, useState } from 'react';
 import { getWebEvent, allWebEvents } from '../../modules/eventDb';
-import type { OptEventFile } from '../../modules/schema';
+import type { EventPackFile } from '../../modules/schema';
 import type { WorldDef } from '../../data/worlds-schema';
 
 interface Props {
@@ -46,7 +46,7 @@ async function extractEventsFromPack(packId: string): Promise<EventOption[]> {
   const evRaw = rec.files['schema/events.json'];
   if (typeof evRaw !== 'string') return [];
   try {
-    const file = JSON.parse(evRaw) as OptEventFile;
+    const file = JSON.parse(evRaw) as EventPackFile;
     const packName = file.name ?? rec.manifest?.name ?? packId;
     return (file.events ?? []).map((ev) => ({
       id: ev.id,

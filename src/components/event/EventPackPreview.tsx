@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, X, Loader2 } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
-import type { OptEventFile, CardFile } from '../../modules/schema';
+import type { EventPackFile, CardFile } from '../../modules/schema';
 import CardRenderer, { cardFileToBlocks, type CardBlockView } from './CardRenderer';
 
 interface EventEntry {
@@ -37,7 +37,7 @@ export default function EventPackPreview({ eventPackId, onClose }: Props) {
         // 读 events.json 获取事件列表
         const evRaw = rec.files['schema/events.json'];
         if (typeof evRaw !== 'string') { setLoading(false); return; }
-        const evFile = JSON.parse(evRaw) as OptEventFile;
+        const evFile = JSON.parse(evRaw) as EventPackFile;
         const entries: EventEntry[] = [];
 
         for (const ev of evFile.events ?? []) {

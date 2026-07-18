@@ -11,12 +11,12 @@ import type { PeriodicRule, Action, Literal } from '../../modules/schema';
 import type { WorldDef } from '../../data/worlds-schema';
 
 interface PeriodicEventPackEditorProps {
-  periodicEvents: PeriodicRule[];
+  periodicRules: PeriodicRule[];
   onChange: (next: PeriodicRule[]) => void;
   worldDef?: WorldDef | null;
 }
 
-export default function PeriodicEventPackEditor({ periodicEvents, onChange, worldDef }: PeriodicEventPackEditorProps) {
+export default function PeriodicEventPackEditor({ periodicRules, onChange, worldDef }: PeriodicEventPackEditorProps) {
   const [expanded, setExpanded] = useState(true);
   const [editingPeriodic, setEditingPeriodic] = useState<PeriodicRule | null>(null);
 
@@ -29,19 +29,19 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
       actions: [],
       narrateToAI: true,
     };
-    onChange([...periodicEvents, newPeriodic]);
+    onChange([...periodicRules, newPeriodic]);
     setEditingPeriodic(newPeriodic);
   };
 
   const updatePeriodicEvent = (index: number, updated: PeriodicRule) => {
-    const next = [...periodicEvents];
+    const next = [...periodicRules];
     next[index] = updated;
     onChange(next);
     setEditingPeriodic(null);
   };
 
   const deletePeriodicEvent = (index: number) => {
-    onChange(periodicEvents.filter((_, i) => i !== index));
+    onChange(periodicRules.filter((_, i) => i !== index));
   };
 
   const getActionSummary = (actions?: Action[]): string => {
@@ -76,13 +76,13 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
           周期事件
         </span>
         <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-          ({periodicEvents.length}个)
+          ({periodicRules.length}个)
         </span>
       </button>
 
       {expanded && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', paddingLeft: 'var(--space-6)' }}>
-          {periodicEvents.map((event, index) => (
+          {periodicRules.map((event, index) => (
             <div
               key={event.id}
               style={{
@@ -136,9 +136,9 @@ export default function PeriodicEventPackEditor({ periodicEvents, onChange, worl
           event={editingPeriodic}
           worldDef={worldDef}
           onSave={updated => {
-            const index = periodicEvents.findIndex(e => e.id === editingPeriodic.id);
+            const index = periodicRules.findIndex(e => e.id === editingPeriodic.id);
             if (index >= 0) updatePeriodicEvent(index, updated);
-            else { onChange([...periodicEvents, updated]); setEditingPeriodic(null); }
+            else { onChange([...periodicRules, updated]); setEditingPeriodic(null); }
           }}
           onCancel={() => setEditingPeriodic(null)}
         />

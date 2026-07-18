@@ -155,14 +155,49 @@ export class VariableManager {
       if (!isSafePath(resolvedPath)) continue;
       switch (patch.op) {
         case 'replace':
-        case 'add':
+        case 'add': {
+          // 好感度 delta 钳制（RFC 补丁路径）
+          if (pathParts[0] === '人物档案' && pathParts.length >= 4 &&
+              pathParts[2] === '关系数据' && pathParts[3] === '好感度' &&
+              (patch.op === 'replace' || patch.op === 'add')) {
+            const npcIdForClamp = pathParts[1];
+            const currentFavor = (this.state.人物档案[npcIdForClamp] as any)?.关系数据?.好感度;
+            if (typeof currentFavor === 'number' && Number.isFinite(currentFavor)) {
+              const newFavor = Number(patch.value);
+              if (Number.isFinite(newFavor)) {
+                const delta = newFavor - currentFavor;
+                if (Math.abs(delta) > 15) {
+                  patch.value = safeClamp(Math.round(currentFavor + Math.sign(delta) * 15), -100, 100, currentFavor);
+                  console.warn(`[VariableManager] RFC补丁好感度 delta ${delta} 超限，已钳制: ${currentFavor} → ${patch.value} (${npcIdForClamp})`);
+                } else {
+                  patch.value = safeClamp(newFavor, -100, 100, currentFavor);
+                }
+              }
+            }
+          }
           set(this.state, resolvedPath, patch.value);
           break;
+        }
         case 'remove':
           unset(this.state, resolvedPath);
           break;
       }
     }
+
+    // NPC 必填字段校验：在场 NPC 缺少当前想法/当前状态时警告
+    for (const [id, npc] of Object.entries(this.state.人物档案)) {
+      const npcRecord = npc as any;
+      if (npcRecord.人物分类 !== '在场') continue;
+      const missing: string[] = [];
+      const thoughts = npcRecord.个人信息?.当前想法;
+      if (!thoughts || thoughts === '暂无' || thoughts === '未知') missing.push('当前想法');
+      const status = npcRecord.个人信息?.当前状态;
+      if (!status || status === '暂无' || status === '未知') missing.push('当前状态');
+      if (missing.length > 0) {
+        console.warn(`[VariableManager] 在场NPC「${npcRecord.姓名 || id}」缺少必填字段: ${missing.join('、')}（辅助AI可能未返回完整更新）`);
+      }
+    }
+
     this.normalizeState();
   }
 
@@ -293,9 +328,43 @@ export class VariableManager {
           const newEntries = incomingChronicles.filter(c => !existingArr.includes(c));
           (this.state.人物档案[npcId] as any).人物事迹 = [...existingArr, ...newEntries];
         }
+        // 好感度 delta 钳制：防止 AI 输出极端值导致好感度乱跳
+        const MAX_FAVORABILITY_DELTA = 15;
+        const incomingRelation = (npcData as any).关系数据;
+        if (incomingRelation && typeof incomingRelation === 'object' && incomingRelation.好感度 !== undefined) {
+          const currentFavor = (this.state.人物档案[npcId] as any)?.关系数据?.好感度;
+          if (typeof currentFavor === 'number' && Number.isFinite(currentFavor)) {
+            const newFavor = Number(incomingRelation.好感度);
+            if (Number.isFinite(newFavor)) {
+              const delta = newFavor - currentFavor;
+              if (Math.abs(delta) > MAX_FAVORABILITY_DELTA) {
+                const clamped = Math.round(currentFavor + Math.sign(delta) * MAX_FAVORABILITY_DELTA);
+                incomingRelation.好感度 = safeClamp(clamped, -100, 100, currentFavor);
+                console.warn(`[VariableManager] 好感度 delta ${delta} 超限，已钳制: ${currentFavor} → ${incomingRelation.好感度} (${identifier})`);
+              } else {
+                incomingRelation.好感度 = safeClamp(newFavor, -100, 100, currentFavor);
+              }
+            }
+          }
+        }
+
         // 原型污染防护（L-19）：源头含危险键则跳过合并，避免污染 this.state
         if (!containsDangerousKey(npcData)) {
           merge(this.state.人物档案[npcId], npcData);
+        }
+      }
+
+      // NPC 必填字段校验：在场 NPC 缺少当前想法/当前状态时警告
+      for (const [id, npc] of Object.entries(this.state.人物档案)) {
+        const npcRecord = npc as any;
+        if (npcRecord.人物分类 !== '在场') continue;
+        const missing: string[] = [];
+        const thoughts = npcRecord.个人信息?.当前想法;
+        if (!thoughts || thoughts === '暂无' || thoughts === '未知') missing.push('当前想法');
+        const status = npcRecord.个人信息?.当前状态;
+        if (!status || status === '暂无' || status === '未知') missing.push('当前状态');
+        if (missing.length > 0) {
+          console.warn(`[VariableManager] 在场NPC「${npcRecord.姓名 || id}」缺少必填字段: ${missing.join('、')}（辅助AI可能未返回完整更新）`);
         }
       }
 

@@ -200,110 +200,103 @@ export const useSaveStore = create<SaveState>((set, get) => ({
   },
 
   performSave: async (saveData) => {
+    // 配额治理：检查配额，不足时自动清理冷消息
+    await autoPruneIfNeeded(saveData.id);
+
+    // 获取上次保存的最后 seq 和消息数
+    const lastSeq = await getLastMessageSeq(saveData.id);
+
+    // 计算新增消息（使用 seq 判断，而不是数组索引）
+    const allMessages = saveData.messages || [];
+
+    // ★ 检测截断/重roll：如果数据库中的消息数 > 当前消息数，
+    // 说明发生过 rollbackAndTruncate，旧消息残留在数据库中
+    // 需要全量重写（先删后写）以保证一致性
+    const dbMessageCount = lastSeq >= 0 ? lastSeq + 1 : 0;
+    const needsFullRewrite = dbMessageCount > allMessages.length;
+
+    if (needsFullRewrite) {
+      await deleteMessages(saveData.id);
+    }
+
+    const newMessages = needsFullRewrite
+      ? allMessages  // 全量重写：所有消息都是"新"的
+      : allMessages.filter(m => (m.seq ?? 0) > lastSeq);
+
+    // 构建紧凑头部（不含 messages）
+    const compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'> = {
+      id: saveData.id,
+      name: saveData.name,
+      timestamp: saveData.timestamp,
+      schemaVersion: SAVE_SCHEMA_VERSION,
+      round: allMessages.reduce((max, m) => Math.max(max, m.round), 0),
+      gameState: saveData.gameState,
+      worldId: saveData.worldId,
+      personalInfo: saveData.personalInfo,
+      characterHistory: saveData.characterHistory,
+      memoryRuntime: saveData.memoryRuntime,
+      memoryConfig: saveData.memoryConfig,
+      vectorMemory: saveData.vectorMemory,
+      variableConfig: saveData.variableConfig,
+      customWorld: saveData.customWorld,
+      simulationState: saveData.simulationState,
+    };
+
+    // 关键写入：存档数据（失败则导出兜底）
     try {
-      // 配额治理：检查配额，不足时自动清理冷消息
-      await autoPruneIfNeeded(saveData.id);
-
-      // 获取上次保存的最后 seq 和消息数
-      const lastSeq = await getLastMessageSeq(saveData.id);
-
-      // 计算新增消息（使用 seq 判断，而不是数组索引）
-      const allMessages = saveData.messages || [];
-
-      // ★ 检测截断/重roll：如果数据库中的消息数 > 当前消息数，
-      // 说明发生过 rollbackAndTruncate，旧消息残留在数据库中
-      // 需要全量重写（先删后写）以保证一致性
-      const dbMessageCount = lastSeq >= 0 ? lastSeq + 1 : 0;
-      const needsFullRewrite = dbMessageCount > allMessages.length;
-
-      if (needsFullRewrite) {
-        await deleteMessages(saveData.id);
-      }
-
-      const newMessages = needsFullRewrite
-        ? allMessages  // 全量重写：所有消息都是"新"的
-        : allMessages.filter(m => (m.seq ?? 0) > lastSeq);
-
-      // 构建紧凑头部（不含 messages）
-      const compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'> = {
-        id: saveData.id,
-        name: saveData.name,
-        timestamp: saveData.timestamp,
-        schemaVersion: SAVE_SCHEMA_VERSION,
-        round: allMessages.reduce((max, m) => Math.max(max, m.round), 0),
-        gameState: saveData.gameState,
-        worldId: saveData.worldId,
-        personalInfo: saveData.personalInfo,
-        characterHistory: saveData.characterHistory,
-        memoryRuntime: saveData.memoryRuntime,
-        memoryConfig: saveData.memoryConfig,
-        vectorMemory: saveData.vectorMemory,
-        variableConfig: saveData.variableConfig,
-        customWorld: saveData.customWorld,
-        simulationState: saveData.simulationState,
-      };
-
-      // 增量保存
       await saveGameIncremental(saveData.id, compactHead, newMessages);
-
-      // 更新元数据
-      const meta: SaveMeta = {
-        id: saveData.id,
-        name: saveData.name,
-        timestamp: saveData.timestamp,
-        preview: buildPreview(saveData),
-        estBytes: allMessages.length * 500, // 粗略估算：每条消息约 500 字节
-        messageCount: allMessages.length,
-      };
-
-      const { savesMeta } = get();
-      const idx = savesMeta.findIndex(m => m.id === meta.id);
-      const updated = idx >= 0
-        ? savesMeta.map((m, i) => i === idx ? meta : m)
-        : [...savesMeta, meta];
-
-      set({ savesMeta: updated });
-      await saveAllSaveMeta(updated);
     } catch (err) {
-      // 错误处理：不再静默吞掉
-      console.error('[存档] 保存失败:', err);
-
-      // 尝试兜底：只导头部+最近50条（避免对超大对象 stringify 二次失败）
+      console.error('[存档] 存档数据写入失败:', err);
+      // 尝试兜底导出
       try {
         const recentMessages = (saveData.messages || []).slice(-50);
         const backupData = {
           type: 'omni-plane-travels-save-backup',
           version: '2.0',
           exportedAt: Date.now(),
-          reason: '存档失败自动备份（只含最近50条消息）',
+          reason: '存档数据写入失败自动备份（只含最近50条消息）',
           save: {
-            id: saveData.id,
-            name: saveData.name,
-            timestamp: saveData.timestamp,
-            messages: recentMessages,
-            gameState: saveData.gameState,
-            worldId: saveData.worldId,
-            personalInfo: saveData.personalInfo,
-            characterHistory: saveData.characterHistory,
-            memoryRuntime: saveData.memoryRuntime,
-            memoryConfig: saveData.memoryConfig,
-            vectorMemory: saveData.vectorMemory,
-            simulationState: saveData.simulationState,
+            id: saveData.id, name: saveData.name, timestamp: saveData.timestamp,
+            messages: recentMessages, gameState: saveData.gameState, worldId: saveData.worldId,
+            personalInfo: saveData.personalInfo, characterHistory: saveData.characterHistory,
+            memoryRuntime: saveData.memoryRuntime, memoryConfig: saveData.memoryConfig,
+            vectorMemory: saveData.vectorMemory, simulationState: saveData.simulationState,
           },
         };
         const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `save-backup-${Date.now()}.json`;
-        a.click();
+        a.href = url; a.download = `save-backup-${Date.now()}.json`; a.click();
         URL.revokeObjectURL(url);
-        console.warn('[存档] 已自动导出备份 JSON（只含最近50条消息）');
+        console.warn('[存档] 已自动导出备份 JSON');
       } catch (exportErr) {
         console.error('[存档] 导出备份也失败:', exportErr);
       }
-
       throw err;
+    }
+
+    // 非关键写入：元数据更新（失败不阻塞，下次 loadSave 会自愈）
+    const meta: SaveMeta = {
+      id: saveData.id,
+      name: saveData.name,
+      timestamp: saveData.timestamp,
+      preview: buildPreview(saveData),
+      estBytes: allMessages.length * 500,
+      messageCount: allMessages.length,
+    };
+
+    const { savesMeta } = get();
+    const idx = savesMeta.findIndex(m => m.id === meta.id);
+    const updated = idx >= 0
+      ? savesMeta.map((m, i) => i === idx ? meta : m)
+      : [...savesMeta, meta];
+
+    set({ savesMeta: updated });
+    try {
+      await saveAllSaveMeta(updated);
+    } catch (err) {
+      // 元数据写入失败不影响存档本身，内存中已更新
+      console.warn('[存档] 元数据持久化失败（内存已更新，不影响游戏）:', err);
     }
   },
 
