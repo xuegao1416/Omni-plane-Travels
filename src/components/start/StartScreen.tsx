@@ -15,6 +15,7 @@ export default function StartScreen() {
           onViewSaves={() => h.setView('saves')}
           onSettings={() => h.navigate('settings')}
           onOpenEvents={() => h.navigate('events')}
+          onOpenUserCenter={() => h.navigate('user-center')}
           title={h.t('start.title')}
           subtitle={h.t('start.subtitle')}
           beginLabel={h.t('start.begin')}

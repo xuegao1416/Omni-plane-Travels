@@ -6,6 +6,7 @@ import StartScreen from './components/start/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/game/GameScreen';
 import EventsScreen from './components/event/EventsScreen';
+import UserCenterPage from './components/UserCenterPage';
 import { useAuthStore } from './stores/authStore';
 
 function AppContent() {
@@ -18,6 +19,7 @@ function AppContent() {
     case 'settings': return <SettingsScreen />;
     case 'events': return <EventsScreen />;
     case 'game': return <GameScreen />;
+    case 'user-center': return <UserCenterPage />;
     default: return <StartScreen />;
   }
 }

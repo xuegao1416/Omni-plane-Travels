@@ -1,6 +1,7 @@
 // 生产构建脚本 - 打包 + 复制静态资源
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
 const DIST = './dist';
 
@@ -83,14 +84,16 @@ writeFileSync(join(DIST, 'main.css'), cssContent);
 console.log(`   ✅ main.css (${(cssContent.length / 1024).toFixed(1)} KB)`
   + (componentCss ? ` [全局 ${(globalCss.length / 1024).toFixed(1)} KB + 组件 ${(componentCss.length / 1024).toFixed(1)} KB]` : ''));
 
-// 4. 生成生产用 index.html
+// 4. 生成生产用 index.html（带 git commit hash 缓存破坏）
 console.log('📝 生成 index.html...');
+let buildHash = 'dev';
+try { buildHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim(); } catch { /* ignore */ }
 const htmlTemplate = readFileSync('./index.html', 'utf-8');
 const prodHtml = htmlTemplate
-  .replace('/src/index.css', '/main.css')
-  .replace('/src/main.tsx', '/main.js');
+  .replace('/src/index.css', `/main.css?v=${buildHash}`)
+  .replace('/src/main.tsx', `/main.js?v=${buildHash}`);
 writeFileSync(join(DIST, 'index.html'), prodHtml);
-console.log('   ✅ index.html');
+console.log(`   ✅ index.html (cache-bust: ${buildHash})`);
 
 // 5. 复制 PWA 资源
 console.log('📱 复制 PWA 资源...');

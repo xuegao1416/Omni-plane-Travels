@@ -1,17 +1,15 @@
 /**
- * saves.ts — 云存档槽位 CRUD。
+ * saves.ts — 云存档槽位 CRUD（支持 gzip 压缩）。
  *
- * 规则（spec.md §4 / §5 / §9）：
- *  - 每注册用户 ≤ 2 槽位（slot_index ∈ {1, 2}），超过返回 403。
- *  - 单槽软上限 1MB，超过返回 413。
- *  - 乐观并发：客户端带 x-save-version 上传；与现有 version 不符返回 409 + currentVersion。
- *  - 存档 JSON 直接存 D1（≤1MB），不需要 R2。
- *
- * 返回值为 { status, body }，由路由层转换为 Hono 响应，便于单元测试。
+ * 规则：
+ *  - 每注册用户 ≤ 2 槽位（slot_index ∈ {1, 2}）
+ *  - 单槽软上限 10MB（压缩后通常 < 200KB）
+ *  - 乐观并发：客户端带 x-save-version 上传；与现有 version 不符返回 409
+ *  - 存档 JSON 直接存 D1，支持 gzip 压缩（x-content-encoding: gzip）
  */
 import type { Bindings, SaveSlotRow } from './types';
 
-export const MAX_SLOT_BYTES = 1_048_576; // 1MB
+export const MAX_SLOT_BYTES = 10_485_760; // 10MB（压缩前上限）
 export const MAX_SLOTS = 2;
 
 export interface SlotSummary {
@@ -60,8 +58,9 @@ export async function getSlotContent(
 
 /**
  * 上传/覆盖槽位。
- * @param payloadJson 存档 JSON 字符串（应为合法 JSON）
- * @param versionHeader 客户端 x-save-version 头（期望的当前版本号，新建槽应为 0 或省略）
+ * @param payloadJson 存档数据（可能是 gzip 压缩后的 base64，也可能是原始 JSON）
+ * @param versionHeader 客户端 x-save-version 头
+ * @param contentEncoding 内容编码（'gzip' 表示已压缩）
  */
 export async function putSlot(
   env: Bindings,
@@ -69,6 +68,7 @@ export async function putSlot(
   slotId: string,
   payloadJson: string,
   versionHeader: string | null,
+  contentEncoding?: string | null,
 ): Promise<SaveResult> {
   const slotIndex = Number(slotId);
   if (!Number.isInteger(slotIndex) || slotIndex < 1 || slotIndex > MAX_SLOTS) {
@@ -77,7 +77,7 @@ export async function putSlot(
 
   const payloadSize = new TextEncoder().encode(payloadJson).length;
   if (payloadSize > MAX_SLOT_BYTES) {
-    return { status: 413, body: { error: 'PAYLOAD_TOO_LARGE', message: '单槽存档上限 1MB' } };
+    return { status: 413, body: { error: 'PAYLOAD_TOO_LARGE', message: `单槽存档上限 10MB（当前 ${(payloadSize / 1024 / 1024).toFixed(2)}MB）` } };
   }
 
   // 计算校验和
@@ -105,7 +105,7 @@ export async function putSlot(
     return { status: 200, body: { version: newVersion, generation } };
   }
 
-  // 新建槽：防御性检查总槽数（固定 2 索引时仅当 1、2 都占满才会触发）
+  // 新建槽
   const countRow = await env.DB.prepare('SELECT COUNT(*) AS c FROM save_slots WHERE user_id = ?')
     .bind(userId)
     .first<{ c: number }>();

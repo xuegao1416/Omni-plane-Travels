@@ -564,7 +564,7 @@ export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[]
         uid: -5004,
         comment: '[模块] 成长体系 - 规则',
         content: progressionContent,
-        constant: false,
+        constant: true,
         key: progressionKeywords.filter(k => k && k.length > 0),
         order: 53,
         position: 'after_char',

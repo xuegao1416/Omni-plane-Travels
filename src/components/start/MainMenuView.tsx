@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Play, FolderOpen, Settings, Boxes } from 'lucide-react';
+import { Play, FolderOpen, Settings, Boxes, Cloud } from 'lucide-react';
 import type { SaveMeta } from '../../storage/db';
+import { useAuthStore } from '../../stores/authStore';
 import BackgroundMusic from '../BackgroundMusic';
 
 interface MainMenuViewProps {
@@ -9,6 +10,7 @@ interface MainMenuViewProps {
   onViewSaves: () => void;
   onSettings: () => void;
   onOpenEvents: () => void;
+  onOpenUserCenter: () => void;
   title: string;
   subtitle: string;
   beginLabel: string;
@@ -24,9 +26,10 @@ interface MenuItem {
 }
 
 export default function MainMenuView({
-  allSaves, onStartWizard, onViewSaves, onSettings, onOpenEvents,
+  allSaves, onStartWizard, onViewSaves, onSettings, onOpenEvents, onOpenUserCenter,
   title, subtitle, beginLabel, settingsLabel,
 }: MainMenuViewProps) {
+  const { user, isAuthenticated } = useAuthStore();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -58,6 +61,40 @@ export default function MainMenuView({
         overflow: 'hidden',
       }}
     >
+      {/* 右上角：用户中心入口 */}
+      <button
+        onClick={onOpenUserCenter}
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '8px 12px',
+          background: 'transparent',
+          border: '1px solid var(--border, rgba(255,255,255,0.1))',
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+          fontSize: 'var(--font-size-sm)',
+          transition: 'all 0.2s',
+          opacity: ready ? 1 : 0,
+          zIndex: 10,
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.color = 'var(--accent)';
+          e.currentTarget.style.borderColor = 'var(--accent)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.color = 'var(--text-muted)';
+          e.currentTarget.style.borderColor = 'var(--border, rgba(255,255,255,0.1))';
+        }}
+      >
+        <Cloud size={16} strokeWidth={1.5} />
+        <span>{isAuthenticated ? (user?.username || user?.email || '已登录') : '登录'}</span>
+      </button>
+
       {/* 装饰：顶部和底部细金线 */}
       <div style={{
         position: 'absolute',
@@ -158,7 +195,7 @@ export default function MainMenuView({
         transition: 'opacity 1s ease 1.2s',
         letterSpacing: '0.05em',
       }}>
-        v2.6.4
+        v2.6.5
       </div>
       <BackgroundMusic />
     </div>

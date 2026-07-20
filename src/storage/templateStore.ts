@@ -235,10 +235,11 @@ function isValidInventoryItem(v: unknown): v is InventoryItem {
   return typeof v.数量 === 'number' && isStr(v.类型) && isStr(v.品质) && validQualities.includes(v.品质) && isStr(v.备注);
 }
 
-/** 校验 CustomNpc 结构（宽松：只要有 name 即可，其余字段可选） */
+/** 校验 CustomNpc 结构（宽松：只要有 name/姓名 即可，其余字段可选） */
 function isValidNpcShape(v: unknown): v is CustomNpc {
   if (!isObj(v)) return false;
-  if (!isStr(v.name) || !v.name.trim()) return false;
+  const npcName = isStr(v.name) ? v.name : (isStr((v as any).姓名) ? (v as any).姓名 : '');
+  if (!npcName.trim()) return false;
   // 可选字段如果存在必须是正确类型
   const strFields = ['gender', 'age', 'race', 'relationshipType', 'occupation', 'socialStatus',
     'personality', 'hiddenPersonality', 'currentThought', 'appearance', 'currentOutfit',
@@ -311,12 +312,19 @@ export function parseNpcTemplateJSON(jsonStr: string): ValidateResult<NpcTemplat
   const data = raw.data ?? raw;
   const npc = data.npc ?? data;
 
+  // 兼容 name 和 姓名 两种字段名（存档人物档案用 姓名，模板用 name）
+  if (isObj(npc) && !isStr(npc.name) && isStr((npc as any).姓名)) {
+    npc.name = (npc as any).姓名;
+  }
+
   if (!isValidNpcShape(npc)) {
-    if (!isStr(npc?.name) || !npc.name.trim()) return { ok: false, error: '缺少有效的 NPC name 字段' };
+    const fallbackName = isObj(npc) ? ((npc as any).name || (npc as any).姓名) : null;
+    if (!isStr(fallbackName) || !fallbackName.trim()) return { ok: false, error: '缺少有效的 NPC name 字段' };
     return { ok: false, error: 'NPC 数据格式无效，请检查字段类型' };
   }
 
-  const tplName = isStr(data.name) ? data.name : (npc.name || '导入的NPC');
+  const npcNameStr = (npc as any).name as string;
+  const tplName = isStr(data.name) ? data.name : (npcNameStr || '导入的NPC');
 
   const tpl: NpcTemplate = {
     id: uuid(),
@@ -324,7 +332,7 @@ export function parseNpcTemplateJSON(jsonStr: string): ValidateResult<NpcTemplat
     createdAt: Date.now(),
     npc: {
       id: uuid(),
-      name: npc.name,
+      name: npcNameStr,
       gender: isStr(npc.gender) ? npc.gender : '',
       age: isStr(npc.age) ? npc.age : '',
       race: isStr(npc.race) ? npc.race : '',

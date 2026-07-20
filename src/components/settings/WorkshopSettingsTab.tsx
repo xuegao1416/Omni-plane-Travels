@@ -84,7 +84,7 @@ export default function WorkshopSettingsTab() {
         .map(t => t.trim())
         .filter(Boolean);
 
-      const res = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/workshop`, {
+      const res = await fetch(`/api/workshop`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

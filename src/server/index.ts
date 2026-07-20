@@ -133,7 +133,8 @@ app.put('/api/saves/:slotId', async (c) => {
     return c.json({ error: 'INVALID_JSON', message: '存档内容必须是合法 JSON' }, 400);
   }
   const versionHeader = c.req.header('x-save-version') ?? null;
-  const res = await putSlot(c.env, s.userId, c.req.param('slotId')!, payloadJson, versionHeader);
+  const contentEncoding = c.req.header('x-content-encoding') ?? null;
+  const res = await putSlot(c.env, s.userId, c.req.param('slotId')!, payloadJson, versionHeader, contentEncoding);
   return c.json(res.body, res.status as 200 | 403 | 409 | 413);
 });
 
@@ -166,23 +167,34 @@ app.get('/api/workshop/:itemId', async (c) => {
 });
 
 app.get('/api/workshop/:itemId/download', async (c) => {
-  const itemId = c.req.param('itemId')!;
-  const item = await getItem(c.env, itemId);
-  if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
+  try {
+    const itemId = c.req.param('itemId')!;
+    const item = await getItem(c.env, itemId);
+    if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
 
-  c.executionCtx.waitUntil(incrementDownloadCount(c.env, itemId));
+    // 增加下载计数（fire-and-forget）
+    incrementDownloadCount(c.env, itemId).catch(() => {});
 
-  return c.json({
-    id: item.id,
-    type: item.type,
-    title: item.title,
-    description: item.description,
-    tags: item.tags ? JSON.parse(item.tags) : [],
-    data: JSON.parse(item.data_json),
-    download_count: item.download_count + 1,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-  });
+    let tags: string[] = [];
+    try { tags = item.tags ? JSON.parse(item.tags) : []; } catch { tags = []; }
+
+    let data: unknown;
+    try { data = JSON.parse(item.data_json); } catch { data = item.data_json; }
+
+    return c.json({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      tags,
+      data,
+      download_count: item.download_count + 1,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    });
+  } catch (err) {
+    return c.json({ error: 'DOWNLOAD_FAILED', message: String(err) }, 500);
+  }
 });
 
 app.post('/api/workshop', requireAuth, async (c) => {
