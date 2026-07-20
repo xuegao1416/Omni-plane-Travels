@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import { UISettingsProvider } from './context/UISettingsContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -5,9 +6,14 @@ import StartScreen from './components/start/StartScreen';
 import SettingsScreen from './components/SettingsScreen';
 import GameScreen from './components/game/GameScreen';
 import EventsScreen from './components/event/EventsScreen';
+import { useAuthStore } from './stores/authStore';
 
 function AppContent() {
   const { state } = useGame();
+  const checkAuth = useAuthStore(s => s.checkAuth);
+
+  useEffect(() => { checkAuth(); }, [checkAuth]);
+
   switch (state.currentScreen) {
     case 'settings': return <SettingsScreen />;
     case 'events': return <EventsScreen />;

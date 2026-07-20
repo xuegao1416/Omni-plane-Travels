@@ -1,0 +1,12 @@
+# .dev.vars.example — 本地开发环境变量模板
+# 复制为 .dev.vars 并填入真实值（.dev.vars 已加入 .gitignore，不会进仓库）。
+# 本地运行：wrangler pages dev dist
+
+# 会话令牌 HMAC 签名密钥，任意长随机串：openssl rand -hex 32
+SESSION_SECRET=replace_with_a_long_random_secret
+
+# Brevo API Key（免费 300 封/天，https://brevo.com 注册获取）
+BREVO_API_KEY=xkeysib-xxxxxxxxxxxx
+
+# 可选：允许跨域的桌面端 Origin（逗号分隔）
+# ALLOWED_ORIGINS=tauri://localhost,http://localhost:8788

@@ -1,6 +1,7 @@
 # Dev tools (不提交)
 .claude/
 CLAUDE.md
+.dev.vars
 
 # Dev tools (不提交)
 dev-size-tool.tsx

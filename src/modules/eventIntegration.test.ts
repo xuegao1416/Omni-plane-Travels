@@ -19,7 +19,7 @@ const ruleManifest: Manifest = {
   author: 'tester',
   engine: 'opt-event',
   schemaVersion: 1,
-  minAppVersion: '2.6.3',
+  minAppVersion: '2.6.4',
   type: 'rule',
   coverColor: '#3b82f6',
   icon: 'Zap',

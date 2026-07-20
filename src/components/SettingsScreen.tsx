@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Palette, Cpu, ArrowLeft, ImageIcon, FileText } from 'lucide-react';
+import { Palette, Cpu, ArrowLeft, ImageIcon, FileText, User, Cloud, Store } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useUISettings } from '../context/UISettingsContext';
@@ -10,14 +10,20 @@ import GeneralSettingsTab from './settings/GeneralSettingsTab';
 import ApiSettingsTab, { type ApiSettingsRef } from './settings/ApiSettingsTab';
 import ImageGenSettingsTab from './settings/ImageGenSettingsTab';
 import PresetSettingsTab from './settings/PresetSettingsTab';
+import AuthSettingsTab from './settings/AuthSettingsTab';
+import CloudSaveSettingsTab from './settings/CloudSaveSettingsTab';
+import WorkshopSettingsTab from './settings/WorkshopSettingsTab';
 
-type SettingsTab = 'general' | 'api' | 'image' | 'preset';
+type SettingsTab = 'general' | 'api' | 'image' | 'preset' | 'auth' | 'cloud' | 'workshop';
 
 const SETTINGS_TABS: { id: SettingsTab; icon: LucideIcon; label: string }[] = [
   { id: 'general', icon: Palette, label: '通常设置' },
   { id: 'api', icon: Cpu, label: 'API 设置' },
   { id: 'image', icon: ImageIcon, label: '生图设置' },
   { id: 'preset', icon: FileText, label: '预设管理' },
+  { id: 'auth', icon: User, label: '账号' },
+  { id: 'cloud', icon: Cloud, label: '云存档' },
+  { id: 'workshop', icon: Store, label: '创意工坊' },
 ];
 
 export default function SettingsScreen() {
@@ -146,6 +152,9 @@ export default function SettingsScreen() {
           {tab === 'api' && <ApiSettingsTab ref={apiRef} initialConfig={apiConfig} t={t} onSave={handleSave} onBack={goBack} />}
           {tab === 'image' && <ImageGenSettingsTab />}
           {tab === 'preset' && <PresetSettingsTab />}
+          {tab === 'auth' && <AuthSettingsTab />}
+          {tab === 'cloud' && <CloudSaveSettingsTab />}
+          {tab === 'workshop' && <WorkshopSettingsTab />}
         </div>
       </div>
 
