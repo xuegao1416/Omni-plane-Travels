@@ -415,6 +415,749 @@
         "position": "before_char"
       },
       {
+        "uid": 20,
+        "entryType": "lore",
+        "key": [
+          "旧世界废墟",
+          "废墟",
+          "城市遗迹"
+        ],
+        "comment": "旧世界废墟",
+        "content": "旧世界废墟是核战前的城市遗迹，如今只剩下扭曲的钢筋骨架和倒塌的混凝土墙。废墟中弥漫着辐射尘，空气中混杂着铁锈和腐烂的味道。废墟是拾荒者的天堂——旧世界的建筑里可能藏着武器、药品、食物和各种零件。但废墟也是危险的地方——辐射值高、变异兽出没、结构不稳定，随时可能坍塌。拾荒者们在废墟中穿行，寻找一切能用的东西，用命换钱。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 21,
+        "entryType": "lore",
+        "key": [
+          "变异森林",
+          "辐射森林",
+          "真菌"
+        ],
+        "comment": "变异森林",
+        "content": "变异森林是核战后在辐射区生长出的奇异生态系统。树木扭曲变形，树干上长满了发光的真菌，树叶呈现出诡异的紫色和蓝色。森林中弥漫着孢子雾，长时间暴露会导致幻觉和精神错乱。变异森林是变异兽的栖息地，也是珍贵药材和辐射晶石的产地。净化者们会定期进入森林采集资源，但每次都是九死一生。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 22,
+        "entryType": "lore",
+        "key": [
+          "旧军事基地",
+          "军火库",
+          "基地"
+        ],
+        "comment": "旧军事基地",
+        "content": "旧军事基地是核战前的军事设施，如今大多被废弃或被势力占据。基地中可能藏着旧世界的武器、弹药、动力装甲和各种高科技设备。但基地也是危险的地方——安保机器人仍在运作、辐射陷阱遍布、变异兽可能在其中筑巢。钢铁黎明占据的旧费城军械库就是其中之一，里面存放着大量旧世界武器。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 23,
+        "entryType": "lore",
+        "key": [
+          "废土酒吧",
+          "酒馆",
+          "交易"
+        ],
+        "comment": "废土酒吧",
+        "content": "废土酒吧是拾荒者和佣兵们聚集的地方。最大的酒吧是铁锈镇的「锈蚀酒馆」，老板是个独眼的老兵。酒馆里什么都有——烈酒、情报、雇佣兵、甚至暗杀委托。酒馆的墙上贴满了悬赏令和寻人启事。酒馆是废土上少有的「中立区」，各势力在这里暂时放下恩怨，喝酒、谈生意、交换情报。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 24,
+        "entryType": "lore",
+        "key": [
+          "奴隶市场",
+          "奴隶",
+          "交易"
+        ],
+        "comment": "奴隶市场",
+        "content": "奴隶市场是废土上最黑暗的地方。掠夺者们把俘虏带到市场上出售，价格取决于年龄、健康和技能。强壮的男人能卖20发.308，年轻女人能卖30发，有技术的（医生、工程师）能卖50发以上。奴隶们被买走后，大多去矿山或工厂做苦力，少数成为私人保镖或仆人。奴隶市场是血狼帮的主要收入来源之一。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 25,
+        "entryType": "lore",
+        "key": [
+          "净化站",
+          "净化",
+          "净水"
+        ],
+        "comment": "净化站",
+        "content": "净化站是废土上最重要的设施之一。净化站能把辐射水变成净水，是聚落生存的关键。铁锈镇的净化站是一台旧世界的净水设备，由退伍老兵汉克维护。净化站每天能生产50升净水，足够80人饮用。但净化站需要燃料和零件，维护成本高昂。没有净化站的聚落，只能靠收集雨水或购买净水生存。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 26,
+        "entryType": "factions",
+        "key": [
+          "纯血凡人联盟",
+          "纯血",
+          "反异能"
+        ],
+        "comment": "纯血凡人联盟",
+        "content": "[neutral] 纯血凡人联盟是废土上反对异能者的组织。他们认为异能者是人类的变异怪物，应该被消灭或隔离。联盟的成员大多是普通幸存者，他们依靠旧世界科技和废土装备生存。联盟的口号是「人类至上，异能必诛」。联盟与钢铁黎明有合作关系，但并非完全一致——钢铁黎明排斥异能者，但不主动猎杀。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "纯血凡人联盟",
+              "description": "反对异能者的组织，认为异能者是变异怪物。依靠旧世界科技生存。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 27,
+        "entryType": "factions",
+        "key": [
+          "赏金猎人",
+          "猎人",
+          "佣兵"
+        ],
+        "comment": "赏金猎人",
+        "content": "[neutral] 赏金猎人是废土上的自由职业者。他们接受各种委托——猎杀变异兽、护送商队、刺杀目标、寻找失踪人口。赏金猎人的价格不菲，但他们的能力和信誉都很可靠。最著名的赏金猎人是「独狼」，他从不与人合作，独自完成过无数危险任务。赏金猎人公会在废土酒吧里有专门的公告板，上面贴满了各种委托。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "赏金猎人",
+              "description": "废土上的自由职业者，接受各种委托。价格不菲但能力和信誉可靠。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 28,
+        "entryType": "factions",
+        "key": [
+          "净化教团",
+          "净化者",
+          "教团"
+        ],
+        "comment": "净化教团",
+        "content": "[friendly] 净化教团是废土上的宗教组织。他们相信核战是「净化」，辐射是「神的试炼」，只有通过净化才能获得新生。教团的成员穿着白色防护服，戴着防毒面具，在辐射区进行「净化仪式」。教团拥有先进的医疗技术和净化设备，能治疗辐射病和基因异化。教团对外来者很友好，但对亵渎者毫不留情。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "净化教团",
+              "description": "废土上的宗教组织，相信核战是净化。拥有先进医疗技术和净化设备。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 29,
+        "entryType": "factions",
+        "key": [
+          "奴隶贩子",
+          "奴隶主"
+        ],
+        "comment": "奴隶贩子",
+        "content": "[hostile] 奴隶贩子是废土上最令人痛恨的群体。他们捕获幸存者，带到奴隶市场上出售。奴隶贩子大多是掠夺者出身，手段残忍、毫无底线。他们最常在废墟和辐射区伏击落单的拾荒者。奴隶贩子的头目是「铁笼」，一个身材魁梧的光头男人，他的标志是一个铁制的项圈。被他盯上的人，几乎没有逃脱的可能。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "奴隶贩子",
+              "description": "捕获幸存者带到奴隶市场出售。手段残忍、毫无底线。",
+              "alignment": "hostile"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 30,
+        "entryType": "npcs",
+        "key": [
+          "独狼",
+          "赏金猎人"
+        ],
+        "comment": "独狼",
+        "content": "【独狼】（赏金猎人）\n年龄不详，总是戴着一副旧世界的护目镜，从不摘下。他从不与人合作，独自完成过无数危险任务——猎杀变异兽王、潜入旧军事基地、刺杀帮派头目。他的价格很高，但信誉极好，接了任务就一定会完成。他很少说话，但每一句都很有分量。他最讨厌的是背叛和不守信用的人。（性格：沉默、高效、守信）",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "独狼",
+              "role": "赏金猎人",
+              "description": "年龄不详，戴旧世界护目镜。从不与人合作，独自完成无数危险任务。价格高但信誉极好。",
+              "personality": "沉默、高效、守信"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 31,
+        "entryType": "npcs",
+        "key": [
+          "汉克",
+          "老兵",
+          "发电机"
+        ],
+        "comment": "汉克",
+        "content": "【汉克】（退伍老兵/发电机维护员）\n六十多岁，是铁锈镇唯一的电力专家。他每天维护那台老旧的柴油发电机，确保镇子每天有两小时的电力。他对发电机比对人还亲，谁要是弄坏了发电机，他会跟谁拼命。他年轻时是旧世界的军人，见过核战爆发的那一刻。他很少提起过去，但偶尔会说：「那时候，天空是蓝色的。」（性格：固执、念旧、手巧）",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "汉克",
+              "role": "退伍老兵",
+              "description": "六十多岁，铁锈镇唯一的电力专家。每天维护柴油发电机，确保镇子有两小时电力。",
+              "personality": "固执、念旧、手巧"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 32,
+        "entryType": "npcs",
+        "key": [
+          "老白",
+          "医生",
+          "诊所"
+        ],
+        "comment": "老白",
+        "content": "【老白】（前军医/诊所医生）\n五十多岁，是三号站诊所的经营者。他年轻时是旧世界的军医，见过无数伤员。他能用旧世界手术器械做简单外伤处理和辐射净化，但收费昂贵——一剂抗辐宁就要十五发子弹。他对病人一视同仁，无论是拾荒者还是帮派成员，只要付得起钱，他就治。他最讨厌的是欠钱不还的人。（性格：冷静、专业、贪财）",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "老白",
+              "role": "前军医",
+              "description": "五十多岁，三号站诊所经营者。能做外伤处理和辐射净化，收费昂贵。",
+              "personality": "冷静、专业、贪财"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 33,
+        "entryType": "npcs",
+        "key": [
+          "军火商",
+          "武器商"
+        ],
+        "comment": "军火商",
+        "content": "【军火商】（武器商人）\n四十多岁，是废土上最大的武器商人。他的名字没人知道，大家都叫他「枪王」。他什么武器都有——手枪、步枪、霰弹枪、甚至火箭筒。他的价格很高，但质量有保证。他最讨厌的是赊账和偷窃，被他抓住的人会被当场处决。他的仓库在旧费城军械库的地下三层，由钢铁黎明保护。（性格：精明、冷酷、守信）",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "军火商",
+              "role": "武器商人",
+              "description": "四十多岁，废土上最大的武器商人。什么武器都有，价格高但质量有保证。",
+              "personality": "精明、冷酷、守信"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 34,
+        "entryType": "npcs",
+        "key": [
+          "情报贩子",
+          "线人"
+        ],
+        "comment": "情报贩子",
+        "content": "【情报贩子】（情报商人）\n三十多岁，是废土上最神秘的人物。他的名字没人知道，大家都叫他「影子」。他什么情报都有——势力动向、物资位置、人员信息、甚至旧世界的秘密。他的价格很高，但情报很准确。他最讨厌的是泄露他身份的人，被他抓住的人会永远消失。他的联络方式是通过短波电台，频率每天都在变化。（性格：神秘、谨慎、无情）",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "情报贩子",
+              "role": "情报商人",
+              "description": "三十多岁，废土上最神秘的人物。什么情报都有，价格高但准确。",
+              "personality": "神秘、谨慎、无情"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 35,
+        "entryType": "culture",
+        "key": [
+          "废土葬礼",
+          "火化",
+          "魂晶"
+        ],
+        "comment": "废土葬礼",
+        "content": "废土人死后不土葬（防瘟疫和变异兽掘尸），一律火化。焚烧时，亲属会在火堆旁寻找遗体中凝结的「辐射晶石」——若死者生前有异能，骨灰中会凝结出微小的晶粒，被称为「魂晶」，由家属保存或嵌入武器作为遗物。葬礼上讲述逝者生平时必须说真话，无论善恶——废土人相信，只有完整真实的一生，死者才能安心踏入「灰烬之河」。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 36,
+        "entryType": "culture",
+        "key": [
+          "废土信用",
+          "承诺",
+          "信用"
+        ],
+        "comment": "废土信用",
+        "content": "废土信用是废土上最重要的社交货币。口头承诺在废土上具有极高分量——一个商人的信用若崩塌，整个商队公会都会将其除名；一个拾荒者若食言，将再无任何聚落收留。但也因此，废土上极少有人轻易许诺——因为他们知道，承诺意味着拿命担保。废土信用的建立需要时间和行动，但崩塌只需要一次背叛。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 37,
+        "entryType": "culture",
+        "key": [
+          "废土交易",
+          "以物易物",
+          "交易规则"
+        ],
+        "comment": "废土交易",
+        "content": "废土交易以.308子弹为通用货币。交易时永远先确认对方的枪口方向，再确认货物。交易规则很简单：一手交钱，一手交货，概不赊账。赊账意味着信用崩塌，信用崩塌意味着死亡。废土交易没有法律保护，只有枪口保护。交易时最好有第三方见证，否则容易被黑吃黑。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 38,
+        "entryType": "culture",
+        "key": [
+          "废土婚姻",
+          "伴侣",
+          "结合"
+        ],
+        "comment": "废土婚姻",
+        "content": "废土上的婚姻很简单——两个人决定在一起，互相保护、互相照顾，就是伴侣了。没有婚礼、没有证书、没有法律保护。废土伴侣的结合基于生存需要和感情，但更多的是生存需要。两个人一起拾荒、一起战斗、一起面对危险，比一个人生存更容易。废土伴侣的分离也很简单——一个人死了，或者一个人背叛了，关系就结束了。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 39,
+        "entryType": "culture",
+        "key": [
+          "废土酒文化",
+          "喝酒",
+          "烈酒"
+        ],
+        "comment": "废土酒文化",
+        "content": "废土上的酒是用变异植物蒸馏出来的烈酒，度数高得吓人，但能让人暂时忘记废土的残酷。喝酒是废土人少有的消遣之一——在废土酒吧里，拾荒者们喝着烈酒，吹嘘自己的冒险经历，交换情报，甚至起冲突。废土酒文化的核心是：喝醉了可以，但不能误事。误事意味着死亡。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 40,
+        "entryType": "economy",
+        "key": [
+          "详细物价",
+          "价格表",
+          "物资价格"
+        ],
+        "comment": "详细物价",
+        "content": "废土物价以.308子弹为基准：\n- 生存品：一壶净水（2升）≈5发，一罐军用口粮≈8发，一剂抗辐宁≈15发\n- 武器：一把修好的旧世界手枪≈50发，一把步枪≈80发，一件防辐射斗篷≈20发\n- 服务：一次外伤治疗≈20发，一次辐射净化≈30发，一次情报交易≈10-50发\n- 特殊：一件动力装甲≈500发，一颗辐射晶石≈100发，一个奴隶≈20-50发",
+        "constant": false,
+        "order": 11,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": ".308步枪弹",
+            "symbol": "⚙️",
+            "description": "废土通用硬通货，纯净水瓶盖用于找零和小额交易"
+          },
+          "priceLevel": "生存品5-15发，武器50-80发，服务20-50发，特殊100-500发"
+        }
+      },
+      {
+        "uid": 41,
+        "entryType": "economy",
+        "key": [
+          "黑市",
+          "非法交易",
+          "地下市场"
+        ],
+        "comment": "黑市",
+        "content": "黑市是废土上非法交易的场所。黑市里什么都有——毒品、奴隶、禁忌科技、甚至核弹头。黑市的位置每天都在变化，只有通过情报贩子才能找到。黑市的价格比正常市场高很多，但这里能买到正常市场买不到的东西。黑市的规则很简单：有钱就买，没钱就滚，闹事就死。",
+        "constant": false,
+        "order": 11,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": ".308步枪弹",
+            "symbol": "⚙️",
+            "description": "黑市交易使用.308子弹，价格比正常市场高"
+          },
+          "priceLevel": "黑市价格是正常市场的2-3倍"
+        }
+      },
+      {
+        "uid": 42,
+        "entryType": "relationships",
+        "key": [
+          "拾荒搭档",
+          "搭档",
+          "伙伴"
+        ],
+        "comment": "拾荒搭档关系",
+        "content": "拾荒搭档是废土上最常见的合作关系。两个人一起拾荒、一起战斗、一起面对危险，比一个人生存更容易。拾荒搭档的关系基于信任和能力——你必须信任对方不会在背后开枪，也必须信任对方有能力在危险时救你。拾荒搭档的关系可能很短暂（一次任务），也可能很长久（一辈子）。",
+        "constant": false,
+        "order": 14,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "拾荒搭档是废土上最常见的合作关系，基于信任和能力。",
+            "mechanics": "拾荒搭档关系影响战斗效率和生存概率。",
+            "types": [
+              {
+                "name": "临时搭档",
+                "description": "一次任务的合作，任务结束就分开。"
+              },
+              {
+                "name": "长期搭档",
+                "description": "长期合作，互相了解对方的能力和习惯。"
+              },
+              {
+                "name": "过命搭档",
+                "description": "一起经历过生死，关系牢不可破。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 43,
+        "entryType": "relationships",
+        "key": [
+          "聚落住民",
+          "庇护值",
+          "居民"
+        ],
+        "comment": "聚落住民关系",
+        "content": "聚落住民关系是你与定居点居民的关系。庇护值高时，居民会主动提供物资赊账、警告危险；低时可能被驱逐甚至出卖。庇护值的提升方式：帮助聚落防御、分享物资、完成居民委托。庇护值的降低方式：伤害居民、私吞物资、背叛聚落。庇护值是废土上少有的「温暖」关系——在这里，你不是一个人。",
+        "constant": false,
+        "order": 14,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "聚落住民关系影响庇护值，庇护值高时获得帮助，低时被驱逐。",
+            "mechanics": "庇护值通过帮助聚落、分享物资、完成委托提升；伤害居民、私吞物资、背叛降低。",
+            "types": [
+              {
+                "name": "外来者",
+                "description": "刚到聚落，庇护值为0。"
+              },
+              {
+                "name": "常客",
+                "description": "经常来聚落，庇护值中等。"
+              },
+              {
+                "name": "自己人",
+                "description": "被聚落接纳，庇护值高。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 44,
+        "entryType": "relationships",
+        "key": [
+          "势力干系人",
+          "联络人",
+          "势力关系"
+        ],
+        "comment": "势力干系人关系",
+        "content": "势力干系人关系是你与各势力联络人的关系。关系好时，你能进入核心区域、购买限制物资、获得武装支援；关系差时，你会被追杀、被通缉、被驱逐。势力干系人关系的提升方式：完成势力委托、提供情报、帮助势力战斗。势力干系人关系的降低方式：伤害势力成员、背叛势力、与敌对势力合作。",
+        "constant": false,
+        "order": 14,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "势力干系人关系决定你能获得的资源和支援。",
+            "mechanics": "关系通过完成委托、提供情报、帮助战斗提升；伤害成员、背叛、与敌对势力合作降低。",
+            "types": [
+              {
+                "name": "陌生人",
+                "description": "与势力没有关系。"
+              },
+              {
+                "name": "合作者",
+                "description": "与势力有合作关系。"
+              },
+              {
+                "name": "核心成员",
+                "description": "被势力接纳为核心成员。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 45,
+        "entryType": "lore",
+        "key": [
+          "旧世界医院",
+          "医院",
+          "医疗设备"
+        ],
+        "comment": "旧世界医院",
+        "content": "旧世界医院是核战前的医疗设施，如今大多被废弃或被势力占据。医院中可能藏着旧世界的医疗设备、药品和手术器械。但医院也是危险的地方——辐射值高、变异兽出没、结构不稳定。老白的诊所就是在旧世界医院的基础上建立的，他用旧世界的手术器械做外伤处理和辐射净化。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 46,
+        "entryType": "lore",
+        "key": [
+          "旧世界学校",
+          "学校",
+          "教育"
+        ],
+        "comment": "旧世界学校",
+        "content": "旧世界学校是核战前的教育设施，如今大多被废弃。学校里可能藏着旧世界的书籍、电脑和各种教学设备。但学校也是危险的地方——辐射值高、变异兽出没、结构不稳定。有些拾荒者会在学校里寻找旧世界的知识，但大多数学校已经被洗劫一空。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 47,
+        "entryType": "lore",
+        "key": [
+          "旧世界工厂",
+          "工厂",
+          "工业"
+        ],
+        "comment": "旧世界工厂",
+        "content": "旧世界工厂是核战前的工业设施，如今大多被废弃或被势力占据。工厂中可能藏着旧世界的机器、零件和原材料。但工厂也是危险的地方——辐射值高、结构不稳定、可能有安保机器人。有些聚落会在工厂里建立生产基地，生产武器、弹药和各种生存物资。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 48,
+        "entryType": "lore",
+        "key": [
+          "辐射区",
+          "高辐射区",
+          "禁区"
+        ],
+        "comment": "辐射区",
+        "content": "辐射区是废土上辐射值最高的地方。辐射区的空气中弥漫着辐射尘，地面覆盖着辐射粉尘，长时间暴露会导致辐射病。辐射区是变异兽的栖息地，也是辐射晶石的产地。进入辐射区需要全套防化装备——铅衬防护服、军用级防毒面具、辐射探测器。单次暴露极限为四小时，超出将引发不可逆的骨髓辐射病。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 49,
+        "entryType": "lore",
+        "key": [
+          "变异兽巢穴",
+          "巢穴",
+          "变异兽"
+        ],
+        "comment": "变异兽巢穴",
+        "content": "变异兽巢穴是变异兽的栖息地，通常在辐射区或废弃建筑中。巢穴里可能有变异兽的幼崽、食物储备和各种资源。但巢穴也是危险的地方——变异兽会保卫自己的领地，入侵者会遭到攻击。最危险的巢穴是「地铁吞噬者」的巢穴——一种融合了车厢铁皮的巨型变异蜈蚣，曾有三支武装小队深入探索，无一生还。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 50,
+        "entryType": "lore",
+        "key": [
+          "旧世界超市",
+          "超市",
+          "商店"
+        ],
+        "comment": "旧世界超市",
+        "content": "旧世界超市是核战前的商业设施，如今大多被废弃或被洗劫一空。超市里可能藏着旧世界的食品、日用品和各种物资。但超市也是危险的地方——辐射值高、变异兽出没、结构不稳定。有些拾荒者会在超市里寻找还能吃的东西，但大多数食品已经过期或被污染。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 51,
+        "entryType": "lore",
+        "key": [
+          "旧世界住宅",
+          "住宅",
+          "公寓"
+        ],
+        "comment": "旧世界住宅",
+        "content": "旧世界住宅是核战前的居住设施，如今大多被废弃。住宅里可能藏着旧世界的家具、电器和各种生活用品。但住宅也是危险的地方——辐射值高、结构不稳定、可能有拾荒者或掠夺者藏身。有些拾荒者会在住宅里寻找还能用的东西，但大多数住宅已经被洗劫一空。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 52,
+        "entryType": "lore",
+        "key": [
+          "旧世界图书馆",
+          "图书馆",
+          "书籍"
+        ],
+        "comment": "旧世界图书馆",
+        "content": "旧世界图书馆是核战前的知识宝库，如今大多被废弃。图书馆里可能藏着旧世界的书籍、地图和各种资料。但图书馆也是危险的地方——辐射值高、结构不稳定、可能有变异兽藏身。有些拾荒者会在图书馆里寻找有用的知识，但大多数书籍已经腐烂或被污染。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 53,
+        "entryType": "lore",
+        "key": [
+          "旧世界地铁站",
+          "地铁",
+          "隧道"
+        ],
+        "comment": "旧世界地铁站",
+        "content": "旧世界地铁站是核战前的交通设施，如今大多被废弃或被改造为聚落。地铁站里可能藏着旧世界的设备、零件和各种物资。但地铁站也是危险的地方——辐射值高、结构不稳定、可能有变异兽藏身。十三号线的地铁站是废土上最繁忙的地下通道，沿线共十四个废弃车站，其中七个被改造为人类聚落。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 54,
+        "entryType": "lore",
+        "key": [
+          "旧世界发电站",
+          "发电站",
+          "电力"
+        ],
+        "comment": "旧世界发电站",
+        "content": "旧世界发电站是核战前的电力设施，如今大多被废弃或被势力占据。发电站里可能藏着旧世界的发电机、变压器和各种电力设备。但发电站也是危险的地方——辐射值高、结构不稳定、可能有安保机器人。有些聚落会在发电站里建立电力系统，为聚落提供电力。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 55,
+        "entryType": "lore",
+        "key": [
+          "旧世界军事基地",
+          "基地",
+          "军事"
+        ],
+        "comment": "旧世界军事基地",
+        "content": "旧世界军事基地是核战前的军事设施，如今大多被废弃或被势力占据。基地里可能藏着旧世界的武器、弹药、动力装甲和各种高科技设备。但基地也是危险的地方——安保机器人仍在运作、辐射陷阱遍布、变异兽可能在其中筑巢。钢铁黎明占据的旧费城军械库就是其中之一。",
+        "constant": false,
+        "order": 18,
+        "position": "before_char"
+      },
+      {
+        "uid": 56,
+        "entryType": "culture",
+        "key": [
+          "废土语言",
+          "俚语",
+          "黑话"
+        ],
+        "comment": "废土语言",
+        "content": "废土上有自己的语言系统。常用俚语包括：「发」（.308子弹的单位）、「水」（净水）、「壳」（瓶盖）、「肉」（奴隶）、「火」（战斗）、「影」（潜行）、「崩」（死亡）、「铁」（武器）、「甲」（防护服）、「芯」（辐射晶石）。废土人说话简短有力，因为每一句话都可能是遗言。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 57,
+        "entryType": "culture",
+        "key": [
+          "废土音乐",
+          "歌曲",
+          "吟游"
+        ],
+        "comment": "废土音乐",
+        "content": "废土上的音乐是用旧世界的乐器演奏的。最常见的乐器是吉他和口琴，因为它们便于携带。废土音乐的主题大多是生存、失去和希望。最著名的废土歌曲是「灰烬之歌」，歌词讲述了一个拾荒者在废土上寻找家的故事。废土音乐是少有的能让人们暂时忘记残酷的东西。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 58,
+        "entryType": "culture",
+        "key": [
+          "废土艺术",
+          "涂鸦",
+          "壁画"
+        ],
+        "comment": "废土艺术",
+        "content": "废土上的艺术是用旧世界的颜料或辐射涂料创作的。最常见的艺术形式是涂鸦和壁画，主题大多是生存、反抗和希望。废土艺术是少有的能让人们表达情感的东西。最著名的废土壁画是铁锈镇墙上的「希望之手」，画着一只伸出的手，象征着废土人对未来的渴望。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 59,
+        "entryType": "culture",
+        "key": [
+          "废土节日",
+          "庆典",
+          "集会"
+        ],
+        "comment": "废土节日",
+        "content": "废土上没有传统意义上的节日，但有一些特殊的集会。最大的集会是「黑市交易日」——每月中旬，流浪商队公会在旧公路举行一次大规模交易会，各势力派代表交换稀缺物资和情报。另一个重要的集会是「净化仪式」——净化教团每月举行一次，为信徒净化辐射。废土上的人们通过这些集会暂时忘记残酷，寻找希望。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 60,
+        "entryType": "rules",
+        "key": [
+          "废土法则",
+          "生存法则",
+          "规矩"
+        ],
+        "comment": "废土法则",
+        "content": "废土的法则是残酷而简单的：\n- **物资至上法则**：一壶净水比十条人命值钱，一发子弹能买一个人情。\n- **不问过去法则**：没有人会追问你战前是谁，废土只认你的当前能力和信用。\n- **以牙还牙法则**：劫掠他人物资等同于宣判对方死刑，被劫者有权无限追杀。\n- **搭手之恩法则**：在荒野中遇到求救者，若力所能及则须施以最低限度的援助。\n- **信用法则**：口头承诺具有极高分量，信用崩塌意味着死亡。",
+        "constant": true,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "powerSystem": "物资与信用体系",
+          "socialStructure": "弱肉强食，适者生存",
+          "specialRules": [
+            "物资至上：一壶净水比十条人命值钱",
+            "不问过去：废土只认当前能力和信用",
+            "以牙还牙：劫掠等同宣判死刑",
+            "搭手之恩：力所能及须施援手",
+            "信用法则：承诺拿命担保"
+          ]
+        }
+      },
+      {
         "uid": -1,
         "comment": "[模块] 数值属性 - 规则",
         "content": "【数值属性更新规则】\n\n当角色受到伤害/恢复/消耗/提升时，更新对应属性：\n{\"玩家\":{\"生存状态\":{\"血量\":75}}}  // 生命类变化\n{\"玩家\":{\"生存状态\":{\"体力值\":55}}}  // 能量类变化\n{\"玩家\":{\"生存状态\":{\"dim1\":47}}}  // 六维变化\n{\"玩家\":{\"生存状态\":{\"str\":8}}}  // 特色属性变化\n\n注意：\n- 只输出发生变化的属性，未变化的不要输出\n- 属性值不能超过当前段位上限（如果有成长体系模块）\n- 属性值不能低于range[0]\n\n─── 属性体系 ───\n生命类：生理活性（上限100）\n能量类：意志余火（上限60）\n六维属性：清除效能、结构韧性、神经反射、逻辑解构、层级威望、命运偏置\n特色属性：孢子侵蚀度（身体组织被真菌孢子寄生的深度，数值越高越接近异变，但也可能获得某些畸变能力。）、氧气配额权限（在地堡密闭循环系统中，个体被允许消耗的空气质量等级与呼吸时长。）",
@@ -639,18 +1382,129 @@
         "rules": [
           {
             "id": "radiation_storm_trigger",
-            "when": { "state": { "path": "玩家.生存状态.血量", "op": ">", "value": 50 } },
-            "then": [{ "addEvent": { "eventId": "radiation_storm", "eventPackId": "world:wasteland_apocalypse:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": ">",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "radiation_storm",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
           },
           {
             "id": "mutant_trigger",
-            "when": { "state": { "path": "玩家.生存状态.体力值", "op": ">", "value": 30 } },
-            "then": [{ "addEvent": { "eventId": "mutant_fight", "eventPackId": "world:wasteland_apocalypse:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 30
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "mutant_fight",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
           },
           {
             "id": "supply_trigger",
-            "when": { "state": { "path": "玩家.生存状态.血量", "op": "<", "value": 50 } },
-            "then": [{ "addEvent": { "eventId": "supply_cache", "eventPackId": "world:wasteland_apocalypse:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "supply_cache",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "radiation_high_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 30
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "radiation_sickness",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "awakening_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "awakening",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "raider_ambush_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": ">",
+                "value": 60
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "raider_ambush",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "trader_encounter_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 40
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "trader_encounter",
+                  "eventPackId": "world:wasteland_apocalypse:events"
+                }
+              }
+            ]
           }
         ],
         "periodicRules": [
@@ -659,8 +1513,18 @@
             "name": "辐射侵蚀",
             "intervalTicks": 14,
             "actions": [
-              { "set": { "path": "玩家.生存状态.血量", "value": -10 } },
-              { "set": { "path": "玩家.生存状态.体力值", "value": -15 } }
+              {
+                "set": {
+                  "path": "玩家.生存状态.血量",
+                  "value": -10
+                }
+              },
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": -15
+                }
+              }
             ],
             "narrateToAI": true,
             "description": "每14天辐射侵蚀身体，血量和体力下降"
@@ -670,13 +1534,45 @@
             "name": "物资耗竭",
             "intervalTicks": 30,
             "actions": [
-              { "set": { "path": "玩家.生存状态.体力值", "value": -10 } }
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": -10
+                }
+              }
             ],
             "narrateToAI": true,
             "description": "每30天物资逐渐耗竭，体力下降"
+          },
+          {
+            "id": "environmental_hazard",
+            "name": "环境危害",
+            "intervalTicks": 10,
+            "offsetTicks": 5,
+            "narrateToAI": true,
+            "description": "每10轮AI描述废土环境变化：辐射风暴、变异兽活动、势力冲突"
+          },
+          {
+            "id": "resource_scarcity",
+            "name": "资源稀缺",
+            "intervalTicks": 20,
+            "offsetTicks": 10,
+            "actions": [
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": -5
+                }
+              }
+            ],
+            "narrateToAI": true,
+            "description": "每20轮资源逐渐稀缺，体力下降"
           }
         ],
-        "permissions": ["modify_world_state", "add_card"]
+        "permissions": [
+          "modify_world_state",
+          "add_card"
+        ]
       },
       {
         "id": "world:wasteland_apocalypse:events",
@@ -687,19 +1583,68 @@
             "id": "radiation_storm",
             "name": "辐射风暴",
             "cards": [
-              { "id": "t_radiation_storm", "componentId": "title", "title": "辐射风暴来袭" },
-              { "id": "n_radiation_storm", "componentId": "narrative", "title": "辐射风暴叙事" },
-              { "id": "c_radiation_storm", "componentId": "choice", "title": "辐射风暴选择" }
+              {
+                "id": "t_radiation_storm",
+                "componentId": "title",
+                "title": "辐射风暴来袭"
+              },
+              {
+                "id": "n_radiation_storm",
+                "componentId": "narrative",
+                "title": "辐射风暴叙事"
+              },
+              {
+                "id": "c_radiation_storm",
+                "componentId": "choice",
+                "title": "辐射风暴选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_radiation_storm", "props": { "title": "辐射风暴来袭" } }],
-                "narrative": [{ "id": "n_radiation_storm", "props": { "text": "天空变成了诡异的绿色，空气中弥漫着刺鼻的味道。辐射风暴正在逼近，你必须立刻做出决定。" } }],
-                "choice": [{ "id": "c_radiation_storm", "props": { "choices": [
-                  { "label": "躲进废墟", "effect": { "statId": "血量", "delta": 0 }, "aiNote": "躲进废墟等待风暴过去" },
-                  { "label": "冒险前进", "effect": { "statId": "血量", "delta": -20 }, "aiNote": "冒险穿越辐射区，受到辐射伤害" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_radiation_storm",
+                    "props": {
+                      "title": "辐射风暴来袭"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_radiation_storm",
+                    "props": {
+                      "text": "天空变成了诡异的绿色，空气中弥漫着刺鼻的味道。辐射风暴正在逼近，你必须立刻做出决定。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_radiation_storm",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "躲进废墟",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 0
+                          },
+                          "aiNote": "躲进废墟等待风暴过去"
+                        },
+                        {
+                          "label": "冒险前进",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -20
+                          },
+                          "aiNote": "冒险穿越辐射区，受到辐射伤害"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -707,19 +1652,68 @@
             "id": "mutant_fight",
             "name": "变异体袭击",
             "cards": [
-              { "id": "t_mutant_fight", "componentId": "title", "title": "变异体出现！" },
-              { "id": "n_mutant_fight", "componentId": "narrative", "title": "变异体叙事" },
-              { "id": "c_mutant_fight", "componentId": "choice", "title": "变异体选择" }
+              {
+                "id": "t_mutant_fight",
+                "componentId": "title",
+                "title": "变异体出现！"
+              },
+              {
+                "id": "n_mutant_fight",
+                "componentId": "narrative",
+                "title": "变异体叙事"
+              },
+              {
+                "id": "c_mutant_fight",
+                "componentId": "choice",
+                "title": "变异体选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_mutant_fight", "props": { "title": "变异体出现！" } }],
-                "narrative": [{ "id": "n_mutant_fight", "props": { "text": "一个扭曲的身影从废墟中爬出，它的身体布满了发光的纹路，发出低沉的嘶吼声。" } }],
-                "choice": [{ "id": "c_mutant_fight", "props": { "choices": [
-                  { "label": "正面战斗", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "与变异体战斗，消耗体力" },
-                  { "label": "逃跑", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "选择逃跑，消耗体力但避免战斗" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_mutant_fight",
+                    "props": {
+                      "title": "变异体出现！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_mutant_fight",
+                    "props": {
+                      "text": "一个扭曲的身影从废墟中爬出，它的身体布满了发光的纹路，发出低沉的嘶吼声。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_mutant_fight",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "正面战斗",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "与变异体战斗，消耗体力"
+                        },
+                        {
+                          "label": "逃跑",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "选择逃跑，消耗体力但避免战斗"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -727,19 +1721,68 @@
             "id": "supply_cache",
             "name": "发现补给点",
             "cards": [
-              { "id": "t_supply_cache", "componentId": "title", "title": "补给点！" },
-              { "id": "n_supply_cache", "componentId": "narrative", "title": "补给点叙事" },
-              { "id": "c_supply_cache", "componentId": "choice", "title": "补给点选择" }
+              {
+                "id": "t_supply_cache",
+                "componentId": "title",
+                "title": "补给点！"
+              },
+              {
+                "id": "n_supply_cache",
+                "componentId": "narrative",
+                "title": "补给点叙事"
+              },
+              {
+                "id": "c_supply_cache",
+                "componentId": "choice",
+                "title": "补给点选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_supply_cache", "props": { "title": "补给点！" } }],
-                "narrative": [{ "id": "n_supply_cache", "props": { "text": "你在一栋倒塌的建筑里发现了一个标记着军用标志的储物柜。里面似乎还有东西。" } }],
-                "choice": [{ "id": "c_supply_cache", "props": { "choices": [
-                  { "label": "搜刮物资", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "找到了医疗物资，恢复生命" },
-                  { "label": "小心离开", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "谨慎起见，没有冒险" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_supply_cache",
+                    "props": {
+                      "title": "补给点！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_supply_cache",
+                    "props": {
+                      "text": "你在一栋倒塌的建筑里发现了一个标记着军用标志的储物柜。里面似乎还有东西。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_supply_cache",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "搜刮物资",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "找到了医疗物资，恢复生命"
+                        },
+                        {
+                          "label": "小心离开",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "谨慎起见，没有冒险"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -747,19 +1790,68 @@
             "id": "faction_encounter",
             "name": "势力接触",
             "cards": [
-              { "id": "t_faction_encounter", "componentId": "title", "title": "有人来了" },
-              { "id": "n_faction_encounter", "componentId": "narrative", "title": "势力接触叙事" },
-              { "id": "c_faction_encounter", "componentId": "choice", "title": "势力接触选择" }
+              {
+                "id": "t_faction_encounter",
+                "componentId": "title",
+                "title": "有人来了"
+              },
+              {
+                "id": "n_faction_encounter",
+                "componentId": "narrative",
+                "title": "势力接触叙事"
+              },
+              {
+                "id": "c_faction_encounter",
+                "componentId": "choice",
+                "title": "势力接触选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_faction_encounter", "props": { "title": "有人来了" } }],
-                "narrative": [{ "id": "n_faction_encounter", "props": { "text": "一队穿着统一制服的人出现在远处。他们举着白旗，似乎想和你谈谈。" } }],
-                "choice": [{ "id": "c_faction_encounter", "props": { "choices": [
-                  { "label": "上前交谈", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "与对方友好交流，获得帮助" },
-                  { "label": "保持警惕", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "保持距离观察，消耗精力" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_faction_encounter",
+                    "props": {
+                      "title": "有人来了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_faction_encounter",
+                    "props": {
+                      "text": "一队穿着统一制服的人出现在远处。他们举着白旗，似乎想和你谈谈。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_faction_encounter",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "上前交谈",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "与对方友好交流，获得帮助"
+                        },
+                        {
+                          "label": "保持警惕",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "保持距离观察，消耗精力"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -767,24 +1859,558 @@
             "id": "power_surge",
             "name": "异能波动",
             "cards": [
-              { "id": "t_power_surge", "componentId": "title", "title": "体内涌动的力量" },
-              { "id": "n_power_surge", "componentId": "narrative", "title": "异能波动叙事" },
-              { "id": "c_power_surge", "componentId": "choice", "title": "异能波动选择" }
+              {
+                "id": "t_power_surge",
+                "componentId": "title",
+                "title": "体内涌动的力量"
+              },
+              {
+                "id": "n_power_surge",
+                "componentId": "narrative",
+                "title": "异能波动叙事"
+              },
+              {
+                "id": "c_power_surge",
+                "componentId": "choice",
+                "title": "异能波动选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_power_surge", "props": { "title": "体内涌动的力量" } }],
-                "narrative": [{ "id": "n_power_surge", "props": { "text": "你感觉到体内有一股奇异的力量在涌动，仿佛有什么东西要破壳而出。这是异能觉醒的征兆。" } }],
-                "choice": [{ "id": "c_power_surge", "props": { "choices": [
-                  { "label": "尝试控制", "effect": { "statId": "体力值", "delta": -20 }, "aiNote": "努力控制异能，消耗大量精力" },
-                  { "label": "压制下去", "effect": { "statId": "血量", "delta": -10 }, "aiNote": "强行压制异能，身体受到反噬" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_power_surge",
+                    "props": {
+                      "title": "体内涌动的力量"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_power_surge",
+                    "props": {
+                      "text": "你感觉到体内有一股奇异的力量在涌动，仿佛有什么东西要破壳而出。这是异能觉醒的征兆。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_power_surge",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "尝试控制",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "努力控制异能，消耗大量精力"
+                        },
+                        {
+                          "label": "压制下去",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -10
+                          },
+                          "aiNote": "强行压制异能，身体受到反噬"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "radiation_sickness",
+            "name": "辐射病",
+            "cards": [
+              {
+                "id": "t_radiation_sickness",
+                "componentId": "title",
+                "title": "辐射病发作"
+              },
+              {
+                "id": "n_radiation_sickness",
+                "componentId": "narrative",
+                "title": "辐射病叙事"
+              },
+              {
+                "id": "c_radiation_sickness",
+                "componentId": "choice",
+                "title": "辐射病选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_radiation_sickness",
+                    "props": {
+                      "title": "辐射病发作"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_radiation_sickness",
+                    "props": {
+                      "text": "你的身体开始出现辐射病的症状——皮肤溃烂、呕吐、头晕。你需要尽快找到抗辐宁或净化治疗。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_radiation_sickness",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "服用抗辐宁",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "服用抗辐宁，症状缓解"
+                        },
+                        {
+                          "label": "硬撑过去",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "硬撑过去，身体虚弱"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "awakening",
+            "name": "异能觉醒",
+            "cards": [
+              {
+                "id": "t_awakening",
+                "componentId": "title",
+                "title": "异能觉醒"
+              },
+              {
+                "id": "n_awakening",
+                "componentId": "narrative",
+                "title": "觉醒叙事"
+              },
+              {
+                "id": "c_awakening",
+                "componentId": "choice",
+                "title": "觉醒选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_awakening",
+                    "props": {
+                      "title": "异能觉醒"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_awakening",
+                    "props": {
+                      "text": "你感觉到体内有一股奇异的力量在涌动，仿佛有什么东西要破壳而出。这是异能觉醒的征兆。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_awakening",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受觉醒",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 20
+                          },
+                          "aiNote": "接受觉醒，获得异能"
+                        },
+                        {
+                          "label": "压制力量",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "强行压制异能，身体受到反噬"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "raider_ambush",
+            "name": "掠夺者伏击",
+            "cards": [
+              {
+                "id": "t_raider",
+                "componentId": "title",
+                "title": "掠夺者伏击！"
+              },
+              {
+                "id": "n_raider",
+                "componentId": "narrative",
+                "title": "伏击叙事"
+              },
+              {
+                "id": "c_raider",
+                "componentId": "choice",
+                "title": "伏击选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_raider",
+                    "props": {
+                      "title": "掠夺者伏击！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_raider",
+                    "props": {
+                      "text": "一群掠夺者从废墟中冲出，他们手持武器，眼神凶狠。你被包围了。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_raider",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "拼死一战",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -25
+                          },
+                          "aiNote": "拼死一战，虽然受伤但击退了掠夺者"
+                        },
+                        {
+                          "label": "交出物资",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "交出部分物资，保住了性命"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "trader_encounter",
+            "name": "商队遭遇",
+            "cards": [
+              {
+                "id": "t_trader",
+                "componentId": "title",
+                "title": "商队出现"
+              },
+              {
+                "id": "n_trader",
+                "componentId": "narrative",
+                "title": "商队叙事"
+              },
+              {
+                "id": "c_trader",
+                "componentId": "choice",
+                "title": "商队选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_trader",
+                    "props": {
+                      "title": "商队出现"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "t_trader",
+                    "props": {
+                      "text": "一支流浪商队出现在远处，他们举着白旗，似乎想和你交易。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_trader",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "上前交易",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "与商队交易，获得了急需的物资"
+                        },
+                        {
+                          "label": "保持距离",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "保持距离观察，没有冒险"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "old_world_cache",
+            "name": "旧世界补给",
+            "cards": [
+              {
+                "id": "t_cache",
+                "componentId": "title",
+                "title": "旧世界补给"
+              },
+              {
+                "id": "n_cache",
+                "componentId": "narrative",
+                "title": "补给叙事"
+              },
+              {
+                "id": "c_cache",
+                "componentId": "choice",
+                "title": "补给选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_cache",
+                    "props": {
+                      "title": "旧世界补给"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_cache",
+                    "props": {
+                      "text": "你在一栋倒塌的建筑里发现了一个标记着军用标志的储物柜。里面似乎还有东西。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_cache",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "搜刮物资",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "找到了医疗物资，恢复生命"
+                        },
+                        {
+                          "label": "小心离开",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "谨慎起见，没有冒险"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "mutant_beast",
+            "name": "变异兽遭遇",
+            "cards": [
+              {
+                "id": "t_beast",
+                "componentId": "title",
+                "title": "变异兽出现！"
+              },
+              {
+                "id": "n_beast",
+                "componentId": "narrative",
+                "title": "变异兽叙事"
+              },
+              {
+                "id": "c_beast",
+                "componentId": "choice",
+                "title": "变异兽选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_beast",
+                    "props": {
+                      "title": "变异兽出现！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_beast",
+                    "props": {
+                      "text": "一只扭曲的变异兽从废墟中爬出，它的身体布满了发光的纹路，发出低沉的嘶吼声。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_beast",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "正面战斗",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -20
+                          },
+                          "aiNote": "与变异兽战斗，虽然受伤但击退了它"
+                        },
+                        {
+                          "label": "逃跑",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "选择逃跑，消耗体力但避免战斗"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "faction_contact",
+            "name": "势力接触",
+            "cards": [
+              {
+                "id": "t_faction",
+                "componentId": "title",
+                "title": "势力接触"
+              },
+              {
+                "id": "n_faction",
+                "componentId": "narrative",
+                "title": "势力接触叙事"
+              },
+              {
+                "id": "c_faction",
+                "componentId": "choice",
+                "title": "势力接触选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_faction",
+                    "props": {
+                      "title": "势力接触"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_faction",
+                    "props": {
+                      "text": "一队穿着统一制服的人出现在远处。他们举着白旗，似乎想和你谈谈。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_faction",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "上前交谈",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "与对方友好交流，获得帮助"
+                        },
+                        {
+                          "label": "保持警惕",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "保持距离观察，消耗精力"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           }
         ],
-        "permissions": ["add_card"]
+        "permissions": [
+          "add_card"
+        ]
       }
     ]
   }

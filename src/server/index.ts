@@ -172,8 +172,8 @@ app.get('/api/workshop/:itemId/download', async (c) => {
     const item = await getItem(c.env, itemId);
     if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
 
-    // 增加下载计数（fire-and-forget）
-    incrementDownloadCount(c.env, itemId).catch(() => {});
+    // 先增加下载计数
+    await incrementDownloadCount(c.env, itemId);
 
     let tags: string[] = [];
     try { tags = item.tags ? JSON.parse(item.tags) : []; } catch { tags = []; }

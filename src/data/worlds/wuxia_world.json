@@ -593,6 +593,822 @@
         "entryType": "culture"
       },
       {
+        "uid": 32,
+        "key": [
+          "锦衣卫",
+          "厂卫",
+          "朝廷鹰犬"
+        ],
+        "constant": false,
+        "comment": "锦衣卫",
+        "content": "[hostile] 朝廷直属的特务机构，直属皇帝调遣。锦衣卫指挥使陆炳权倾朝野，麾下缇骑遍布天下，专司监视江湖动向、缉拿钦犯。锦衣卫中不乏高手，尤以\"十三太保\"最为凶残，个个身怀绝技。他们奉行\"宁杀错不放过\"的原则，是江湖人最忌惮的朝廷势力。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "锦衣卫",
+              "description": "朝廷直属特务机构，缇骑遍布天下，专司监视江湖、缉拿钦犯。十三太保个个身怀绝技。",
+              "alignment": "hostile"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 33,
+        "key": [
+          "唐门",
+          "蜀中唐门",
+          "暗器"
+        ],
+        "constant": false,
+        "comment": "唐门",
+        "content": "[neutral] 蜀中唐门，以暗器和毒药闻名天下。唐门行事低调，不参与六派盟约，亦不与天道教为敌。门主唐无影老谋深算，将唐门经营得铁桶一般。唐门暗器谱上记载三百余种暗器，每一种都足以致命。江湖中有句话：宁惹阎王，莫惹唐门。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "唐门",
+              "description": "蜀中唐门，以暗器和毒药闻名天下。行事低调不参与盟约，暗器谱上三百余种暗器每一种都足以致命。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 34,
+        "key": [
+          "丐帮",
+          "乞丐",
+          "消息"
+        ],
+        "constant": false,
+        "comment": "丐帮",
+        "content": "[friendly] 天下第一大帮，弟子遍布大江南北。丐帮以\"打狗棒法\"和\"降龙十八掌\"闻名，但真正可怕的是其无孔不入的消息网。帮主洪七公豪迈仗义，丐帮虽是草根帮派，却在江湖大事中从不缺席。丐帮弟子以布袋数量定辈分，九袋长老地位仅次于帮主。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "丐帮",
+              "description": "天下第一大帮，弟子遍布大江南北。以打狗棒法和降龙十八掌闻名，真正可怕的是无孔不入的消息网。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 35,
+        "key": [
+          "镖局",
+          "走镖",
+          "镖师"
+        ],
+        "constant": false,
+        "comment": "镖局",
+        "content": "[neutral] 江湖中的镖局是武林与商界的交汇点。最大的\"镇远镖局\"总镖头王振威一手\"铁枪\"名震江湖，走镖三十年从未失手。镖局规矩繁多：不走夜路、不住黑店、不问雇主来历。镖师们靠真本事吃饭，刀口舔血赚的是辛苦银子。若镖物被劫，镖局须照价赔偿，否则名声尽毁。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "镖局",
+              "description": "江湖中的镖局是武林与商界的交汇点。镇远镖局总镖头王振威走镖三十年从未失手，镖师们刀口舔血赚辛苦银子。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 36,
+        "key": [
+          "六扇门",
+          "捕快",
+          "官府"
+        ],
+        "constant": false,
+        "comment": "六扇门",
+        "content": "[neutral] 官府设立的江湖事务衙门，专门处理武林纷争、缉拿江洋大盗。六扇门总捕头铁面无私，手下捕快虽武功不及各大门派弟子，但胜在人多势众、有朝廷撑腰。六扇门与锦衣卫不同——锦衣卫监视江湖，六扇门则是江湖与官府之间的缓冲。许多门派弟子犯了事，都是通过六扇门\"销案\"的。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "六扇门",
+              "description": "官府设立的江湖事务衙门，专门处理武林纷争、缉拿江洋大盗。是江湖与官府之间的缓冲。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 37,
+        "key": [
+          "唐无影"
+        ],
+        "constant": false,
+        "comment": "唐无影",
+        "content": "人物 — 唐门门主，人称\"千手阎罗\"。年过六旬却精神矍铄，双手修长如玉，能在一瞬间射出三十六枚透骨钉。他将唐门经营得铁桶一般，从不参与江湖纷争，只关心两件事：暗器和家族。他最恨两种人——偷学唐门暗器的人，和看不起唐门暗器的人。（性格：老谋深算、护短、孤僻）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "唐无影",
+              "role": "唐门门主",
+              "description": "人称\"千手阎罗\"，年过六旬却精神矍铄，能在一瞬间射出三十六枚透骨钉。将唐门经营得铁桶一般。",
+              "personality": "老谋深算、护短、孤僻"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 38,
+        "key": [
+          "洪七公"
+        ],
+        "constant": false,
+        "comment": "洪七公",
+        "content": "人物 — 丐帮帮主，人称\"九指神丐\"。性格豪迈仗义，好酒贪杯，却有一颗悲天悯人之心。他武功盖世，降龙十八掌威震天下，但从不恃强凌弱。他最爱说的一句话是\"路见不平，拔刀相助\"。丐帮弟子遍布天下，他走到哪里都有人请喝酒。（性格：豪迈、仗义、贪杯）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "洪七公",
+              "role": "丐帮帮主",
+              "description": "人称\"九指神丐\"，性格豪迈仗义，好酒贪杯。降龙十八掌威震天下，丐帮弟子遍布天下。",
+              "personality": "豪迈、仗义、贪杯"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 39,
+        "key": [
+          "陆炳"
+        ],
+        "constant": false,
+        "comment": "陆炳",
+        "content": "人物 — 锦衣卫指挥使，皇帝身边最忠实的鹰犬。他武功深不可测，据说曾一人独战三位宗师而不败。他掌管锦衣卫十三太保，监视天下武林动向。他不问正邪，只问忠奸——在他眼里，任何不服朝廷管束的江湖人都是叛逆。（性格：冷酷、忠诚、偏执）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "陆炳",
+              "role": "锦衣卫指挥使",
+              "description": "皇帝身边最忠实的鹰犬，武功深不可测，曾一人独战三位宗师而不败。掌管锦衣卫十三太保。",
+              "personality": "冷酷、忠诚、偏执"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 40,
+        "key": [
+          "王振威",
+          "总镖头"
+        ],
+        "constant": false,
+        "comment": "王振威",
+        "content": "人物 — 镇远镖局总镖头，人称\"铁枪王\"。走镖三十年从未失手，靠的是一杆铁枪和过人的江湖经验。他为人圆滑，与黑白两道都有交情，镖旗一竖，江湖朋友都要给三分薄面。他最得意的事是：曾护送一批官银从洛阳到云南，全程三千余里，一文不少。（性格：圆滑、稳重、讲义气）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "王振威",
+              "role": "总镖头",
+              "description": "镇远镖局总镖头，人称\"铁枪王\"。走镖三十年从未失手，与黑白两道都有交情，镖旗一竖江湖朋友都要给三分薄面。",
+              "personality": "圆滑、稳重、讲义气"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 41,
+        "key": [
+          "药王",
+          "孙思邈",
+          "神医"
+        ],
+        "constant": false,
+        "comment": "药王",
+        "content": "人物 — 隐居终南山的神医，人称\"药王\"。他医术通神，能起死回生，但从不轻易出手。他立下规矩：救人可以，但必须用等价之物交换——可能是你的武功秘籍，可能是你的十年寿命，也可能是一段刻骨铭心的记忆。江湖中人又敬又怕，敬他医术，怕他条件。（性格：古怪、清高、重原则）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "药王",
+              "role": "神医",
+              "description": "隐居终南山的神医，医术通神能起死回生，但从不轻易出手。救人必须用等价之物交换。",
+              "personality": "古怪、清高、重原则"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 42,
+        "key": [
+          "铸剑师",
+          "干将",
+          "莫邪"
+        ],
+        "constant": false,
+        "comment": "铸剑师",
+        "content": "人物 — 隐居深山的铸剑大师，人称\"剑痴\"。他一生铸剑三百余柄，每一柄都是传世名器。他铸剑有个怪癖：必须见血才开锋——用他的话说，\"剑不见血，就是废铁\"。他最得意的作品是\"秋水无痕\"，一柄看不见剑身的透明软剑，据说能斩断世间一切有形之物。（性格：痴迷、古怪、执着）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "铸剑师",
+              "role": "铸剑大师",
+              "description": "隐居深山的铸剑大师，人称\"剑痴\"。一生铸剑三百余柄，每一柄都是传世名器。铸剑必须见血才开锋。",
+              "personality": "痴迷、古怪、执着"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 43,
+        "key": [
+          "说书人",
+          "百晓生"
+        ],
+        "constant": false,
+        "comment": "说书人",
+        "content": "人物 — 江湖人称\"百晓生\"的神秘说书人，真名无人知晓。他走遍天下，见多识广，江湖中没有他不知道的事。他在各大茶楼酒肆说书，将江湖恩怨编成故事，听得人如痴如醉。他最著名的作品是《兵器谱》，排名天下前十的神兵利器，引得无数高手争相验证。（性格：风趣、博学、爱卖关子）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "说书人",
+              "role": "百晓生",
+              "description": "江湖人称\"百晓生\"的神秘说书人，走遍天下见多识广。最著名的作品是《兵器谱》，排名天下前十的神兵利器。",
+              "personality": "风趣、博学、爱卖关子"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 44,
+        "key": [
+          "碧落派掌门",
+          "凌霜"
+        ],
+        "constant": false,
+        "comment": "凌霜",
+        "content": "人物 — 碧落派掌门，人称\"冷月仙子\"。她容貌倾城却冷若冰霜，剑法凌厉无匹。她与沧浪派司徒桓有婚约，却暗中厌恶其为人。她执掌碧落派后，门风严谨，弟子个个剑法出众。她最恨两种人：负心汉和叛徒。（性格：冷傲、刚烈、重情）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "凌霜",
+              "role": "碧落派掌门",
+              "description": "人称\"冷月仙子\"，容貌倾城却冷若冰霜，剑法凌厉无匹。与司徒桓有婚约却暗中厌恶其为人。",
+              "personality": "冷傲、刚烈、重情"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 45,
+        "key": [
+          "赤霞派掌门",
+          "火云邪神"
+        ],
+        "constant": false,
+        "comment": "火云邪神",
+        "content": "人物 — 赤霞派掌门，人称\"火云邪神\"。他性格暴烈如火，武功也走刚猛路线，一双铁掌能开碑裂石。他与天道教有血海深仇——当年天道教屠了他满门，他发誓要亲手杀了殷九幽。他为人虽然粗犷，但对弟子极好，赤霞派上下一心，同仇敌忾。（性格：暴烈、重义、记仇）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "火云邪神",
+              "role": "赤霞派掌门",
+              "description": "性格暴烈如火，一双铁掌能开碑裂石。与天道教有血海深仇，发誓要亲手杀了殷九幽。",
+              "personality": "暴烈、重义、记仇"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 46,
+        "key": [
+          "凌虚派掌门",
+          "云中鹤"
+        ],
+        "constant": false,
+        "comment": "云中鹤",
+        "content": "人物 — 凌虚派掌门，人称\"云中鹤\"。他轻功天下第一，能在水面行走如飞，来去无踪。他性格洒脱不羁，喜欢游山玩水，门派事务多交给大弟子打理。他与丐帮洪七公是莫逆之交，二人常常结伴游历江湖。他最讨厌的事是被人追着要他收徒。（性格：洒脱、随性、怕麻烦）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "云中鹤",
+              "role": "凌虚派掌门",
+              "description": "轻功天下第一，能在水面行走如飞。性格洒脱不羁，喜欢游山玩水，与丐帮洪七公是莫逆之交。",
+              "personality": "洒脱、随性、怕麻烦"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 47,
+        "key": [
+          "夜枭",
+          "独行大盗"
+        ],
+        "constant": false,
+        "comment": "夜枭",
+        "content": "人物 — 江湖上赫赫有名的独行大盗，专偷富商和贪官。他轻功卓绝，来去如风，从未被人当场抓住。他有个怪癖：每次作案后都会留下一只纸折的猫头鹰作为\"签名\"。他亦正亦邪，偷来的钱财大多接济了穷苦百姓，因此被百姓称为\"义贼\"。（性格：狡黠、正义感、爱炫耀）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "夜枭",
+              "role": "独行大盗",
+              "description": "江湖上赫赫有名的独行大盗，专偷富商和贪官。每次作案后留下纸折猫头鹰作为签名，偷来的钱财大多接济穷苦百姓。",
+              "personality": "狡黠、正义感、爱炫耀"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 48,
+        "key": [
+          "碧落峰"
+        ],
+        "constant": false,
+        "comment": "碧落峰",
+        "content": "碧落派所在之地，山势险峻如剑指苍穹。峰顶常年云雾缭绕，碧落派弟子在此修习剑法。峰后有一片竹林，是碧落派历代掌门的安息之地。竹林深处藏着碧落派的镇派之宝——\"碧落黄泉剑\"，据说此剑出鞘必见血，否则会反噬持剑之人。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 49,
+        "key": [
+          "赤霞山"
+        ],
+        "constant": false,
+        "comment": "赤霞山",
+        "content": "赤霞派所在之地，山体呈赤红色，夕阳照射时如火云漫天。山中有一座赤霞宫，是赤霞派的议事大殿。山脚下有一条赤水河，河水终年温热，据说是地底火山余热所致。赤霞派弟子在此修炼刚猛掌法，每日清晨对着瀑布练功，水花四溅如血雨纷飞。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 50,
+        "key": [
+          "金陵城"
+        ],
+        "constant": false,
+        "comment": "金陵城",
+        "content": "六朝古都，江南第一城。城中繁华似锦，秦淮河畔灯火通明，歌楼酒肆林立。金陵城是江湖与朝堂的交汇点，各方势力在此暗中角力。城中有三大禁地：灵枢阁旧址、锦衣卫南镇抚司、以及秦淮河底的\"水月洞天\"——据说那里藏着前朝的宝藏。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 51,
+        "key": [
+          "洛阳",
+          "白马寺"
+        ],
+        "constant": false,
+        "comment": "洛阳城",
+        "content": "九朝古都，天下之中。白马寺是佛教传入中原的第一座寺院，寺中高僧云集，藏有无数佛门绝学。洛阳城外的龙门石窟中，据说藏着一部刻在石壁上的《易筋经》全本。每年春天，洛阳牡丹盛开，各路江湖客都会来此赏花——当然，赏花是假，暗中交易是真。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 52,
+        "key": [
+          "塞外",
+          "大漠",
+          "西域"
+        ],
+        "constant": false,
+        "comment": "塞外大漠",
+        "content": "中原以西的广袤沙漠，是西域商队和马贼的天下。大漠深处有一座\"沙城\"，是西域武林的中心。沙城城主\"大漠孤烟\"是西域第一高手，他的\"大漠刀法\"霸道绝伦。塞外与中原武林素来井水不犯河水，但近年来西域高手频频东渡，似乎在寻找什么。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 53,
+        "key": [
+          "终南山",
+          "活死人墓"
+        ],
+        "constant": false,
+        "comment": "终南山",
+        "content": "终南山是道家圣地，山中道观林立，隐士如云。山深处有一座\"活死人墓\"，据说是一位失意高手的隐居之地。终南山也是药王的隐居之所，他在此种植草药、炼制丹药。山中有一条\"问道阶\"，从山脚到山顶共三千六百级台阶，据说走完就能悟道——但从未有人走完过。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 54,
+        "key": [
+          "洞庭湖",
+          "岳阳楼"
+        ],
+        "constant": false,
+        "comment": "洞庭湖",
+        "content": "八百里洞庭，烟波浩渺。岳阳楼矗立湖畔，是文人墨客的聚集之地。每年中秋，洞庭湖上会举办\"水月大会\"，各路高手在此比武论道。湖中有一座小岛，名为\"君山\"，岛上住着一群与世无争的渔夫，据说他们之中藏着一位退隐江湖的绝世高手。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 55,
+        "key": [
+          "华山",
+          "论剑"
+        ],
+        "constant": false,
+        "comment": "华山",
+        "content": "西岳华山，天下第一险山。华山之巅是江湖中传说的\"论剑之地\"，每三十年一次的\"华山论剑\"是武林中最盛大的盛事。届时天下高手齐聚华山之巅，以武论道，胜者将获得\"天下第一\"的称号。上一届华山论剑的胜者是独孤云，但他从未承认这个称号。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 56,
+        "key": [
+          "江湖黑话",
+          "切口",
+          "暗语"
+        ],
+        "constant": false,
+        "comment": "江湖黑话",
+        "content": "江湖中人有自己的暗语系统，外人听不懂。常用黑话包括：踩盘子（探路）、扯呼（逃跑）、点子扎手（对手厉害）、风紧（情况紧急）、扯活（动手）、并肩子（兄弟）、老合（老江湖）、空子（外行人）。门派之间也有暗号：飞云派以\"云起\"为号，天道教以\"天道昭昭\"为令。不懂黑话的人在江湖上寸步难行。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 57,
+        "key": [
+          "比武",
+          "规矩",
+          "江湖规矩"
+        ],
+        "constant": false,
+        "comment": "比武规矩",
+        "content": "江湖比武有不成文的规矩：一、比武前须通报姓名门派，否则视为偷袭；二、点到即止，除非有深仇大恨，否则不取人性命；三、比武时不得使用暗器毒药，除非双方约定；四、输了就是输了，不得事后报复；五、长辈对晚辈须让三招。违反规矩者将被江湖人唾弃，严重者会被六派盟约除名。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 58,
+        "key": [
+          "拜师",
+          "入门",
+          "收徒"
+        ],
+        "constant": false,
+        "comment": "拜师礼",
+        "content": "江湖中拜师是大事，礼仪繁复。首先需有引荐人，然后递上拜师帖，帖上写明籍贯、师承、志愿。师父若同意，便行三叩九拜之礼，敬茶、献礼。师父会赐下门派信物，从此便是门派中人。背叛师门是江湖大忌，轻则废除武功，重则处死。有些门派还有\"试炼\"——新弟子须通过考验才能正式入门。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 59,
+        "key": [
+          "悬赏",
+          "赏金",
+          "通缉"
+        ],
+        "constant": false,
+        "comment": "悬赏制度",
+        "content": "江湖中的悬赏制度：官府通缉的钦犯有赏金，江湖中人也可以私下悬赏。悬赏分三等：百两以下为\"小活\"，千两为\"大活\"，万两以上为\"天价\"。悬赏通常通过灵枢阁或丐帮的消息网发布，赏金猎人以此为生。最著名的悬赏是十年前天道教悬赏《九霄剑经》全本，赏金十万两白银，至今无人领取。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "赏金",
+            "symbol": "两",
+            "description": "悬赏分三等：小活（百两以下）、大活（千两）、天价（万两以上）。"
+          },
+          "priceLevel": "一条人命百两起，一本秘籍千两起，一件神兵万两起。"
+        }
+      },
+      {
+        "uid": 60,
+        "key": [
+          "师徒",
+          "师徒关系"
+        ],
+        "constant": false,
+        "comment": "师徒关系",
+        "content": "【师徒关系】\n- **亲传弟子**：师父倾囊相授，视如己出。亲传弟子通常继承师父衣钵，执掌门派。师徒之间情同父子，背叛师门是最大的不孝。\n- **记名弟子**：师父指点一二，但不传授核心武功。记名弟子数量众多，是门派的中坚力量。\n- **挂名弟子**：名义上拜师，实际上各过各的。多是江湖散人为了有个靠山。\n\n师徒关系是江湖中最牢固的纽带，也是最危险的枷锁。许多武林惨案，都源于师徒反目。",
+        "order": 9,
+        "position": "before_char",
+        "entryType": "relationships",
+        "meta": {
+          "relationships": {
+            "description": "江湖中的师徒关系分亲传、记名、挂名三种，是最牢固的纽带也是最危险的枷锁。",
+            "mechanics": "师徒关系影响门派忠诚度、武功传承、江湖名声。",
+            "types": [
+              {
+                "name": "亲传弟子",
+                "description": "师父倾囊相授，视如己出。通常继承衣钵，执掌门派。"
+              },
+              {
+                "name": "记名弟子",
+                "description": "师父指点一二，但不传授核心武功。是门派的中坚力量。"
+              },
+              {
+                "name": "挂名弟子",
+                "description": "名义上拜师，实际上各过各的。多是为了有个靠山。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 61,
+        "key": [
+          "飞云派",
+          "剑宗",
+          "气宗"
+        ],
+        "constant": false,
+        "comment": "飞云派",
+        "content": "[neutral] 六大剑派之一，分为\"剑宗\"与\"气宗\"两脉。剑宗重招式，气宗重内力，两脉之争由来已久。剑宗隐世高人独孤云隐居飞云绝顶，气宗掌门秦怀远在山下执掌门派。飞云派剑法飘逸灵动，以\"归一剑诀\"为最高绝学，但两脉对剑诀的理解截然不同，这也是内斗的根源。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "飞云派",
+              "description": "六派之一，分剑宗气宗两脉。剑宗重招式，气宗重内力，两脉之争由来已久。以归一剑诀为最高绝学。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 62,
+        "key": [
+          "玄霜派",
+          "白莲庵",
+          "尼姑"
+        ],
+        "constant": false,
+        "comment": "玄霜派",
+        "content": "[friendly] 六大剑派之一，由白莲庵庵主静虚师太执掌。玄霜派全是女弟子，门风清净、与世无争。她们的\"霜华剑法\"绵密凌厉，看似柔弱实则刚猛。玄霜派不参与盟约纷争，但若有外敌入侵，她们绝不手软。静虚师太与少林空闻方丈是旧识，二人常以书信往来。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "玄霜派",
+              "description": "六派之一，由白莲庵庵主静虚师太执掌。全是女弟子，门风清净、与世无争。霜华剑法绵密凌厉。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 63,
+        "key": [
+          "赤霞派"
+        ],
+        "constant": false,
+        "comment": "赤霞派",
+        "content": "[friendly] 六大剑派之一，掌门火云邪神性格暴烈如火。赤霞派武功走刚猛路线，以\"赤霞掌\"和\"烈焰刀\"闻名。赤霞派与天道教有血海深仇——二十年前天道教屠了赤霞派满门，只剩火云邪神一人幸存。他发誓要亲手杀了殷九幽，为此不惜与六派盟约决裂。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "赤霞派",
+              "description": "六派之一，掌门火云邪神性格暴烈。武功走刚猛路线，与天道教有血海深仇。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 64,
+        "key": [
+          "凌虚派"
+        ],
+        "constant": false,
+        "comment": "凌虚派",
+        "content": "[friendly] 六大剑派之一，掌门云中鹤轻功天下第一。凌虚派武功以轻灵见长，\"凌虚步法\"能在水面行走如飞。凌虚派弟子大多性格洒脱，不喜争斗，门派事务多由大弟子打理。云中鹤与丐帮洪七公是莫逆之交，二人常常结伴游历江湖，留下不少佳话。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "凌虚派",
+              "description": "六派之一，掌门云中鹤轻功天下第一。武功以轻灵见长，弟子大多性格洒脱不喜争斗。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 65,
+        "key": [
+          "陆炳",
+          "十三太保"
+        ],
+        "constant": false,
+        "comment": "锦衣卫十三太保",
+        "content": "[hostile] 锦衣卫指挥使陆炳麾下最精锐的十三名高手，个个身怀绝技。他们以代号相称：一太保\"铁掌\"、二太保\"追风\"、三太保\"锁喉\"……一直到十三太保\"无面\"。他们专门负责监视和缉拿江湖高手，是锦衣卫的王牌。十三太保从不单独行动，至少三人一组，配合默契。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "锦衣卫十三太保",
+              "description": "锦衣卫指挥使陆炳麾下最精锐的十三名高手，以代号相称，专门负责监视和缉拿江湖高手。",
+              "alignment": "hostile"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 66,
+        "key": [
+          "静虚师太"
+        ],
+        "constant": false,
+        "comment": "静虚师太",
+        "content": "人物 — 玄霜派白莲庵庵主，人称\"霜华仙子\"。她年过五旬却面如少女，一身素衣，手持拂尘。她武功高绝，霜华剑法绵密凌厉，从不给对手喘息之机。她与少林空闻方丈是旧识，二人常以书信往来，探讨佛理。她最恨两种人：负心汉和欺师灭祖之徒。（性格：清冷、慈悲、嫉恶如仇）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "静虚师太",
+              "role": "玄霜派庵主",
+              "description": "人称\"霜华仙子\"，年过五旬却面如少女。武功高绝，霜华剑法绵密凌厉。与少林空闻方丈是旧识。",
+              "personality": "清冷、慈悲、嫉恶如仇"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 67,
+        "key": [
+          "大漠孤烟"
+        ],
+        "constant": false,
+        "comment": "大漠孤烟",
+        "content": "人物 — 塞外沙城城主，西域第一高手。他身材魁梧，面容粗犷，一双鹰眼锐利无比。他的\"大漠刀法\"霸道绝伦，据说能一刀劈开巨石。他统领西域武林，与中原井水不犯河水，但近年来频频派遣高手东渡，似乎在寻找什么失传已久的宝物。（性格：豪迈、霸道、深藏不露）",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "大漠孤烟",
+              "role": "沙城城主",
+              "description": "西域第一高手，身材魁梧面容粗犷。大漠刀法霸道绝伦，统领西域武林，近年频频派遣高手东渡。",
+              "personality": "豪迈、霸道、深藏不露"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 68,
+        "key": [
+          "独行大盗",
+          "义贼"
+        ],
+        "constant": false,
+        "comment": "江湖散人",
+        "content": "江湖中有许多不属于任何门派的散人。他们或行侠仗义，或独来独往，或亦正亦邪。散人没有门派靠山，但也没有门派束缚，自由自在。他们通常以一技之长谋生：有的当镖师，有的当赏金猎人，有的卖艺，有的算命。散人是江湖中最自由也最危险的存在。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "江湖散人",
+              "description": "不属于任何门派的散人，或行侠仗义或独来独往。没有门派靠山也没有束缚，是江湖中最自由也最危险的存在。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 69,
+        "key": [
+          "走镖",
+          "镖路",
+          "镖旗"
+        ],
+        "constant": false,
+        "comment": "走镖规矩",
+        "content": "走镖有规矩：一、镖旗一竖，江湖朋友给三分薄面；二、不走夜路，不住黑店；三、不问雇主来历；四、遇劫先报字号，字号不管用再动手；五、镖在人在，镖失人亡。镇远镖局的镖旗是\"镇远\"二字，绣在红底金边的大旗上，走镖时竖在车队最前面。若镖被劫，镖局须照价赔偿，否则名声尽毁。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 70,
+        "key": ["凡人", "普通人", "凡夫俗子"],
+        "constant": false,
+        "comment": "凡人境",
+        "content": "【凡人境】\n你目前的境界：凡人。筋骨松散，气血浮而不沉，拳脚只凭蛮力，未窥武道门径。\n\n凡人境的特征：\n- 内力：无内力，全靠蛮力\n- 招式：只会基本拳脚，无章法可言\n- 体质：普通人水准，易受伤易疲劳\n- 感知：五感与常人无异\n\n突破条件：通过基础武学训练，打通任督二脉中的任一条，即可晋升后天境。\n\n凡人境的叙事风格：你的拳脚带着几分生涩，每一招都用尽全力，却总感觉差了点什么。江湖对你来说，还是一个遥远的传说。",
+        "order": 52,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
+        "uid": 71,
+        "key": ["后天", "后天境", "初窥门径"],
+        "constant": false,
+        "comment": "后天境",
+        "content": "【后天境】\n你目前的境界：后天。渐通经脉运转，根基日益夯实，气力稳步增长。\n\n后天境的特征：\n- 内力：初生内力，可运功疗伤\n- 招式：掌握基础剑法拳法，有招有式\n- 体质：强于常人，恢复力提升\n- 感知：可感知周围数丈内的动静\n\n突破条件：内力充盈，打通任督二脉，内力生生不息，即可晋升先天境。\n\n后天境的叙事风格：你感到体内有一股暖流在经脉中缓缓运转，出招时不再只凭蛮力，而是有了几分内力加持。江湖路远，你才刚刚起步。",
+        "order": 52,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
+        "uid": 72,
+        "key": ["先天", "先天境", "真气"],
+        "constant": false,
+        "comment": "先天境",
+        "content": "【先天境】\n你目前的境界：先天。真气生生不息周流全身，气机与天地感应相通，劲力收发自然天成。\n\n先天境的特征：\n- 内力：真气浑厚，可外放伤人\n- 招式：无招胜有招，随机应变\n- 体质：刀枪不入（寻常兵器），百毒不侵（普通毒药）\n- 感知：可感知百丈内的风吹草动\n\n突破条件：真气凝练，触及天道，感悟武学至理，即可晋升宗师境。\n\n先天境的叙事风格：真气在你体内如江河奔涌，你已能感知天地间的气机流转。出招时浑然天成，仿佛与天地融为一体。江湖中人提起你，都要竖起大拇指。",
+        "order": 52,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
+        "uid": 73,
+        "key": ["宗师", "宗师境", "开宗立派"],
+        "constant": false,
+        "comment": "宗师境",
+        "content": "【宗师境】\n你目前的境界：宗师。气随意转气象自成，出手即有法度，足可开宗立派泽被后人。\n\n宗师境的特征：\n- 内力：真气凝实，可化形为剑气刀罡\n- 招式：自创武学，融会贯通\n- 体质：寻常伤害可自行愈合\n- 感知：可感知千丈内的气机变化\n\n突破条件：返璞归真，劲力浑圆无漏，无招胜有招，即可晋升大宗师境。\n\n宗师境的叙事风格：你已是一代宗师，举手投足间自有法度。你的武学已臻化境，江湖中人提起你的名字，都要加上\\\"前辈\\\"二字。六派盟约都要给你三分薄面。",
+        "order": 52,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
+        "uid": 74,
+        "key": ["大宗师", "大宗师境", "返璞归真"],
+        "constant": false,
+        "comment": "大宗师境",
+        "content": "【大宗师境】\n你目前的境界：大宗师。返璞归真劲力浑圆无漏，无招胜有招，神意所至如渊渟岳峙。\n\n大宗师境的特征：\n- 内力：真气如海，深不可测\n- 招式：无招之境，以意驭剑\n- 体质：寻常伤害如挠痒，重伤亦可自愈\n- 感知：可感知方圆数里内的气机流转\n\n突破条件：身心与天道浑然相融，已非凡俗武学可及，即可晋升天人境。\n\n大宗师境的叙事风格：你已臻化境，举手投足间皆是武学至理。江湖中人提起你，都要加上\\\"传说中的\\\"四字。少林方丈、武当道长见了你，都要合掌行礼。",
+        "order": 52,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
+        "uid": 75,
+        "key": ["天人", "天人境", "天人合一"],
+        "constant": false,
+        "comment": "天人境",
+        "content": "【天人境】\n你目前的境界：天人。身心与天道浑然相融，已非凡俗武学可及。\n\n天人境的特征：\n- 内力：真气与天地同源，取之不尽用之不竭\n- 招式：一花一叶皆可为剑，举手投足皆是武学\n- 体质：寻常伤害如清风拂面，重伤亦可瞬间愈合\n- 感知：可感知天地万物的气机流转\n\n天人境的叙事风格：你已超凡入圣，与天道融为一体。江湖中人提起你，都要加上\\\"神话中的\\\"四字。你的存在本身，就是一段传说。少林方丈、武当道长见了你，都要执弟子之礼。",
+        "order": 52,
+        "position": "after_char",
+        "entryType": "module_rule"
+      },
+      {
         "uid": -2,
         "comment": "[模块] 数值属性 - 规则",
         "content": "【数值属性更新规则】\n\n当角色受到伤害/恢复/消耗/提升时，更新对应属性：\n{\"玩家\":{\"生存状态\":{\"血量\":75}}}  // 生命类变化\n{\"玩家\":{\"生存状态\":{\"内息值\":55}}}  // 能量类变化\n{\"玩家\":{\"生存状态\":{\"dim1\":47}}}  // 六维属性变化\n{\"玩家\":{\"生存状态\":{\"str\":8}}}  // 特色属性变化\n\n注意：\n- 只输出发生变化的属性，未变化的不要输出\n- 属性值不能超过当前段位上限\n- 属性值不能低于range[0]\n\n─── 属性体系 ───\n生命类：气血（上限200）\n能量类：内息（上限150）\n六维属性：膂力（外练气力、斩击伤害）、根骨（抗击打、体质骨骼）、身法（腾挪躲闪、先手速度）、悟性（绝学参悟、破招概率）、定力（琴心音律抗性、抵抗负面状态）、福缘（奇遇概率、绝处逢生）\n特色属性：内功（呼吸吐纳练气，气沉丹田，心意一动，劲力便贯透全身经脉。）、外功（千锤百炼拳脚刀剑，招式快如闪电，一招一式皆求克敌制胜。）",
@@ -620,20 +1436,8 @@
         "uid": -3,
         "comment": "[模块] 成长体系 - 规则",
         "content": "【成长体系更新规则】\n\n─── 段位体系 ───\n1. 凡人：筋骨松散，气血浮而不沉，拳脚只凭蛮力，未窥武道门径。\n2. 后天：渐通经脉运转，根基日益夯实，气力稳步增长。\n3. 先天：真气生生不息周流全身，气机与天地感应相通，劲力收发自然天成。\n4. 宗师：气随意转气象自成，出手即有法度，足可开宗立派泽被后人。\n5. 大宗师：返璞归真劲力浑圆无漏，无招胜有招，神意所至如渊渟岳峙。\n6. 天人：身心与天道浑然相融，已非凡俗武学可及。\n\n─── 叙事风格 ───\n角色成长时的表现：琴音与剑鸣在识海中交织共振，洗髓伐骨间，你感到周身气机破茧成蝶，踏入了全新的天地。\n成长相关关键词：破境、顿悟、弦断重铸、剑意升华、气机圆满",
-        "constant": false,
-        "key": [
-          "凡人",
-          "后天",
-          "先天",
-          "宗师",
-          "大宗师",
-          "天人",
-          "段位",
-          "境界",
-          "突破",
-          "升级",
-          "进阶"
-        ],
+        "constant": true,
+        "key": [],
         "order": 53,
         "position": "after_char",
         "entryType": "module_rule"
@@ -1209,22 +2013,176 @@
         "id": "world:wuxia_world",
         "name": "武林风云规则",
         "type": "rule",
-        "permissions": ["modify_world_state", "add_card"],
+        "permissions": [
+          "modify_world_state",
+          "add_card"
+        ],
         "rules": [
           {
             "id": "duel_trigger",
-            "when": { "state": { "path": "玩家.生存状态.血量", "op": ">", "value": 80 } },
-            "then": [{ "addEvent": { "eventId": "duel", "eventPackId": "world:wuxia_world:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": ">",
+                "value": 80
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "duel",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
           },
           {
             "id": "treasure_trigger",
-            "when": { "state": { "path": "玩家.生存状态.体力值", "op": ">", "value": 60 } },
-            "then": [{ "addEvent": { "eventId": "treasure_map", "eventPackId": "world:wuxia_world:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 60
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "treasure_map",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
           },
           {
             "id": "poison_trigger",
-            "when": { "state": { "path": "玩家.生存状态.血量", "op": "<", "value": 50 } },
-            "then": [{ "addEvent": { "eventId": "poison", "eventPackId": "world:wuxia_world:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "poison",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "breakthrough_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": ">",
+                "value": 150
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "breakthrough",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "secret_realm_trigger",
+            "when": {
+              "all": [
+                {
+                  "state": {
+                    "path": "玩家.生存状态.dim4",
+                    "op": ">",
+                    "value": 70
+                  }
+                },
+                {
+                  "state": {
+                    "path": "玩家.生存状态.dim6",
+                    "op": ">",
+                    "value": 60
+                  }
+                }
+              ]
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "secret_realm",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "injury_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 30
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "injury",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "encounter_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.dim6",
+                "op": ">",
+                "value": 75
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "encounter",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "rival_trigger",
+            "when": {
+              "all": [
+                {
+                  "state": {
+                    "path": "玩家.生存状态.dim1",
+                    "op": ">",
+                    "value": 60
+                  }
+                },
+                {
+                  "state": {
+                    "path": "玩家.生存状态.血量",
+                    "op": ">",
+                    "value": 100
+                  }
+                }
+              ]
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "rival",
+                  "eventPackId": "world:wuxia_world:events"
+                }
+              }
+            ]
           }
         ],
         "periodicRules": [
@@ -1232,9 +2190,48 @@
             "id": "qi_recovery",
             "name": "内息恢复",
             "intervalTicks": 3,
-            "actions": [{ "set": { "path": "玩家.生存状态.体力值", "value": 5 } }],
+            "actions": [
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": 5
+                }
+              }
+            ],
             "narrateToAI": true,
             "description": "每3轮恢复体力值5点，AI描述调息吐纳恢复内力的过程"
+          },
+          {
+            "id": "jianghu_situation",
+            "name": "江湖局势",
+            "intervalTicks": 10,
+            "offsetTicks": 3,
+            "narrateToAI": true,
+            "description": "每10轮AI描述江湖局势变化：门派纷争、武林大事、朝廷动向"
+          },
+          {
+            "id": "sect_dynamics",
+            "name": "门派动态",
+            "intervalTicks": 7,
+            "offsetTicks": 5,
+            "narrateToAI": true,
+            "description": "每7轮AI描述各门派动态：弟子习武、掌门决策、门派间的明争暗斗"
+          },
+          {
+            "id": "qi_fluctuation",
+            "name": "内息波动",
+            "intervalTicks": 5,
+            "offsetTicks": 2,
+            "actions": [
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": 3
+                }
+              }
+            ],
+            "narrateToAI": true,
+            "description": "每5轮自然恢复内息3点，AI描述调息吐纳的过程"
           }
         ]
       },
@@ -1242,25 +2239,76 @@
         "id": "world:wuxia_world:events",
         "name": "武林风云事件",
         "type": "card",
-        "permissions": ["add_card"],
+        "permissions": [
+          "add_card"
+        ],
         "events": [
           {
             "id": "duel",
             "name": "比武挑战",
             "cards": [
-              { "id": "t_duel", "componentId": "title", "title": "比武挑战" },
-              { "id": "n_duel", "componentId": "narrative", "title": "比武挑战叙事" },
-              { "id": "c_duel", "componentId": "choice", "title": "比武挑战选择" }
+              {
+                "id": "t_duel",
+                "componentId": "title",
+                "title": "比武挑战"
+              },
+              {
+                "id": "n_duel",
+                "componentId": "narrative",
+                "title": "比武挑战叙事"
+              },
+              {
+                "id": "c_duel",
+                "componentId": "choice",
+                "title": "比武挑战选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_duel", "props": { "title": "比武挑战" } }],
-                "narrative": [{ "id": "n_duel", "props": { "text": "一位身着白衣的剑客拦住了你的去路，手中长剑寒光闪闪。'久闻大名，今日特来讨教。'" } }],
-                "choice": [{ "id": "c_duel", "props": { "choices": [
-                  { "label": "应战", "effect": { "statId": "体力值", "delta": -20 }, "aiNote": "接受比武挑战，消耗体力" },
-                  { "label": "拒绝", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "婉拒比武，保持和平" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_duel",
+                    "props": {
+                      "title": "比武挑战"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_duel",
+                    "props": {
+                      "text": "一位身着白衣的剑客拦住了你的去路，手中长剑寒光闪闪。'久闻大名，今日特来讨教。'"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_duel",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "应战",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "接受比武挑战，消耗体力"
+                        },
+                        {
+                          "label": "拒绝",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "婉拒比武，保持和平"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1268,19 +2316,68 @@
             "id": "treasure_map",
             "name": "藏宝图",
             "cards": [
-              { "id": "t_treasure", "componentId": "title", "title": "一张泛黄的地图" },
-              { "id": "n_treasure", "componentId": "narrative", "title": "藏宝图叙事" },
-              { "id": "c_treasure", "componentId": "choice", "title": "藏宝图选择" }
+              {
+                "id": "t_treasure",
+                "componentId": "title",
+                "title": "一张泛黄的地图"
+              },
+              {
+                "id": "n_treasure",
+                "componentId": "narrative",
+                "title": "藏宝图叙事"
+              },
+              {
+                "id": "c_treasure",
+                "componentId": "choice",
+                "title": "藏宝图选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_treasure", "props": { "title": "一张泛黄的地图" } }],
-                "narrative": [{ "id": "n_treasure", "props": { "text": "你在路边的茶摊上捡到一张泛黄的羊皮地图，上面标注着一个隐秘的山谷，据说藏着前朝的武功秘籍。" } }],
-                "choice": [{ "id": "c_treasure", "props": { "choices": [
-                  { "label": "组队探险", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "与同伴一起探险，消耗体力" },
-                  { "label": "独自前往", "effect": { "statId": "体力值", "delta": -25 }, "aiNote": "独自冒险，消耗更多体力但可能收获更大" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_treasure",
+                    "props": {
+                      "title": "一张泛黄的地图"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_treasure",
+                    "props": {
+                      "text": "你在路边的茶摊上捡到一张泛黄的羊皮地图，上面标注着一个隐秘的山谷，据说藏着前朝的武功秘籍。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_treasure",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "组队探险",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "与同伴一起探险，消耗体力"
+                        },
+                        {
+                          "label": "独自前往",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -25
+                          },
+                          "aiNote": "独自冒险，消耗更多体力但可能收获更大"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1288,19 +2385,68 @@
             "id": "poison",
             "name": "中毒事件",
             "cards": [
-              { "id": "t_poison", "componentId": "title", "title": "你中毒了！" },
-              { "id": "n_poison", "componentId": "narrative", "title": "中毒事件叙事" },
-              { "id": "c_poison", "componentId": "choice", "title": "中毒事件选择" }
+              {
+                "id": "t_poison",
+                "componentId": "title",
+                "title": "你中毒了！"
+              },
+              {
+                "id": "n_poison",
+                "componentId": "narrative",
+                "title": "中毒事件叙事"
+              },
+              {
+                "id": "c_poison",
+                "componentId": "choice",
+                "title": "中毒事件选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_poison", "props": { "title": "你中毒了！" } }],
-                "narrative": [{ "id": "n_poison", "props": { "text": "你在用膳时突然感到腹中剧痛，嘴唇发麻。有人在你的饭菜里下了毒！" } }],
-                "choice": [{ "id": "c_poison", "props": { "choices": [
-                  { "label": "用内功逼毒", "effect": { "statId": "体力值", "delta": -30 }, "aiNote": "用内功逼出毒素，消耗大量内力" },
-                  { "label": "找医馆", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "去医馆治疗，恢复生命" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_poison",
+                    "props": {
+                      "title": "你中毒了！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_poison",
+                    "props": {
+                      "text": "你在用膳时突然感到腹中剧痛，嘴唇发麻。有人在你的饭菜里下了毒！"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_poison",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "用内功逼毒",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -30
+                          },
+                          "aiNote": "用内功逼出毒素，消耗大量内力"
+                        },
+                        {
+                          "label": "找医馆",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "去医馆治疗，恢复生命"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1308,19 +2454,68 @@
             "id": "martial_arts_book",
             "name": "秘籍出现",
             "cards": [
-              { "id": "t_book", "componentId": "title", "title": "武功秘籍！" },
-              { "id": "n_book", "componentId": "narrative", "title": "秘籍出现叙事" },
-              { "id": "c_book", "componentId": "choice", "title": "秘籍出现选择" }
+              {
+                "id": "t_book",
+                "componentId": "title",
+                "title": "武功秘籍！"
+              },
+              {
+                "id": "n_book",
+                "componentId": "narrative",
+                "title": "秘籍出现叙事"
+              },
+              {
+                "id": "c_book",
+                "componentId": "choice",
+                "title": "秘籍出现选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_book", "props": { "title": "武功秘籍！" } }],
-                "narrative": [{ "id": "n_book", "props": { "text": "在一具枯骨旁边，你发现了一本破旧的手抄本。翻开一看，竟然是失传已久的武功心法！" } }],
-                "choice": [{ "id": "c_book", "props": { "choices": [
-                  { "label": "修炼秘籍", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "修炼秘籍，实力提升" },
-                  { "label": "卖掉换银子", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "卖掉秘籍获得碎银" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_book",
+                    "props": {
+                      "title": "武功秘籍！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_book",
+                    "props": {
+                      "text": "在一具枯骨旁边，你发现了一本破旧的手抄本。翻开一看，竟然是失传已久的武功心法！"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_book",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "修炼秘籍",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "修炼秘籍，实力提升"
+                        },
+                        {
+                          "label": "卖掉换银子",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "卖掉秘籍获得碎银"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1328,19 +2523,68 @@
             "id": "hermit",
             "name": "隐世高手",
             "cards": [
-              { "id": "t_hermit", "componentId": "title", "title": "山中老人" },
-              { "id": "n_hermit", "componentId": "narrative", "title": "隐世高手叙事" },
-              { "id": "c_hermit", "componentId": "choice", "title": "隐世高手选择" }
+              {
+                "id": "t_hermit",
+                "componentId": "title",
+                "title": "山中老人"
+              },
+              {
+                "id": "n_hermit",
+                "componentId": "narrative",
+                "title": "隐世高手叙事"
+              },
+              {
+                "id": "c_hermit",
+                "componentId": "choice",
+                "title": "隐世高手选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_hermit", "props": { "title": "山中老人" } }],
-                "narrative": [{ "id": "n_hermit", "props": { "text": "深山之中，一位白发苍苍的老人正在练功。他的招式行云流水，显然是一位绝世高手。" } }],
-                "choice": [{ "id": "c_hermit", "props": { "choices": [
-                  { "label": "上前拜师", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "拜师学习，消耗精力但获得指点" },
-                  { "label": "默默离开", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "没有打扰，保持现状" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_hermit",
+                    "props": {
+                      "title": "山中老人"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_hermit",
+                    "props": {
+                      "text": "深山之中，一位白发苍苍的老人正在练功。他的招式行云流水，显然是一位绝世高手。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_hermit",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "上前拜师",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "拜师学习，消耗精力但获得指点"
+                        },
+                        {
+                          "label": "默默离开",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "没有打扰，保持现状"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1348,19 +2592,68 @@
             "id": "sect_conflict",
             "name": "门派冲突",
             "cards": [
-              { "id": "t_sect", "componentId": "title", "title": "门派纷争" },
-              { "id": "n_sect", "componentId": "narrative", "title": "门派冲突叙事" },
-              { "id": "c_sect", "componentId": "choice", "title": "门派冲突选择" }
+              {
+                "id": "t_sect",
+                "componentId": "title",
+                "title": "门派纷争"
+              },
+              {
+                "id": "n_sect",
+                "componentId": "narrative",
+                "title": "门派冲突叙事"
+              },
+              {
+                "id": "c_sect",
+                "componentId": "choice",
+                "title": "门派冲突选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_sect", "props": { "title": "门派纷争" } }],
-                "narrative": [{ "id": "n_sect", "props": { "text": "江湖上两大门派因为一本武功秘籍的归属问题起了争执，双方都派人来拉拢你。" } }],
-                "choice": [{ "id": "c_sect", "props": { "choices": [
-                  { "label": "支持正派", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "站在正派一方，获得支持" },
-                  { "label": "保持中立", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "中立立场，两面不讨好" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_sect",
+                    "props": {
+                      "title": "门派纷争"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_sect",
+                    "props": {
+                      "text": "江湖上两大门派因为一本武功秘籍的归属问题起了争执，双方都派人来拉拢你。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_sect",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "支持正派",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "站在正派一方，获得支持"
+                        },
+                        {
+                          "label": "保持中立",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "中立立场，两面不讨好"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1368,19 +2661,620 @@
             "id": "betrayal",
             "name": "背叛",
             "cards": [
-              { "id": "t_betrayal", "componentId": "title", "title": "背叛！" },
-              { "id": "n_betrayal", "componentId": "narrative", "title": "背叛叙事" },
-              { "id": "c_betrayal", "componentId": "choice", "title": "背叛选择" }
+              {
+                "id": "t_betrayal",
+                "componentId": "title",
+                "title": "背叛！"
+              },
+              {
+                "id": "n_betrayal",
+                "componentId": "narrative",
+                "title": "背叛叙事"
+              },
+              {
+                "id": "c_betrayal",
+                "componentId": "choice",
+                "title": "背叛选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_betrayal", "props": { "title": "背叛！" } }],
-                "narrative": [{ "id": "n_betrayal", "props": { "text": "你最信任的同伴突然在背后捅了你一刀。'对不起，我别无选择。'" } }],
-                "choice": [{ "id": "c_betrayal", "props": { "choices": [
-                  { "label": "原谅他", "effect": { "statId": "血量", "delta": -10 }, "aiNote": "选择原谅，但内心受伤" },
-                  { "label": "反击", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "反击背叛者，消耗体力" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_betrayal",
+                    "props": {
+                      "title": "背叛！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_betrayal",
+                    "props": {
+                      "text": "你最信任的同伴突然在背后捅了你一刀。'对不起，我别无选择。'"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_betrayal",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "原谅他",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -10
+                          },
+                          "aiNote": "选择原谅，但内心受伤"
+                        },
+                        {
+                          "label": "反击",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "反击背叛者，消耗体力"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "breakthrough",
+            "name": "武功突破",
+            "cards": [
+              {
+                "id": "t_breakthrough",
+                "componentId": "title",
+                "title": "突破契机"
+              },
+              {
+                "id": "n_breakthrough",
+                "componentId": "narrative",
+                "title": "突破叙事"
+              },
+              {
+                "id": "c_breakthrough",
+                "componentId": "choice",
+                "title": "突破选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_breakthrough",
+                    "props": {
+                      "title": "突破契机"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_breakthrough",
+                    "props": {
+                      "text": "你感到体内真气澎湃，经脉中似有千军万马奔腾。这是突破的征兆！但突破有风险——若心神不宁，可能走火入魔。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_breakthrough",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "闭关突破",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 30
+                          },
+                          "aiNote": "闭关突破成功，实力大增"
+                        },
+                        {
+                          "label": "稳固根基",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 15
+                          },
+                          "aiNote": "选择稳固根基，不急于突破"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "secret_realm",
+            "name": "秘境发现",
+            "cards": [
+              {
+                "id": "t_secret",
+                "componentId": "title",
+                "title": "隐秘洞窟"
+              },
+              {
+                "id": "n_secret",
+                "componentId": "narrative",
+                "title": "秘境叙事"
+              },
+              {
+                "id": "c_secret",
+                "componentId": "choice",
+                "title": "秘境选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_secret",
+                    "props": {
+                      "title": "隐秘洞窟"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_secret",
+                    "props": {
+                      "text": "凭借过人的悟性和福缘，你发现了一处隐秘的洞窟。洞壁上刻满了古老的武功心法，空气中弥漫着淡淡的灵气。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_secret",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "参悟心法",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 25
+                          },
+                          "aiNote": "参悟洞壁心法，武功精进"
+                        },
+                        {
+                          "label": "搜寻宝物",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 20
+                          },
+                          "aiNote": "在洞窟中搜寻到珍贵药材"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "injury",
+            "name": "重伤",
+            "cards": [
+              {
+                "id": "t_injury",
+                "componentId": "title",
+                "title": "重伤倒地"
+              },
+              {
+                "id": "n_injury",
+                "componentId": "narrative",
+                "title": "重伤叙事"
+              },
+              {
+                "id": "c_injury",
+                "componentId": "choice",
+                "title": "重伤选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_injury",
+                    "props": {
+                      "title": "重伤倒地"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_injury",
+                    "props": {
+                      "text": "你身受重伤，鲜血染红了衣襟。意识渐渐模糊，眼前一黑，倒在了路边。恍惚中，似乎有人向你走来……"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_injury",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "强运内功",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "强运内功疗伤，消耗大量内力但稳住伤势"
+                        },
+                        {
+                          "label": "等待救援",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "被路过的侠客所救，伤势得到初步处理"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "encounter",
+            "name": "奇遇",
+            "cards": [
+              {
+                "id": "t_encounter",
+                "componentId": "title",
+                "title": "天降奇缘"
+              },
+              {
+                "id": "n_encounter",
+                "componentId": "narrative",
+                "title": "奇遇叙事"
+              },
+              {
+                "id": "c_encounter",
+                "componentId": "choice",
+                "title": "奇遇选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_encounter",
+                    "props": {
+                      "title": "天降奇缘"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_encounter",
+                    "props": {
+                      "text": "福缘深厚，天降奇缘！你在山间漫步时，偶然发现一处被藤蔓遮蔽的石室。石室中央放着一个古朴的木盒，上面刻着神秘的符文。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_encounter",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "打开木盒",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 20
+                          },
+                          "aiNote": "木盒中藏着一枚珍贵的丹药，服下后实力大增"
+                        },
+                        {
+                          "label": "谨慎离开",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "觉得事有蹊跷，选择谨慎离开"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "rival",
+            "name": "宿敌",
+            "cards": [
+              {
+                "id": "t_rival",
+                "componentId": "title",
+                "title": "宿敌现身"
+              },
+              {
+                "id": "n_rival",
+                "componentId": "narrative",
+                "title": "宿敌叙事"
+              },
+              {
+                "id": "c_rival",
+                "componentId": "choice",
+                "title": "宿敌选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_rival",
+                    "props": {
+                      "title": "宿敌现身"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_rival",
+                    "props": {
+                      "text": "你的实力引起了某位高手的注意。此人与你有旧怨，今日特来寻仇。他手持利刃，眼中满是杀意。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_rival",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "正面迎战",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -25
+                          },
+                          "aiNote": "与宿敌激战，虽然受伤但将其击退"
+                        },
+                        {
+                          "label": "智取脱身",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "用计谋脱身，避免了正面冲突"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "sect_quest",
+            "name": "门派任务",
+            "cards": [
+              {
+                "id": "t_quest",
+                "componentId": "title",
+                "title": "门派密令"
+              },
+              {
+                "id": "n_quest",
+                "componentId": "narrative",
+                "title": "任务叙事"
+              },
+              {
+                "id": "c_quest",
+                "componentId": "choice",
+                "title": "任务选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_quest",
+                    "props": {
+                      "title": "门派密令"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_quest",
+                    "props": {
+                      "text": "掌门召见你，交给你一项秘密任务：前往金陵城，调查灵枢阁旧址中传出的异动。此行凶险，但若成功，门派将重重有赏。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_quest",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "领命前往",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "接受门派任务，前往金陵城调查"
+                        },
+                        {
+                          "label": "婉言推辞",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "推辞任务，但掌门似乎不太高兴"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "martial_arts_conference",
+            "name": "武林大会",
+            "cards": [
+              {
+                "id": "t_conference",
+                "componentId": "title",
+                "title": "武林大会"
+              },
+              {
+                "id": "n_conference",
+                "componentId": "narrative",
+                "title": "大会叙事"
+              },
+              {
+                "id": "c_conference",
+                "componentId": "choice",
+                "title": "大会选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_conference",
+                    "props": {
+                      "title": "武林大会"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_conference",
+                    "props": {
+                      "text": "六派盟约在沧浪峰举办武林大会，各路高手齐聚一堂。大会上有比武论道、有秘籍交易、也有暗中角力。你作为江湖新秀，收到了邀请。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_conference",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "参加比武",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 20
+                          },
+                          "aiNote": "在比武中表现出色，赢得名声"
+                        },
+                        {
+                          "label": "暗中观察",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 10
+                          },
+                          "aiNote": "暗中观察各方势力，收集情报"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "poison_test",
+            "name": "试毒",
+            "cards": [
+              {
+                "id": "t_poison_test",
+                "componentId": "title",
+                "title": "唐门试毒"
+              },
+              {
+                "id": "n_poison_test",
+                "componentId": "narrative",
+                "title": "试毒叙事"
+              },
+              {
+                "id": "c_poison_test",
+                "componentId": "choice",
+                "title": "试毒选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_poison_test",
+                    "props": {
+                      "title": "唐门试毒"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_poison_test",
+                    "props": {
+                      "text": "唐门的人找到你，说要测试你对毒药的抵抗力。如果你能扛过三种毒药，就传授你唐门暗器绝技。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_poison_test",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受试毒",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -15
+                          },
+                          "aiNote": "通过试毒考验，获得唐门暗器传授"
+                        },
+                        {
+                          "label": "断然拒绝",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "拒绝试毒，保全性命"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           }

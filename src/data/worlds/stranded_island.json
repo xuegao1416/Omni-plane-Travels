@@ -474,6 +474,906 @@
           "决策火圈",
           "火堆功绩"
         ]
+      },
+      {
+        "uid": 13,
+        "entryType": "lore",
+        "key": [
+          "珊瑚礁",
+          "礁石",
+          "海洋"
+        ],
+        "comment": "珊瑚礁",
+        "content": "岛屿南端环绕着一圈珊瑚礁，退潮时露出水面，是捡拾海螺、蛤蜊和螃蟹的好地方。珊瑚礁上附着锋利的藤壶，光脚行走会割伤，必须穿鞋或裹布防护。珊瑚礁也是天然的防波堤，能减弱海浪对沙滩的冲击。珊瑚礁缝隙中常见小型海鱼搁浅，是稳定的蛋白质来源。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 14,
+        "entryType": "lore",
+        "key": [
+          "海底洞穴",
+          "洞穴",
+          "海洋"
+        ],
+        "comment": "海底洞穴",
+        "content": "岛屿东侧有一处海底洞穴，退潮时入口露出水面。洞穴内部空间不大，但干燥通风，是天然的避难所。洞穴深处有一处地下泉眼，水质清澈，是岛上最好的水源。但洞穴入口狭窄，只能单人通过，且涨潮时会被淹没，必须掌握潮汐时间才能安全进出。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 15,
+        "entryType": "lore",
+        "key": [
+          "丛林深处",
+          "热带雨林",
+          "危险"
+        ],
+        "comment": "丛林深处",
+        "content": "岛屿中部被浓密的热带雨林覆盖，树木高大茂密，阳光难以穿透。丛林深处是野猪、毒蛇和各种昆虫的栖息地。丛林中有大量可食用的植物和果实，但也有许多有毒的品种，辨识错误可能致命。丛林中的藤蔓可以用来制作绳索，但有些藤蔓有毒，接触后会导致皮肤溃烂。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 16,
+        "entryType": "lore",
+        "key": [
+          "火山口",
+          "火山",
+          "黑曜石"
+        ],
+        "comment": "火山口",
+        "content": "岛屿北端的休眠火山锥顶部有一个直径约五十米的火山口，内部积水形成一个小湖。火山口附近散落着大量黑曜石碎片，质地锋利，可敲出比普通石材锐利数倍的刀片、矛头和箭头。火山口边缘是岛上最高的点，天气晴朗时可以看到方圆四十公里的海面。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 17,
+        "entryType": "lore",
+        "key": [
+          "椰林",
+          "椰子",
+          "椰树"
+        ],
+        "comment": "椰林",
+        "content": "新月滩东侧有一片椰林，六棵高大椰树能为营地提供阴凉和稳定的椰子水源。每天最多采集2颗椰子，每颗含0.5单位淡水。椰子壳可以用来做容器，椰肉可以食用，椰纤维可以用来做绳索。椰林是营地的重要资源点，但椰树高大，采摘需要技巧和体力。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 18,
+        "entryType": "lore",
+        "key": [
+          "淡水溪流",
+          "溪流",
+          "水源"
+        ],
+        "comment": "淡水溪流",
+        "content": "青藤谷中有一条常年不断的溪流，流量约每小时一桶，水质清澈但必须煮沸饮用——上游有野猪活动，粪便污染风险高。溪流是岛上最重要的水源，但距离营地步行约一小时，来回需要消耗大量体力。溪流两侧有大量枯死的乔木，干木材储量约50单位。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 19,
+        "entryType": "factions",
+        "key": [
+          "探索队",
+          "探索",
+          "侦察"
+        ],
+        "comment": "探索队",
+        "content": "[friendly] 探索队是营地中负责探索岛屿的小组。探索队的任务是寻找新的资源点、探索未知区域、绘制岛屿地图。探索队的成员需要体力好、方向感强、有野外生存经验。老陈是探索队的队长，他对岛屿的地形了如指掌。探索队每次出发都需要携带足够的水和食物，因为探索可能持续一整天。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "探索队",
+              "description": "负责探索岛屿、寻找资源点、绘制地图。老陈是队长。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 20,
+        "entryType": "factions",
+        "key": [
+          "后勤组",
+          "后勤",
+          "采集"
+        ],
+        "comment": "后勤组",
+        "content": "[friendly] 后勤组是营地中负责日常采集和维护的小组。后勤组的任务是采集淡水、食物、木材等日常消耗品，维护营地设施，处理食物和储存物资。后勤组的成员需要细心、耐心、有组织能力。林医生是后勤组的负责人，他对物资管理非常严格。后勤组的工作看似简单，但关系到营地的生存。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "后勤组",
+              "description": "负责日常采集和维护，林医生是负责人。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 21,
+        "entryType": "factions",
+        "key": [
+          "守卫队",
+          "守卫",
+          "安全"
+        ],
+        "comment": "守卫队",
+        "content": "[friendly] 守卫队是营地中负责安全的小组。守卫队的任务是守夜、巡逻、驱赶野兽、保护营地。守卫队的成员需要警觉、勇敢、有战斗经验。阿杰是守卫队的队长，他体力好、胆子大，是营地中最适合守夜的人。守卫队的工作危险但重要，因为营地的安全取决于他们。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "守卫队",
+              "description": "负责营地安全，守夜、巡逻、驱赶野兽。阿杰是队长。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 22,
+        "entryType": "npcs",
+        "key": [
+          "野猪",
+          "动物",
+          "狩猎"
+        ],
+        "comment": "野猪",
+        "content": "【野猪】（岛屿野生动物）\n岛上最大的陆生动物，有三只成年野猪活动。野猪白天躲雨林深处休息，黄昏到海滩觅食。野猪是重要的蛋白质来源，但也是危险的对手——被野猪撞伤可能导致骨折或内出血。野猪的弱点是眼睛和鼻子，攻击这些部位可以有效制服它。野猪的皮可以用来做皮革，骨头可以用来做工具。",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "野猪",
+              "role": "岛屿野生动物",
+              "description": "三只成年野猪，白天躲雨林，黄昏到海滩觅食。是蛋白质来源也是危险对手。",
+              "personality": "领地意识强、夜间活跃、攻击性强"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 23,
+        "entryType": "npcs",
+        "key": [
+          "海鸟",
+          "鸟类",
+          "狩猎"
+        ],
+        "comment": "海鸟",
+        "content": "【海鸟】（岛屿野生动物）\n岛屿周围有大量海鸟栖息，它们清晨群聚在礁石上，是稳定的蛋白质来源。海鸟可以用陷阱或弹弓捕猎，但需要技巧和耐心。海鸟的蛋也可以食用，营养价值高。海鸟的羽毛可以用来做保暖材料，骨头可以用来做鱼钩。",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "海鸟",
+              "role": "岛屿野生动物",
+              "description": "清晨群聚在礁石上，是稳定的蛋白质来源。可以用陷阱或弹弓捕猎。",
+              "personality": "警觉、群居、清晨活跃"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 24,
+        "entryType": "npcs",
+        "key": [
+          "毒蛇",
+          "蛇",
+          "危险"
+        ],
+        "comment": "毒蛇",
+        "content": "【毒蛇】（岛屿危险动物）\n丛林中有几种毒蛇，最常见的是竹叶青和眼镜蛇。毒蛇通常不会主动攻击人，但受到惊吓或被踩到时会反击。被毒蛇咬伤需要立即处理，否则可能致命。处理方法：用布条扎紧伤口上方，用清水冲洗伤口，用草药敷伤口。毒蛇的蛇胆和蛇皮可以用来做药材。",
+        "constant": false,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "毒蛇",
+              "role": "岛屿危险动物",
+              "description": "竹叶青和眼镜蛇，通常不主动攻击，但被惊吓或踩到时会反击。",
+              "personality": "隐蔽、警觉、防御性攻击"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 25,
+        "entryType": "culture",
+        "key": [
+          "生火",
+          "钻木取火",
+          "火源"
+        ],
+        "comment": "生火技能",
+        "content": "生火是荒岛生存的核心技能。有了火才能煮沸水、烤熟食、驱赶野兽、发送信号。生火的方法有几种：钻木取火（成功率极低，需要干燥的木材和大量耐心）、打火石（用黑曜石和铁矿石撞击产生火花）、放大镜（用眼镜片聚光点燃火绒）。飞机残骸中可能有打火机或火柴，是最方便的火源。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 26,
+        "entryType": "culture",
+        "key": [
+          "捕鱼",
+          "渔网",
+          "鱼"
+        ],
+        "comment": "捕鱼技能",
+        "content": "捕鱼是荒岛获取蛋白质的重要方式。捕鱼的方法有几种：徒手抓鱼（只适合浅水区，成功率低）、用渔网捕鱼（需要布料或藤蔓制作渔网，效率高）、用鱼叉捕鱼（需要木材和石头制作鱼叉，需要技巧）、用鱼钩钓鱼（需要骨头或金属制作鱼钩，需要耐心）。礁石缝隙中的小鱼可以用手直接抓。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 27,
+        "entryType": "culture",
+        "key": [
+          "制作工具",
+          "石器",
+          "工具"
+        ],
+        "comment": "工具制作",
+        "content": "荒岛上的工具制作是生存的基础。最基本的工具是石刀——用黑曜石或燧石敲出锋利的刃口，用来切割、刮削、雕刻。石斧需要石材和木材，用来砍伐树木。鱼叉需要木材和石头，用来捕鱼。渔网需要布料或藤蔓，用来捕鱼。绳索需要藤蔓或布料，用来捆绑、攀爬、制作陷阱。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 28,
+        "entryType": "culture",
+        "key": [
+          "信号发送",
+          "求救",
+          "信号火"
+        ],
+        "comment": "信号发送",
+        "content": "发送求救信号是荒岛生存的终极目标。信号发送的方法有几种：信号火（在高处点燃三堆篝火形成等腰三角形，是国际通用的求救信号）、反光镜（用金属片或玻璃反射阳光，吸引远处船只的注意）、烟雾信号（在火堆上加湿树叶产生浓烟，白天可见度高）。信号发送需要选择合适的时间和地点——天气晴朗、海面上有船只的时候效果最好。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 29,
+        "entryType": "culture",
+        "key": [
+          "庇护所",
+          "搭建",
+          "住所"
+        ],
+        "comment": "庇护所搭建",
+        "content": "庇护所是荒岛生存的必需品。热带气候白天暴晒、夜间降温、随时有暴雨，不建庇护所，三天内即因失温或中暑倒下。最基本的庇护所是用木材搭建的简易棚屋，上面覆盖棕榈叶或芭蕉叶防雨。更好的庇护所是用石头和木材搭建的坚固小屋，能抵御暴风雨。最理想的庇护所是天然洞穴，干燥通风、安全可靠。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 30,
+        "entryType": "culture",
+        "key": [
+          "医疗",
+          "草药",
+          "治疗"
+        ],
+        "comment": "荒岛医疗",
+        "content": "荒岛上的医疗条件极其有限，没有药品、没有手术器械、没有医生（只有林医生有基本的医疗知识）。处理伤病的方法主要是：用草药敷伤口（鱼腥草消炎、野薄荷退烧、岩藓止血）、用清水冲洗伤口、用布料包扎伤口。严重的伤病（骨折、内出血、感染）基本无法处理，只能靠运气和意志力。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 31,
+        "entryType": "culture",
+        "key": [
+          "食物保存",
+          "储存",
+          "防腐"
+        ],
+        "comment": "食物保存",
+        "content": "荒岛上的食物保存是生存的关键。生肉和鲜果两天内变质，必须尽快食用或加工。食物保存的方法有几种：熏制（用烟熏肉，可以保存五天左右）、晒干（把肉和鱼晒成干，可以保存更久）、腌制（用海水腌制，可以保存三天左右）。食物储存需要放在高处，防止野兽偷吃。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 32,
+        "entryType": "economy",
+        "key": [
+          "工具制作",
+          "制作配方",
+          "工具"
+        ],
+        "comment": "工具制作配方",
+        "content": "荒岛上的工具制作配方：\n- 石刀：石材×1 + 木材×1 → 切割、刮削、雕刻\n- 石斧：石材×2 + 木材×2 → 砍伐树木、建造\n- 鱼叉：木材×2 + 石材×1 → 捕鱼\n- 渔网：布料×3 + 藤蔓×2 → 捕鱼\n- 绳索：藤蔓×3 → 捆绑、攀爬、制作陷阱\n- 弹弓：木材×1 + 藤蔓×1 → 狩猎小鸟\n- 鱼钩：骨头×1 或 金属×1 → 钓鱼\n- 火把：木材×1 + 布料×1 → 照明、驱兽、信号",
+        "constant": false,
+        "order": 11,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": "物资转化",
+            "symbol": "→",
+            "description": "用原始物资制作工具，提升生存效率"
+          },
+          "priceLevel": "石刀1.5，石斧2.0，鱼叉1.8，渔网2.5，绳索1.2"
+        }
+      },
+      {
+        "uid": 33,
+        "entryType": "economy",
+        "key": [
+          "食物来源",
+          "采集",
+          "狩猎"
+        ],
+        "comment": "食物来源",
+        "content": "荒岛上的食物来源：\n- 椰子：每天2颗，每颗含0.5单位淡水+0.5单位食物\n- 贝类：退潮时在礁石区捡拾，每天可获2-3单位食物\n- 海鱼：用渔网或鱼叉捕鱼，每天可获1-2单位食物\n- 野果：丛林中有各种野果，但需要辨识是否有毒\n- 野猪：狩猎野猪可获大量食物（5-10单位），但危险\n- 海鸟：用陷阱或弹弓捕猎，每天可获1-2单位食物\n- 鸟蛋：在海鸟巢穴中捡拾，每天可获1-2单位食物",
+        "constant": false,
+        "order": 11,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": "食物来源",
+            "symbol": "🍖",
+            "description": "各种食物的获取方式和产量"
+          },
+          "priceLevel": "椰子1.0，贝类2-3，海鱼1-2，野猪5-10，海鸟1-2"
+        }
+      },
+      {
+        "uid": 34,
+        "entryType": "economy",
+        "key": [
+          "水源",
+          "淡水",
+          "获取"
+        ],
+        "comment": "水源",
+        "content": "荒岛上的水源：\n- 泉眼：新月滩西侧有一处淡水泉眼，每天可收集2-3单位淡水\n- 溪流：青藤谷中有一条溪流，流量约每小时一桶，但需要煮沸\n- 椰子：每天2颗，每颗含0.5单位淡水\n- 雨水：下雨时用容器收集，但不稳定\n- 蒸馏：用火加盐水蒸馏，但效率低、消耗燃料\n- 露水：清晨用布料收集露水，量少但可应急",
+        "constant": false,
+        "order": 11,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": "水源",
+            "symbol": "💧",
+            "description": "各种水源的获取方式和产量"
+          },
+          "priceLevel": "泉眼2-3，溪流每小时1，椰子0.5，雨水不稳定"
+        }
+      },
+      {
+        "uid": 35,
+        "entryType": "relationships",
+        "key": [
+          "信任危机",
+          "怀疑",
+          "背叛"
+        ],
+        "comment": "信任危机",
+        "content": "荒岛上的信任危机是生存的最大威胁。当资源短缺时，人们会开始怀疑别人私藏物资、偷窃食物、甚至背叛营地。刘叔私藏物资的行为被发现后，营地的信任彻底破裂。信任危机的解决方法：物资公示（每天清点物资）、轮流值守（防止偷窃）、公开讨论（解决矛盾）。但信任一旦破裂，很难修复。",
+        "constant": false,
+        "order": 14,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "信任危机是荒岛生存的最大威胁，资源短缺时人们会怀疑别人。",
+            "mechanics": "信任危机影响物资共享、决策投票、营地稳定。",
+            "types": [
+              {
+                "name": "怀疑",
+                "description": "怀疑别人私藏物资、偷窃食物。"
+              },
+              {
+                "name": "指控",
+                "description": "公开指控别人背叛营地。"
+              },
+              {
+                "name": "分裂",
+                "description": "营地分裂成几个小团体。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 36,
+        "entryType": "relationships",
+        "key": [
+          "领导权",
+          "决策",
+          "投票"
+        ],
+        "comment": "领导权",
+        "content": "荒岛上没有明确的首领，决策需要多数同意。但当意见分歧时，谁有最终决定权？林医生是医疗决策者，老陈是生存专家，阿杰是体力担当。领导权的争夺可能导致营地分裂。领导权的解决方法：轮流执政（每人负责一天）、投票表决（少数服从多数）、专业决策（谁擅长谁决定）。但领导权一旦确定，必须服从，否则营地无法运作。",
+        "constant": false,
+        "order": 14,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "荒岛上没有明确首领，领导权的争夺可能导致营地分裂。",
+            "mechanics": "领导权影响决策效率、营地稳定、资源分配。",
+            "types": [
+              {
+                "name": "轮流执政",
+                "description": "每人负责一天，轮流领导。"
+              },
+              {
+                "name": "投票表决",
+                "description": "少数服从多数，民主决策。"
+              },
+              {
+                "name": "专业决策",
+                "description": "谁擅长谁决定，效率最高。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 37,
+        "entryType": "relationships",
+        "key": [
+          "分工合作",
+          "协作",
+          "团队"
+        ],
+        "comment": "分工合作",
+        "content": "荒岛上的分工合作是生存的基础。每个人都有自己的特长和弱点，合理分工可以最大化生存概率。林医生负责医疗和决策，老陈负责探索和生存技能，小雨负责植物辨识，阿杰负责体力劳动，小夏负责护理，小米负责搜索侦察。分工合作的关键是信任和配合——你必须信任别人能完成自己的任务，也必须配合别人完成共同的任务。",
+        "constant": false,
+        "order": 14,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "分工合作是荒岛生存的基础，合理分工最大化生存概率。",
+            "mechanics": "分工合作影响资源产出效率、营地稳定、生存概率。",
+            "types": [
+              {
+                "name": "专业分工",
+                "description": "每人负责自己擅长的领域。"
+              },
+              {
+                "name": "轮换分工",
+                "description": "轮流做不同的工作，避免疲劳。"
+              },
+              {
+                "name": "协作分工",
+                "description": "多人合作完成一项任务。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 38,
+        "entryType": "lore",
+        "key": [
+          "飞机残骸",
+          "残骸",
+          "坠机"
+        ],
+        "comment": "飞机残骸",
+        "content": "飞机残骸是坠机后留下的遗骸，散落在新月滩周围。残骸中可能有有用的物资：金属片（→工具材料）、塑料瓶（→储水容器）、衣物（→布料）、座椅（→木材）、行李箱（→各种物品）。机尾有一台损坏的应急电台，需要五单位金属零件和两天修理时间才能恢复工作。残骸周围有燃油浮油，是易燃物，可以用来生火。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 39,
+        "entryType": "lore",
+        "key": [
+          "海滩东侧",
+          "东海岸",
+          "岩石"
+        ],
+        "comment": "海滩东侧",
+        "content": "新月滩东侧是绵延约八十米的礁石区，退潮时暴露，适合捡拾海螺、蛤蜊和螃蟹。礁石缝隙中常见小型海鱼搁浅，是稳定的蛋白质来源。但礁石上附着锋利藤壶，光脚行走会割伤，必须穿鞋或裹布防护。礁石区也是观察潮汐的好地方——退潮时可以看到潮汐的变化规律。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 40,
+        "entryType": "lore",
+        "key": [
+          "海滩西侧",
+          "西海岸",
+          "泉眼"
+        ],
+        "comment": "海滩西侧",
+        "content": "新月滩西侧有一处石灰岩层下渗出的淡水泉眼，退潮时裸露，每天可收集2-3单位淡水（雨季更多）。泉眼旁边有天然凹坑，可围成蓄水池，但大雨时会被淹没。泉眼是营地最重要的水源，但需要每天派人去收集，来回需要消耗体力。泉眼周围有几棵椰树，可以提供阴凉和椰子。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 41,
+        "entryType": "lore",
+        "key": [
+          "营地设施",
+          "营地",
+          "建设"
+        ],
+        "comment": "营地设施",
+        "content": "营地设施是荒岛生存的基础。最基本的设施是庇护所（用木材和棕榈叶搭建的简易棚屋）、火堆（用来烹饪、取暖、驱兽）、蓄水池（用石头围成的淡水储存设施）、食物储存处（高处悬挂，防止野兽偷吃）。更好的设施包括：木屋（更坚固的庇护所）、瞭望台（观察远处情况）、围栏（防止野兽入侵）、晾晒架（保存食物）。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 42,
+        "entryType": "lore",
+        "key": [
+          "天气变化",
+          "天气",
+          "气候"
+        ],
+        "comment": "天气变化",
+        "content": "荒岛上的天气变化无常。热带气候的特点是：白天暴晒（容易中暑）、夜间降温（容易失温）、随时有暴雨（可能摧毁庇护所）、偶尔有台风（破坏力极大）。天气变化的规律：连续两日闷热无风、海水异常平静，是热带风暴的前兆。站在望崖上可以提前6-8小时看到风暴来袭。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 43,
+        "entryType": "lore",
+        "key": [
+          "丛林边缘",
+          "边缘",
+          "过渡"
+        ],
+        "comment": "丛林边缘",
+        "content": "丛林边缘是沙滩和丛林的过渡地带，植被从低矮的灌木逐渐变成高大的乔木。丛林边缘是采集野果和草药的好地方，但也是毒蛇和昆虫的栖息地。丛林边缘的阳光充足，适合种植一些作物。丛林边缘也是观察丛林深处的好地方——可以看到丛林中的动静，提前发现危险。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 44,
+        "entryType": "lore",
+        "key": [
+          "火山坡",
+          "山坡",
+          "攀登"
+        ],
+        "comment": "火山坡",
+        "content": "火山坡是岛屿北端的斜坡，覆盖着松散的火山砾和蕨类植被。攀登火山坡需要消耗大量体力（2-3小时），但登顶后的回报远超成本：可以看到方圆四十公里的海面、采集黑曜石、发送求救信号、判断天气变化。火山坡上有一些小洞穴，可以作为临时避难所。火山坡的植被稀疏，但有一些耐旱的植物可以食用。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 45,
+        "entryType": "lore",
+        "key": [
+          "海岸线",
+          "海岸",
+          "探索"
+        ],
+        "comment": "海岸线",
+        "content": "岛屿的海岸线长约十公里，由沙滩、礁石、悬崖和海湾组成。海岸线是探索岛屿的好地方——可以看到岛屿的全貌、发现新的资源点、寻找漂流物。海岸线也是危险的地方——潮汐变化、海浪冲击、礁石锋利。探索海岸线需要消耗大量体力，但可能发现有用的物资或新的营地位置。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 46,
+        "entryType": "lore",
+        "key": [
+          "岛屿地图",
+          "地图",
+          "绘制"
+        ],
+        "comment": "岛屿地图",
+        "content": "绘制岛屿地图是探索的重要任务。地图可以标记资源点、危险区域、营地位置、探索路线。绘制地图需要：纸张（从飞机残骸中找到）、笔（从行李箱中找到）、测量工具（用绳索和脚步测量距离）。地图是营地的重要资产，可以帮助新人快速了解岛屿，也可以帮助探索队规划路线。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 47,
+        "entryType": "lore",
+        "key": [
+          "救援等待",
+          "救援",
+          "希望"
+        ],
+        "comment": "救援等待",
+        "content": "救援等待是荒岛生存中最煎熬的事情。每天都在想：救援什么时候会来？有没有人知道我们在这里？信号有没有发出去？救援等待的关键是保持希望——希望是活下去的动力。但希望也可能变成绝望——如果救援迟迟不来，人们会开始放弃。救援等待的方法：每天派人去望崖观察海面、维护信号火、修复应急电台。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 48,
+        "entryType": "lore",
+        "key": [
+          "应急电台",
+          "电台",
+          "通讯"
+        ],
+        "comment": "应急电台",
+        "content": "应急电台是飞机尾部的通讯设备，坠机时损坏但可能可以修复。修复需要：五单位金属零件（从飞机残骸中拆取）、两天的修理时间（需要有电子知识的人）。修复后可以发送求救信号，但信号范围有限，需要有船只或飞机在附近才能收到。应急电台是获救的最大希望，但修复它需要消耗大量时间和资源。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 49,
+        "entryType": "culture",
+        "key": [
+          "陷阱制作",
+          "陷阱",
+          "狩猎"
+        ],
+        "comment": "陷阱制作",
+        "content": "陷阱是荒岛狩猎的重要工具。陷阱的种类有几种：绳套陷阱（用藤蔓做绳套，套住动物的脚或脖子）、落石陷阱（用石头和木材搭建，触发后石头落下砸中动物）、鱼笼陷阱（用藤蔓编织笼子，放在水中捕鱼）、弹射陷阱（用木材和藤蔓做弹射装置，触发后弹射出尖刺）。陷阱需要放置在动物常出没的地方，需要定期检查。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 50,
+        "entryType": "culture",
+        "key": [
+          "绳索制作",
+          "绳索",
+          "编织"
+        ],
+        "comment": "绳索制作",
+        "content": "绳索是荒岛生存的重要工具，用来捆绑、攀爬、制作陷阱、制作渔网。绳索的制作方法：用藤蔓或树皮纤维搓成细绳，然后把三根细绳编织成粗绳。绳索的强度取决于材料和编织方法——藤蔓绳索强度高但粗糙，树皮绳索柔软但强度低。绳索制作需要耐心和技巧，但一旦学会，就能源源不断地生产。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 51,
+        "entryType": "culture",
+        "key": [
+          "编织",
+          "篮子",
+          "容器"
+        ],
+        "comment": "编织技术",
+        "content": "编织是荒岛制作容器和工具的技术。编织的材料有几种：藤蔓（用来编织篮子、鱼笼、围栏）、棕榈叶（用来编织席子、帽子、遮阳棚）、树皮（用来编织绳索、袋子、容器）。编织需要耐心和技巧，但一旦学会，就能制作各种有用的物品。编织的篮子可以用来收集和储存物资，编织的鱼笼可以用来捕鱼。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 52,
+        "entryType": "culture",
+        "key": [
+          "取水",
+          "净水",
+          "蒸馏"
+        ],
+        "comment": "取水技术",
+        "content": "荒岛上的取水技术是生存的关键。取水的方法有几种：直接饮用（泉水、溪水，但可能有污染）、煮沸（用火把水烧开，杀死细菌）、蒸馏（用火加盐水蒸馏，去除盐分和杂质）、过滤（用沙子和木炭过滤，去除杂质）。最安全的取水方法是煮沸——简单、有效、消耗少。蒸馏虽然能去除盐分，但效率低、消耗燃料。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 53,
+        "entryType": "culture",
+        "key": [
+          "导航",
+          "方向",
+          "定位"
+        ],
+        "comment": "荒岛导航",
+        "content": "荒岛上的导航是探索的基础。导航的方法有几种：太阳（太阳东升西落，可以判断方向）、星星（北极星指向北方）、风向（信风的方向固定）、海流（海流的方向固定）、地形（用火山、海岸线、河流作为参照物）。导航的关键是记住走过的路线，避免迷路。迷路在荒岛上可能致命——找不到回营地的路，就可能死在野外。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 54,
+        "entryType": "culture",
+        "key": [
+          "急救",
+          "伤口",
+          "包扎"
+        ],
+        "comment": "急救知识",
+        "content": "荒岛上的急救知识是生存的关键。急救的方法有几种：止血（用布料按压伤口，抬高伤肢）、包扎（用干净的布料包扎伤口，防止感染）、固定（用木材和布料固定骨折部位）、心肺复苏（按压胸部和人工呼吸）。急救的关键是快速、干净、正确——慢了会失血过多，脏了会感染，错了会加重伤势。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 55,
+        "entryType": "culture",
+        "key": [
+          "心理调节",
+          "心理",
+          "压力"
+        ],
+        "comment": "心理调节",
+        "content": "荒岛上的心理调节是生存的重要因素。长期的恐惧、焦虑、孤独、绝望会严重影响判断力和行动力。心理调节的方法有几种：保持忙碌（有事做就不会胡思乱想）、互相支持（跟别人聊天、分享感受）、设定目标（每天完成一个小任务）、保持希望（相信救援会来）。心理崩溃在荒岛上可能致命——失去求生意志的人，活不过三天。",
+        "constant": false,
+        "order": 19,
+        "position": "before_char"
+      },
+      {
+        "uid": 56,
+        "entryType": "rules",
+        "key": [
+          "生存法则",
+          "规矩",
+          "规则"
+        ],
+        "comment": "生存法则",
+        "content": "荒岛生存的核心法则：\n- **淡水优先**：72小时不进水即死亡，食物最长可撑三周。\n- **庇护必需**：三天内无遮蔽即失温或中暑。\n- **火源核心**：煮沸水、烤肉、驱兽、发信号。\n- **伤病恶性循环**：小伤口感染可致命。\n- **潮汐窗口**：退潮时采集海产，错过就等第二天。\n- **动物习性**：了解习性才能有效狩猎。\n- **信号优先**：修复电台、发送信号是获救的关键。",
+        "constant": true,
+        "order": 7,
+        "position": "before_char",
+        "meta": {
+          "powerSystem": "基于真实野外生存规则，无超自然力量",
+          "socialStructure": "七名幸存者，无明确首领，决策需多数同意",
+          "specialRules": [
+            "淡水优先：72小时不进水即死亡",
+            "庇护必需：三天内无遮蔽即失温或中暑",
+            "火源核心：煮沸水、烤肉、驱兽、发信号",
+            "伤病恶性循环：小伤口感染可致命",
+            "潮汐窗口：退潮时采集海产",
+            "动物习性：了解习性才能有效狩猎",
+            "信号优先：修复电台、发送信号是获救的关键"
+          ]
+        }
+      },
+      {
+        "uid": 57,
+        "entryType": "lore",
+        "key": [
+          "潮汐",
+          "涨潮",
+          "退潮"
+        ],
+        "comment": "潮汐",
+        "content": "潮汐是荒岛上最重要的自然现象。每天两次退潮，露出礁石区，是捡拾贝类和海产的唯一时机。潮汐的规律：大约每12小时一次涨退潮，退潮持续约2-3小时。错过退潮窗口，就只能等第二天。潮汐也是危险的——涨潮时海水会淹没低洼地区，如果在退潮时进入礁石区，涨潮时可能被困住。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 58,
+        "entryType": "lore",
+        "key": [
+          "淡水危机",
+          "缺水",
+          "干旱"
+        ],
+        "comment": "淡水危机",
+        "content": "淡水危机是荒岛生存中最危险的情况。淡水储备见底、泉眼干涸、连续多日无降水，都可能导致淡水危机。淡水危机的症状：口渴、头晕、乏力、意识模糊。淡水危机的解决方法：寻找新水源（溪流、椰子、露水）、节约用水（减少活动、避免出汗）、蒸馏海水（消耗燃料）。淡水危机不解决，72小时内就会死亡。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 59,
+        "entryType": "lore",
+        "key": [
+          "食物短缺",
+          "饥饿",
+          "缺粮"
+        ],
+        "comment": "食物短缺",
+        "content": "食物短缺是荒岛生存中常见的问题。食物储备见底、狩猎失败、采集不到食物，都可能导致食物短缺。食物短缺的症状：饥饿、乏力、免疫力下降、情绪低落。食物短缺的解决方法：寻找新食物源（捕鱼、采集野果、狩猎）、节约食物（减少活动、分配食物）、制作工具（提高采集效率）。食物短缺不会很快致命，但会严重影响生存能力。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 60,
+        "entryType": "lore",
+        "key": [
+          "受伤",
+          "伤口",
+          "感染"
+        ],
+        "comment": "受伤与感染",
+        "content": "受伤是荒岛生存中常见的问题。磕碰、割伤、扭伤、骨折，都可能发生。受伤的症状：疼痛、出血、肿胀、活动受限。受伤的处理方法：止血（用布料按压伤口）、包扎（用干净的布料包扎）、固定（用木材固定骨折部位）。受伤最危险的是感染——小伤口不处理会化脓，感染发烧消耗双倍水量，无法劳作导致资源断供。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 61,
+        "entryType": "lore",
+        "key": [
+          "野兽袭击",
+          "野猪",
+          "危险"
+        ],
+        "comment": "野兽袭击",
+        "content": "野兽袭击是荒岛生存中的危险情况。野猪、毒蛇、甚至鲨鱼，都可能对人造成伤害。野兽袭击的预防方法：了解动物习性（避免在危险时间进入危险区域）、设置防护（围栏、陷阱、火堆）、保持警觉（注意周围动静）。野兽袭击的应对方法：逃跑（跑向安全区域）、反击（用武器攻击弱点）、求救（呼叫同伴帮忙）。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 62,
+        "entryType": "lore",
+        "key": [
+          "台风",
+          "风暴",
+          "暴风雨"
+        ],
+        "comment": "台风与风暴",
+        "content": "台风与风暴是荒岛上最可怕的自然灾害。台风的破坏力极大——摧毁庇护所、卷走物资、引发洪水、造成人员伤亡。台风的前兆：连续两日闷热无风、海水异常平静、天空出现特殊云层。台风的应对方法：提前加固庇护所（用木材和石头加固）、储备物资（提前收集足够的水和食物）、寻找避难所（洞穴或地下）。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
       }
     ],
     "eventPacks": [
@@ -481,35 +1381,141 @@
         "id": "world:stranded_island",
         "name": "孤岛求生规则",
         "type": "rule",
-        "permissions": ["modify_world_state", "add_card"],
+        "permissions": [
+          "modify_world_state",
+          "add_card"
+        ],
         "rules": [
           {
             "id": "storm_trigger",
-            "when": { "state": { "path": "weather", "op": "contains", "value": "暴风雨" } },
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前天气",
+                "op": "contains",
+                "value": "暴风雨"
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "storm_hit", "eventPackId": "world:stranded_island:events" } },
-              { "modifyResource": { "key": "wood", "delta": -1 } }
+              {
+                "addEvent": {
+                  "eventId": "storm_hit",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              },
+              {
+                "modifyResource": {
+                  "key": "wood",
+                  "delta": -1
+                }
+              }
             ]
           },
           {
             "id": "injury_trigger",
-            "when": { "state": { "path": "玩家.生存状态.血量", "op": "<", "value": 40 } },
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 40
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "injury", "eventPackId": "world:stranded_island:events" } }
+              {
+                "addEvent": {
+                  "eventId": "injury",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              }
             ]
           },
           {
             "id": "water_crisis_trigger",
-            "when": { "state": { "path": "资源.water", "op": "<=", "value": 2 } },
+            "when": {
+              "state": {
+                "path": "玩家.生存资源.water.数量",
+                "op": "<=",
+                "value": 2
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "water_crisis", "eventPackId": "world:stranded_island:events" } }
+              {
+                "addEvent": {
+                  "eventId": "water_crisis",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              }
             ]
           },
           {
             "id": "wild_animal_trigger",
-            "when": { "state": { "path": "资源.food", "op": ">", "value": 5 } },
+            "when": {
+              "state": {
+                "path": "玩家.生存资源.food.数量",
+                "op": ">",
+                "value": 5
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "wild_animal", "eventPackId": "world:stranded_island:events" } }
+              {
+                "addEvent": {
+                  "eventId": "wild_animal",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "rescue_signal_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": ">",
+                "value": 80
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "rescue_signal",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "exploration_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "exploration",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "conflict_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 60
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "conflict",
+                  "eventPackId": "world:stranded_island:events"
+                }
+              }
             ]
           }
         ],
@@ -519,8 +1525,18 @@
             "name": "每日消耗",
             "intervalTicks": 1,
             "actions": [
-              { "modifyResource": { "key": "water", "delta": -1 } },
-              { "modifyResource": { "key": "food", "delta": -1 } }
+              {
+                "modifyResource": {
+                  "key": "water",
+                  "delta": -1
+                }
+              },
+              {
+                "modifyResource": {
+                  "key": "food",
+                  "delta": -1
+                }
+              }
             ],
             "narrateToAI": true
           },
@@ -530,7 +1546,12 @@
             "intervalTicks": 1,
             "offsetTicks": 1,
             "actions": [
-              { "modifyResource": { "key": "food", "delta": 1 } }
+              {
+                "modifyResource": {
+                  "key": "food",
+                  "delta": 1
+                }
+              }
             ],
             "narrateToAI": true
           },
@@ -539,9 +1560,44 @@
             "name": "风雨侵蚀",
             "intervalTicks": 5,
             "actions": [
-              { "modifyResource": { "key": "wood", "delta": -1 } }
+              {
+                "modifyResource": {
+                  "key": "wood",
+                  "delta": -1
+                }
+              }
             ],
             "narrateToAI": true
+          },
+          {
+            "id": "weather_change",
+            "name": "天气变化",
+            "intervalTicks": 7,
+            "offsetTicks": 3,
+            "narrateToAI": true,
+            "description": "每7轮AI描述天气变化：晴天、下雨、风暴、酷热"
+          },
+          {
+            "id": "resource_gather",
+            "name": "资源采集",
+            "intervalTicks": 3,
+            "offsetTicks": 1,
+            "actions": [
+              {
+                "modifyResource": {
+                  "key": "food",
+                  "delta": 1
+                }
+              },
+              {
+                "modifyResource": {
+                  "key": "water",
+                  "delta": 1
+                }
+              }
+            ],
+            "narrateToAI": true,
+            "description": "每3轮自动采集基础资源"
           }
         ]
       },
@@ -549,24 +1605,50 @@
         "id": "world:stranded_island:events",
         "name": "孤岛求生事件",
         "type": "card",
-        "permissions": ["add_card"],
+        "permissions": [
+          "add_card"
+        ],
         "events": [
           {
             "id": "storm_hit",
             "name": "暴风雨来袭",
             "cards": [
-              { "id": "t_storm_hit", "componentId": "title", "title": "暴风雨来袭" },
-              { "id": "n_storm_hit", "componentId": "narrative", "title": "暴风雨来袭" },
-              { "id": "c_storm_hit", "componentId": "choice", "title": "暴风雨来袭" }
+              {
+                "id": "t_storm_hit",
+                "componentId": "title",
+                "title": "暴风雨来袭"
+              },
+              {
+                "id": "n_storm_hit",
+                "componentId": "narrative",
+                "title": "暴风雨来袭"
+              },
+              {
+                "id": "c_storm_hit",
+                "componentId": "choice",
+                "title": "暴风雨来袭"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
                 "title": [
-                  { "id": "t_storm_hit", "props": { "title": "暴风雨来袭" } }
+                  {
+                    "id": "t_storm_hit",
+                    "props": {
+                      "title": "暴风雨来袭"
+                    }
+                  }
                 ],
                 "narrative": [
-                  { "id": "n_storm_hit", "props": { "text": "天空骤然暗沉，狂风裹挟着暴雨席卷而来。你的庇护所在风中摇摇欲坠。" } }
+                  {
+                    "id": "n_storm_hit",
+                    "props": {
+                      "text": "天空骤然暗沉，狂风裹挟着暴雨席卷而来。你的庇护所在风中摇摇欲坠。"
+                    }
+                  }
                 ],
                 "choice": [
                   {
@@ -575,12 +1657,18 @@
                       "choices": [
                         {
                           "label": "躲进庇护所",
-                          "effect": { "statId": "体力值", "delta": -10 },
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
                           "aiNote": "选择躲避，体力消耗"
                         },
                         {
                           "label": "加固棚屋",
-                          "effect": { "resourcePath": "生存资源.wood", "delta": -3 },
+                          "effect": {
+                            "resourcePath": "生存资源.wood",
+                            "delta": -3
+                          },
                           "aiNote": "用木材加固，消耗资源"
                         }
                       ]
@@ -594,18 +1682,42 @@
             "id": "injury",
             "name": "受伤了",
             "cards": [
-              { "id": "t_injury", "componentId": "title", "title": "你受伤了" },
-              { "id": "n_injury", "componentId": "narrative", "title": "你受伤了" },
-              { "id": "c_injury", "componentId": "choice", "title": "你受伤了" }
+              {
+                "id": "t_injury",
+                "componentId": "title",
+                "title": "你受伤了"
+              },
+              {
+                "id": "n_injury",
+                "componentId": "narrative",
+                "title": "你受伤了"
+              },
+              {
+                "id": "c_injury",
+                "componentId": "choice",
+                "title": "你受伤了"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
                 "title": [
-                  { "id": "t_injury", "props": { "title": "你受伤了" } }
+                  {
+                    "id": "t_injury",
+                    "props": {
+                      "title": "你受伤了"
+                    }
+                  }
                 ],
                 "narrative": [
-                  { "id": "n_injury", "props": { "text": "你在攀爬礁石时滑倒，膝盖磕破了皮，鲜血直流。在这个没有医院的荒岛上，每一道伤口都可能是致命的。" } }
+                  {
+                    "id": "n_injury",
+                    "props": {
+                      "text": "你在攀爬礁石时滑倒，膝盖磕破了皮，鲜血直流。在这个没有医院的荒岛上，每一道伤口都可能是致命的。"
+                    }
+                  }
                 ],
                 "choice": [
                   {
@@ -614,12 +1726,18 @@
                       "choices": [
                         {
                           "label": "用草药敷伤口",
-                          "effect": { "resourcePath": "生存资源.herb", "delta": -2 },
+                          "effect": {
+                            "resourcePath": "生存资源.herb",
+                            "delta": -2
+                          },
                           "aiNote": "用草药治疗，消耗草药"
                         },
                         {
                           "label": "忍痛自愈",
-                          "effect": { "statId": "血量", "delta": -15 },
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -15
+                          },
                           "aiNote": "硬扛过去，血量下降"
                         }
                       ]
@@ -633,18 +1751,42 @@
             "id": "water_crisis",
             "name": "淡水告急",
             "cards": [
-              { "id": "t_water_crisis", "componentId": "title", "title": "淡水告急" },
-              { "id": "n_water_crisis", "componentId": "narrative", "title": "淡水告急" },
-              { "id": "c_water_crisis", "componentId": "choice", "title": "淡水告急" }
+              {
+                "id": "t_water_crisis",
+                "componentId": "title",
+                "title": "淡水告急"
+              },
+              {
+                "id": "n_water_crisis",
+                "componentId": "narrative",
+                "title": "淡水告急"
+              },
+              {
+                "id": "c_water_crisis",
+                "componentId": "choice",
+                "title": "淡水告急"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
                 "title": [
-                  { "id": "t_water_crisis", "props": { "title": "淡水告急" } }
+                  {
+                    "id": "t_water_crisis",
+                    "props": {
+                      "title": "淡水告急"
+                    }
+                  }
                 ],
                 "narrative": [
-                  { "id": "n_water_crisis", "props": { "text": "淡水储备已经见底了。你记得岛的另一侧有一条溪流，但那里地形复杂，上次去差点迷路。" } }
+                  {
+                    "id": "n_water_crisis",
+                    "props": {
+                      "text": "淡水储备已经见底了。你记得岛的另一侧有一条溪流，但那里地形复杂，上次去差点迷路。"
+                    }
+                  }
                 ],
                 "choice": [
                   {
@@ -653,12 +1795,18 @@
                       "choices": [
                         {
                           "label": "冒险去溪流",
-                          "effect": { "resourcePath": "生存资源.water", "delta": 4 },
+                          "effect": {
+                            "resourcePath": "生存资源.water",
+                            "delta": 4
+                          },
                           "aiNote": "冒险取水成功，获得淡水"
                         },
                         {
                           "label": "收集雨水",
-                          "effect": { "statId": "体力值", "delta": -5 },
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
                           "aiNote": "等待下雨，体力消耗"
                         }
                       ]
@@ -672,18 +1820,42 @@
             "id": "wild_animal",
             "name": "野兽出没",
             "cards": [
-              { "id": "t_wild_animal", "componentId": "title", "title": "野兽出没" },
-              { "id": "n_wild_animal", "componentId": "narrative", "title": "野兽出没" },
-              { "id": "c_wild_animal", "componentId": "choice", "title": "野兽出没" }
+              {
+                "id": "t_wild_animal",
+                "componentId": "title",
+                "title": "野兽出没"
+              },
+              {
+                "id": "n_wild_animal",
+                "componentId": "narrative",
+                "title": "野兽出没"
+              },
+              {
+                "id": "c_wild_animal",
+                "componentId": "choice",
+                "title": "野兽出没"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
                 "title": [
-                  { "id": "t_wild_animal", "props": { "title": "野兽出没" } }
+                  {
+                    "id": "t_wild_animal",
+                    "props": {
+                      "title": "野兽出没"
+                    }
+                  }
                 ],
                 "narrative": [
-                  { "id": "n_wild_animal", "props": { "text": "夜幕降临，你听到灌木丛中传来低沉的咆哮声。一双发光的眼睛在黑暗中盯着你的食物储备。" } }
+                  {
+                    "id": "n_wild_animal",
+                    "props": {
+                      "text": "夜幕降临，你听到灌木丛中传来低沉的咆哮声。一双发光的眼睛在黑暗中盯着你的食物储备。"
+                    }
+                  }
                 ],
                 "choice": [
                   {
@@ -692,13 +1864,502 @@
                       "choices": [
                         {
                           "label": "大声驱赶",
-                          "effect": { "statId": "体力值", "delta": -5 },
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
                           "aiNote": "驱赶野兽，消耗体力"
                         },
                         {
                           "label": "分一些食物给它",
-                          "effect": { "resourcePath": "生存资源.food", "delta": -2 },
+                          "effect": {
+                            "resourcePath": "生存资源.food",
+                            "delta": -2
+                          },
                           "aiNote": "分享食物，避免冲突"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "rescue_signal",
+            "name": "救援信号",
+            "cards": [
+              {
+                "id": "t_rescue",
+                "componentId": "title",
+                "title": "有船！"
+              },
+              {
+                "id": "n_rescue",
+                "componentId": "narrative",
+                "title": "救援叙事"
+              },
+              {
+                "id": "c_rescue",
+                "componentId": "choice",
+                "title": "救援选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_rescue",
+                    "props": {
+                      "title": "有船！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_rescue",
+                    "props": {
+                      "text": "你在望崖上发现海平线上有一个黑点，似乎是一艘船！但它离得很远，可能看不到岛上的信号。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_rescue",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "点燃信号火",
+                          "effect": {
+                            "resourcePath": "生存资源.wood",
+                            "delta": -3
+                          },
+                          "aiNote": "点燃信号火，消耗木材"
+                        },
+                        {
+                          "label": "继续观察",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "继续观察，消耗体力"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "exploration",
+            "name": "探索发现",
+            "cards": [
+              {
+                "id": "t_explore",
+                "componentId": "title",
+                "title": "新发现"
+              },
+              {
+                "id": "n_explore",
+                "componentId": "narrative",
+                "title": "探索叙事"
+              },
+              {
+                "id": "c_explore",
+                "componentId": "choice",
+                "title": "探索选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_explore",
+                    "props": {
+                      "title": "新发现"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_explore",
+                    "props": {
+                      "text": "你在探索岛屿时发现了一处隐蔽的洞穴，洞口被藤蔓遮挡，里面似乎有东西。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_explore",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "进入洞穴",
+                          "effect": {
+                            "resourcePath": "生存资源.water",
+                            "delta": 3
+                          },
+                          "aiNote": "进入洞穴，发现了地下水源"
+                        },
+                        {
+                          "label": "标记位置",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "标记位置，以后再来探索"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "conflict",
+            "name": "营地冲突",
+            "cards": [
+              {
+                "id": "t_conflict",
+                "componentId": "title",
+                "title": "争吵"
+              },
+              {
+                "id": "n_conflict",
+                "componentId": "narrative",
+                "title": "冲突叙事"
+              },
+              {
+                "id": "c_conflict",
+                "componentId": "choice",
+                "title": "冲突选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_conflict",
+                    "props": {
+                      "title": "争吵"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_conflict",
+                    "props": {
+                      "text": "营地里爆发了争吵。刘叔指责有人偷了他的食物，阿杰反驳说刘叔私藏物资。气氛很紧张。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_conflict",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "调解矛盾",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "成功调解矛盾，营地恢复和平"
+                        },
+                        {
+                          "label": "保持中立",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "保持中立，但气氛依然紧张"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "fishing",
+            "name": "捕鱼",
+            "cards": [
+              {
+                "id": "t_fishing",
+                "componentId": "title",
+                "title": "捕鱼"
+              },
+              {
+                "id": "n_fishing",
+                "componentId": "narrative",
+                "title": "捕鱼叙事"
+              },
+              {
+                "id": "c_fishing",
+                "componentId": "choice",
+                "title": "捕鱼选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_fishing",
+                    "props": {
+                      "title": "捕鱼"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_fishing",
+                    "props": {
+                      "text": "退潮了，礁石区露出了很多小鱼和贝类。你决定去捕鱼。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_fishing",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "用渔网捕鱼",
+                          "effect": {
+                            "resourcePath": "生存资源.food",
+                            "delta": 3
+                          },
+                          "aiNote": "用渔网捕鱼，收获丰富"
+                        },
+                        {
+                          "label": "徒手抓鱼",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "徒手抓鱼，效率低但省资源"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "shelter_upgrade",
+            "name": "庇护所升级",
+            "cards": [
+              {
+                "id": "t_shelter",
+                "componentId": "title",
+                "title": "庇护所升级"
+              },
+              {
+                "id": "n_shelter",
+                "componentId": "narrative",
+                "title": "升级叙事"
+              },
+              {
+                "id": "c_shelter",
+                "componentId": "choice",
+                "title": "升级选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_shelter",
+                    "props": {
+                      "title": "庇护所升级"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_shelter",
+                    "props": {
+                      "text": "你的简易棚屋在暴风雨中摇摇欲坠。是时候升级庇护所了。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_shelter",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "加固棚屋",
+                          "effect": {
+                            "resourcePath": "生存资源.wood",
+                            "delta": -5
+                          },
+                          "aiNote": "用木材加固棚屋，更安全"
+                        },
+                        {
+                          "label": "寻找洞穴",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "寻找天然洞穴，更安全但消耗体力"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "wild_boar_hunt",
+            "name": "野猪狩猎",
+            "cards": [
+              {
+                "id": "t_boar",
+                "componentId": "title",
+                "title": "野猪出没"
+              },
+              {
+                "id": "n_boar",
+                "componentId": "narrative",
+                "title": "野猪叙事"
+              },
+              {
+                "id": "c_boar",
+                "componentId": "choice",
+                "title": "野猪选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_boar",
+                    "props": {
+                      "title": "野猪出没"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_boar",
+                    "props": {
+                      "text": "一只野猪出现在营地附近，它看起来很饿，在翻找食物残渣。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_boar",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "狩猎野猪",
+                          "effect": {
+                            "resourcePath": "生存资源.food",
+                            "delta": 5
+                          },
+                          "aiNote": "成功狩猎野猪，获得大量食物"
+                        },
+                        {
+                          "label": "驱赶野猪",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "驱赶野猪，消耗体力但保护了营地"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "coconut_gather",
+            "name": "椰子采集",
+            "cards": [
+              {
+                "id": "t_coconut",
+                "componentId": "title",
+                "title": "椰子熟了"
+              },
+              {
+                "id": "n_coconut",
+                "componentId": "narrative",
+                "title": "椰子叙事"
+              },
+              {
+                "id": "c_coconut",
+                "componentId": "choice",
+                "title": "椰子选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_coconut",
+                    "props": {
+                      "title": "椰子熟了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_coconut",
+                    "props": {
+                      "text": "椰树上的椰子成熟了，你决定去采集。但椰树很高，采摘需要技巧。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_coconut",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "爬树采摘",
+                          "effect": {
+                            "resourcePath": "生存资源.water",
+                            "delta": 1
+                          },
+                          "aiNote": "爬树采摘椰子，获得淡水"
+                        },
+                        {
+                          "label": "用石头砸",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "用石头砸椰子，消耗体力"
                         }
                       ]
                     }

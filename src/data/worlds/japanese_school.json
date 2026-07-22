@@ -490,6 +490,851 @@
           "学园祭",
           "义理巧克力"
         ]
+      },
+      {
+        "uid": 1018,
+        "entryType": "lore",
+        "key": [
+          "图书馆",
+          "阅览室",
+          "自习"
+        ],
+        "comment": "图书馆",
+        "content": "樱丘高校的图书馆位于主教学楼一楼东侧，是一间宽敞明亮的大房间。书架上摆满了各类书籍，从文学小说到参考书应有尽有。图书馆是学霸们的圣地，尤其是考试前两周，座位争夺战进入白热化阶段。图书馆管理员是一位温柔的女老师，她总是轻声细语地提醒大家保持安静。靠窗的位置最受欢迎——阳光洒在书页上，偶尔抬头看看操场上的同学，是备考时光中最惬意的片刻。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1019,
+        "entryType": "lore",
+        "key": [
+          "操场",
+          "运动场",
+          "跑道"
+        ],
+        "comment": "操场",
+        "content": "樱丘高校的操场是一片开阔的草地，周围环绕着红色的塑胶跑道。这里是体育课和运动部训练的主战场，也是体育祭的核心场地。午休时，总有学生在操场上踢足球、打棒球，或者只是躺在草地上晒太阳。操场边有一棵大樱花树，春天的时候花瓣飘落，美得像画一样。放学后，运动部的呐喊声回荡在操场上，是青春最热血的画面。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1020,
+        "entryType": "lore",
+        "key": [
+          "游泳池",
+          "游泳部"
+        ],
+        "comment": "游泳池",
+        "content": "樱丘高校的游泳池位于操场东侧，是一个标准的25米露天泳池。夏天的时候，游泳池是全校最热闹的地方——游泳部在这里训练，体育课在这里上课，午休时甚至有人偷偷溜来游泳。游泳池旁边有一间小更衣室，里面总是湿漉漉的。游泳部的成员们每天放学后都会在这里训练，他们的目标是打入全国大赛。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1021,
+        "entryType": "lore",
+        "key": [
+          "保健室",
+          "校医",
+          "休息"
+        ],
+        "comment": "保健室",
+        "content": "樱丘高校的保健室位于一楼走廊尽头，是一间安静舒适的房间。保健老师是一位温柔的中年女性，她总是微笑着询问学生的情况。保健室是逃避体育课的圣地——只要说肚子疼或者头晕，就能在这里躺一节课。但保健室也是许多重要对话的发生地：受伤后的照顾、心情不好时的倾诉、甚至告白。保健室的窗帘总是半拉着，阳光透过缝隙洒进来，营造出一种私密而温暖的氛围。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1022,
+        "entryType": "lore",
+        "key": [
+          "学生会室",
+          "会议室"
+        ],
+        "comment": "学生会室",
+        "content": "樱丘高校的学生会室位于二楼走廊东侧，是一间宽敞的会议室。房间里摆着一张长桌和十几把椅子，墙上贴满了学生会的公告和活动计划。学生会成员每天放学后都会在这里开会，讨论学校的各项事务。学生会室也是权力的象征——能进入这里的人，都是学校里的精英。星野千鹤每天都在这里忙碌，她对学生会的工作一丝不苟。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1023,
+        "entryType": "lore",
+        "key": [
+          "旧校舍",
+          "废弃教室"
+        ],
+        "comment": "旧校舍",
+        "content": "樱丘高校的旧校舍位于校园西北角，是一栋破旧的两层建筑。旧校舍已经废弃多年，窗户破破烂烂，墙上爬满了藤蔓。但这里是不良少年们的聚集地——秋庭莲经常在这里抽烟，他的几个朋友也在这里混。旧校舍后面有一小块空地，是不良们打架的地方。据说旧校舍里闹鬼，但没人真的见过。旧校舍二楼有一间废弃的活动室，门上贴着褪色的封条，那是多年前废部的「神秘研究部」留下的。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1024,
+        "entryType": "lore",
+        "key": [
+          "河川敷",
+          "河堤",
+          "自行车"
+        ],
+        "comment": "河川敷",
+        "content": "樱丘高校附近的河川敷是一条沿着小河的堤坝，是学生们放学后常去的地方。河川敷两旁种满了樱花树，春天的时候美得像画一样。骑自行车沿着河川敷回家，是许多学生的日常。河川敷也是约会的圣地——黄昏时分，夕阳洒在河面上，骑着自行车载着喜欢的人，是青春最浪漫的画面。河川敷的尽头有一座小桥，桥上是看夕阳的最佳位置。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1025,
+        "entryType": "lore",
+        "key": [
+          "神社",
+          "许愿",
+          "新年参拜"
+        ],
+        "comment": "神社",
+        "content": "樱丘高校附近的神社是一座古老的建筑，坐落在小山丘上。神社是学生们许愿的地方——考试前许愿考高分，恋爱前许愿告白成功。新年参拜的时候，学生们会穿着和服来神社许愿。神社旁边有一棵大银杏树，秋天的时候叶子变成金黄色，美得让人窒息。神社的签很灵验，学生们经常来这里抽签，看看自己的运势。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1026,
+        "entryType": "lore",
+        "key": [
+          "海边",
+          "合宿",
+          "海水浴"
+        ],
+        "comment": "海边",
+        "content": "樱丘高校附近的海边是一片金色的沙滩，夏天的时候是学生们最喜欢的地方。游泳部和运动部每年夏天都会来这里合宿训练，白天在海边训练，晚上在旅馆里开联欢会。海边也是夏日祭的举办地——烟花在夜空中绽放，海风吹拂着浴袍，是青春最美好的回忆。海边有一家小旅馆，老板娘做的海鲜料理远近闻名。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1027,
+        "entryType": "factions",
+        "key": [
+          "文化系社团联盟",
+          "文艺部"
+        ],
+        "comment": "文化系社团联盟",
+        "content": "[friendly] 樱丘高校的文化系社团联盟，包括管乐部、美术部、文学部、戏剧部、电脑部等。这些社团虽然人数不多，但各有特色。文化系社团联盟在学园祭上大放异彩，他们的表演和展览总是最受欢迎的。联盟的代表是管乐部部长，她是一位温柔的学姐，擅长协调各社团之间的关系。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "文化系社团联盟",
+              "description": "包括管乐部、美术部、文学部、戏剧部、电脑部等，在学园祭上大放异彩。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1028,
+        "entryType": "factions",
+        "key": [
+          "风纪委员会",
+          "风纪委员"
+        ],
+        "comment": "风纪委员会",
+        "content": "[neutral] 樱丘高校的风纪委员会，负责维护校园秩序。风纪委员们每天在走廊上巡逻，检查学生的仪容仪表和迟到早退。他们对学生的要求很严格——头发不能染、裙子不能短、不能在走廊上跑步。风纪委员会的委员长是一位严肃的学姐，她对学生的要求一丝不苟，但私下里其实是个温柔的人。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "风纪委员会",
+              "description": "负责维护校园秩序，检查学生的仪容仪表和迟到早退。对学生要求严格。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1029,
+        "entryType": "factions",
+        "key": [
+          "应援团",
+          "啦啦队"
+        ],
+        "comment": "应援团",
+        "content": "[friendly] 樱丘高校的应援团，负责在体育祭和运动比赛中为学校加油助威。应援团的成员们穿着统一的制服，挥舞着旗帜，喊着整齐的口号。应援团的团长是一位热血的学长，他总是能调动全场的气氛。应援团在体育祭上的表演是最受欢迎的，他们的舞蹈和口号总能让人热血沸腾。",
+        "constant": false,
+        "order": 3,
+        "position": "before_char",
+        "meta": {
+          "factions": [
+            {
+              "name": "应援团",
+              "description": "负责在体育祭和运动比赛中为学校加油助威，穿着统一制服，挥舞旗帜。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1030,
+        "entryType": "npcs",
+        "key": [
+          "班主任",
+          "田中老师"
+        ],
+        "comment": "班主任",
+        "content": "人物 — 田中老师，二年一班的班主任，教国语。他是一位三十多岁的男性，戴着黑框眼镜，看起来很斯文。他对学生很关心，但也很严格。他最讨厌学生迟到早退，但对成绩好的学生很宽容。他经常在班会上强调「和谐」的重要性，希望班级里的同学能友好相处。他最担心的是秋庭莲，总是找他谈话，希望他能改邪归正。（性格：认真、关心学生、有点唠叨）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "田中老师",
+              "role": "班主任",
+              "description": "二年一班的班主任，教国语。三十多岁，戴黑框眼镜。对学生关心但严格，最讨厌迟到早退。",
+              "personality": "认真、关心学生、有点唠叨"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1031,
+        "entryType": "npcs",
+        "key": [
+          "体育老师",
+          "佐藤老师"
+        ],
+        "comment": "体育老师",
+        "content": "人物 — 佐藤老师，樱丘高校的体育老师，教体育课和指导田径部。他是一位四十多岁的男性，身材健壮，皮肤黝黑。他上课的时候很严格，要求学生认真完成每一个动作。但他也很关心学生，经常在课后留下来指导运动部的训练。他最得意的学生是田径部的王牌，去年在全国大赛上拿了奖牌。（性格：热血、严格、关心学生）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "佐藤老师",
+              "role": "体育老师",
+              "description": "樱丘高校的体育老师，教体育课和指导田径部。四十多岁，身材健壮，皮肤黝黑。",
+              "personality": "热血、严格、关心学生"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1032,
+        "entryType": "npcs",
+        "key": [
+          "管乐部部长",
+          "学姐"
+        ],
+        "comment": "管乐部部长",
+        "content": "人物 — 管乐部部长，三年级的学姐，擅长长笛。她是一位温柔的女性，总是微笑着对待每一个人。她对管乐部的成员很关心，经常在练习后请大家吃零食。她最得意的是管乐部在学园祭上的表演，每年都座无虚席。她对后辈很照顾，经常指导他们练习。她最担心的是毕业后的管乐部，希望有人能继承她的位置。（性格：温柔、有责任心、擅长音乐）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "管乐部部长",
+              "role": "学姐",
+              "description": "三年级的学姐，擅长长笛。温柔有责任心，对后辈很照顾，经常指导他们练习。",
+              "personality": "温柔、有责任心、擅长音乐"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1033,
+        "entryType": "npcs",
+        "key": [
+          "青梅竹马",
+          "儿时玩伴"
+        ],
+        "comment": "青梅竹马",
+        "content": "人物 — 你的青梅竹马，从小一起长大的邻居。她/他跟你上同一所幼儿园、同一所小学、同一所中学，现在又上了同一所高中。你们之间有一种默契——不用说话就能理解对方的意思。但上了高中后，你们的关系似乎有了微妙的变化——你开始在意她/他的一举一动，看到她/他跟别人说话会莫名其妙地吃醋。你不知道这是不是喜欢，但你知道，她/他对你来说很重要。（性格：熟悉、默契、有点在意）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "青梅竹马",
+              "role": "儿时玩伴",
+              "description": "从小一起长大的邻居，上了同一所高中。关系有微妙变化，开始在意对方。",
+              "personality": "熟悉、默契、有点在意"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1034,
+        "entryType": "npcs",
+        "key": [
+          "前辈",
+          "学长"
+        ],
+        "comment": "前辈",
+        "content": "人物 — 社团里的前辈，三年级的学长/学姐。她/他对后辈很照顾，经常在练习后请大家吃零食。她/他的技术很好，是社团里的王牌。她/他对后辈的要求也很严格，希望他们能认真对待社团活动。她/他最担心的是毕业后的社团，希望有人能继承她/他的位置。她/他对你的指导让你受益匪浅，你很尊敬她/他。（性格：有责任心、严格、关心后辈）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "前辈",
+              "role": "学长/学姐",
+              "description": "社团里的前辈，三年级。对后辈照顾但严格，技术很好，是社团王牌。",
+              "personality": "有责任心、严格、关心后辈"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1035,
+        "entryType": "npcs",
+        "key": [
+          "后辈",
+          "学妹"
+        ],
+        "comment": "后辈",
+        "content": "人物 — 社团里的后辈，一年级的学妹/学弟。她/他刚入学，对一切都很新鲜。她/他对前辈很尊敬，总是认真完成前辈布置的任务。她/她的技术还不够好，但很努力，每天放学后都会留下来练习。她/她对你很依赖，经常找你请教问题。你很喜欢这个后辈，觉得她/她是社团的未来。（性格：天真、努力、依赖前辈）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "后辈",
+              "role": "学妹/学弟",
+              "description": "社团里的后辈，一年级。对前辈尊敬，技术还不够好但很努力。",
+              "personality": "天真、努力、依赖前辈"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1036,
+        "entryType": "npcs",
+        "key": [
+          "学生会成员",
+          "会计"
+        ],
+        "comment": "学生会成员",
+        "content": "人物 — 学生会的会计，二年级的女生。她戴着银框眼镜，做事一丝不苟。她负责管理学生会的预算，每一笔支出都要经过她的审核。她对学生会的工作很认真，经常加班到很晚。她跟星野千鹤是好朋友，经常一起在学生会室工作。她最讨厌的是乱花钱的社团，每次审批经费都要仔细核对。（性格：认真、节俭、有点强迫症）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "学生会会计",
+              "role": "学生会成员",
+              "description": "二年级女生，戴银框眼镜。负责管理学生会预算，做事一丝不苟。",
+              "personality": "认真、节俭、有点强迫症"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1037,
+        "entryType": "npcs",
+        "key": [
+          "转学生",
+          "神秘"
+        ],
+        "comment": "另一个转学生",
+        "content": "人物 — 另一个转学生，学期中途转入的男生。他来自东京，说话带着关东口音。他很快融入了班级，跟大家打成一片。他擅长打篮球，加入了篮球部，很快就成了主力。他对白石铃很好奇，经常找她说话，但白石铃总是冷淡地回应他。他不知道白石铃的秘密，但他感觉她不简单。（性格：开朗、运动好、好奇心强）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "另一个转学生",
+              "role": "转学生",
+              "description": "来自东京的男生，擅长打篮球，很快融入班级。对白石铃很好奇。",
+              "personality": "开朗、运动好、好奇心强"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1038,
+        "entryType": "npcs",
+        "key": [
+          "便利店店员",
+          "打工"
+        ],
+        "comment": "便利店店员",
+        "content": "人物 — 便利店的店员，二十多岁的年轻人。他白天在便利店打工，晚上在夜校读书。他对学生们很友好，经常跟他们聊天。他知道很多学校里的八卦，因为学生们买东西的时候总会聊几句。他对秋庭莲有点印象，因为他经常来买烟。他最讨厌的是偷东西的学生，抓到就报警。（性格：友好、健谈、有原则）",
+        "constant": false,
+        "order": 4,
+        "position": "before_char",
+        "meta": {
+          "npcs": [
+            {
+              "name": "便利店店员",
+              "role": "店员",
+              "description": "二十多岁的年轻人，白天打工晚上读书。对学生友好，知道很多学校八卦。",
+              "personality": "友好、健谈、有原则"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 1039,
+        "entryType": "culture",
+        "key": [
+          "便当",
+          "午餐",
+          "便当文化"
+        ],
+        "comment": "便当文化",
+        "content": "樱丘高校的便当文化是校园生活的重要组成部分。自带便当的学生通常在教室或天台与好友一起吃，买面包的则在走廊或中庭独自解决。给喜欢的人做便当是一种重量级的告白信号——如果你收到某人亲手做的便当，那说明她/他对你有意思。交换便当配菜则是友谊的象征——只有关系好的人才会这么做。午休时的便当时间是社交的重要时刻，你会在这段时间里了解很多关于同学的事情。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1040,
+        "entryType": "culture",
+        "key": [
+          "情人节",
+          "巧克力",
+          "白色情人节"
+        ],
+        "comment": "情人节文化",
+        "content": "樱丘高校的情人节是全年最重要的社交事件。2月14日情人节，女生会给男生送巧克力。巧克力的种类直接反映了人际关系：本命巧克力（给喜欢的人，亲手做的）、义理巧克力（给普通朋友，买的）、友情巧克力（给好朋友，便宜的）。3月14日白色情人节，男生要回礼，回礼的价值通常是巧克力的三倍。情人节前后，校园里的气氛格外紧张——谁给谁送了巧克力，成了最大的八卦。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1041,
+        "entryType": "culture",
+        "key": [
+          "运动会",
+          "体育祭",
+          "加油"
+        ],
+        "comment": "运动会文化",
+        "content": "樱丘高校的体育祭是春季最重要的活动。以班级为单位进行比赛，项目包括接力跑、骑马战、拔河等。体育祭前两周，各班就开始练习，午休和放学后都能看到练习的身影。体育祭当天，同学们穿着统一的班服，脸上画着彩绘，喊着整齐的口号。应援团的表演是最受欢迎的，他们的舞蹈和口号总能让人热血沸腾。体育祭是班级凝聚力的试金石，也是展现运动神经的最佳舞台。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1042,
+        "entryType": "culture",
+        "key": [
+          "修学旅行",
+          "京都",
+          "奈良"
+        ],
+        "comment": "修学旅行文化",
+        "content": "樱丘高校的修学旅行是高二秋季的重头戏，为期三天两夜，前往京都或奈良等历史文化名城。修学旅行是关系发展的催化剂——自由活动时间的分组、夜晚旅馆里的枕头大战和真心话大冒险、以及旅行中突发的意外状况，都为关系发展提供了绝佳的舞台。据说，修学旅行期间产生的好感度是日常的三倍。修学旅行的最后一天晚上，通常会有篝火晚会，大家围着篝火唱歌、聊天、甚至告白。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1043,
+        "entryType": "culture",
+        "key": [
+          "告白",
+          "天台告白",
+          "情书"
+        ],
+        "comment": "告白文化",
+        "content": "樱丘高校的告白文化是青春最青涩的冒险。告白的方式有很多种：天台告白（放学后黄昏时分的天台上）、情书告白（递一封信就跑）、当面告白（鼓起勇气说出来）。告白的时机很重要——学园祭后、期末考试结束时、毕业典礼前夕，都是告白的好时机。告白的结果有两种：接受（开始交往）或拒绝（保持朋友关系）。无论结果如何，告白都是青春中最重要的记忆。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1044,
+        "entryType": "economy",
+        "key": [
+          "零花钱",
+          "压岁钱",
+          "打工"
+        ],
+        "comment": "零花钱",
+        "content": "樱丘高校的学生主要通过零花钱和打工获得收入。零花钱的多少因家庭而异，一般每月3000-5000日元。打工是学生们赚取额外收入的方式，最常见的打工地点是便利店和餐厅。打工的时间一般在放学后和周末，每小时800-1000日元。学生们用零花钱买文具、零食、漫画，或者存起来买想要的东西。",
+        "constant": false,
+        "order": 5,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": "日元",
+            "symbol": "¥",
+            "description": "学生主要通过零花钱和打工获得收入。"
+          },
+          "priceLevel": "零花钱每月3000-5000日元，打工每小时800-1000日元。"
+        }
+      },
+      {
+        "uid": 1045,
+        "entryType": "economy",
+        "key": [
+          "购物",
+          "买东西",
+          "消费"
+        ],
+        "comment": "学生消费",
+        "content": "樱丘高校的学生消费主要集中在以下几个方面：文具（笔记本、笔、橡皮等）、零食（面包、饮料、糖果等）、漫画和游戏、以及社交消费（聚餐、KTV、电影等）。商业街上的店铺是学生们的主要消费场所，可丽饼店和二手书店是最受欢迎的。学生们通常会精打细算，把零花钱花在最想要的东西上。",
+        "constant": false,
+        "order": 5,
+        "position": "before_char",
+        "meta": {
+          "currency": {
+            "name": "日元",
+            "symbol": "¥",
+            "description": "学生消费主要集中在文具、零食、漫画和社交消费。"
+          },
+          "priceLevel": "可丽饼300-500日元，漫画500-800日元，KTV每小时500-1000日元。"
+        }
+      },
+      {
+        "uid": 1046,
+        "entryType": "relationships",
+        "key": [
+          "青梅竹马关系",
+          "儿时玩伴"
+        ],
+        "comment": "青梅竹马关系",
+        "content": "青梅竹马是日式校园中最特殊的关系之一。从小一起长大的两个人，对彼此了如指掌——知道对方喜欢吃什么、讨厌什么、害怕什么。但上了高中后，这种关系可能会发生变化：你开始在意对方的一举一动，看到对方跟别人说话会莫名其妙地吃醋。你不知道这是不是喜欢，但你知道，对方对你来说很重要。青梅竹马关系的转变，是青春中最微妙也最美好的冒险。",
+        "constant": false,
+        "order": 9,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "青梅竹马是从小一起长大的特殊关系，上了高中后可能会发生变化。",
+            "mechanics": "青梅竹马关系有特殊的好感度加成，但也容易因为误解而产生矛盾。",
+            "types": [
+              {
+                "name": "纯友谊",
+                "description": "从小一起长大，但只是普通朋友。"
+              },
+              {
+                "name": "暧昧期",
+                "description": "开始在意对方，但还没捅破窗户纸。"
+              },
+              {
+                "name": "恋人未满",
+                "description": "互相喜欢，但谁都没先开口。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 1047,
+        "entryType": "relationships",
+        "key": [
+          "前辈后辈关系",
+          "学长学妹"
+        ],
+        "comment": "前辈后辈关系",
+        "content": "前辈后辈关系是日式校园中最经典的纵向关系。前辈对后辈的指导、关怀和偶尔的严厉，构成了日式校园最经典的互动模式。后辈对前辈的仰慕也可能悄然转变为更深的情感。前辈后辈关系的发展，往往从社团活动开始——前辈指导后辈练习，后辈为前辈加油。这种关系在日式校园中被广泛接受，甚至被鼓励。",
+        "constant": false,
+        "order": 9,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "前辈后辈关系是日式校园中最经典的纵向关系，从社团活动开始发展。",
+            "mechanics": "前辈后辈关系有特殊的好感度发展路径，仰慕可能转变为更深的情感。",
+            "types": [
+              {
+                "name": "师徒关系",
+                "description": "前辈指导后辈，后辈尊敬前辈。"
+              },
+              {
+                "name": "暗恋",
+                "description": "后辈对前辈的仰慕转变为暗恋。"
+              },
+              {
+                "name": "双向奔赴",
+                "description": "前辈也对后辈有好感，互相喜欢。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 1048,
+        "entryType": "lore",
+        "key": [
+          "教室",
+          "座位",
+          "窗边"
+        ],
+        "comment": "教室",
+        "content": "樱丘高校的教室是学生们每天待得最久的地方。教室里有四列六排座位，座位每个月轮换一次。靠窗的位置最受欢迎——可以看到操场上的风景，也可以在上课时发呆。教室后面的墙上贴满了班级公告和活动海报。教室的黑板上总是写着今天的课程和值日生。放学后的教室格外安静，夕阳透过窗户洒进来，是许多重要对话的发生地。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1049,
+        "entryType": "lore",
+        "key": [
+          "音乐室",
+          "钢琴",
+          "管乐"
+        ],
+        "comment": "音乐室",
+        "content": "樱丘高校的音乐室位于四楼，是一间宽敞的房间。房间里有一架钢琴、几把椅子和乐谱架。音乐室是管乐部的活动室，每天放学后都能听到悠扬的乐声。音乐室的隔音效果很好，即使在里面大声演奏，走廊上也听不到。音乐室也是许多重要对话的发生地——在钢琴声中，人们更容易敞开心扉。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1050,
+        "entryType": "lore",
+        "key": [
+          "美术室",
+          "画画",
+          "美术部"
+        ],
+        "comment": "美术室",
+        "content": "樱丘高校的美术室位于四楼，是一间采光很好的房间。房间里摆着画架、画板和各种颜料。美术室是美术部的活动室，每天放学后都能看到学生们在这里画画。美术室的墙上贴满了学生们的作品，有素描、水彩、油画等。美术室也是许多灵感的诞生地——在安静的环境中，人们更容易发挥创造力。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1051,
+        "entryType": "lore",
+        "key": [
+          "电脑室",
+          "电脑部",
+          "编程"
+        ],
+        "comment": "电脑室",
+        "content": "樱丘高校的电脑室位于四楼，是一间摆满电脑的房间。电脑室是电脑部的活动室，每天放学后都能看到学生们在这里编程、打游戏、看动漫。电脑部的成员们大多是宅男宅女，他们在这里找到了属于自己的小天地。电脑室也是许多网络文化的发源地——表情包、网络用语、动漫讨论，都在这里诞生。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1052,
+        "entryType": "lore",
+        "key": [
+          "戏剧部",
+          "话剧",
+          "表演"
+        ],
+        "comment": "戏剧部",
+        "content": "樱丘高校的戏剧部是文化系社团中最受欢迎的社团之一。戏剧部每年在学园祭上表演话剧，每年都座无虚席。戏剧部的成员们每天放学后都在排练，从台词到动作，每一个细节都要反复练习。戏剧部的部长是一位三年级的学姐，她对表演要求很严格，但也很关心成员。戏剧部的表演是学园祭的重头戏，也是许多学生最期待的节目。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1053,
+        "entryType": "lore",
+        "key": [
+          "棒球部",
+          "甲子园",
+          "训练"
+        ],
+        "comment": "棒球部",
+        "content": "樱丘高校的棒球部是运动系社团中最受欢迎的社团之一。棒球部的目标是打入甲子园，每天放学后都在操场上训练。棒球部的成员们穿着统一的队服，戴着帽子，挥舞着球棒。棒球部的教练是一位热血的老师，他对训练要求很严格，但也很关心成员。棒球部的比赛是体育祭的重头戏，也是许多学生最期待的节目。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1054,
+        "entryType": "lore",
+        "key": [
+          "足球部",
+          "足球场",
+          "训练"
+        ],
+        "comment": "足球部",
+        "content": "樱丘高校的足球部是运动系社团中最受欢迎的社团之一。足球部的目标是打入全国大赛，每天放学后都在操场上训练。足球部的成员们穿着统一的队服，踢着足球。足球部的教练是一位热血的老师，他对训练要求很严格，但也很关心成员。足球部的比赛是体育祭的重头戏，也是许多学生最期待的节目。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1055,
+        "entryType": "lore",
+        "key": [
+          "弓道部",
+          "弓道",
+          "射箭"
+        ],
+        "comment": "弓道部",
+        "content": "樱丘高校的弓道部是运动系社团中最安静的社团之一。弓道部的成员们每天放学后都在弓道场练习射箭。弓道是一项需要专注和耐心的运动，每一次射箭都要全神贯注。弓道部的成员们大多是性格沉静的学生，他们在这里找到了属于自己的节奏。弓道部的比赛是体育祭的特色项目，也是许多学生最期待的节目。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1056,
+        "entryType": "lore",
+        "key": [
+          "食堂",
+          "猪排饭",
+          "午餐"
+        ],
+        "comment": "学生食堂",
+        "content": "樱丘高校的学生食堂位于一楼，是一间宽敞的房间。食堂的招牌菜是猪排饭套餐，500日元一份，量大实惠。食堂的座位总是不够用，尤其是午休的时候，要抢座位。食堂也是社交的重要场所——你会在这里遇到各种各样的人，从学霸到不良，从现充到宅男。食堂的阿姨们对学生很友好，偶尔会多给一点菜。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1057,
+        "entryType": "lore",
+        "key": [
+          "校门",
+          "上学",
+          "放学"
+        ],
+        "comment": "校门",
+        "content": "樱丘高校的校门是一座铁门，每天早上七点半打开，下午六点关闭。校门口有风纪委员站岗，检查学生的仪容仪表。校门外是一条长长的坡道，坡道两旁种满了樱花树。春天的时候，樱花飘落，美得像画一样。上学和放学的时候，校门口总是人来人往，是许多重要相遇的发生地。",
+        "constant": false,
+        "order": 13,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1058,
+        "entryType": "culture",
+        "key": [
+          "制服",
+          "校服",
+          "穿搭"
+        ],
+        "comment": "制服文化",
+        "content": "樱丘高校的制服是学校文化的重要组成部分。男生的制服是白衬衫配深色长裤，女生的制服是白衬衫配深色百褶裙。制服的穿法有很多种：裙子的长度、衬衫的扣子、领带的松紧，都反映了学生的个性。风纪委员会对制服的要求很严格，但学生们总有办法在规则内展现自己的风格。制服也是身份的象征——穿上制服，你就是樱丘高校的学生。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1059,
+        "entryType": "culture",
+        "key": [
+          "迟到",
+          "早退",
+          "逃课"
+        ],
+        "comment": "迟到与逃课",
+        "content": "樱丘高校对迟到和早退的要求很严格。迟到的学生要在走廊上罚站，早退的学生要被记过。但总有学生想办法逃课——假装生病去保健室、翻墙出去、或者干脆不来了。逃课的学生通常是不良少年，他们经常在旧校舍后面抽烟、打游戏。老师对逃课的学生很头疼，但也没什么好办法。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1060,
+        "entryType": "culture",
+        "key": [
+          "毕业",
+          "毕业典礼",
+          "告别"
+        ],
+        "comment": "毕业文化",
+        "content": "樱丘高校的毕业典礼是每年三月的重头戏。毕业生们穿着制服，参加毕业典礼。典礼上，校长致辞、学生代表致辞、颁发毕业证书。典礼结束后，毕业生们在校门口合影留念，然后告别母校。毕业典礼是青春的终点，也是新生活的起点。许多学生在毕业典礼上告白，因为这是最后的机会。",
+        "constant": false,
+        "order": 12,
+        "position": "before_char",
+        "depth": 30,
+        "probability": 100
+      },
+      {
+        "uid": 1061,
+        "entryType": "relationships",
+        "key": [
+          "三角关系",
+          "情敌"
+        ],
+        "comment": "三角关系",
+        "content": "三角关系是日式校园中最常见的恋爱难题。两个人同时喜欢上一个人，或者一个人同时被两个人喜欢。三角关系的发展充满了戏剧性：误会、吃醋、争吵、和好。三角关系的结局通常是：一个人退出，两个人在一起；或者三个人都受伤。三角关系是青春中最痛苦也最美好的冒险。",
+        "constant": false,
+        "order": 9,
+        "position": "before_char",
+        "meta": {
+          "relationships": {
+            "description": "三角关系是日式校园中最常见的恋爱难题，充满了戏剧性。",
+            "mechanics": "三角关系会触发特殊事件，需要做出选择。",
+            "types": [
+              {
+                "name": "单相思",
+                "description": "你喜欢的人喜欢别人。"
+              },
+              {
+                "name": "被喜欢",
+                "description": "你被两个人同时喜欢。"
+              },
+              {
+                "name": "双向暗恋",
+                "description": "你们互相喜欢，但中间有阻碍。"
+              }
+            ]
+          }
+        }
       }
     ],
     "eventPacks": [
@@ -500,18 +1345,129 @@
         "rules": [
           {
             "id": "festival_trigger",
-            "when": { "state": { "path": "世界.时间系统.当前时间", "op": "contains", "value": "秋" } },
-            "then": [{ "addEvent": { "eventId": "festival", "eventPackId": "world:japanese_school:events" } }]
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前时间",
+                "op": "contains",
+                "value": "秋"
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "festival",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
           },
           {
             "id": "exam_trigger",
-            "when": { "state": { "path": "世界.时间系统.当前时间", "op": "contains", "value": "期末" } },
-            "then": [{ "addEvent": { "eventId": "exam", "eventPackId": "world:japanese_school:events" } }]
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前时间",
+                "op": "contains",
+                "value": "期末"
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "exam",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
           },
           {
             "id": "confession_trigger",
-            "when": { "state": { "path": "人物档案.学生.关系数据.好感度", "op": ">=", "value": 70 } },
-            "then": [{ "addEvent": { "eventId": "confession", "eventPackId": "world:japanese_school:events" } }]
+            "when": {
+              "state": {
+                "path": "人物档案.学生.关系数据.好感度",
+                "op": ">=",
+                "value": 70
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "confession",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "sports_festival_trigger",
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前时间",
+                "op": "contains",
+                "value": "春"
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "sports_festival",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "study_trip_trigger",
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前时间",
+                "op": "contains",
+                "value": "秋"
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "study_trip",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "valentine_trigger",
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前时间",
+                "op": "contains",
+                "value": "2月"
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "valentine",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "rainy_day_trigger",
+            "when": {
+              "state": {
+                "path": "世界.时间系统.当前时间",
+                "op": "contains",
+                "value": "雨"
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "rainy_day",
+                  "eventPackId": "world:japanese_school:events"
+                }
+              }
+            ]
           }
         ],
         "periodicRules": [
@@ -519,7 +1475,14 @@
             "id": "school_schedule",
             "name": "校园日程",
             "intervalTicks": 5,
-            "actions": [{ "set": { "path": "玩家.生存状态.体力值", "value": -5 } }],
+            "actions": [
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": -5
+                }
+              }
+            ],
             "narrateToAI": true,
             "description": "每5轮消耗体力，AI描述校园日常节奏"
           },
@@ -530,9 +1493,28 @@
             "actions": [],
             "narrateToAI": true,
             "description": "每30轮AI描述季节变化"
+          },
+          {
+            "id": "daily_life",
+            "name": "校园日常",
+            "intervalTicks": 3,
+            "offsetTicks": 1,
+            "narrateToAI": true,
+            "description": "每3轮AI描述校园日常：上课、午休、放学后的活动"
+          },
+          {
+            "id": "relationship_development",
+            "name": "关系发展",
+            "intervalTicks": 10,
+            "offsetTicks": 5,
+            "narrateToAI": true,
+            "description": "每10轮AI描述人际关系的变化：好感度提升、误会、和解"
           }
         ],
-        "permissions": ["modify_world_state", "add_card"]
+        "permissions": [
+          "modify_world_state",
+          "add_card"
+        ]
       },
       {
         "id": "world:japanese_school:events",
@@ -543,19 +1525,68 @@
             "id": "festival",
             "name": "文化祭",
             "cards": [
-              { "id": "t_festival", "componentId": "title", "title": "文化祭来了！" },
-              { "id": "n_festival", "componentId": "narrative", "title": "文化祭叙事" },
-              { "id": "c_festival", "componentId": "choice", "title": "文化祭选择" }
+              {
+                "id": "t_festival",
+                "componentId": "title",
+                "title": "文化祭来了！"
+              },
+              {
+                "id": "n_festival",
+                "componentId": "narrative",
+                "title": "文化祭叙事"
+              },
+              {
+                "id": "c_festival",
+                "componentId": "choice",
+                "title": "文化祭选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_festival", "props": { "title": "文化祭来了！" } }],
-                "narrative": [{ "id": "n_festival", "props": { "text": "一年一度的文化祭终于到了！校园里张灯结彩，各个班级和社团都在紧张地准备着自己的摊位和表演。空气中弥漫着章鱼烧和棉花糖的香气。" } }],
-                "choice": [{ "id": "c_festival", "props": { "choices": [
-                  { "label": "去逛同学的摊位", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "逛摊位，社交互动，心情愉快" },
-                  { "label": "帮忙执行委员会", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "帮忙组织活动，消耗体力但获得成长" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_festival",
+                    "props": {
+                      "title": "文化祭来了！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_festival",
+                    "props": {
+                      "text": "一年一度的文化祭终于到了！校园里张灯结彩，各个班级和社团都在紧张地准备着自己的摊位和表演。空气中弥漫着章鱼烧和棉花糖的香气。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_festival",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "去逛同学的摊位",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "逛摊位，社交互动，心情愉快"
+                        },
+                        {
+                          "label": "帮忙执行委员会",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "帮忙组织活动，消耗体力但获得成长"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -563,19 +1594,68 @@
             "id": "exam",
             "name": "期末考试",
             "cards": [
-              { "id": "t_exam", "componentId": "title", "title": "期末考试！" },
-              { "id": "n_exam", "componentId": "narrative", "title": "期末考试叙事" },
-              { "id": "c_exam", "componentId": "choice", "title": "期末考试选择" }
+              {
+                "id": "t_exam",
+                "componentId": "title",
+                "title": "期末考试！"
+              },
+              {
+                "id": "n_exam",
+                "componentId": "narrative",
+                "title": "期末考试叙事"
+              },
+              {
+                "id": "c_exam",
+                "componentId": "choice",
+                "title": "期末考试选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_exam", "props": { "title": "期末考试！" } }],
-                "narrative": [{ "id": "n_exam", "props": { "text": "期末考试周到了。教室里弥漫着紧张的气氛，同学们都在疯狂复习。你翻开课本，发现很多内容都还没看过。" } }],
-                "choice": [{ "id": "c_exam", "props": { "choices": [
-                  { "label": "临时抱佛脚", "effect": { "statId": "体力值", "delta": -15 }, "aiNote": "熬夜复习，体力消耗大" },
-                  { "label": "放弃治疗", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "放弃复习，反而轻松了" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_exam",
+                    "props": {
+                      "title": "期末考试！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_exam",
+                    "props": {
+                      "text": "期末考试周到了。教室里弥漫着紧张的气氛，同学们都在疯狂复习。你翻开课本，发现很多内容都还没看过。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_exam",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "临时抱佛脚",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "熬夜复习，体力消耗大"
+                        },
+                        {
+                          "label": "放弃治疗",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "放弃复习，反而轻松了"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -583,19 +1663,68 @@
             "id": "confession",
             "name": "告白",
             "cards": [
-              { "id": "t_confession", "componentId": "title", "title": "有人向你告白了！" },
-              { "id": "n_confession", "componentId": "narrative", "title": "告白叙事" },
-              { "id": "c_confession", "componentId": "choice", "title": "告白选择" }
+              {
+                "id": "t_confession",
+                "componentId": "title",
+                "title": "有人向你告白了！"
+              },
+              {
+                "id": "n_confession",
+                "componentId": "narrative",
+                "title": "告白叙事"
+              },
+              {
+                "id": "c_confession",
+                "componentId": "choice",
+                "title": "告白选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_confession", "props": { "title": "有人向你告白了！" } }],
-                "narrative": [{ "id": "n_confession", "props": { "text": "放学后，一个人红着脸走到你面前，递给你一封信就跑掉了。你打开信，上面写着'我喜欢你'。" } }],
-                "choice": [{ "id": "c_confession", "props": { "choices": [
-                  { "label": "接受告白", "effect": { "statId": "血量", "delta": 20 }, "aiNote": "接受了告白，心情很好" },
-                  { "label": "婉拒", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "婉拒了对方，保持单身" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_confession",
+                    "props": {
+                      "title": "有人向你告白了！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_confession",
+                    "props": {
+                      "text": "放学后，一个人红着脸走到你面前，递给你一封信就跑掉了。你打开信，上面写着'我喜欢你'。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_confession",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受告白",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 20
+                          },
+                          "aiNote": "接受了告白，心情很好"
+                        },
+                        {
+                          "label": "婉拒",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "婉拒了对方，保持单身"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -603,19 +1732,68 @@
             "id": "club_activity",
             "name": "社团活动",
             "cards": [
-              { "id": "t_club", "componentId": "title", "title": "社团活动时间" },
-              { "id": "n_club", "componentId": "narrative", "title": "社团活动叙事" },
-              { "id": "c_club", "componentId": "choice", "title": "社团活动选择" }
+              {
+                "id": "t_club",
+                "componentId": "title",
+                "title": "社团活动时间"
+              },
+              {
+                "id": "n_club",
+                "componentId": "narrative",
+                "title": "社团活动叙事"
+              },
+              {
+                "id": "c_club",
+                "componentId": "choice",
+                "title": "社团活动选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_club", "props": { "title": "社团活动时间" } }],
-                "narrative": [{ "id": "n_club", "props": { "text": "放学后的社团活动时间到了。运动部在操场上训练，文艺部在教室里排练，你该去哪个？" } }],
-                "choice": [{ "id": "c_club", "props": { "choices": [
-                  { "label": "去运动部", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "参加运动，体力消耗但健康" },
-                  { "label": "去文艺部", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "参加文艺活动，放松心情" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_club",
+                    "props": {
+                      "title": "社团活动时间"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_club",
+                    "props": {
+                      "text": "放学后的社团活动时间到了。运动部在操场上训练，文艺部在教室里排练，你该去哪个？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_club",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "去运动部",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "参加运动，体力消耗但健康"
+                        },
+                        {
+                          "label": "去文艺部",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "参加文艺活动，放松心情"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -623,24 +1801,558 @@
             "id": "summer_festival",
             "name": "夏日祭",
             "cards": [
-              { "id": "t_summer", "componentId": "title", "title": "夏日祭！" },
-              { "id": "n_summer", "componentId": "narrative", "title": "夏日祭叙事" },
-              { "id": "c_summer", "componentId": "choice", "title": "夏日祭选择" }
+              {
+                "id": "t_summer",
+                "componentId": "title",
+                "title": "夏日祭！"
+              },
+              {
+                "id": "n_summer",
+                "componentId": "narrative",
+                "title": "夏日祭叙事"
+              },
+              {
+                "id": "c_summer",
+                "componentId": "choice",
+                "title": "夏日祭选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_summer", "props": { "title": "夏日祭！" } }],
-                "narrative": [{ "id": "n_summer", "props": { "text": "夏天到了，学校举办夏日祭。操场上搭起了摊位，有金鱼摊、苹果糖、捞水气球。远处还能看到烟花。" } }],
-                "choice": [{ "id": "c_summer", "props": { "choices": [
-                  { "label": "穿浴袍逛摊位", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "穿浴袍参加夏日祭，很开心" },
-                  { "label": "在家吹空调", "effect": { "statId": "体力值", "delta": 10 }, "aiNote": "待在家里休息，恢复体力" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_summer",
+                    "props": {
+                      "title": "夏日祭！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_summer",
+                    "props": {
+                      "text": "夏天到了，学校举办夏日祭。操场上搭起了摊位，有金鱼摊、苹果糖、捞水气球。远处还能看到烟花。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_summer",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "穿浴袍逛摊位",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "穿浴袍参加夏日祭，很开心"
+                        },
+                        {
+                          "label": "在家吹空调",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 10
+                          },
+                          "aiNote": "待在家里休息，恢复体力"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "sports_festival",
+            "name": "体育祭",
+            "cards": [
+              {
+                "id": "t_sports",
+                "componentId": "title",
+                "title": "体育祭！"
+              },
+              {
+                "id": "n_sports",
+                "componentId": "narrative",
+                "title": "体育祭叙事"
+              },
+              {
+                "id": "c_sports",
+                "componentId": "choice",
+                "title": "体育祭选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_sports",
+                    "props": {
+                      "title": "体育祭！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_sports",
+                    "props": {
+                      "text": "体育祭到了！操场上人声鼎沸，各班都在为比赛做准备。你被选为班级接力跑的最后一棒，全班的希望都寄托在你身上。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_sports",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "全力以赴",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "拼尽全力跑步，虽然累但很热血"
+                        },
+                        {
+                          "label": "重在参与",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "保持平常心，享受体育祭的氛围"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "study_trip",
+            "name": "修学旅行",
+            "cards": [
+              {
+                "id": "t_trip",
+                "componentId": "title",
+                "title": "修学旅行！"
+              },
+              {
+                "id": "n_trip",
+                "componentId": "narrative",
+                "title": "修学旅行叙事"
+              },
+              {
+                "id": "c_trip",
+                "componentId": "choice",
+                "title": "修学旅行选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_trip",
+                    "props": {
+                      "title": "修学旅行！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "t_trip",
+                    "props": {
+                      "text": "修学旅行的目的地是京都。在自由活动时间，你想去哪里？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_trip",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "去神社参拜",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "在神社许愿，心情平静"
+                        },
+                        {
+                          "label": "去商业街购物",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "逛商业街买东西，有点累但很开心"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "valentine",
+            "name": "情人节",
+            "cards": [
+              {
+                "id": "t_valentine",
+                "componentId": "title",
+                "title": "情人节！"
+              },
+              {
+                "id": "n_valentine",
+                "componentId": "narrative",
+                "title": "情人节叙事"
+              },
+              {
+                "id": "c_valentine",
+                "componentId": "choice",
+                "title": "情人节选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_valentine",
+                    "props": {
+                      "title": "情人节！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_valentine",
+                    "props": {
+                      "text": "情人节到了。你的鞋柜里放着几盒巧克力，有义理巧克力，也有一盒看起来很特别的本命巧克力。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_valentine",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "打开本命巧克力",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "打开本命巧克力，发现是喜欢的人送的"
+                        },
+                        {
+                          "label": "先收起来",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "先把巧克力收起来，等想清楚再说"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "rainy_day",
+            "name": "雨天",
+            "cards": [
+              {
+                "id": "t_rain",
+                "componentId": "title",
+                "title": "下雨了"
+              },
+              {
+                "id": "n_rain",
+                "componentId": "narrative",
+                "title": "雨天叙事"
+              },
+              {
+                "id": "c_rain",
+                "componentId": "choice",
+                "title": "雨天选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_rain",
+                    "props": {
+                      "title": "下雨了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_rain",
+                    "props": {
+                      "text": "放学的时候突然下起了雨。你没带伞，只能站在校门口等雨停。这时，一个人走到你身边，递给你一把伞。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_rain",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受伞",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "接受对方的伞，心里暖暖的"
+                        },
+                        {
+                          "label": "一起撑伞",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "一起撑伞回家，距离拉近了"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "confession_rooftop",
+            "name": "天台告白",
+            "cards": [
+              {
+                "id": "t_rooftop",
+                "componentId": "title",
+                "title": "天台告白"
+              },
+              {
+                "id": "n_rooftop",
+                "componentId": "narrative",
+                "title": "天台告白叙事"
+              },
+              {
+                "id": "c_rooftop",
+                "componentId": "choice",
+                "title": "天台告白选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_rooftop",
+                    "props": {
+                      "title": "天台告白"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_rooftop",
+                    "props": {
+                      "text": "放学后，你被叫到了天台。夕阳西下，一个人站在那里，红着脸对你说：'我有话想对你说。'"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_rooftop",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受告白",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 25
+                          },
+                          "aiNote": "接受了告白，开始了甜蜜的恋爱"
+                        },
+                        {
+                          "label": "需要时间考虑",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "说需要时间考虑，对方有点失落"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "club_crisis",
+            "name": "废部危机",
+            "cards": [
+              {
+                "id": "t_club_crisis",
+                "componentId": "title",
+                "title": "废部危机！"
+              },
+              {
+                "id": "n_club_crisis",
+                "componentId": "narrative",
+                "title": "废部危机叙事"
+              },
+              {
+                "id": "c_club_crisis",
+                "componentId": "choice",
+                "title": "废部危机选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_club_crisis",
+                    "props": {
+                      "title": "废部危机！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_club_crisis",
+                    "props": {
+                      "text": "你的社团遇到了废部危机——成员不足五人，学校发出了废部警告。部长召集大家开会，商量对策。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_club_crisis",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "努力招新",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "拼命招新，终于凑够了人数"
+                        },
+                        {
+                          "label": "接受废部",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -10
+                          },
+                          "aiNote": "接受废部，心情很低落"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "study_group",
+            "name": "学习会",
+            "cards": [
+              {
+                "id": "t_study",
+                "componentId": "title",
+                "title": "学习会"
+              },
+              {
+                "id": "n_study",
+                "componentId": "narrative",
+                "title": "学习会叙事"
+              },
+              {
+                "id": "c_study",
+                "componentId": "choice",
+                "title": "学习会选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_study",
+                    "props": {
+                      "title": "学习会"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_study",
+                    "props": {
+                      "text": "考试快到了，班里的学霸组织了一个学习会。你被邀请参加，但你更想自己复习。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_study",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "参加学习会",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "参加学习会，学到了很多，也交到了朋友"
+                        },
+                        {
+                          "label": "自己复习",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "自己复习，效率更高但有点孤单"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           }
         ],
-        "permissions": ["add_card"]
+        "permissions": [
+          "add_card"
+        ]
       }
     ]
   }

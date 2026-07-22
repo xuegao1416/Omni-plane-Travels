@@ -22,13 +22,13 @@ export const permissionSchema = z.enum([
 
 export const assetKindSchema = z.enum(['image', 'text', 'data', 'audio']);
 
-const ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
+const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 export const manifestSchema = z
   .object({
-    id: z.string().regex(ID_RE, 'id 需匹配 ^[a-z0-9][a-z0-9_-]{2,63}$'),
+    id: z.string().regex(ID_RE, 'id 需匹配 ^[a-z0-9][a-z0-9_:-]{2,63}$'),
     name: z.string().min(1).max(80),
     version: z.string().regex(SEMVER_RE, 'version 需为 x.y.z'),
     author: z.string().min(1).max(60),

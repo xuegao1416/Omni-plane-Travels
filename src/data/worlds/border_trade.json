@@ -317,6 +317,902 @@
             "灰色地带的生存智慧——政策模糊、规则不清，倒爷们在夹缝中找到自己的生存之道。"
           ]
         }
+      },
+      {
+        "uid": 17,
+        "key": [
+          "绥芬河火车站",
+          "火车站"
+        ],
+        "constant": false,
+        "comment": "绥芬河火车站",
+        "content": "绥芬河火车站是个小站，但每天人流量不小。从哈尔滨来的火车凌晨到站，车厢里挤满了扛着编织袋的倒爷。站前广场上停着几辆面包车，专门拉客去青云市场。冬天的凌晨冷得刺骨，但倒爷们一下车就精神抖擞——赚钱的劲头比什么都暖和。站前有几个卖早点的小摊，包子、油条、豆浆，管饱。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 18,
+        "key": [
+          "边贸一条街",
+          "商业街"
+        ],
+        "constant": false,
+        "comment": "边贸一条街",
+        "content": "绥芬河最繁华的街道，两边全是边贸公司的招牌。街上什么都有：报关行、翻译社、旅馆、饭店、商店。白天人来人往，晚上灯火通明。街角有几家录像厅，放着港台片，倒爷们忙完一天会来看场电影放松。街上最显眼的是那家「中俄友好饭店」，老板娘是个爽快的东北女人，菜量大、价格实惠，是倒爷们谈生意的首选。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 19,
+        "key": [
+          "旅馆",
+          "招待所",
+          "住宿"
+        ],
+        "constant": false,
+        "comment": "旅馆",
+        "content": "绥芬河的旅馆分三等：最好的是口岸宾馆，有暖气有热水，但价格贵；中等的是私人开的小旅馆，条件一般但便宜；最差的是地下室旅馆，一张床几块钱，冬天冷得要命。倒爷们大多住中等旅馆，一间房两三个人挤，省下的钱多进点货。旅馆老板都认识常客，会帮忙存货物、传消息，是倒爷们在绥芬河的「家」。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 20,
+        "key": [
+          "仓库",
+          "货场"
+        ],
+        "constant": false,
+        "comment": "仓库",
+        "content": "绥芬河的仓库集中在口岸附近，大多是简易铁皮房。倒爷们把货存在这里，等过关的时候再拉出去。仓库租金不便宜，按天算，一天几十块。有的倒爷为了省钱，直接把货存在旅馆房间里，结果搞得连睡觉的地方都没有。仓库管理员是个肥差，能帮倒爷们「通融」优先出货的，每月能多赚好几千。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 21,
+        "key": [
+          "银行",
+          "信用社",
+          "存钱"
+        ],
+        "constant": false,
+        "comment": "银行",
+        "content": "绥芬河有几家银行，但倒爷们大多不信任银行。他们习惯现金交易，赚了钱就揣在身上或者藏在旅馆里。银行的主要业务是换汇——人民币换卢布，或者卢布换人民币。汇率一天一个样，银行门口总有人拿着计算器算来算去。有些胆大的倒爷不去银行，找黑市换汇，汇率更划算，但风险也大。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 22,
+        "key": [
+          "饭店",
+          "吃饭",
+          "喝酒"
+        ],
+        "constant": false,
+        "comment": "饭店",
+        "content": "绥芬河的饭店是倒爷们谈生意的重要场所。最好的饭店是「中俄友好饭店」，老板娘做的锅包肉远近闻名。谈生意必须先喝酒，白酒、啤酒、伏特加，喝到位了什么都好说。有的倒爷为了谈成一笔生意，能喝到半夜。饭店老板都认识这些常客，会帮他们留位子、记账，甚至帮忙传话。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 23,
+        "key": [
+          "警察局",
+          "派出所"
+        ],
+        "constant": false,
+        "comment": "警察局",
+        "content": "绥芬河派出所的民警们每天都很忙。倒爷们之间经常发生纠纷：欠钱不还、抢客户、货物被偷，都要找警察。警察们见多了这种事，大多会调解，实在不行才抓人。有些倒爷跟警察混熟了，遇到麻烦能找人通融。但也有不长眼的，在警察眼皮底下搞小动作，结果被抓进去蹲几天。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "警察局",
+              "description": "绥芬河派出所，处理倒爷们之间的纠纷和治安问题。警察们见多识广，大多会调解。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 24,
+        "key": [
+          "工商局",
+          "注册公司"
+        ],
+        "constant": false,
+        "comment": "工商局",
+        "content": "绥芬河工商局是倒爷们必须打交道的地方。注册边贸公司需要在这里办手续，一间办公室、一个公章、一部电话，就能开张。工商局的人知道这些公司大多是皮包公司，但只要手续齐全，他们也不多问。有些倒爷为了省事，直接买现成的公司壳子，价格几千到几万不等。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "工商局",
+              "description": "绥芬河工商局，负责边贸公司注册。知道很多是皮包公司，但只要手续齐全就不多问。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 25,
+        "key": [
+          "运输公司",
+          "货运",
+          "物流"
+        ],
+        "constant": false,
+        "comment": "运输公司",
+        "content": "绥芬河的运输公司负责把货物从内地运到口岸，或者从口岸运到俄罗斯。最大的运输公司是「龙运物流」，老板是本地人，跟海关关系好，走货快。运输费用不便宜，按重量和体积算，一趟下来几千块。有些倒爷为了省钱，自己找车拉货，但风险大——路上可能被查，也可能出事故。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "运输公司",
+              "description": "绥芬河的运输公司，负责货物运输。龙运物流最大，跟海关关系好，走货快。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 26,
+        "key": [
+          "个体户协会",
+          "倒爷协会"
+        ],
+        "constant": false,
+        "comment": "个体户协会",
+        "content": "绥芬河有个体户协会，是倒爷们自发组织的。协会的作用是：帮新人熟悉门路、调解内部纠纷、跟政府部门打交道。协会会长是个老倒爷，在绥芬河混了多年，人脉广、说话有分量。加入协会不需要交钱，但要守规矩——不能骗人、不能抢客户、不能做太出格的事。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "个体户协会",
+              "description": "倒爷们自发组织的协会，帮新人熟悉门路、调解纠纷、跟政府部门打交道。",
+              "alignment": "friendly"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 27,
+        "key": [
+          "老张"
+        ],
+        "constant": false,
+        "comment": "老张",
+        "content": "老张（老倒爷）：东北本地人，在绥芬河做了五年边贸。他从最开始扛编织袋起家，现在有了自己的小公司。他最擅长的是找货源——广州的服装、义乌的小商品、温州的鞋，他都有渠道。他为人仗义，带过不少新人，但也吃过亏——有个新人学会了他的门路，转头就抢了他的客户。（性格：仗义、精明、记仇）",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "老张",
+              "role": "老倒爷",
+              "description": "东北本地人，在绥芬河做了五年边贸。从扛编织袋起家，现在有了自己的小公司。擅长找货源。",
+              "personality": "仗义、精明、记仇"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 28,
+        "key": [
+          "李会计"
+        ],
+        "constant": false,
+        "comment": "李会计",
+        "content": "李会计（财务）：绥芬河唯一的女会计，三十出头，戴着金丝眼镜。她给好几家边贸公司做账，对每家的进出货了如指掌。她做账有一套——能帮公司在合法范围内少交税，也能帮倒爷们把账做平。她不参与生意，但知道的秘密比谁都多。倒爷们对她又敬又怕——敬她本事，怕她嘴不严。（性格：精明、谨慎、嘴严）",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "李会计",
+              "role": "财务",
+              "description": "绥芬河唯一的女会计，给好几家边贸公司做账。做账有一套，能帮公司在合法范围内少交税。",
+              "personality": "精明、谨慎、嘴严"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 29,
+        "key": [
+          "黑市换汇人",
+          "换汇"
+        ],
+        "constant": false,
+        "comment": "黑市换汇人",
+        "content": "老陈（换汇人）：绥芬河黑市换汇的头面人物。他每天在银行门口转悠，看到有人换汇就凑上去。他的汇率比银行划算，但风险也大——有时候收到假币，有时候被警察抓。他手下有几个人，专门负责验钞和放风。倒爷们找他换汇，图的就是那点差价。（性格：狡猾、胆大、谨慎）",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "老陈",
+              "role": "换汇人",
+              "description": "绥芬河黑市换汇的头面人物，每天在银行门口转悠。汇率比银行划算，但风险也大。",
+              "personality": "狡猾、胆大、谨慎"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 30,
+        "key": [
+          "搬运工",
+          "扛包的"
+        ],
+        "constant": false,
+        "comment": "搬运工",
+        "content": "绥芬河的搬运工大多是附近农村来的壮劳力。他们每天在口岸附近等着，有货来了就上去扛。一包货几十斤，从仓库扛到口岸，或者从口岸扛到车上，一趟几块钱。搬运工们最怕冬天——零下二三十度，手都伸不出来，但还得扛。他们最盼望的是遇上大方的倒爷，多给几块钱小费。",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "搬运工",
+              "role": "体力劳动者",
+              "description": "附近农村来的壮劳力，每天在口岸附近等着扛货。一包货几十斤，一趟几块钱。",
+              "personality": "朴实、能吃苦、盼望小费"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 31,
+        "key": [
+          "喝酒",
+          "酒桌文化"
+        ],
+        "constant": false,
+        "comment": "喝酒规矩",
+        "content": "绥芬河谈生意必须喝酒，这是铁规矩。白酒、啤酒、伏特加，喝到位了什么都好说。喝酒有讲究：先敬对方三杯，表示尊重；然后对方回敬三杯，表示接受；最后大家一起喝，表示合作愉快。不能喝的要提前说，否则喝到一半吐了，生意就黄了。有的倒爷为了谈生意，能喝一斤白酒，第二天照样早起过关。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 32,
+        "key": [
+          "谈判",
+          "谈价",
+          "讨价还价"
+        ],
+        "constant": false,
+        "comment": "谈判技巧",
+        "content": "绥芬河谈价有套路：先开高价，让对方还；然后慢慢降，降到双方都能接受的价格。不能一开始就亮底牌，否则会被对方吃死。谈价的时候要沉住气，不能急——你越急，对方越压价。有的倒爷谈价能谈一整天，从早上谈到晚上，最后才成交。还有的倒爷用「欲擒故纵」——假装不买了，转身就走，对方着急了就会喊住你。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 33,
+        "key": [
+          "送礼",
+          "人情",
+          "关系"
+        ],
+        "constant": false,
+        "comment": "送礼文化",
+        "content": "绥芬河办事要送礼，这是潜规则。送礼有讲究：不能太轻，显得没诚意；不能太重，显得有求于人。最常见的是送烟酒——中华烟、茅台酒，拿出来有面子。送给海关的要含蓄，不能直接送钱，要说是「意思意思」。送给俄商的要实在，他们喜欢中国的白酒和茶叶。送礼的时机也很重要——过年过节是最佳时机，平时送显得太刻意。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 34,
+        "key": [
+          "邮局",
+          "寄东西"
+        ],
+        "constant": false,
+        "comment": "邮局",
+        "content": "绥芬河邮局是倒爷们寄钱回家的地方。赚了钱不敢带太多现金在身上，就去邮局汇款。邮局汇款手续费不便宜，但安全。邮局也是寄包裹的地方——有的倒爷把俄罗斯的望远镜、军用手表寄回家卖，又是一笔收入。邮局的工作人员都认识这些常客，知道他们寄的是什么，但只要不违法，也睁一只眼闭一只眼。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 35,
+        "key": [
+          "理发店",
+          "澡堂"
+        ],
+        "constant": false,
+        "comment": "理发店与澡堂",
+        "content": "绥芬河的理发店和澡堂是倒爷们放松的地方。理发店不光理发，还提供按摩、刮脸，一套下来十块钱。澡堂更受欢迎——冬天在外面跑一天，冻得骨头都僵了，泡个热水澡，浑身舒坦。澡堂里还能搓澡、拔火罐，东北味十足。倒爷们在澡堂里聊天、吹牛，交换信息，是重要的社交场所。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 36,
+        "key": [
+          "服装厂",
+          "进货",
+          "广州"
+        ],
+        "constant": false,
+        "comment": "进货渠道",
+        "content": "绥芬河的货大多从南方进：广州的服装、义乌的小商品、温州的鞋、福建的茶叶。进货有门道：找对了厂家，价格能便宜一半；找错了，质量没保证。老倒爷们都有自己的进货渠道，新人只能到处打听。有的倒爷直接去广州进货，坐火车来回要一个星期，但利润更高。有的倒爷图省事，在绥芬河当地批发，利润薄但风险小。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "进货成本",
+            "symbol": "¥",
+            "description": "从南方进货的成本，加上运费和关税，就是总成本。"
+          },
+          "priceLevel": "服装进价20-50元，卖到俄罗斯100-200元；小商品进价5-10元，卖到俄罗斯30-50元。"
+        }
+      },
+      {
+        "uid": 37,
+        "key": [
+          "运费",
+          "物流成本"
+        ],
+        "constant": false,
+        "comment": "运输成本",
+        "content": "绥芬河的运输成本是倒爷们必须精打细算的。从广州到绥芬河，铁路运输每吨500-800元；从绥芬河到格罗迭科沃，每吨200-300元。加上装卸费、仓储费、报关费，一趟货的运输成本能占到总成本的三成。有的倒爷为了省钱，找私人司机拉货，价格便宜但风险大——路上可能被查，也可能出事故。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "运输费用",
+            "symbol": "¥",
+            "description": "从内地到口岸，再从口岸到俄罗斯的运输费用。"
+          },
+          "priceLevel": "铁路运输每吨500-800元，口岸运输每吨200-300元。"
+        }
+      },
+      {
+        "uid": 38,
+        "key": [
+          "关税",
+          "报关",
+          "清关"
+        ],
+        "constant": false,
+        "comment": "关税与报关",
+        "content": "绥芬河的关税是倒爷们最头疼的问题。关税税率经常变动，今天还是10%，明天可能就涨到20%。报关需要找专业的报关行，费用不便宜，一趟货几百到几千块。有的倒爷为了省钱，找「黄牛」报关，价格便宜但风险大——万一被查出来，货会被扣，人也可能被抓。最稳的做法是：找个靠谱的报关行，该交的税交，别想钻空子。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "关税",
+            "symbol": "¥",
+            "description": "进出口关税，税率经常变动，是倒爷们最头疼的问题。"
+          },
+          "priceLevel": "关税税率10-20%，报关费用几百到几千块。"
+        }
+      },
+      {
+        "uid": 39,
+        "key": [
+          "俄罗斯黑帮",
+          "毛子帮"
+        ],
+        "constant": false,
+        "comment": "俄罗斯黑帮",
+        "content": "[hostile] 格罗迭科沃的俄罗斯黑帮，专门欺负中国倒爷。他们收保护费、强买强卖，甚至抢劫。中国倒爷们大多敢怒不敢言——在人家地盘上，惹不起。有些倒爷找关系好的俄商帮忙摆平，有些则花钱消灾。最怕的是遇到不讲理的黑帮，收了钱还不办事。倒爷们总结出一条经验：在俄罗斯，低调做人，别炫富。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "俄罗斯黑帮",
+              "description": "格罗迭科沃的俄罗斯黑帮，专门欺负中国倒爷。收保护费、强买强卖，甚至抢劫。",
+              "alignment": "hostile"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 40,
+        "key": [
+          "报关行"
+        ],
+        "constant": false,
+        "comment": "报关行",
+        "content": "[neutral] 绥芬河的报关行是倒爷们过关的桥梁。他们熟悉海关的每一条规定，知道怎么填表、怎么申报、怎么应对检查。报关行收费不便宜，但能帮倒爷们省很多麻烦。最大的报关行是「顺通报关」，老板跟海关关系好，走货快。有的报关行还能帮忙「通融」——遇到问题的时候，花点钱就能解决。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "报关行",
+              "description": "绥芬河的报关行，熟悉海关规定，帮倒爷们过关。顺通报关最大，跟海关关系好。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 41,
+        "key": [
+          "旅馆老板",
+          "张姐"
+        ],
+        "constant": false,
+        "comment": "旅馆老板",
+        "content": "人物 — 张姐，绥芬河一家小旅馆的老板。她四十多岁，东北女人，嗓门大、心肠热。她对常客特别照顾，会帮忙存货物、传消息，甚至帮忙介绍客户。她最讨厌的是那些住完不给钱就跑的人——遇到这种人，她会记一辈子。她跟老刘是老相识，经常帮他介绍新来的倒爷。（性格：热心、嗓门大、记仇）",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "张姐",
+              "role": "旅馆老板",
+              "description": "绥芬河小旅馆老板，四十多岁，东北女人。对常客特别照顾，会帮忙存货物、传消息。",
+              "personality": "热心、嗓门大、记仇"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 42,
+        "key": [
+          "饭店老板",
+          "王大勺"
+        ],
+        "constant": false,
+        "comment": "饭店老板",
+        "content": "人物 — 王大勺，「中俄友好饭店」的厨师兼老板。他做菜有一手，锅包肉、地三鲜、小鸡炖蘑菇，都是他的拿手菜。倒爷们谈生意都爱来他这里，因为菜量大、价格实惠，而且他能帮忙打圆场——遇到谈不拢的时候，他一句「来来来，先喝酒」就能化解尴尬。他最得意的事是：有个倒爷在他饭店里谈成了一笔百万生意，请全场喝酒。（性格：豪爽、会来事、爱热闹）",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "王大勺",
+              "role": "饭店老板",
+              "description": "「中俄友好饭店」的厨师兼老板，做菜有一手。倒爷们谈生意都爱来他这里。",
+              "personality": "豪爽、会来事、爱热闹"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 43,
+        "key": [
+          "报关员",
+          "小孙"
+        ],
+        "constant": false,
+        "comment": "报关员",
+        "content": "人物 — 小孙，顺通报关行的报关员。他二十多岁，戴着黑框眼镜，看起来文质彬彬。他对海关的每一条规定都了如指掌，填表、申报、应对检查，样样精通。他最擅长的是「通融」——遇到问题的时候，他能找到合适的人，花合适的钱，把事情摆平。倒爷们都说，找小孙报关，省心。（性格：精明、圆滑、靠谱）",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "小孙",
+              "role": "报关员",
+              "description": "顺通报关行的报关员，二十多岁。对海关规定了如指掌，擅长「通融」解决问题。",
+              "personality": "精明、圆滑、靠谱"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 44,
+        "key": [
+          "90年代",
+          "时代背景"
+        ],
+        "constant": false,
+        "comment": "90年代生活",
+        "content": "1993年的中国，改革开放正在深入。下海经商是时髦词，铁饭碗不再香。绥芬河这样的边境小城，成了普通人淘金的圣地。那时候没有互联网，没有手机，BP机是最高级的通讯工具。倒爷们联系客户靠打电话、发电报，信息传递慢，但机会也多——因为信息不对称，谁能先拿到货源，谁就能赚钱。这是属于胆大心细的人的时代。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 45,
+        "key": [
+          "信用",
+          "口碑"
+        ],
+        "constant": false,
+        "comment": "信用体系",
+        "content": "绥芬河的生意靠信用。没有合同、没有担保，全凭一句话。你答应人家什么时候交货，就得什么时候交货；你答应人家什么价格，就不能临时涨价。信用坏了，在绥芬河就混不下去了。有的倒爷为了维护信用，宁可自己亏本，也要按时交货。有的倒爷不讲信用，赚了一笔就跑，结果被全行业拉黑，以后再也接不到生意。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 46,
+        "key": [
+          "师徒",
+          "带新人"
+        ],
+        "constant": false,
+        "comment": "师徒关系",
+        "content": "绥芬河的师徒关系很简单：老倒爷带新人，新人请老倒爷喝酒。老倒爷教新人怎么报关、怎么找翻译、怎么跟俄商打交道。新人学会了，就自己出去闯。有的新人感恩，发达了还回来看看师父；有的新人忘本，学会了就翻脸不认人。老刘就吃过这种亏——他带的一个新人，学会了他的门路，转头就抢了他的客户。",
+        "order": 9,
+        "position": "before_char",
+        "entryType": "relationships",
+        "meta": {
+          "relationships": {
+            "description": "绥芬河的师徒关系：老倒爷带新人，新人请喝酒。学会后各奔东西，有的感恩有的忘本。",
+            "mechanics": "师徒关系影响入门速度、人脉资源、行业口碑。",
+            "types": [
+              {
+                "name": "亲传弟子",
+                "description": "师父倾囊相授，徒弟感恩戴德。"
+              },
+              {
+                "name": "普通带新人",
+                "description": "教点皮毛，收点辛苦费。"
+              },
+              {
+                "name": "翻脸不认人",
+                "description": "学会了就抢师父客户。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 47,
+        "key": [
+          "合作伙伴"
+        ],
+        "constant": false,
+        "comment": "合作关系",
+        "content": "绥芬河的合作关系多种多样。有的是两个人合伙进货，各出一半钱，赚了平分；有的是一个人找货源，一个人负责销售，按比例分成；有的是几个人联合起来，一起做一笔大生意。合作的关键是信任——你信得过对方，才敢把钱交给他。但合作也容易出问题：账目不清、分钱不均、互相猜忌，最后闹翻的比比皆是。",
+        "order": 9,
+        "position": "before_char",
+        "entryType": "relationships",
+        "meta": {
+          "relationships": {
+            "description": "绥芬河的合作关系：合伙进货、联合销售、按比例分成。关键是信任，但容易出问题。",
+            "mechanics": "合作能降低风险、扩大规模，但也容易因账目不清闹翻。",
+            "types": [
+              {
+                "name": "合伙进货",
+                "description": "各出一半钱，赚了平分。"
+              },
+              {
+                "name": "分工合作",
+                "description": "一个找货源，一个负责销售。"
+              },
+              {
+                "name": "联合生意",
+                "description": "几个人联合做一笔大生意。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 48,
+        "key": [
+          "竞争对手",
+          "同行"
+        ],
+        "constant": false,
+        "comment": "竞争关系",
+        "content": "绥芬河的竞争关系很微妙。大家在市场里是竞争对手，出了市场又是一起喝酒的朋友。竞争的方式主要是价格战——你卖100，我就卖95；你卖95，我就卖90。但价格战打到最后，大家都没钱赚。有的倒爷不打价格战，靠质量和服务取胜；有的倒爷搞小动作，背后说坏话、抢客户。最怕的是遇到不讲理的竞争者，直接动手。",
+        "order": 9,
+        "position": "before_char",
+        "entryType": "relationships",
+        "meta": {
+          "relationships": {
+            "description": "绥芬河的竞争关系：市场里是对手，出了市场是朋友。竞争方式主要是价格战。",
+            "mechanics": "竞争能促进进步，但也容易两败俱伤。",
+            "types": [
+              {
+                "name": "价格战",
+                "description": "你卖100我就卖95，打到最后都没钱赚。"
+              },
+              {
+                "name": "质量竞争",
+                "description": "靠质量和服务取胜，不打价格战。"
+              },
+              {
+                "name": "恶性竞争",
+                "description": "背后说坏话、抢客户，甚至动手。"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 49,
+        "key": [
+          "格罗迭科沃市场",
+          "俄罗斯市场"
+        ],
+        "constant": false,
+        "comment": "格罗迭科沃市场",
+        "content": "格罗迭科沃的市场跟青云市场一样热闹，但卖的是中国货。俄罗斯大妈们排着队买中国的羽绒服和运动鞋，年轻人们倒卖万宝路香烟。市场里有专门的翻译区，中国倒爷们在这里跟俄商谈生意。市场旁边有几家小旅馆，住满了中国倒爷。冬天的市场冷得刺骨，但生意人的心里都揣着一团火。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 50,
+        "key": [
+          "下岗工人",
+          "铁饭碗"
+        ],
+        "constant": false,
+        "comment": "下岗工人",
+        "content": "绥芬河的倒爷里，有不少是下岗工人。90年代初，国企改革，大批工人下岗。他们没有学历、没有技术，但有的是胆量和力气。绥芬河给了他们第二次机会——不需要背景，不需要学历，只要胆子大、能吃苦，就能赚钱。有的下岗工人在这里发了财，回家盖了房子；有的赔了本钱，只能继续扛编织袋。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 51,
+        "key": [
+          "东北菜",
+          "锅包肉"
+        ],
+        "constant": false,
+        "comment": "东北菜",
+        "content": "绥芬河的饭店以东北菜为主：锅包肉、地三鲜、小鸡炖蘑菇、酸菜炖粉条。菜量大、价格实惠，是倒爷们的最爱。俄罗斯商人也喜欢中国菜，尤其是锅包肉——他们叫它「甜蜜的肉」。饭店里还能喝到东北白酒，度数高、劲儿大，但倒爷们就爱这一口。冬天吃饭要趁热，否则菜还没吃完就凉了。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 52,
+        "key": [
+          "BP机",
+          "大哥大",
+          "通讯"
+        ],
+        "constant": false,
+        "comment": "通讯工具",
+        "content": "1993年的绥芬河，BP机是最高级的通讯工具。有BP机的倒爷，在市场里走路都带风。没有BP机的，只能靠打电话、发电报。绥芬河的电话亭前总排着长队，一分钟几块钱，但为了生意，大家都舍得花。有的倒爷为了省钱，用公用电话打长途，说几句就挂，让对方打过来。最怕的是BP机响了，回电话却找不到电话亭。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 53,
+        "key": [
+          "羽绒服",
+          "热销商品"
+        ],
+        "constant": false,
+        "comment": "热销商品",
+        "content": "绥芬河最热销的商品是羽绒服。俄罗斯冬天冷，羽绒服是刚需。中国的羽绒服价格便宜、款式多，在俄罗斯特别受欢迎。一件羽绒服在中国进价50-80元，卖到俄罗斯能卖200-300元，利润翻好几倍。除了羽绒服，运动鞋、方便面、白酒、暖水瓶也很畅销。有的倒爷专门做一种商品，有的什么都倒。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "商品利润",
+            "symbol": "¥",
+            "description": "热销商品的利润空间，取决于选品眼光和进货渠道。"
+          },
+          "priceLevel": "羽绒服进价50-80元，卖200-300元；运动鞋进价30-50元，卖100-150元。"
+        }
+      },
+      {
+        "uid": 54,
+        "key": [
+          "风险",
+          "亏本",
+          "赔钱"
+        ],
+        "constant": false,
+        "comment": "风险与亏本",
+        "content": "绥芬河的生意不是稳赚不赔的。有的倒爷进了一批货，结果卖不出去，砸在手里；有的倒爷被俄商骗了，货发过去了，钱没收到；有的倒爷被海关扣了货，血本无归。亏本的倒爷，有的扛过去了，重新来过；有的扛不住，只能回家种地。绥芬河流传着一句话：「十个人倒货，七个亏，两个平，一个赚」。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "风险成本",
+            "symbol": "¥",
+            "description": "绥芬河的生意风险：货物积压、被骗、被海关扣货。"
+          },
+          "priceLevel": "十个人倒货，七个亏，两个平，一个赚。"
+        }
+      },
+      {
+        "uid": 55,
+        "key": [
+          "独联体",
+          "苏联解体"
+        ],
+        "constant": false,
+        "comment": "独联体背景",
+        "content": "1991年苏联解体，分裂成15个独立国家。俄罗斯远东地区物资极度匮乏，轻工业品几乎断供。这给了中国倒爷们巨大的机会——中国的服装、鞋帽、日用品，在俄罗斯被疯抢。绥芬河作为中俄边境口岸，成了这场边贸热潮的中心。每天清晨，数百名倒爷扛着编织袋涌向口岸，用皮包公司的名义把货物发往对面。",
+        "order": 1,
+        "position": "before_char",
+        "entryType": "setting",
+        "meta": {
+          "genre": "年代现实主义",
+          "atmosphere": "热闹、混乱、充满机会",
+          "timePeriod": "1993年冬（苏联解体后两年）",
+          "conflict": "在政策灰色地带中淘金：海关规则模糊、汇率波动、同行竞争、俄商狡猾"
+        }
+      },
+      {
+        "uid": 56,
+        "key": [
+          "皮包公司",
+          "空壳公司"
+        ],
+        "constant": false,
+        "comment": "皮包公司",
+        "content": "绥芬河遍地都是皮包公司——一间办公室、一个公章、一部电话，就是一家公司。这些公司名义上做正规进出口，实际上什么都倒。有的公司连办公室都没有，公章揣在口袋里，走到哪都是公司。皮包公司的好处是：出了问题可以跑路，不用负责任。坏处是：俄商不信任，海关查得严。有的倒爷做着做着，把皮包公司做成了真正的公司。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "皮包公司",
+              "description": "绥芬河遍地都是的空壳公司，一间办公室、一个公章、一部电话。名义上做进出口，实际上什么都倒。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 57,
+        "key": [
+          "翻译",
+          "中俄双语"
+        ],
+        "constant": false,
+        "comment": "翻译行业",
+        "content": "绥芬河的翻译是刚需。中俄贸易离不开翻译，但靠谱的翻译不多。有的翻译两头吃回扣，帮倒爷谈价的时候，暗中给俄商通风报信；有的翻译水平不行，把价格翻错了，害得倒爷亏钱。好的翻译不光要语言好，还要懂生意——知道怎么谈价、怎么签合同、怎么处理纠纷。小赵就是这样的好翻译，但他收费也贵。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "翻译行业",
+              "description": "绥芬河的翻译是刚需，但靠谱的不多。好的翻译要语言好、懂生意。",
+              "alignment": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 58,
+        "key": [
+          "边贸黄金期",
+          "赚钱机会"
+        ],
+        "constant": false,
+        "comment": "边贸黄金期",
+        "content": "1992-1994年是绥芬河边贸的黄金期。那时候政策宽松，海关查得不严，只要胆子大，就能赚钱。有的倒爷一趟货就能赚几万，一个月下来能赚几十万。但黄金期很快就过去了——政策收紧、海关严查、竞争加剧，利润越来越薄。老倒爷们都说，那两年是「捡钱」的时代，错过了就再也没有了。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "rules",
+        "meta": {
+          "powerSystem": "关系与信用体系",
+          "socialStructure": "不分阶层，全凭本事。下岗工人可以成为百万富翁，大学生也可能赔得精光。",
+          "specialRules": [
+            "黄金期法则：1992-1994年是边贸黄金期，政策宽松、利润丰厚。",
+            "窗口期法则：政策窗口稍纵即逝，抓住了就是暴利，错过了就是白忙。",
+            "转型期法则：黄金期过后，必须转型做正规生意，否则会被淘汰。"
+          ]
+        }
+      },
+      {
+        "uid": 59,
+        "key": [
+          "边贸公司注册",
+          "开公司"
+        ],
+        "constant": false,
+        "comment": "注册公司流程",
+        "content": "在绥芬河注册边贸公司很简单：去工商局填表、交钱、领公章，一天就能搞定。注册资本不需要真有钱，填个数字就行。有的倒爷注册好几家公司，轮着用——一家出了问题，换另一家。公司注册地址可以是实际办公地点，也可以是虚拟地址。有的倒爷连办公室都没有，公章揣在口袋里，走到哪都是公司。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 60,
+        "key": [
+          "边贸纠纷",
+          "欠钱不还"
+        ],
+        "constant": false,
+        "comment": "边贸纠纷",
+        "content": "绥芬河的边贸纠纷很常见。最常见的是欠钱不还——你把货发过去了，对方说没钱，拖着不给。有的倒爷为了要账，能跟对方耗一个月。还有的纠纷是货物质量问题——你发的货跟样品不一样，对方要退货。最严重的纠纷是诈骗——收了钱不发货，或者发假货。遇到这种事，只能找警察或者协会调解。",
+        "order": 8,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 61,
+        "key": [
+          "绥芬河冬天",
+          "寒冷"
+        ],
+        "constant": false,
+        "comment": "绥芬河冬天",
+        "content": "绥芬河的冬天冷得刺骨，零下二三十度是常态。倒爷们每天凌晨就要去口岸排队，冻得手脚发麻。最怕的是下雪——路滑、车慢、货难运。但冬天也是旺季——俄罗斯人需要羽绒服、棉鞋、暖水瓶，这些东西冬天最好卖。倒爷们说，在绥芬河赚钱，就是拿命换的——冻出来的。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 62,
+        "key": [
+          "边贸繁荣",
+          "小香港"
+        ],
+        "constant": false,
+        "comment": "绥芬河繁荣",
+        "content": "1993年的绥芬河被称为「小香港」——虽然地方小，但繁华程度不输大城市。街上到处是南腔北调的倒爷，市场上什么都能买到，饭店里什么都能吃到。绥芬河的人均收入是全国最高的之一，万元户遍地都是。但繁荣的背后也有阴影——走私、诈骗、黑市，这座小城的光鲜下面，藏着不少灰色地带。",
+        "order": 2,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 63,
+        "key": [
+          "边贸培训",
+          "新手入门"
+        ],
+        "constant": false,
+        "comment": "新手入门",
+        "content": "绥芬河有专门的边贸培训班，教新手怎么报关、怎么找翻译、怎么跟俄商打交道。培训班收费不便宜，但能帮新手少走弯路。有的老倒爷也带新人，不收钱，但要请喝酒。新手入门最重要的是：找对师父、选对商品、守规矩。有的新手急功近利，想一口吃成胖子，结果赔得精光。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 64,
+        "key": [
+          "边贸没落",
+          "转型"
+        ],
+        "constant": false,
+        "comment": "边贸没落",
+        "content": "1995年以后，绥芬河边贸开始没落。政策收紧、海关严查、竞争加剧，利润越来越薄。有的倒爷转型做正规贸易，有的转行做其他生意，有的干脆回家种地。绥芬河的繁华渐渐褪去，街上的人少了，市场冷清了。老倒爷们回忆起当年的黄金期，总是感慨万千：「那时候遍地是钱，弯腰就能捡。」",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "rules",
+        "meta": {
+          "powerSystem": "关系与信用体系",
+          "socialStructure": "不分阶层，全凭本事。下岗工人可以成为百万富翁，大学生也可能赔得精光。",
+          "specialRules": [
+            "没落期法则：1995年以后边贸没落，必须转型做正规生意。",
+            "淘汰法则：不转型的倒爷会被淘汰，只能回家种地。",
+            "回忆法则：老倒爷们回忆起黄金期，总是感慨万千。"
+          ]
+        }
       }
     ],
     "modules": [
@@ -402,27 +1298,135 @@
         "id": "world:border_trade",
         "name": "绥芬边贸规则",
         "type": "rule",
-        "permissions": ["modify_world_state", "add_card"],
+        "permissions": [
+          "modify_world_state",
+          "add_card"
+        ],
         "rules": [
           {
             "id": "deal_trigger",
-            "when": { "state": { "path": "玩家.货币资源.主货币.数量", "op": ">", "value": 200 } },
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": ">",
+                "value": 200
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "deal", "eventPackId": "world:border_trade:events" } }
+              {
+                "addEvent": {
+                  "eventId": "deal",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
             ]
           },
           {
             "id": "smuggle_trigger",
-            "when": { "state": { "path": "玩家.货币资源.主货币.数量", "op": "<", "value": 100 } },
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": "<",
+                "value": 100
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "smuggle", "eventPackId": "world:border_trade:events" } }
+              {
+                "addEvent": {
+                  "eventId": "smuggle",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
             ]
           },
           {
             "id": "quality_trigger",
-            "when": { "state": { "path": "玩家.货币资源.主货币.数量", "op": ">", "value": 500 } },
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": ">",
+                "value": 500
+              }
+            },
             "then": [
-              { "addEvent": { "eventId": "quality_issue", "eventPackId": "world:border_trade:events" } }
+              {
+                "addEvent": {
+                  "eventId": "quality_issue",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "big_deal_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": ">",
+                "value": 1000
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "big_deal",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "currency_crisis_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": "<",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "currency_crisis",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "network_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": ">",
+                "value": 300
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "network",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "scam_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.货币资源.主货币.数量",
+                "op": ">",
+                "value": 600
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "scam",
+                  "eventPackId": "world:border_trade:events"
+                }
+              }
             ]
           }
         ],
@@ -442,6 +1446,22 @@
             "actions": [],
             "narrateToAI": true,
             "description": "每10轮AI描述绥芬河口岸形势变化：海关政策收紧或放松、俄商动态、边贸环境"
+          },
+          {
+            "id": "policy_change",
+            "name": "政策变动",
+            "intervalTicks": 15,
+            "offsetTicks": 8,
+            "narrateToAI": true,
+            "description": "每15轮AI描述绥芬河口岸政策变动：关税调整、海关严查、新规定出台"
+          },
+          {
+            "id": "weather_impact",
+            "name": "天气影响",
+            "intervalTicks": 8,
+            "offsetTicks": 3,
+            "narrateToAI": true,
+            "description": "每8轮AI描述绥芬河天气变化对边贸的影响：大雪封路、严寒天气、暖春到来"
           }
         ]
       },
@@ -449,30 +1469,76 @@
         "id": "world:border_trade:events",
         "name": "绥芬边贸事件",
         "type": "card",
-        "permissions": ["add_card"],
+        "permissions": [
+          "add_card"
+        ],
         "events": [
           {
             "id": "deal",
             "name": "大单生意",
             "cards": [
-              { "id": "t_deal", "componentId": "title", "title": "一笔大生意" },
-              { "id": "n_deal", "componentId": "narrative", "title": "大单叙事" },
-              { "id": "c_deal", "componentId": "choice", "title": "大单选择" }
+              {
+                "id": "t_deal",
+                "componentId": "title",
+                "title": "一笔大生意"
+              },
+              {
+                "id": "n_deal",
+                "componentId": "narrative",
+                "title": "大单叙事"
+              },
+              {
+                "id": "c_deal",
+                "componentId": "choice",
+                "title": "大单选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_deal", "props": { "title": "一笔大生意" } }],
-                "narrative": [{ "id": "n_deal", "props": { "text": "一个俄罗斯商人找到了你，说有一批紧俏的电子产品要出手。价格比市场价低三成，但需要现金。" } }],
-                "choice": [{
-                  "id": "c_deal",
-                  "props": {
-                    "choices": [
-                      { "label": "高价收购", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "抓住机会进货，期待高价卖出" },
-                      { "label": "谨慎观望", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "没有冒险，保持现状" }
-                    ]
+                "title": [
+                  {
+                    "id": "t_deal",
+                    "props": {
+                      "title": "一笔大生意"
+                    }
                   }
-                }]
+                ],
+                "narrative": [
+                  {
+                    "id": "n_deal",
+                    "props": {
+                      "text": "一个俄罗斯商人找到了你，说有一批紧俏的电子产品要出手。价格比市场价低三成，但需要现金。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_deal",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "高价收购",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "抓住机会进货，期待高价卖出"
+                        },
+                        {
+                          "label": "谨慎观望",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "没有冒险，保持现状"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -480,24 +1546,68 @@
             "id": "smuggle",
             "name": "走私机会",
             "cards": [
-              { "id": "t_smuggle", "componentId": "title", "title": "走私机会" },
-              { "id": "n_smuggle", "componentId": "narrative", "title": "走私叙事" },
-              { "id": "c_smuggle", "componentId": "choice", "title": "走私选择" }
+              {
+                "id": "t_smuggle",
+                "componentId": "title",
+                "title": "走私机会"
+              },
+              {
+                "id": "n_smuggle",
+                "componentId": "narrative",
+                "title": "走私叙事"
+              },
+              {
+                "id": "c_smuggle",
+                "componentId": "choice",
+                "title": "走私选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_smuggle", "props": { "title": "走私机会" } }],
-                "narrative": [{ "id": "n_smuggle", "props": { "text": "有人找到你，说可以通过一条秘密通道把货物运过边境，利润是正常的五倍，但风险也很大。" } }],
-                "choice": [{
-                  "id": "c_smuggle",
-                  "props": {
-                    "choices": [
-                      { "label": "冒险走私", "effect": { "statId": "血量", "delta": 20 }, "aiNote": "走私成功，获得高额利润" },
-                      { "label": "放弃", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "没有冒险，安全第一" }
-                    ]
+                "title": [
+                  {
+                    "id": "t_smuggle",
+                    "props": {
+                      "title": "走私机会"
+                    }
                   }
-                }]
+                ],
+                "narrative": [
+                  {
+                    "id": "n_smuggle",
+                    "props": {
+                      "text": "有人找到你，说可以通过一条秘密通道把货物运过边境，利润是正常的五倍，但风险也很大。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_smuggle",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "冒险走私",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 20
+                          },
+                          "aiNote": "走私成功，获得高额利润"
+                        },
+                        {
+                          "label": "放弃",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "没有冒险，安全第一"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -505,24 +1615,68 @@
             "id": "russian_contact",
             "name": "俄罗斯商人",
             "cards": [
-              { "id": "t_russian_contact", "componentId": "title", "title": "新朋友" },
-              { "id": "n_russian_contact", "componentId": "narrative", "title": "俄商叙事" },
-              { "id": "c_russian_contact", "componentId": "choice", "title": "俄商选择" }
+              {
+                "id": "t_russian_contact",
+                "componentId": "title",
+                "title": "新朋友"
+              },
+              {
+                "id": "n_russian_contact",
+                "componentId": "narrative",
+                "title": "俄商叙事"
+              },
+              {
+                "id": "c_russian_contact",
+                "componentId": "choice",
+                "title": "俄商选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_russian_contact", "props": { "title": "新朋友" } }],
-                "narrative": [{ "id": "n_russian_contact", "props": { "text": "在市场里，你遇到了一个热情的俄罗斯商人。他邀请你去他的仓库看看货。" } }],
-                "choice": [{
-                  "id": "c_russian_contact",
-                  "props": {
-                    "choices": [
-                      { "label": "建立关系", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "与俄罗斯商人建立长期合作关系" },
-                      { "label": "纯生意", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "只做一次性交易，拿到利润" }
-                    ]
+                "title": [
+                  {
+                    "id": "t_russian_contact",
+                    "props": {
+                      "title": "新朋友"
+                    }
                   }
-                }]
+                ],
+                "narrative": [
+                  {
+                    "id": "n_russian_contact",
+                    "props": {
+                      "text": "在市场里，你遇到了一个热情的俄罗斯商人。他邀请你去他的仓库看看货。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_russian_contact",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "建立关系",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "与俄罗斯商人建立长期合作关系"
+                        },
+                        {
+                          "label": "纯生意",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "只做一次性交易，拿到利润"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -530,24 +1684,68 @@
             "id": "quality_issue",
             "name": "货物质量问题",
             "cards": [
-              { "id": "t_quality_issue", "componentId": "title", "title": "退货风波" },
-              { "id": "n_quality_issue", "componentId": "narrative", "title": "质量叙事" },
-              { "id": "c_quality_issue", "componentId": "choice", "title": "质量选择" }
+              {
+                "id": "t_quality_issue",
+                "componentId": "title",
+                "title": "退货风波"
+              },
+              {
+                "id": "n_quality_issue",
+                "componentId": "narrative",
+                "title": "质量叙事"
+              },
+              {
+                "id": "c_quality_issue",
+                "componentId": "choice",
+                "title": "质量选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_quality_issue", "props": { "title": "退货风波" } }],
-                "narrative": [{ "id": "n_quality_issue", "props": { "text": "你进的一批货出了质量问题，客户找上门来要求退货。你该怎么办？" } }],
-                "choice": [{
-                  "id": "c_quality_issue",
-                  "props": {
-                    "choices": [
-                      { "label": "退货退款", "effect": { "statId": "血量", "delta": -15 }, "aiNote": "退货退款，损失利润但保住口碑" },
-                      { "label": "低价甩卖", "effect": { "statId": "血量", "delta": -5 }, "aiNote": "低价处理，减少损失但口碑受损" }
-                    ]
+                "title": [
+                  {
+                    "id": "t_quality_issue",
+                    "props": {
+                      "title": "退货风波"
+                    }
                   }
-                }]
+                ],
+                "narrative": [
+                  {
+                    "id": "n_quality_issue",
+                    "props": {
+                      "text": "你进的一批货出了质量问题，客户找上门来要求退货。你该怎么办？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_quality_issue",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "退货退款",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -15
+                          },
+                          "aiNote": "退货退款，损失利润但保住口碑"
+                        },
+                        {
+                          "label": "低价甩卖",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -5
+                          },
+                          "aiNote": "低价处理，减少损失但口碑受损"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -555,24 +1753,68 @@
             "id": "customs_check",
             "name": "海关检查",
             "cards": [
-              { "id": "t_customs_check", "componentId": "title", "title": "海关来了！" },
-              { "id": "n_customs_check", "componentId": "narrative", "title": "海关叙事" },
-              { "id": "c_customs_check", "componentId": "choice", "title": "海关选择" }
+              {
+                "id": "t_customs_check",
+                "componentId": "title",
+                "title": "海关来了！"
+              },
+              {
+                "id": "n_customs_check",
+                "componentId": "narrative",
+                "title": "海关叙事"
+              },
+              {
+                "id": "c_customs_check",
+                "componentId": "choice",
+                "title": "海关选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_customs_check", "props": { "title": "海关来了！" } }],
-                "narrative": [{ "id": "n_customs_check", "props": { "text": "海关人员突然来到你的仓库，说要例行检查。你的仓库里有一些没有正规手续的货物。" } }],
-                "choice": [{
-                  "id": "c_customs_check",
-                  "props": {
-                    "choices": [
-                      { "label": "坦然面对", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "配合检查，没有问题" },
-                      { "label": "塞红包", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "塞红包过关，但有风险" }
-                    ]
+                "title": [
+                  {
+                    "id": "t_customs_check",
+                    "props": {
+                      "title": "海关来了！"
+                    }
                   }
-                }]
+                ],
+                "narrative": [
+                  {
+                    "id": "n_customs_check",
+                    "props": {
+                      "text": "海关人员突然来到你的仓库，说要例行检查。你的仓库里有一些没有正规手续的货物。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_customs_check",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "坦然面对",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "配合检查，没有问题"
+                        },
+                        {
+                          "label": "塞红包",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "塞红包过关，但有风险"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -580,24 +1822,551 @@
             "id": "competitor",
             "name": "竞争对手",
             "cards": [
-              { "id": "t_competitor", "componentId": "title", "title": "新对手" },
-              { "id": "n_competitor", "componentId": "narrative", "title": "竞争叙事" },
-              { "id": "c_competitor", "componentId": "choice", "title": "竞争选择" }
+              {
+                "id": "t_competitor",
+                "componentId": "title",
+                "title": "新对手"
+              },
+              {
+                "id": "n_competitor",
+                "componentId": "narrative",
+                "title": "竞争叙事"
+              },
+              {
+                "id": "c_competitor",
+                "componentId": "choice",
+                "title": "竞争选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_competitor", "props": { "title": "新对手" } }],
-                "narrative": [{ "id": "n_competitor", "props": { "text": "市场里新来了一个竞争对手，他的价格比你低，抢走了不少客户。" } }],
-                "choice": [{
-                  "id": "c_competitor",
-                  "props": {
-                    "choices": [
-                      { "label": "价格战", "effect": { "statId": "血量", "delta": -10 }, "aiNote": "打价格战，利润降低但保住客户" },
-                      { "label": "合作共赢", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "与对手合作，共同做大市场" }
-                    ]
+                "title": [
+                  {
+                    "id": "t_competitor",
+                    "props": {
+                      "title": "新对手"
+                    }
                   }
-                }]
+                ],
+                "narrative": [
+                  {
+                    "id": "n_competitor",
+                    "props": {
+                      "text": "市场里新来了一个竞争对手，他的价格比你低，抢走了不少客户。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_competitor",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "价格战",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -10
+                          },
+                          "aiNote": "打价格战，利润降低但保住客户"
+                        },
+                        {
+                          "label": "合作共赢",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "与对手合作，共同做大市场"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "big_deal",
+            "name": "大买卖",
+            "cards": [
+              {
+                "id": "t_big_deal",
+                "componentId": "title",
+                "title": "一笔大买卖"
+              },
+              {
+                "id": "n_big_deal",
+                "componentId": "narrative",
+                "title": "大买卖叙事"
+              },
+              {
+                "id": "c_big_deal",
+                "componentId": "choice",
+                "title": "大买卖选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_big_deal",
+                    "props": {
+                      "title": "一笔大买卖"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_big_deal",
+                    "props": {
+                      "text": "一个俄罗斯大批发商找到你，说要一大批货——一万件羽绒服。价格比市场价高两成，但要求一个月内交货。这是你做边贸以来遇到的最大一笔生意。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_big_deal",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接下大单",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 25
+                          },
+                          "aiNote": "接下大单，四处筹货，忙得脚不沾地"
+                        },
+                        {
+                          "label": "量力而行",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 10
+                          },
+                          "aiNote": "觉得风险太大，选择量力而行"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "currency_crisis",
+            "name": "资金危机",
+            "cards": [
+              {
+                "id": "t_crisis",
+                "componentId": "title",
+                "title": "钱不够了"
+              },
+              {
+                "id": "n_crisis",
+                "componentId": "narrative",
+                "title": "危机叙事"
+              },
+              {
+                "id": "c_crisis",
+                "componentId": "choice",
+                "title": "危机选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_crisis",
+                    "props": {
+                      "title": "钱不够了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_crisis",
+                    "props": {
+                      "text": "你手头的钱不够进货了。房租要交、饭要吃、货要进，到处都要花钱。你该怎么办？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_crisis",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "找人借钱",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -10
+                          },
+                          "aiNote": "找老刘借钱，虽然要还利息，但能解燃眉之急"
+                        },
+                        {
+                          "label": "先扛着",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -15
+                          },
+                          "aiNote": "省吃俭用，先扛过这段时间"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "network",
+            "name": "人脉拓展",
+            "cards": [
+              {
+                "id": "t_network",
+                "componentId": "title",
+                "title": "认识新朋友"
+              },
+              {
+                "id": "n_network",
+                "componentId": "narrative",
+                "title": "人脉叙事"
+              },
+              {
+                "id": "c_network",
+                "componentId": "choice",
+                "title": "人脉选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_network",
+                    "props": {
+                      "title": "认识新朋友"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_network",
+                    "props": {
+                      "text": "在饭店吃饭的时候，你遇到了一个南方来的老板。他做外贸多年，手里有很多资源。他对你很感兴趣，想跟你合作。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_network",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "深入交流",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "跟南方老板深入交流，建立了合作关系"
+                        },
+                        {
+                          "label": "保持距离",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "觉得不靠谱，选择保持距离"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "scam",
+            "name": "骗局",
+            "cards": [
+              {
+                "id": "t_scam",
+                "componentId": "title",
+                "title": "小心骗局"
+              },
+              {
+                "id": "n_scam",
+                "componentId": "narrative",
+                "title": "骗局叙事"
+              },
+              {
+                "id": "c_scam",
+                "componentId": "choice",
+                "title": "骗局选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_scam",
+                    "props": {
+                      "title": "小心骗局"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_scam",
+                    "props": {
+                      "text": "有人找到你，说有一批海关罚没的货，价格只有市场价的一半。你觉得太便宜了，有点不对劲。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_scam",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "贪便宜",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -20
+                          },
+                          "aiNote": "贪便宜买了，结果是假货，亏了一大笔"
+                        },
+                        {
+                          "label": "谨慎拒绝",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "觉得不对劲，谨慎拒绝，后来听说是骗局"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "drinking_session",
+            "name": "酒局",
+            "cards": [
+              {
+                "id": "t_drink",
+                "componentId": "title",
+                "title": "今晚喝点"
+              },
+              {
+                "id": "n_drink",
+                "componentId": "narrative",
+                "title": "酒局叙事"
+              },
+              {
+                "id": "c_drink",
+                "componentId": "choice",
+                "title": "酒局选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_drink",
+                    "props": {
+                      "title": "今晚喝点"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_drink",
+                    "props": {
+                      "text": "老刘约你今晚去饭店喝酒，说要介绍几个朋友给你认识。你知道，这顿酒可能喝出一笔生意来。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_drink",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "赴约喝酒",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "喝到位了，认识了几个靠谱的合作伙伴"
+                        },
+                        {
+                          "label": "婉言谢绝",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "不想喝酒，但错过了认识人脉的机会"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "customs_raid",
+            "name": "海关严查",
+            "cards": [
+              {
+                "id": "t_raid",
+                "componentId": "title",
+                "title": "海关严查！"
+              },
+              {
+                "id": "n_raid",
+                "componentId": "narrative",
+                "title": "严查叙事"
+              },
+              {
+                "id": "c_raid",
+                "componentId": "choice",
+                "title": "严查选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_raid",
+                    "props": {
+                      "title": "海关严查！"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_raid",
+                    "props": {
+                      "text": "海关突然开始严查，所有货物都要开箱检查。你的仓库里有一些手续不全的货，如果被查到，会被扣押。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_raid",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "赶紧转移",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -15
+                          },
+                          "aiNote": "连夜把货转移到安全地方，虽然损失了一些，但保住了大部分"
+                        },
+                        {
+                          "label": "赌一把",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -25
+                          },
+                          "aiNote": "赌海关查不到，结果被查到了，货被扣了"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "partner_conflict",
+            "name": "合伙人纠纷",
+            "cards": [
+              {
+                "id": "t_partner",
+                "componentId": "title",
+                "title": "合伙人翻脸"
+              },
+              {
+                "id": "n_partner",
+                "componentId": "narrative",
+                "title": "纠纷叙事"
+              },
+              {
+                "id": "c_partner",
+                "componentId": "choice",
+                "title": "纠纷选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_partner",
+                    "props": {
+                      "title": "合伙人翻脸"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_partner",
+                    "props": {
+                      "text": "你跟合伙人因为分钱的问题吵了起来。他说他出力多，应该多分；你说你出钱多，应该多分。两个人越吵越凶，眼看就要翻脸。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_partner",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "各退一步",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "各退一步，平分利润，关系保住了"
+                        },
+                        {
+                          "label": "撕破脸",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "撕破脸，散伙单干，虽然自由了但少了帮手"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           }

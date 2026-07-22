@@ -1,5 +1,5 @@
 // 路径下拉 —— 用于 When 条件编辑器和 set 动作，分组显示可选路径。
-// 路径体系：引擎路径（attrA / resources.food.amount / flags.x）
+// 路径体系：GameState 中文路径（玩家.生存状态.血量 / 玩家.生存资源.water.数量 等）
 // 数据来源：worldDef.modules 提供资源/属性列表；无 worldDef 时只显示固定键。
 import React, { useMemo, useState, useEffect } from 'react';
 import type { WorldDef } from '../../data/worlds-schema';
@@ -32,16 +32,23 @@ const selectStyle: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-/** 固定属性路径（所有世界通用） */
+/** 固定属性路径（所有世界通用，对应 GameState.玩家.生存状态.*） */
 const FIXED_STAT_PATHS: PathOption[] = [
-  { value: 'attrA', label: '生命 (attrA)', group: '属性' },
-  { value: 'attrB', label: '能量 (attrB)', group: '属性' },
-  { value: 'dim1', label: '六维 dim1', group: '属性' },
-  { value: 'dim2', label: '六维 dim2', group: '属性' },
-  { value: 'dim3', label: '六维 dim3', group: '属性' },
-  { value: 'dim4', label: '六维 dim4', group: '属性' },
-  { value: 'dim5', label: '六维 dim5', group: '属性' },
-  { value: 'dim6', label: '六维 dim6', group: '属性' },
+  { value: '玩家.生存状态.血量', label: '血量', group: '生存状态' },
+  { value: '玩家.生存状态.体力值', label: '体力值', group: '生存状态' },
+  { value: '玩家.生存状态.dim1', label: '六维 dim1', group: '生存状态' },
+  { value: '玩家.生存状态.dim2', label: '六维 dim2', group: '生存状态' },
+  { value: '玩家.生存状态.dim3', label: '六维 dim3', group: '生存状态' },
+  { value: '玩家.生存状态.dim4', label: '六维 dim4', group: '生存状态' },
+  { value: '玩家.生存状态.dim5', label: '六维 dim5', group: '生存状态' },
+  { value: '玩家.生存状态.dim6', label: '六维 dim6', group: '生存状态' },
+];
+
+/** 世界状态路径 */
+const WORLD_PATHS: PathOption[] = [
+  { value: '世界.时间系统.当前天气', label: '当前天气', group: '世界状态' },
+  { value: '世界.时间系统.当前时间', label: '当前时间', group: '世界状态' },
+  { value: '世界.空间定位.当前位置', label: '当前位置', group: '世界状态' },
 ];
 
 /** 通用路径（不依赖 worldDef） */
@@ -61,7 +68,7 @@ function getWorldPaths(worldDef?: WorldDef): PathOption[] {
       if (resources) {
         for (const r of resources) {
           paths.push({
-            value: `resources.${r.id}.amount`,
+            value: `玩家.生存资源.${r.id}.数量`,
             label: `${r.name} (${r.id})`,
             group: '生存资源',
           });
@@ -70,12 +77,12 @@ function getWorldPaths(worldDef?: WorldDef): PathOption[] {
     }
     // 经营资产
     if (mod.moduleId === 'business' && mod.moduleConfig) {
-      paths.push({ value: 'business.funds', label: '资金', group: '经营' });
+      paths.push({ value: '玩家.货币资源.主货币.数量', label: '主货币', group: '经营' });
       const assets = mod.moduleConfig.assets as Array<{ id: string; name: string }> | undefined;
       if (assets) {
         for (const a of assets) {
           paths.push({
-            value: `business.assets.${a.id}.level`,
+            value: `玩家.经营资产.资产列表.${a.id}.等级`,
             label: `${a.name}等级`,
             group: '经营',
           });
@@ -87,7 +94,7 @@ function getWorldPaths(worldDef?: WorldDef): PathOption[] {
       const special = mod.moduleConfig.special as Array<{ id: string; name: string }> | undefined;
       if (special) {
         for (const s of special) {
-          paths.push({ value: s.id, label: `${s.name} (${s.id})`, group: '属性' });
+          paths.push({ value: `玩家.生存状态.${s.id}`, label: `${s.name} (${s.id})`, group: '生存状态' });
         }
       }
     }
@@ -99,7 +106,7 @@ export default function WhenPathSelect({ value, onChange, worldDef, excludeResou
   const options = useMemo(() => {
     const worldPaths = getWorldPaths(worldDef);
     const filtered = excludeResources ? worldPaths.filter(p => p.group !== '生存资源') : worldPaths;
-    return [...FIXED_STAT_PATHS, ...filtered, ...COMMON_PATHS];
+    return [...FIXED_STAT_PATHS, ...WORLD_PATHS, ...filtered, ...COMMON_PATHS];
   }, [worldDef, excludeResources]);
 
   // 当前值是否在已知选项中
@@ -120,7 +127,7 @@ export default function WhenPathSelect({ value, onChange, worldDef, excludeResou
     return (
       <input
         value={value ?? ''}
-        placeholder="引擎路径,如 flags.hasKey"
+        placeholder="GameState 路径,如 玩家.生存状态.血量"
         onChange={(e) => onChange(e.target.value)}
         style={selectStyle}
       />

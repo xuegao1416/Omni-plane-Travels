@@ -611,6 +611,565 @@
         "position": "before_char"
       },
       {
+        "uid": 22,
+        "key": [
+          "健身房",
+          "健身",
+          "锻炼"
+        ],
+        "constant": false,
+        "comment": "健身房",
+        "content": "公司附近的连锁健身房，月卡300元。跑步机永远有人占，器械区弥漫着汗水和蛋白粉的味道。私教会主动搭讪推销课程，但你可以假装戴耳机没听到。洗澡间是社恐的噩梦——和领导赤诚相见，聊什么？聊天气。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 23,
+        "key": [
+          "咖啡店",
+          "咖啡",
+          "星巴克"
+        ],
+        "constant": false,
+        "comment": "咖啡店",
+        "content": "楼下那家独立咖啡店，老板是个文青，墙上挂着摄影作品。美式25元，拿铁30元。你可以坐一下午，只要点一杯。WiFi密码是'zhuangbi123'。周末这里有读书会和小型音乐会。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 24,
+        "key": [
+          "地铁",
+          "通勤",
+          "早高峰"
+        ],
+        "constant": false,
+        "comment": "地铁站",
+        "content": "早高峰的地铁站是人间炼狱。7:30-9:00，人潮像沙丁鱼罐头一样被塞进车厢。你需要学会在人群中保持平衡，单手刷手机，另一只手护住包。到站时的'借过'是一门艺术——太轻没人理，太重会被白眼。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 25,
+        "key": [
+          "公园",
+          "散步",
+          "遛狗"
+        ],
+        "constant": false,
+        "comment": "城市公园",
+        "content": "公司附近的湿地公园，免费开放。傍晚时分，遛狗的大爷、跳广场舞的阿姨、跑步的年轻人各占一方。你可以在这里发呆、听歌、或者假装在等人。公园里有一家奶茶店，柠檬水15元，是加班后的治愈。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 26,
+        "key": [
+          "商场",
+          "逛街",
+          "购物"
+        ],
+        "constant": false,
+        "comment": "商圈",
+        "content": "周末才去的地方。地下一层是美食广场，地上是服装、化妆品、电子产品。打折季人满为患，平时冷清得可以听见自己的脚步声。电影院在顶楼，爆米花比电影票还贵。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 27,
+        "key": [
+          "医院",
+          "看病",
+          "体检"
+        ],
+        "constant": false,
+        "comment": "医院",
+        "content": "公司年度体检的那家三甲医院。挂号要提前一周预约，候诊区永远坐满了人。医生问诊不超过三分钟，但开的检查单能绕地球一圈。最怕的是听到'你这个需要进一步检查'。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 28,
+        "key": [
+          "宠物医院",
+          "猫",
+          "狗",
+          "宠物"
+        ],
+        "constant": false,
+        "comment": "宠物医院",
+        "content": "楼下那家宠物医院，老板是个温柔的兽医。猫打疫苗120元，狗驱虫80元。最贵的是急诊——半夜猫吐了，你比猫还紧张。兽医说'没什么大问题'的那一刻，你比升职还开心。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 29,
+        "key": [
+          "菜市场",
+          "买菜",
+          "做饭"
+        ],
+        "constant": false,
+        "comment": "菜市场",
+        "content": "小区旁边的菜市场，早上六点开到晚上八点。菜贩子认识你，知道你买什么菜、要不要葱。你可以赊账，但别超过一周。菜市场的烟火气是城市里最真实的味道。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 30,
+        "key": [
+          "夜市",
+          "宵夜",
+          "烧烤"
+        ],
+        "constant": false,
+        "comment": "夜市",
+        "content": "周末晚上的夜市，烧烤摊、小龙虾、臭豆腐、烤冷面。人均50-80元，吃到撑。夜市的氛围是：你不在乎热量，不在乎明天的体检报告，只在乎这一刻的快乐。",
+        "order": 3,
+        "position": "before_char",
+        "entryType": "lore"
+      },
+      {
+        "uid": 31,
+        "key": [
+          "健身教练",
+          "私教"
+        ],
+        "constant": false,
+        "comment": "健身教练",
+        "content": "健身房的私教，身材好得让人自卑。他们会主动搭讪：'哥/姐，你这个体态需要调整一下。'一节私教课300-500元，包月更贵。但如果你坚持不去，他们也不会追到你家。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "健身教练",
+              "role": "健身指导",
+              "description": "身材好得让人自卑，会主动搭讪推销课程。",
+              "personality": "热情、专业、有业绩压力"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 32,
+        "key": [
+          "咖啡师",
+          "老板"
+        ],
+        "constant": false,
+        "comment": "咖啡师",
+        "content": "楼下咖啡店的老板兼咖啡师，文青打扮，戴黑框眼镜。他记得你喝什么，不加糖不加奶。偶尔会推荐新品：'今天有埃塞俄比亚的豆子，要不要试试？'他不催你走，但你也不好意思坐太久。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "咖啡师",
+              "role": "咖啡店老板",
+              "description": "文青打扮，戴黑框眼镜。记得你喝什么，不催你走。",
+              "personality": "文艺、随和、有品味"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 33,
+        "key": [
+          "外卖小哥",
+          "外卖",
+          "配送"
+        ],
+        "constant": false,
+        "comment": "外卖小哥",
+        "content": "给你送外卖的小哥，风雨无阻。他会在楼下打电话：'哥，你的外卖到了。'你可以让他放门口，也可以自己下去拿。最怕的是：他打电话时你正在开会。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "外卖小哥",
+              "role": "外卖配送",
+              "description": "风雨无阻给你送外卖，会在楼下打电话。",
+              "personality": "勤劳、急躁、有时间压力"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 34,
+        "key": [
+          "理发师",
+          "理发",
+          "Tony"
+        ],
+        "constant": false,
+        "comment": "理发师",
+        "content": "楼下理发店的Tony老师，剪发38元。他会问你：'哥，要不要做个造型？'你可以拒绝，但下次来他还会问。最尴尬的是：剪完发现不好看，但你不好意思说。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "理发师",
+              "role": "理发师",
+              "description": "剪发38元，会问你做不做造型。剪完发现不好看你也不好意思说。",
+              "personality": "热情、推销、手艺不稳定"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 35,
+        "key": [
+          "同事",
+          "摸鱼",
+          "吐槽"
+        ],
+        "constant": false,
+        "comment": "摸鱼同事",
+        "content": "工位旁边的摸鱼达人，上班时间刷淘宝、看小说、打游戏。他最擅长的是：领导来了秒切屏幕。你可以和他一起摸鱼，但别被领导发现。他离职后，你才发现：摸鱼也是需要搭档的。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "摸鱼同事",
+              "role": "同事",
+              "description": "工位旁边的摸鱼达人，上班时间刷淘宝看小说打游戏。",
+              "personality": "懒散、机灵、会摸鱼"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 36,
+        "key": [
+          "卷王",
+          "加班",
+          "内卷"
+        ],
+        "constant": false,
+        "comment": "卷王同事",
+        "content": "工位右边的卷王，永远在加班。他的工位上堆满了文件和零食，显示器上永远是工作界面。他最可怕的地方是：让你觉得自己不够努力。但你不知道的是，他回家后也在加班。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "卷王同事",
+              "role": "同事",
+              "description": "永远在加班，工位上堆满文件和零食。让你觉得自己不够努力。",
+              "personality": "勤奋、焦虑、内卷"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 37,
+        "key": [
+          "领导",
+          "老板",
+          "上司"
+        ],
+        "constant": false,
+        "comment": "直属领导",
+        "content": "你的直属领导，决定了你加班的频率和请假的难度。他可能和蔼可亲，也可能吹毛求疵。但无论哪种，你都要学会：在电梯里和他聊天气，在微信里秒回他的消息。",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "领导",
+              "role": "直属领导",
+              "description": "决定了你加班的频率和请假的难度。你要学会在电梯里和他聊天气。",
+              "personality": "因人而异"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 38,
+        "key": [
+          "宠物医生",
+          "兽医"
+        ],
+        "constant": false,
+        "comment": "宠物医生",
+        "content": "宠物医院的兽医，温柔且耐心。他会对你的猫/狗说：'乖，不疼。'然后打一针。他会详细解释病情，但你听不懂。你只需要知道：要不要住院？多少钱？",
+        "order": 4,
+        "position": "before_char",
+        "entryType": "npcs",
+        "meta": {
+          "npcs": [
+            {
+              "name": "宠物医生",
+              "role": "兽医",
+              "description": "温柔且耐心，会对你的宠物说'乖不疼'。你只需要知道要不要住院多少钱。",
+              "personality": "温柔、专业、有爱心"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 39,
+        "key": [
+          "跑步团",
+          "跑步",
+          "马拉松"
+        ],
+        "constant": false,
+        "comment": "跑步团",
+        "content": "周末早晨在公园跑步的团体，大多是上班族。他们有自己的微信群，每周约跑2-3次。加入跑步团的好处是：有人监督你，有人陪你跑，跑完一起吃早餐。坏处是：你可能会被拉着报马拉松。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "跑步团",
+              "description": "周末早晨在公园跑步的团体，大多是上班族。每周约跑2-3次。",
+              "alignment": "健康社交/积极"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 40,
+        "key": [
+          "宠物群",
+          "猫友",
+          "狗友"
+        ],
+        "constant": false,
+        "comment": "宠物群",
+        "content": "小区的宠物微信群，每天分享宠物照片和养宠经验。谁家猫吐了、谁家狗不吃饭、谁家仓鼠跑了，都会在群里问。群里的'宠物专家'比兽医还专业，但建议不一定靠谱。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "宠物群",
+              "description": "小区的宠物微信群，每天分享宠物照片和养宠经验。",
+              "alignment": "宠物社交/温暖"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 41,
+        "key": [
+          "读书会",
+          "书友"
+        ],
+        "constant": false,
+        "comment": "读书会",
+        "content": "咖啡店周末举办的读书会，每月读一本书。参加的人大多是文艺青年，讨论时引用尼采和加缪。你可以去装文艺，也可以真的读书。但去了几次你会发现：读书会的社交属性大于读书属性。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "读书会",
+              "description": "咖啡店周末举办的读书会，每月读一本书。参加的人大多是文艺青年。",
+              "alignment": "文艺社交/轻松"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 42,
+        "key": [
+          "车友会",
+          "车友",
+          "自驾"
+        ],
+        "constant": false,
+        "comment": "车友会",
+        "content": "有车一族的微信群，周末约自驾游。群里讨论最多的是：油价、保养、堵车。自驾游的好处是：自由。坏处是：油费、过路费、停车费。但和朋友们一起开车去郊外，确实是难得的放松。",
+        "order": 5,
+        "position": "before_char",
+        "entryType": "factions",
+        "meta": {
+          "factions": [
+            {
+              "name": "车友会",
+              "description": "有车一族的微信群，周末约自驾游。讨论最多的是油价保养堵车。",
+              "alignment": "休闲社交/中产"
+            }
+          ]
+        }
+      },
+      {
+        "uid": 43,
+        "key": [
+          "朋友圈",
+          "微信",
+          "社交"
+        ],
+        "constant": false,
+        "comment": "朋友圈规则",
+        "content": "朋友圈有自己的规则：一、不要秒赞，显得你太闲；二、不要发太长的文字，没人看；三、分组可见是基本操作；四、不要在朋友圈卖东西，会被拉黑；五、深夜发的矫情文字，第二天要删。朋友圈是表演，分组是保护。",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 44,
+        "key": [
+          "外卖备注",
+          "备注",
+          "外卖"
+        ],
+        "constant": false,
+        "comment": "外卖备注文化",
+        "content": "外卖备注是都市人的表达方式：'多放辣'是心情好，'不要辣'是心情差，'少放盐'是开始养生，'多放醋'是失恋了。最经典的备注是：'汤不要洒，上次洒了，差评。'外卖小哥看到备注，大概能猜出你今天过得怎么样。",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 45,
+        "key": [
+          "健身打卡",
+          "打卡",
+          "自律"
+        ],
+        "constant": false,
+        "comment": "健身打卡",
+        "content": "健身打卡是都市人的自律仪式。去了健身房要拍照，跑了步要发朋友圈，做了瑜伽要打卡。打卡的意义不在于锻炼，在于让别人知道你在锻炼。但打卡一个月后，你会发现：自律是一种幻觉。",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 46,
+        "key": [
+          "咖啡",
+          "咖啡文化",
+          "续命"
+        ],
+        "constant": false,
+        "comment": "咖啡文化",
+        "content": "都市人的咖啡文化：早上一杯美式提神，下午一杯拿铁续命，加班一杯浓缩撑住。不喝咖啡的人被视为异类。咖啡的价格是身份的象征：星巴克>瑞幸>便利店>速溶。但无论喝什么，本质都是：你困了。",
+        "order": 6,
+        "position": "before_char",
+        "entryType": "culture"
+      },
+      {
+        "uid": 47,
+        "key": [
+          "房租",
+          "涨租",
+          "租房"
+        ],
+        "constant": false,
+        "comment": "房租经济",
+        "content": "【房租】\n- 合租单间：1500-2000元/月\n- 整租一室：2500-3500元/月\n- 整租两室：3500-5000元/月\n\n房租是每月最大的支出，工资到账后第一件事就是交房租。房东每年涨租200-500元，你可以选择接受或搬家。搬家的成本也很高：中介费、搬家费、新家具。所以大多数人选择忍。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "economy",
+        "meta": {
+          "currency": {
+            "name": "人民币",
+            "symbol": "¥",
+            "description": "房租是每月最大的支出"
+          },
+          "priceLevel": "房租>餐饮>交通>娱乐"
+        }
+      },
+      {
+        "uid": 48,
+        "key": [
+          "消费",
+          "花钱",
+          "月光"
+        ],
+        "constant": false,
+        "comment": "消费陷阱",
+        "content": "【消费陷阱】\n- 外卖：每餐20-50元，一个月1500-3000元\n- 咖啡：每杯15-35元，一个月500-1000元\n- 健身：月卡200-500元\n- 聚餐：每次100-300元\n- 购物：看心情\n\n月底吃土是常态，但下个月又是一条好汉。都市人的消费观：钱不是省出来的，是赚出来的。但赚的永远不够花。",
+        "order": 7,
+        "position": "before_char",
+        "entryType": "economy"
+      },
+      {
+        "uid": 49,
+        "key": [
+          "暧昧",
+          "恋爱",
+          "表白"
+        ],
+        "constant": false,
+        "comment": "暧昧关系",
+        "content": "【暧昧关系】\n暧昧是最甜蜜也最折磨的阶段。每天聊天，但谁都没捅破那层窗户纸。暧昧的信号：秒回消息、主动约饭、记住对方的喜好。暧昧的终结：表白成功或表白失败。大多数人卡在暧昧阶段，因为害怕失败。",
+        "order": 9,
+        "position": "before_char",
+        "entryType": "relationships",
+        "meta": {
+          "relationships": {
+            "description": "暧昧是最甜蜜也最折磨的阶段",
+            "types": [
+              {
+                "name": "暧昧对象",
+                "description": "每天聊天但谁都没捅破窗户纸"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "uid": 50,
+        "key": [
+          "合租",
+          "室友",
+          "室友关系"
+        ],
+        "constant": false,
+        "comment": "合租关系",
+        "content": "【合租关系】\n合租是都市人的无奈选择。室友可能是陌生人，也可能是朋友。合租的规则：一、公共区域轮流打扫；二、不要带异性过夜（除非提前说）；三、水电费AA；四、不要用对方的东西。最好的室友是：互不打扰，偶尔一起点外卖。",
+        "order": 9,
+        "position": "before_char",
+        "entryType": "relationships"
+      },
+      {
+        "uid": 51,
+        "key": [
+          "都市生活",
+          "平凡",
+          "小确幸"
+        ],
+        "constant": false,
+        "comment": "核心特色",
+        "content": "都市生活的三个核心看点：一、平凡中的小确幸——下班后的奶茶、周末的懒觉、深夜的外卖；二、社交的距离感——同事不是朋友、邻居保持距离、朋友贵精不贵多；三、选择的自由——你可以卷或躺，但无论选哪个，房租都要交。",
+        "order": 10,
+        "position": "before_char",
+        "entryType": "highlights",
+        "meta": {
+          "highlights": [
+            "平凡中的小确幸",
+            "社交的距离感",
+            "选择的自由"
+          ]
+        }
+      },
+      {
         "uid": -1,
         "entryType": "module_rule",
         "key": [
@@ -645,21 +1204,156 @@
             "id": "overtime_trigger",
             "when": {
               "all": [
-                { "state": { "path": "玩家.生存状态.体力值", "op": "<", "value": 30 } },
-                { "state": { "path": "玩家.生存状态.血量", "op": ">", "value": 50 } }
+                {
+                  "state": {
+                    "path": "玩家.生存状态.体力值",
+                    "op": "<",
+                    "value": 30
+                  }
+                },
+                {
+                  "state": {
+                    "path": "玩家.生存状态.血量",
+                    "op": ">",
+                    "value": 50
+                  }
+                }
               ]
             },
-            "then": [{ "addEvent": { "eventId": "overtime", "eventPackId": "world:desire_metropolis:events" } }]
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "overtime",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
           },
           {
             "id": "date_trigger",
-            "when": { "state": { "path": "人物档案.相亲对象.关系数据.好感度", "op": ">=", "value": 50 } },
-            "then": [{ "addEvent": { "eventId": "date", "eventPackId": "world:desire_metropolis:events" } }]
+            "when": {
+              "state": {
+                "path": "人物档案.相亲对象.关系数据.好感度",
+                "op": ">=",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "date",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
           },
           {
             "id": "cook_trigger",
-            "when": { "state": { "path": "玩家.生存状态.体力值", "op": ">", "value": 60 } },
-            "then": [{ "addEvent": { "eventId": "cook", "eventPackId": "world:desire_metropolis:events" } }]
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 60
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "cook",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "gym_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": ">",
+                "value": 80
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "gym",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "date_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.dim5",
+                "op": ">",
+                "value": 60
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "date",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "moving_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": "<",
+                "value": 30
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "moving",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "pet_sick_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.血量",
+                "op": "<",
+                "value": 40
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "pet_sick",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
+          },
+          {
+            "id": "colleague_dinner_trigger",
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.dim5",
+                "op": ">",
+                "value": 50
+              }
+            },
+            "then": [
+              {
+                "addEvent": {
+                  "eventId": "colleague_dinner",
+                  "eventPackId": "world:desire_metropolis:events"
+                }
+              }
+            ]
           }
         ],
         "periodicRules": [
@@ -668,8 +1362,18 @@
             "name": "每日恢复",
             "intervalTicks": 1,
             "actions": [
-              { "set": { "path": "玩家.生存状态.血量", "value": 3 } },
-              { "set": { "path": "玩家.生存状态.体力值", "value": 5 } }
+              {
+                "set": {
+                  "path": "玩家.生存状态.血量",
+                  "value": 3
+                }
+              },
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": 5
+                }
+              }
             ],
             "description": "每天自然恢复体力和精力"
           },
@@ -677,13 +1381,43 @@
             "id": "work_cycle",
             "name": "工作消耗",
             "intervalTicks": 5,
-            "when": { "state": { "path": "玩家.生存状态.体力值", "op": ">", "value": 20 } },
-            "actions": [{ "set": { "path": "玩家.生存状态.体力值", "value": -15 } }],
+            "when": {
+              "state": {
+                "path": "玩家.生存状态.体力值",
+                "op": ">",
+                "value": 20
+              }
+            },
+            "actions": [
+              {
+                "set": {
+                  "path": "玩家.生存状态.体力值",
+                  "value": -15
+                }
+              }
+            ],
             "narrateToAI": true,
             "description": "每5天工作消耗精力"
+          },
+          {
+            "id": "rent_reminder",
+            "name": "房租提醒",
+            "intervalTicks": 30,
+            "narrateToAI": true,
+            "description": "每月提醒房租到期，AI描述房东发消息的场景"
+          },
+          {
+            "id": "social_circle",
+            "name": "社交动态",
+            "intervalTicks": 7,
+            "narrateToAI": true,
+            "description": "每周AI描述朋友圈和社交圈的动态"
           }
         ],
-        "permissions": ["modify_world_state", "add_card"]
+        "permissions": [
+          "modify_world_state",
+          "add_card"
+        ]
       },
       {
         "id": "world:desire_metropolis:events",
@@ -694,19 +1428,68 @@
             "id": "overtime",
             "name": "加班",
             "cards": [
-              { "id": "t_overtime", "componentId": "title", "title": "加班通知" },
-              { "id": "n_overtime", "componentId": "narrative", "title": "加班叙事" },
-              { "id": "c_overtime", "componentId": "choice", "title": "加班选择" }
+              {
+                "id": "t_overtime",
+                "componentId": "title",
+                "title": "加班通知"
+              },
+              {
+                "id": "n_overtime",
+                "componentId": "narrative",
+                "title": "加班叙事"
+              },
+              {
+                "id": "c_overtime",
+                "componentId": "choice",
+                "title": "加班选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_overtime", "props": { "title": "加班通知" } }],
-                "narrative": [{ "id": "n_overtime", "props": { "text": "快下班的时候，领导突然在群里@你，说今晚需要加班赶一个方案。你看了看时间，已经晚上7点了。" } }],
-                "choice": [{ "id": "c_overtime", "props": { "choices": [
-                  { "label": "接受加班", "effect": { "statId": "体力值", "delta": -20 }, "aiNote": "接受了加班，精力消耗大" },
-                  { "label": "拒绝加班", "effect": { "statId": "血量", "delta": -5 }, "aiNote": "拒绝加班，但有点内疚" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_overtime",
+                    "props": {
+                      "title": "加班通知"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_overtime",
+                    "props": {
+                      "text": "快下班的时候，领导突然在群里@你，说今晚需要加班赶一个方案。你看了看时间，已经晚上7点了。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_overtime",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受加班",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "接受了加班，精力消耗大"
+                        },
+                        {
+                          "label": "拒绝加班",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -5
+                          },
+                          "aiNote": "拒绝加班，但有点内疚"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -714,19 +1497,68 @@
             "id": "date",
             "name": "约会",
             "cards": [
-              { "id": "t_date", "componentId": "title", "title": "约会邀请" },
-              { "id": "n_date", "componentId": "narrative", "title": "约会叙事" },
-              { "id": "c_date", "componentId": "choice", "title": "约会选择" }
+              {
+                "id": "t_date",
+                "componentId": "title",
+                "title": "约会邀请"
+              },
+              {
+                "id": "n_date",
+                "componentId": "narrative",
+                "title": "约会叙事"
+              },
+              {
+                "id": "c_date",
+                "componentId": "choice",
+                "title": "约会选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_date", "props": { "title": "约会邀请" } }],
-                "narrative": [{ "id": "n_date", "props": { "text": "手机响了，是一条消息：'周末有空吗？想约你出来吃个饭。'你看了看日程表，周末刚好有空。" } }],
-                "choice": [{ "id": "c_date", "props": { "choices": [
-                  { "label": "精心打扮赴约", "effect": { "statId": "血量", "delta": 10 }, "aiNote": "精心打扮去约会，心情很好" },
-                  { "label": "随性出门", "effect": { "statId": "体力值", "delta": 5 }, "aiNote": "随意赴约，保持自然" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_date",
+                    "props": {
+                      "title": "约会邀请"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_date",
+                    "props": {
+                      "text": "手机响了，是一条消息：'周末有空吗？想约你出来吃个饭。'你看了看日程表，周末刚好有空。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_date",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "精心打扮赴约",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "精心打扮去约会，心情很好"
+                        },
+                        {
+                          "label": "随性出门",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "随意赴约，保持自然"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -734,19 +1566,68 @@
             "id": "cook",
             "name": "做饭",
             "cards": [
-              { "id": "t_cook", "componentId": "title", "title": "今晚吃什么？" },
-              { "id": "n_cook", "componentId": "narrative", "title": "做饭叙事" },
-              { "id": "c_cook", "componentId": "choice", "title": "做饭选择" }
+              {
+                "id": "t_cook",
+                "componentId": "title",
+                "title": "今晚吃什么？"
+              },
+              {
+                "id": "n_cook",
+                "componentId": "narrative",
+                "title": "做饭叙事"
+              },
+              {
+                "id": "c_cook",
+                "componentId": "choice",
+                "title": "做饭选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_cook", "props": { "title": "今晚吃什么？" } }],
-                "narrative": [{ "id": "n_cook", "props": { "text": "下班回到家，冰箱里还有一些食材。你是选择自己做饭，还是叫外卖？" } }],
-                "choice": [{ "id": "c_cook", "props": { "choices": [
-                  { "label": "尝试新菜谱", "effect": { "statId": "体力值", "delta": -10 }, "aiNote": "尝试做新菜，消耗精力但提升厨艺" },
-                  { "label": "叫外卖", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "叫外卖省事，但不太健康" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_cook",
+                    "props": {
+                      "title": "今晚吃什么？"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_cook",
+                    "props": {
+                      "text": "下班回到家，冰箱里还有一些食材。你是选择自己做饭，还是叫外卖？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_cook",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "尝试新菜谱",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -10
+                          },
+                          "aiNote": "尝试做新菜，消耗精力但提升厨艺"
+                        },
+                        {
+                          "label": "叫外卖",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "叫外卖省事，但不太健康"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -754,19 +1635,68 @@
             "id": "neighbor",
             "name": "邻居纠纷",
             "cards": [
-              { "id": "t_neighbor", "componentId": "title", "title": "邻居敲门了" },
-              { "id": "n_neighbor", "componentId": "narrative", "title": "邻居叙事" },
-              { "id": "c_neighbor", "componentId": "choice", "title": "邻居选择" }
+              {
+                "id": "t_neighbor",
+                "componentId": "title",
+                "title": "邻居敲门了"
+              },
+              {
+                "id": "n_neighbor",
+                "componentId": "narrative",
+                "title": "邻居叙事"
+              },
+              {
+                "id": "c_neighbor",
+                "componentId": "choice",
+                "title": "邻居选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_neighbor", "props": { "title": "邻居敲门了" } }],
-                "narrative": [{ "id": "n_neighbor", "props": { "text": "门铃响了，是楼下的邻居。他说你昨晚太吵了，影响到他休息。你回想了一下，昨晚确实在家跳了会儿健身操。" } }],
-                "choice": [{ "id": "c_neighbor", "props": { "choices": [
-                  { "label": "道歉并承诺注意", "effect": { "statId": "血量", "delta": 5 }, "aiNote": "道歉化解矛盾，邻里关系改善" },
-                  { "label": "觉得小题大做", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "和邻居起了争执，心情变差" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_neighbor",
+                    "props": {
+                      "title": "邻居敲门了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_neighbor",
+                    "props": {
+                      "text": "门铃响了，是楼下的邻居。他说你昨晚太吵了，影响到他休息。你回想了一下，昨晚确实在家跳了会儿健身操。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_neighbor",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "道歉并承诺注意",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "道歉化解矛盾，邻里关系改善"
+                        },
+                        {
+                          "label": "觉得小题大做",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "和邻居起了争执，心情变差"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           },
@@ -774,24 +1704,489 @@
             "id": "crush",
             "name": "心动瞬间",
             "cards": [
-              { "id": "t_crush", "componentId": "title", "title": "心动了" },
-              { "id": "n_crush", "componentId": "narrative", "title": "心动叙事" },
-              { "id": "c_crush", "componentId": "choice", "title": "心动选择" }
+              {
+                "id": "t_crush",
+                "componentId": "title",
+                "title": "心动了"
+              },
+              {
+                "id": "n_crush",
+                "componentId": "narrative",
+                "title": "心动叙事"
+              },
+              {
+                "id": "c_crush",
+                "componentId": "choice",
+                "title": "心动选择"
+              }
             ],
             "puck": {
-              "root": { "props": {} },
+              "root": {
+                "props": {}
+              },
               "components": {
-                "title": [{ "id": "t_crush", "props": { "title": "心动了" } }],
-                "narrative": [{ "id": "n_crush", "props": { "text": "在咖啡店排队的时候，前面那个人回头对你笑了一下。那一瞬间，你的心跳漏了一拍。" } }],
-                "choice": [{ "id": "c_crush", "props": { "choices": [
-                  { "label": "主动搭讪", "effect": { "statId": "血量", "delta": 15 }, "aiNote": "鼓起勇气搭讪，心情激动" },
-                  { "label": "错过机会", "effect": { "statId": "体力值", "delta": -5 }, "aiNote": "犹豫了一下，对方已经走了" }
-                ] } }]
+                "title": [
+                  {
+                    "id": "t_crush",
+                    "props": {
+                      "title": "心动了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_crush",
+                    "props": {
+                      "text": "在咖啡店排队的时候，前面那个人回头对你笑了一下。那一瞬间，你的心跳漏了一拍。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_crush",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "主动搭讪",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "鼓起勇气搭讪，心情激动"
+                        },
+                        {
+                          "label": "错过机会",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "犹豫了一下，对方已经走了"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "gym",
+            "name": "健身",
+            "cards": [
+              {
+                "id": "t_gym",
+                "componentId": "title",
+                "title": "今天去健身吗？"
+              },
+              {
+                "id": "n_gym",
+                "componentId": "narrative",
+                "title": "健身叙事"
+              },
+              {
+                "id": "c_gym",
+                "componentId": "choice",
+                "title": "健身体验"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_gym",
+                    "props": {
+                      "title": "今天去健身吗？"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_gym",
+                    "props": {
+                      "text": "下班后，你路过健身房。今天状态不错，要不要去练一会儿？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_gym",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "去练一小时",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "去健身房锻炼，身体状态提升"
+                        },
+                        {
+                          "label": "回家躺平",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "选择回家休息，恢复精力"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "date",
+            "name": "约会",
+            "cards": [
+              {
+                "id": "t_date",
+                "componentId": "title",
+                "title": "约会邀请"
+              },
+              {
+                "id": "n_date",
+                "componentId": "narrative",
+                "title": "约会叙事"
+              },
+              {
+                "id": "c_date",
+                "componentId": "choice",
+                "title": "约会选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_date",
+                    "props": {
+                      "title": "约会邀请"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_date",
+                    "props": {
+                      "text": "手机响了，是一条消息：'周末有空吗？想约你出来吃个饭。'你看了看日程表，周末刚好有空。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_date",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "精心打扮赴约",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 15
+                          },
+                          "aiNote": "精心打扮去约会，心情很好"
+                        },
+                        {
+                          "label": "随性出门",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "随意赴约，保持自然"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "moving",
+            "name": "搬家",
+            "cards": [
+              {
+                "id": "t_moving",
+                "componentId": "title",
+                "title": "房东要涨租了"
+              },
+              {
+                "id": "n_moving",
+                "componentId": "narrative",
+                "title": "搬家叙事"
+              },
+              {
+                "id": "c_moving",
+                "componentId": "choice",
+                "title": "搬家选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_moving",
+                    "props": {
+                      "title": "房东要涨租了"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_moving",
+                    "props": {
+                      "text": "房东发来消息：'小X啊，下季度房租涨500哈。'你看了看工资卡，这个月又月光了。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_moving",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "接受涨租",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -10
+                          },
+                          "aiNote": "接受涨租，经济压力增大"
+                        },
+                        {
+                          "label": "找新房搬家",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -20
+                          },
+                          "aiNote": "搬家很累，但省下了钱"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "pet_sick",
+            "name": "宠物生病",
+            "cards": [
+              {
+                "id": "t_pet",
+                "componentId": "title",
+                "title": "猫/狗不舒服"
+              },
+              {
+                "id": "n_pet",
+                "componentId": "narrative",
+                "title": "宠物生病叙事"
+              },
+              {
+                "id": "c_pet",
+                "componentId": "choice",
+                "title": "宠物生病选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_pet",
+                    "props": {
+                      "title": "猫/狗不舒服"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_pet",
+                    "props": {
+                      "text": "你的猫/狗今天不太对劲，不吃东西，精神萎靡。你很担心，要不要带它去宠物医院？"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_pet",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "带去宠物医院",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": -15
+                          },
+                          "aiNote": "带宠物去看病，花钱但安心"
+                        },
+                        {
+                          "label": "先观察一下",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "先观察，但心里不安"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "colleague_dinner",
+            "name": "同事聚餐",
+            "cards": [
+              {
+                "id": "t_dinner",
+                "componentId": "title",
+                "title": "同事约饭"
+              },
+              {
+                "id": "n_dinner",
+                "componentId": "narrative",
+                "title": "聚餐叙事"
+              },
+              {
+                "id": "c_dinner",
+                "componentId": "choice",
+                "title": "聚餐选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_dinner",
+                    "props": {
+                      "title": "同事约饭"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_dinner",
+                    "props": {
+                      "text": "同事在群里@你：'今晚一起吃饭吗？新开了一家火锅店。'你看了看钱包，这个月已经吃了三次火锅了。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_dinner",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "去吃火锅",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 10
+                          },
+                          "aiNote": "和同事聚餐，增进感情"
+                        },
+                        {
+                          "label": "说有事推掉",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": 5
+                          },
+                          "aiNote": "推掉聚餐，省了钱但可能被边缘化"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "late_night_emotion",
+            "name": "深夜emo",
+            "cards": [
+              {
+                "id": "t_emo",
+                "componentId": "title",
+                "title": "深夜emo"
+              },
+              {
+                "id": "n_emo",
+                "componentId": "narrative",
+                "title": "深夜叙事"
+              },
+              {
+                "id": "c_emo",
+                "componentId": "choice",
+                "title": "深夜选择"
+              }
+            ],
+            "puck": {
+              "root": {
+                "props": {}
+              },
+              "components": {
+                "title": [
+                  {
+                    "id": "t_emo",
+                    "props": {
+                      "title": "深夜emo"
+                    }
+                  }
+                ],
+                "narrative": [
+                  {
+                    "id": "n_emo",
+                    "props": {
+                      "text": "凌晨两点，你躺在床上，突然觉得人生好难。工作、房租、感情、未来……所有的问题一起涌上来。"
+                    }
+                  }
+                ],
+                "choice": [
+                  {
+                    "id": "c_emo",
+                    "props": {
+                      "choices": [
+                        {
+                          "label": "点一份炸鸡",
+                          "effect": {
+                            "statId": "血量",
+                            "delta": 5
+                          },
+                          "aiNote": "用美食治愈自己，明天会更好"
+                        },
+                        {
+                          "label": "打开手机刷视频",
+                          "effect": {
+                            "statId": "体力值",
+                            "delta": -5
+                          },
+                          "aiNote": "刷视频到天亮，第二天更累"
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             }
           }
         ],
-        "permissions": ["add_card"]
+        "permissions": [
+          "add_card"
+        ]
       }
     ]
   }

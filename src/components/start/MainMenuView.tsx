@@ -31,10 +31,14 @@ export default function MainMenuView({
 }: MainMenuViewProps) {
   const { user, isAuthenticated } = useAuthStore();
   const [ready, setReady] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setReady(true));
-    return () => cancelAnimationFrame(t);
+    const mql = window.matchMedia('(max-width: 768px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => { cancelAnimationFrame(t); mql.removeEventListener('change', handler); };
   }, []);
 
   const menuItems: MenuItem[] = [
@@ -52,10 +56,13 @@ export default function MainMenuView({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `
+        backgroundImage: `
           radial-gradient(ellipse at 50% 30%, var(--accent-glow) 0%, transparent 60%),
-          var(--bg-deep)
+          url('${isMobile ? '/bg-main-phone.png' : '/bg-main.png'}')
         `,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
         padding: '2rem',
         position: 'relative',
         overflow: 'hidden',
@@ -72,23 +79,25 @@ export default function MainMenuView({
           alignItems: 'center',
           gap: '6px',
           padding: '8px 12px',
-          background: 'transparent',
-          border: '1px solid var(--border, rgba(255,255,255,0.1))',
+          background: 'rgba(0, 0, 0, 0.1)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.2)',
           borderRadius: 'var(--radius-md)',
-          color: 'var(--text-muted)',
+          color: '#ffffffcc',
           cursor: 'pointer',
           fontSize: 'var(--font-size-sm)',
-          transition: 'all 0.2s',
-          opacity: ready ? 1 : 0,
+          opacity: 0.8,
+          transform: ready ? 'translateY(0)' : 'translateY(-12px)',
+          transition: 'transform 0.4s ease, color 0.15s, border-color 0.15s',
           zIndex: 10,
         }}
         onMouseEnter={e => {
-          e.currentTarget.style.color = 'var(--accent)';
-          e.currentTarget.style.borderColor = 'var(--accent)';
+          e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)';
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.color = 'var(--text-muted)';
-          e.currentTarget.style.borderColor = 'var(--border, rgba(255,255,255,0.1))';
+          e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
         }}
       >
         <Cloud size={16} strokeWidth={1.5} />
@@ -118,53 +127,23 @@ export default function MainMenuView({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '3rem',
-        maxWidth: '520px',
+        gap: '0.5rem',
+        maxWidth: '640px',
         width: '100%',
       }}>
-        {/* 标题区域 */}
-        <div style={{ textAlign: 'center' }}>
-          {/* 主标题 */}
-          <h1 style={{
-            fontFamily: 'var(--font-display, serif)',
-            fontSize: 'clamp(2.4rem, 7vw, 3.6rem)',
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            letterSpacing: '0.15em',
-            margin: 0,
-            lineHeight: 1.2,
+        {/* 主标题 */}
+        <img
+          src="/title-main.png"
+          alt={title}
+          style={{
+            maxWidth: '600px',
+            width: '100%',
+            height: 'auto',
             opacity: ready ? 1 : 0,
             transform: ready ? 'translateY(0)' : 'translateY(-20px)',
             transition: 'opacity 0.8s ease, transform 0.8s ease',
-          }}>
-            {title}
-          </h1>
-
-          {/* 金色分隔线 */}
-          <div style={{
-            height: '1px',
-            margin: '20px auto',
-            maxWidth: '240px',
-            background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-            width: ready ? '100%' : '0%',
-            opacity: ready ? 1 : 0,
-            transition: 'width 1s ease 0.3s, opacity 0.6s ease 0.3s',
-          }} />
-
-          {/* 副标题 */}
-          <p style={{
-            fontFamily: 'var(--font-display, serif)',
-            fontSize: 'clamp(0.9rem, 2.5vw, 1.15rem)',
-            color: 'var(--text-muted)',
-            letterSpacing: '0.2em',
-            margin: 0,
-            opacity: ready ? 1 : 0,
-            transform: ready ? 'translateY(0)' : 'translateY(8px)',
-            transition: 'opacity 0.6s ease 0.5s, transform 0.6s ease 0.5s',
-          }}>
-            {subtitle}
-          </p>
-        </div>
+          }}
+        />
 
         {/* 菜单项列表 */}
         <div style={{
@@ -173,6 +152,7 @@ export default function MainMenuView({
           gap: '8px',
           width: '100%',
           maxWidth: '420px',
+          marginTop: '-2rem',
         }}>
           {menuItems.map((item, i) => (
             <MenuItemButton
@@ -195,7 +175,7 @@ export default function MainMenuView({
         transition: 'opacity 1s ease 1.2s',
         letterSpacing: '0.05em',
       }}>
-        v2.6.5
+        v2.6.6
       </div>
       <BackgroundMusic />
     </div>
@@ -220,7 +200,7 @@ function MenuItemButton({
       disabled={item.disabled}
       className="menu-item-btn"
       style={{
-        opacity: ready ? (item.disabled ? 0.35 : 1) : 0,
+        opacity: ready ? (item.disabled ? 0.35 : 0.8) : 0,
         transform: ready ? 'translateY(0)' : 'translateY(-12px)',
         transitionDelay: `${delay}s, ${delay}s, 0s, 0s, 0s, 0s`,
         cursor: item.disabled ? 'not-allowed' : undefined,

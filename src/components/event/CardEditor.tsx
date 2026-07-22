@@ -3,13 +3,15 @@ import JSZip from 'jszip';
 import {
   ArrowLeft, FileText, ScrollText, ListChecks, Eye, ShieldCheck, Settings, Pencil,
   Download, Save, Braces, Plus, Trash2, ArrowUp, ArrowDown, BookOpen, X, AlertTriangle, Check, Package,
-  Layers, Loader2,
+  Layers, Loader2, Lock,
 } from 'lucide-react';
 import type { CardFile, PuckData, CardDef, Manifest, ValidationIssue, EventPackType, ChoiceOption, ChoiceEffect, PeriodicRule, RuleFile, EventDef, EventPackFile } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
 import { getAllWorldBookEntries, WorldBookPicker, type WorldBookSelection } from './WorldBookPicker';
 import { getWebEvent, putWebEvent } from '../../modules/eventDb';
 import { saveEventToPack, createPackWithEvent, listEventsInPack, savePackMeta, deleteEventFromPack, renameEventInPack } from '../../modules/webEventStore';
+import { findWorldDef, getAllWorlds } from '../../data/worldLoader';
+import type { WorldDef } from '../../data/worlds-schema';
 import StatIdSelect from './StatIdSelect';
 import { textOn } from './colorUtils';
 
@@ -19,7 +21,7 @@ import { textOn } from './colorUtils';
    产出 schema 兼容的 CardFile（puck: PuckData）。若后续接入真正的 React Puck 编辑器，
    仅需替换画布层，下面对外契约（CardFile / 导出 .opt-event）保持不变。 */
 
-const APP_VERSION = '2.6.5';
+const APP_VERSION = '2.6.6';
 
 const BLOCK_TYPES = ['title', 'narrative', 'choice'] as const;
 type BlockType = (typeof BLOCK_TYPES)[number];
@@ -112,7 +114,7 @@ function fromCardFile(file: CardFile): CardBlock[] {
   return out;
 }
 
-const ID_RE = /^[a-z0-9][a-z0-9_-]{2,63}$/;
+const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 
 /** 结构化校验（对应 spec 校验顺序：结构 → 必填 → 内容合法性） */
@@ -141,7 +143,7 @@ export function validateCardFile(file: CardFile, manifest: ManifestDraft): Valid
     }
   }
 
-  if (!ID_RE.test(manifest.id)) issues.push({ code: 'MANIFEST_MISSING_FIELD', field: 'id', message: `id 不符合 ^[a-z0-9][a-z0-9_-]{2,63}$（当前：${manifest.id}；包ID为内部英文标识，输入中文名称将自动生成，仅限小写字母/数字/连字符）` });
+  if (!ID_RE.test(manifest.id)) issues.push({ code: 'MANIFEST_MISSING_FIELD', field: 'id', message: `id 不符合 ^[a-z0-9][a-z0-9_:-]{2,63}$（当前：${manifest.id}；包ID为内部英文标识，输入中文名称将自动生成，仅限小写字母/数字/连字符/冒号）` });
   if (!VER_RE.test(manifest.version)) issues.push({ code: 'MANIFEST_INVALID', field: 'version', message: `version 需为 主.次.修 格式（当前：${manifest.version}）` });
   if (!manifest.name.trim()) issues.push({ code: 'MANIFEST_MISSING_FIELD', field: 'name', message: '事件名称不能为空' });
   return issues;
@@ -221,11 +223,13 @@ export interface CardEditorProps {
   gameState?: GameState;
   /** 保存成功后回调（用于事件库刷新） */
   onSaved?: () => void;
+  /** 外部传入的世界定义（游戏内编辑时） */
+  worldDef?: WorldDef;
 }
 
 type Mode = 'visual' | 'json';
 
-export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: CardEditorProps) {
+export default function CardEditor({ eventPackId, onBack, gameState, onSaved, worldDef: worldDefProp }: CardEditorProps) {
   const [blocks, setBlocks] = useState<CardBlock[]>([defaultBlock('title'), defaultBlock('narrative')]);
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('visual');
@@ -274,6 +278,52 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
 
   // 删除事件确认模态目标（null = 关闭）
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // ── 世界绑定（与 RuleEditor 同模式） ──
+  const [localWorldDef, setLocalWorldDef] = useState<WorldDef | undefined>(worldDefProp);
+  const [showWorldPicker, setShowWorldPicker] = useState(false);
+  const [confirmWorld, setConfirmWorld] = useState<WorldDef | null>(null);
+  const [worldBound, setWorldBound] = useState(false);
+  const worldDef = worldDefProp ?? localWorldDef;
+
+  // 初始化：如果事件包已绑定世界，自动加载并锁定
+  useEffect(() => {
+    if (!currentPackId || worldDefProp) return;
+    (async () => {
+      try {
+        const rec = await getWebEvent(currentPackId);
+        if (rec?.worldId) {
+          const found = findWorldDef(rec.worldId);
+          if (found) { setLocalWorldDef(found); setWorldBound(true); }
+        }
+      } catch { /* ignore */ }
+    })();
+  }, [currentPackId, worldDefProp]);
+
+  const handleLoadWorld = () => {
+    if (!currentPackId) return;
+    setShowWorldPicker(true);
+  };
+
+  const handlePickWorld = (wid: string) => {
+    const found = findWorldDef(wid);
+    if (found) { setConfirmWorld(found); setShowWorldPicker(false); }
+  };
+
+  const handleConfirmWorld = async () => {
+    if (!confirmWorld || !currentPackId) return;
+    try {
+      const rec = await getWebEvent(currentPackId);
+      if (rec) { rec.worldId = confirmWorld.id; await putWebEvent(rec); }
+      setLocalWorldDef(confirmWorld);
+      setWorldBound(true);
+      setConfirmWorld(null);
+    } catch (err) {
+      showSaveToast('绑定世界失败：' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleCancelWorld = () => { setConfirmWorld(null); };
 
   /** 删除事件：已保存事件走 deleteEventFromPack + 刷新；删的是当前事件则自动切到相邻/首个或空白态 */
   const handleDeleteEvent = async (id: string) => {
@@ -738,7 +788,36 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved }: 
             {currentPackId ? `包 ID：${currentPackId}` : '新事件包 · 首次保存时创建'}
           </span>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          {/* 世界绑定 */}
+          {worldBound && worldDef ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <Lock size={12} /> {worldDef.name}
+            </span>
+          ) : confirmWorld ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <span style={{ color: 'var(--text-muted)' }}>绑定「{confirmWorld.name}」？</span>
+              <button className="btn-primary btn-sm" onClick={() => void handleConfirmWorld()} style={{ padding: '2px 8px', fontSize: 'var(--font-size-xs)' }}>确认</button>
+              <button className="btn-ghost btn-sm" onClick={handleCancelWorld} style={{ padding: '2px 6px', fontSize: 'var(--font-size-xs)' }}>取消</button>
+            </span>
+          ) : showWorldPicker ? (
+            <select
+              autoFocus
+              value=""
+              onChange={(e) => e.target.value && handlePickWorld(e.target.value)}
+              onBlur={() => setShowWorldPicker(false)}
+              style={{ padding: '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', width: 140, flexShrink: 0 }}
+            >
+              <option value="" disabled>选择世界…</option>
+              {getAllWorlds().map((w) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
+            </select>
+          ) : (
+            <button className="btn-secondary btn-sm" onClick={handleLoadWorld} disabled={!currentPackId} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <BookOpen size={14} /> 读取世界
+            </button>
+          )}
           <button className="btn-secondary btn-sm" onClick={() => setShowPreview(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Eye size={15} /> 预览</button>
           <button className="btn-secondary btn-sm" onClick={runValidate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> 校验</button>
           <button className="btn-primary btn-sm" onClick={() => void handleSaveEvent()} disabled={saving} title="保存当前事件及事件包元信息" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Save size={15} /> 保存事件包</button>

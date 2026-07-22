@@ -16,7 +16,7 @@ use crate::mod_system::APP_VERSION;
 
 // ---------------- manual format validators (avoid extra deps) ----------------
 
-/// `^[a-z0-9][a-z0-9_-]{2,63}$`
+/// `^[a-z0-9][a-z0-9_:-]{2,63}$`
 pub fn is_valid_mod_id(s: &str) -> bool {
     let b = s.as_bytes();
     if b.len() < 3 || b.len() > 64 {
@@ -27,7 +27,7 @@ pub fn is_valid_mod_id(s: &str) -> bool {
         return false;
     }
     for &c in &b[1..] {
-        if !(is_id_char(c) || c == b'_' || c == b'-') {
+        if !(is_id_char(c) || c == b'_' || c == b'-' || c == b':') {
             return false;
         }
     }
@@ -60,7 +60,7 @@ pub fn validate_structure(m: &ModManifest) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
 
     if !is_valid_mod_id(&m.id) {
-        issues.push(issue("SCHEMA", Some("id"), "id 格式必须匹配 ^[a-z0-9][a-z0-9_-]{2,63}$"));
+        issues.push(issue("SCHEMA", Some("id"), "id 格式必须匹配 ^[a-z0-9][a-z0-9_:-]{2,63}$"));
     }
     if m.name.is_empty() || m.name.len() > 80 {
         issues.push(issue("SCHEMA", Some("name"), "name 长度需为 1..80"));

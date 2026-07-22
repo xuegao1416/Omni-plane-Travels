@@ -110,6 +110,18 @@ if (existsSync('./scarborough-fair.mp3')) {
   copyFileSync('./scarborough-fair.mp3', join(DIST, 'scarborough-fair.mp3'));
   console.log('   ✅ scarborough-fair.mp3');
 }
+if (existsSync('./bg-main.png')) {
+  copyFileSync('./bg-main.png', join(DIST, 'bg-main.png'));
+  console.log('   ✅ bg-main.png');
+}
+if (existsSync('./bg-main-phone.png')) {
+  copyFileSync('./bg-main-phone.png', join(DIST, 'bg-main-phone.png'));
+  console.log('   ✅ bg-main-phone.png');
+}
+if (existsSync('./title-main.png')) {
+  copyFileSync('./title-main.png', join(DIST, 'title-main.png'));
+  console.log('   ✅ title-main.png');
+}
 
 console.log('\n✨ 构建完成！dist/ 目录结构：');
 console.log('   dist/');
@@ -117,4 +129,7 @@ console.log('   ├── index.html');
 console.log('   ├── main.js');
 console.log('   ├── main.css');
 console.log('   ├── manifest.json (PWA 配置)');
-console.log('   └── icon.png (应用图标)');
+console.log('   ├── icon.png (应用图标)');
+console.log('   ├── bg-main.png (主页背景-桌面)');
+console.log('   ├── bg-main-phone.png (主页背景-移动)');
+console.log('   └── title-main.png (主页标题)');

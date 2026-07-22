@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useWorkshopStore, type WorkshopItem } from '../../stores/workshopStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
+import { STORAGE_KEYS } from '../../config/storageKeys';
+import type { WorldDef } from '../../data/worlds-schema';
 import {
   Store, Download, Trash2, Loader, RefreshCw,
   Globe, User, BookOpen, Layers, Plus, Upload, X
@@ -38,8 +40,37 @@ export default function WorkshopSettingsTab() {
 
   const handleDownload = async (item: WorkshopItem) => {
     try {
-      const data = await downloadItem(item.id);
-      if (data) {
+      const result = await downloadItem(item.id);
+      if (!result) return;
+
+      const { data } = result;
+      if (!data) {
+        await showAlert('下载失败：数据为空', { title: '下载失败', danger: true });
+        return;
+      }
+
+      // 根据类型执行不同的导入操作
+      if (item.type === 'world_package') {
+        // 导入世界包：保存到 CUSTOM_WORLDS
+        try {
+          const world = data as WorldDef;
+          if (!world.id) world.id = `workshop_${Date.now()}`;
+          if (!world.name) world.name = item.title;
+
+          const existing: WorldDef[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
+          const idx = existing.findIndex(w => w.id === world.id);
+          if (idx >= 0) {
+            existing[idx] = world;
+          } else {
+            existing.push(world);
+          }
+          localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(existing));
+          await showAlert(`世界「${world.name}」已导入！`, { title: '导入成功' });
+        } catch (e) {
+          await showAlert('导入世界失败：' + (e instanceof Error ? e.message : String(e)), { title: '导入失败', danger: true });
+        }
+      } else {
+        // 其他类型：下载为 JSON 文件
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
