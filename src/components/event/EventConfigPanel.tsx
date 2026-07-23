@@ -61,14 +61,15 @@ export default function EventConfigPanel({
       // 只显示全局已启用的包（总开关）
       const enabled = list.filter(e => e.enabled);
       // 预加载 worldId：批量读取 WebEventRecord，构建 id→worldId 映射
+      // 优先取 WebEventRecord.worldId，回退到 manifest.worldId
       const allRecs = await allWebEvents();
-      const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId]));
-      // 所有内置包必须 worldId === worldDef.id 才显示（防止跨世界污染）
+      const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId ?? r.manifest.worldId]));
+      // 所有包必须 worldId === worldDef.id 才显示（防止跨世界污染）
       const filtered = enabled.filter(e => {
         if (!worldDef) return true; // 无世界上下文时不过滤
         const wId = worldIdMap.get(e.meta.id);
-        if (!wId) return true; // 无 worldId 的用户自建包正常显示
-        return wId === worldDef.id; // 有 worldId 的内置包必须匹配
+        if (!wId) return true; // 无 worldId 的全局包正常显示
+        return wId === worldDef.id; // 有 worldId 的包必须匹配当前世界
       });
       setPacks(filtered);
       // 加载合集列表
@@ -148,14 +149,23 @@ export default function EventConfigPanel({
         if (!rec) return;
         const rules: any[] = [];
         const periodicRules: any[] = [];
-        const raw = rec.files['schema/rules.json'];
-        if (typeof raw === 'string') {
-          const rf = JSON.parse(raw);
-          if (rf.rules) rules.push(...rf.rules);
-          if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
+        let workflow: import('../../modules/workflowSchema').WorkflowDefinition | undefined;
+        // 优先读工作流格式
+        const wfRaw = rec.files['schema/workflow.json'];
+        if (typeof wfRaw === 'string') {
+          try { workflow = JSON.parse(wfRaw); } catch { /* 损坏 */ }
+        }
+        // 回退读规则格式
+        if (!workflow) {
+          const raw = rec.files['schema/rules.json'];
+          if (typeof raw === 'string') {
+            const rf = JSON.parse(raw);
+            if (rf.rules) rules.push(...rf.rules);
+            if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
+          }
         }
         eventWorldEvolution.registerPack({
-          eventPackId: id, rules, periodicRules,
+          eventPackId: id, rules, periodicRules, workflow,
           permissions: rec.manifest.permissions ?? [],
           runtime: { onceFired: {}, cooldownRemaining: {} },
           source: rec.builtin ? 'world' : 'user',

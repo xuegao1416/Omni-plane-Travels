@@ -315,7 +315,19 @@ export function graphToRuleFile(graph: EventGraph): RuleFile {
     }
   }
 
-  return { version: 1, rules, periodicRules: periodicRules.length > 0 ? periodicRules : undefined };
+  // 收集节点位置（从 EventGraphNode.position 字段）
+  const nodePositions: Record<string, { x: number; y: number }> = {};
+  for (const node of graph.nodes) {
+    if (node.position) nodePositions[node.id] = node.position;
+  }
+
+  const result: RuleFile = {
+    version: 1,
+    rules,
+    periodicRules: periodicRules.length > 0 ? periodicRules : undefined,
+  };
+  if (Object.keys(nodePositions).length > 0) result.nodePositions = nodePositions;
+  return result;
 }
 
 // ─── Condition 树 → condition 节点链（反向转换辅助） ───
@@ -409,6 +421,7 @@ function conditionToNodes(
 export function ruleFileToGraph(file: RuleFile): EventGraph {
   const nodes: EventGraphNode[] = [];
   const edges: EventGraphEdge[] = [];
+  const positions = file.nodePositions ?? {};
 
   for (const rule of file.rules) {
     const triggerId = rule.id;
@@ -502,6 +515,12 @@ export function ruleFileToGraph(file: RuleFile): EventGraph {
         edges.push({ id: `${pr.id}->${effectId}`, source: pr.id, target: effectId, kind: 'flow' });
       }
     }
+  }
+
+  // 恢复节点位置
+  for (const node of nodes) {
+    const pos = positions[node.id];
+    if (pos) node.position = pos;
   }
 
   return { nodes, edges };

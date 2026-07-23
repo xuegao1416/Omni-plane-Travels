@@ -12,6 +12,8 @@ import type {
   PeriodicRule,
 } from './schema';
 import { evaluate, type EvaluateResult, type EvaluateLimits } from './ruleEngine';
+import type { WorkflowDefinition } from './workflowSchema';
+import { executeWorkflowAsEvaluation } from './workflowBridge';
 
 export interface RegisteredEventRules {
   eventPackId: string;
@@ -24,6 +26,8 @@ export interface RegisteredEventRules {
   displayName?: string;
   /** 来源：world=世界内置（随世界加载、不可卸载）；user=用户安装的包 */
   source?: 'world' | 'user';
+  /** 工作流定义（可选，有此字段时用工作流引擎替代规则引擎） */
+  workflow?: WorkflowDefinition;
 }
 
 export interface TickEvaluation {
@@ -43,7 +47,11 @@ export class EventWorldEvolution {
   private limits?: Partial<EvaluateLimits>;
 
   registerPack(pack: RegisteredEventRules): void {
-    this.packs.set(pack.eventPackId, { ...pack, periodicRules: pack.periodicRules ?? [] });
+    this.packs.set(pack.eventPackId, {
+      ...pack,
+      periodicRules: pack.periodicRules ?? [],
+      workflow: pack.workflow,
+    });
   }
 
   unregisterPack(packId: string): void {
@@ -90,13 +98,30 @@ export class EventWorldEvolution {
 
     for (const pack of this.packs.values()) {
       try {
-        const r = evaluate(current, pack.rules, {
-          permissions: pack.permissions,
-          runtime: pack.runtime,
-          tick,
-          limits: this.limits,
-          events,
-        });
+        let r: EvaluateResult;
+
+        if (pack.workflow) {
+          // 工作流模式：用工作流引擎执行
+          r = executeWorkflowAsEvaluation(
+            pack.workflow,
+            current,
+            tick,
+            events,
+            pack.runtime,
+            pack.eventPackId,
+            pack.permissions,
+          );
+        } else {
+          // 传统模式：用规则引擎执行
+          r = evaluate(current, pack.rules, {
+            permissions: pack.permissions,
+            runtime: pack.runtime,
+            tick,
+            limits: this.limits,
+            events,
+          });
+        }
+
         r.eventPackId = pack.eventPackId;
         current = r.ctx;
         results.push(r);

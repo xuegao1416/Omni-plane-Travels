@@ -150,14 +150,14 @@ export default function GameScreen() {
           enabledIds = [];
         }
       }
-      // 所有内置包必须绑定当前世界才加载（防止跨世界污染）
+      // 所有包必须绑定当前世界才加载（防止跨世界污染）
       if (worldDef) {
         const allRecs = await allWebEvents().catch(() => []);
-        const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId]));
+        const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId ?? r.manifest.worldId]));
         enabledIds = enabledIds.filter(id => {
           const wId = worldIdMap.get(id);
-          if (!wId) return true; // 无 worldId 的用户自建包正常加载
-          return wId === worldDef.id; // 有 worldId 的内置包必须匹配
+          if (!wId) return true; // 无 worldId 的全局包正常加载
+          return wId === worldDef.id; // 有 worldId 的包必须匹配当前世界
         });
       }
       if (cancelled) return;
@@ -198,18 +198,28 @@ export default function GameScreen() {
           if (!rec) continue;
           const rules: EventRule[] = [];
           const periodicRules: PeriodicRule[] = [];
-          const raw = rec.files['schema/rules.json'];
-          if (typeof raw === 'string') {
-            const rf = JSON.parse(raw) as RuleFile;
-            if (rf.rules) rules.push(...rf.rules);
-            if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
+          let workflow: import('../../modules/workflowSchema').WorkflowDefinition | undefined;
+          // 优先读工作流格式
+          const wfRaw = rec.files['schema/workflow.json'];
+          if (typeof wfRaw === 'string') {
+            try { workflow = JSON.parse(wfRaw); } catch { /* 损坏 */ }
           }
-          if (rules.length > 0 || periodicRules.length > 0) {
+          // 回退读规则格式
+          if (!workflow) {
+            const raw = rec.files['schema/rules.json'];
+            if (typeof raw === 'string') {
+              const rf = JSON.parse(raw) as RuleFile;
+              if (rf.rules) rules.push(...rf.rules);
+              if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
+            }
+          }
+          if (workflow || rules.length > 0 || periodicRules.length > 0) {
             const savedRuntime = gameState.simulationRuntime?.eventRuntimes?.[id];
             eventWorldEvolution.registerPack({
               eventPackId: id,
               rules,
               periodicRules,
+              workflow,
               permissions: rec.manifest.permissions ?? [],
               runtime: savedRuntime ?? { onceFired: {}, cooldownRemaining: {} },
               source: rec.builtin ? 'world' : 'user',

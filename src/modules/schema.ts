@@ -608,6 +608,8 @@ export interface RuleFile {
   rules: EventRule[];
   /** 周期规则（与 rules 平级，随事件包分享；运行时注册进 eventWorldEvolution 按 tick 静默结算） */
   periodicRules?: PeriodicRule[];
+  /** 节点位置（编辑器画布坐标，不参与规则逻辑，仅用于还原布局） */
+  nodePositions?: Record<string, { x: number; y: number }>;
 }
 
 // ─── React Flow 节点图（规则编辑器） ───
@@ -626,6 +628,8 @@ export interface EventGraphNode {
   id: string;
   kind: EventNodeKind;
   label: string;
+  /** 节点在画布上的位置（可选，自动布局或手动拖拽后持久化） */
+  position?: { x: number; y: number };
   /** 触发条件（trigger / condition 节点承载，对应 EventRule.when） */
   when?: Condition;
   /** 动作序列（effect 节点承载，对应 EventRule.then） */
@@ -717,6 +721,8 @@ export interface Manifest {
   assets?: { path: string; kind: AssetKind; size: number }[];
   checksum?: { manifest: string; assets: Record<string, string> };
   signature?: string | null;
+  /** 绑定世界 ID（仅该世界的存档可见；为空则全局可见） */
+  worldId?: string;
 }
 
 // ─── 发现态 / 注册表 / 校验 / 详情 ───

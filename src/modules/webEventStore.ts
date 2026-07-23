@@ -43,7 +43,7 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.6.6';
+const APP_VERSION = '2.6.7';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
@@ -482,10 +482,50 @@ export async function savePeriodicRulesToPack(packId: string, periodicRules: Per
 }
 
 /**
+ * 保存工作流定义到事件包（落 schema/workflow.json）。
+ * 同时自动生成 rules.json 供旧引擎兼容。
+ */
+export async function saveWorkflowToPack(packId: string, workflow: import('./workflowSchema').WorkflowDefinition): Promise<void> {
+  const { workflowToRuleFile } = await import('./workflowConverters');
+  const rec = await getWebEvent(packId);
+  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
+  // 保存工作流原始格式
+  rec.files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
+  // 同时生成 rules.json 兼容旧引擎
+  const rf = workflowToRuleFile(workflow);
+  rec.files['schema/rules.json'] = JSON.stringify(rf, null, 2);
+  await putWebEvent(rec);
+}
+
+/**
+ * 从事件包加载工作流定义。
+ * 优先读 schema/workflow.json，不存在则从 schema/rules.json 转换。
+ */
+export async function loadWorkflowFromPack(packId: string): Promise<import('./workflowSchema').WorkflowDefinition | null> {
+  const { ruleFileToWorkflow } = await import('./workflowConverters');
+  const rec = await getWebEvent(packId);
+  if (!rec) return null;
+  // 优先读工作流格式
+  const wfRaw = rec.files['schema/workflow.json'];
+  if (typeof wfRaw === 'string') {
+    try { return JSON.parse(wfRaw) as import('./workflowSchema').WorkflowDefinition; } catch { /* 损坏 */ }
+  }
+  // 回退：从 rules.json 转换
+  const rfRaw = rec.files['schema/rules.json'];
+  if (typeof rfRaw === 'string') {
+    try {
+      const rf = JSON.parse(rfRaw) as import('./schema').RuleFile;
+      return ruleFileToWorkflow(rf, packId);
+    } catch { /* 损坏 */ }
+  }
+  return null;
+}
+
+/**
  * 新建一条空白规则（manifest type='rule' + 空 schema/rules.json）。
  * 返回新建包 id，供事件中心「新建规则」后直接打开 RuleEditor。
  */
-export async function createRule(): Promise<string> {
+export async function createRule(worldId?: string): Promise<string> {
   const id = `rule-${Date.now()}`;
   const manifest: Manifest = {
     id,
@@ -503,6 +543,7 @@ export async function createRule(): Promise<string> {
     loadOrder: 100,
     permissions: [],
     cards: [],
+    ...(worldId ? { worldId } : {}),
   };
   const rec: WebEventRecord = {
     id,
@@ -524,7 +565,7 @@ export async function createRule(): Promise<string> {
  * 类比「创建游戏存档」：点击即生成一个空的、已持久化的包，随后在编辑器里往里加事件。
  * 返回新建包 id，供事件中心「新建事件包」后直接打开编辑器。
  */
-export async function createEmptyPack(defaultName = '我的卡片事件包'): Promise<string> {
+export async function createEmptyPack(defaultName = '我的卡片事件包', worldId?: string): Promise<string> {
   const id = `pack-${Date.now()}`;
   const manifest: Manifest = {
     id,
@@ -542,6 +583,7 @@ export async function createEmptyPack(defaultName = '我的卡片事件包'): Pr
     loadOrder: 100,
     permissions: ['add_card'],
     cards: [],
+    ...(worldId ? { worldId } : {}),
   };
   const file: EventPackFile = { version: 1, name: defaultName, events: [] };
   const rec: WebEventRecord = {
@@ -581,7 +623,7 @@ export async function listEventsInPack(packId: string): Promise<EventDef[]> {
  */
 export async function createPackWithEvent(
   event: EventDef,
-  meta: { id: string; name: string; version?: string; coverColor?: string; icon?: string; type: EventPackType; periodicRules?: PeriodicRule[] },
+  meta: { id: string; name: string; version?: string; coverColor?: string; icon?: string; type: EventPackType; periodicRules?: PeriodicRule[]; worldId?: string },
 ): Promise<string> {
   const manifest: Manifest = {
     id: meta.id,
@@ -595,6 +637,7 @@ export async function createPackWithEvent(
     coverColor: meta.coverColor ?? '#3b82f6',
     icon: meta.icon ?? 'Package',
     enabledByDefault: false,
+    ...(meta.worldId ? { worldId: meta.worldId } : {}),
   };
   const file: EventPackFile = {
     version: 1,
@@ -685,6 +728,15 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
         periodicRules: pack.periodicRules ?? [],
       };
       files['schema/rules.json'] = JSON.stringify(ruleFile, null, 2);
+      // 同时生成 workflow.json（新工作流格式）
+      try {
+        const { WORLD_WORKFLOWS } = await import('./worldWorkflows');
+        const workflowFn = WORLD_WORKFLOWS[world.id];
+        if (workflowFn) {
+          const workflow = workflowFn();
+          files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
+        }
+      } catch { /* 世界工作流生成失败不影响旧规则 */ }
       // 规则包也需要 events.json（空的，供索引用）
       files['schema/events.json'] = JSON.stringify({ version: 1, events: [] } as EventPackFile, null, 2);
     } else if (packType === 'card') {

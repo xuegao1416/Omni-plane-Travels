@@ -409,22 +409,33 @@ export class WorldSimulationEngine {
           // 清空 pending
           if (gameState.simulationRuntime) gameState.simulationRuntime.pendingAddEvents = [];
           for (const ev of addEventActions) {
-            const rec = await getWebEvent(ev.eventPackId);
-            if (!rec) continue;
-            // 从 IndexedDB 文件中找事件定义
-            for (const [key, val] of Object.entries(rec.files)) {
-              if (typeof val !== 'string' || !key.startsWith('schema/event-')) continue;
-              try {
-                const parsed = JSON.parse(val);
-                const matchEvt = Array.isArray(parsed)
-                  ? parsed.find((e: { id?: string }) => e.id === ev.eventId)
-                  : parsed.id === ev.eventId ? parsed : null;
-                if (matchEvt?.cards) {
-                  for (const card of matchEvt.cards) {
-                    eventBus.emit(EVENTS.EVENT_CARD, { cardId: card.id, eventPackId: ev.eventPackId });
+            // 先查指定包，找不到再搜所有已启用包（fallback）
+            const packsToSearch = [ev.eventPackId];
+            if (eventWorldEvolution.has(ev.eventPackId) === false) {
+              // eventPackId 指向的包未注册，搜所有已注册包
+              packsToSearch.push(...eventWorldEvolution.list().map(p => p.eventPackId));
+            }
+            let found = false;
+            for (const packId of packsToSearch) {
+              if (found) break;
+              const rec = await getWebEvent(packId);
+              if (!rec) continue;
+              for (const [key, val] of Object.entries(rec.files)) {
+                if (typeof val !== 'string' || !key.startsWith('schema/event-')) continue;
+                try {
+                  const parsed = JSON.parse(val);
+                  const matchEvt = Array.isArray(parsed)
+                    ? parsed.find((e: { id?: string }) => e.id === ev.eventId)
+                    : parsed.id === ev.eventId ? parsed : null;
+                  if (matchEvt?.cards) {
+                    for (const card of matchEvt.cards) {
+                      eventBus.emit(EVENTS.EVENT_CARD, { cardId: card.id, eventPackId: packId });
+                    }
+                    found = true;
+                    break;
                   }
-                }
-              } catch { /* 单文件隔离 */ }
+                } catch { /* 单文件隔离 */ }
+              }
             }
           }
         } catch (addEventErr) {

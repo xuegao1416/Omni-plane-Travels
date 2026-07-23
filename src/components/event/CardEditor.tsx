@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useIsPhone } from '../../hooks/useIsMobile';
 import JSZip from 'jszip';
 import {
   ArrowLeft, FileText, ScrollText, ListChecks, Eye, ShieldCheck, Settings, Pencil,
   Download, Save, Braces, Plus, Trash2, ArrowUp, ArrowDown, BookOpen, X, AlertTriangle, Check, Package,
-  Layers, Loader2, Lock,
+  Layers, Loader2, Lock, PanelLeft, SlidersHorizontal,
 } from 'lucide-react';
 import type { CardFile, PuckData, CardDef, Manifest, ValidationIssue, EventPackType, ChoiceOption, ChoiceEffect, PeriodicRule, RuleFile, EventDef, EventPackFile } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
@@ -21,7 +22,7 @@ import { textOn } from './colorUtils';
    产出 schema 兼容的 CardFile（puck: PuckData）。若后续接入真正的 React Puck 编辑器，
    仅需替换画布层，下面对外契约（CardFile / 导出 .opt-event）保持不变。 */
 
-const APP_VERSION = '2.6.6';
+const APP_VERSION = '2.6.7';
 
 const BLOCK_TYPES = ['title', 'narrative', 'choice'] as const;
 type BlockType = (typeof BLOCK_TYPES)[number];
@@ -230,9 +231,13 @@ export interface CardEditorProps {
 type Mode = 'visual' | 'json';
 
 export default function CardEditor({ eventPackId, onBack, gameState, onSaved, worldDef: worldDefProp }: CardEditorProps) {
+  const isPhone = useIsPhone();
   const [blocks, setBlocks] = useState<CardBlock[]>([defaultBlock('title'), defaultBlock('narrative')]);
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('visual');
+  const [mobileEventPanel, setMobileEventPanel] = useState(false);
+  const [mobileBlockPanel, setMobileBlockPanel] = useState(false);
+  const [mobilePropsPanel, setMobilePropsPanel] = useState(false);
   const [jsonText, setJsonText] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
@@ -750,15 +755,14 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       {/* 顶栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0 }}>
-        <button className="btn-ghost btn-sm" onClick={onBack} style={{ minHeight: 'var(--touch-min)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <ArrowLeft size={16} /> 返回
+      <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 'var(--space-3)', padding: isPhone ? '6px 8px' : '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0, overflow: 'hidden' }}>
+        <button className="btn-ghost btn-sm" onClick={onBack} style={{ minHeight: isPhone ? 36 : 'var(--touch-min)', minWidth: isPhone ? 36 : undefined, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isPhone ? '4px' : undefined }}>
+          <ArrowLeft size={16} />{!isPhone && ' 返回'}
         </button>
-          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
-          {/* 事件包名称：可直接改名，点「保存事件包」时落盘。铅笔统一在可编辑标签左侧（size=14, aria-label=可编辑） */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-            <Package size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <Pencil size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="可编辑" />
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2, flexShrink: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 4 : 6, minWidth: 0 }}>
+            {!isPhone && <Package size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+            {!isPhone && <Pencil size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="可编辑" />}
             <input
               value={manifest.name}
               onChange={(e) => {
@@ -769,69 +773,58 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               aria-label="事件包名称"
               title="点击修改事件包名称，保存后生效"
               style={{
-                fontFamily: 'var(--font-display)', fontSize: 'var(--font-size-lg)', fontWeight: 600,
+                fontFamily: 'var(--font-display)', fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-lg)', fontWeight: 600,
                 color: 'var(--text-primary)', border: '1px solid transparent', background: 'transparent',
-                borderRadius: 'var(--radius-sm)', padding: '2px 6px', minWidth: 0, maxWidth: 320,
-                outline: 'none',
+                borderRadius: 'var(--radius-sm)', padding: '2px 6px', minWidth: 0, maxWidth: isPhone ? 160 : 320,
+                outline: 'none', overflow: 'hidden', textOverflow: 'ellipsis',
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
               onBlur={(e) => (e.currentTarget.style.borderColor = 'transparent')}
             />
           </div>
-          {/* 面包屑仅静态文字：事件 / 叙事卡片（事件改名入口已移至左侧「当前事件」区，不再出现在顶部） */}
-          <nav aria-label="事件层级" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-xs)', lineHeight: 1.2, flexWrap: 'wrap', minWidth: 0 }}>
-            <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>事件</span>
-            <span style={{ color: 'var(--text-muted)' }}>/</span>
-            <span style={{ color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap' }}>叙事卡片</span>
-          </nav>
-          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {currentPackId ? `包 ID：${currentPackId}` : '新事件包 · 首次保存时创建'}
-          </span>
+          {!isPhone && (
+            <>
+              <nav aria-label="事件层级" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-size-xs)', lineHeight: 1.2, flexWrap: 'wrap', minWidth: 0 }}>
+                <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>事件</span>
+                <span style={{ color: 'var(--text-muted)' }}>/</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap' }}>叙事卡片</span>
+              </nav>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentPackId ? `包 ID：${currentPackId}` : '新事件包 · 首次保存时创建'}
+              </span>
+            </>
+          )}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+        <div className="event-toolbar-scroll" style={{ marginLeft: 'auto', display: 'flex', gap: isPhone ? '2px' : 'var(--space-2)', alignItems: 'center', minWidth: 0, flexShrink: 1, overflowX: 'auto', overflowY: 'hidden' }}>
           {/* 世界绑定 */}
           {worldBound && worldDef ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <Lock size={12} /> {worldDef.name}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <Lock size={12} /> {isPhone ? worldDef.name.slice(0, 3) : worldDef.name}
             </span>
           ) : confirmWorld ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <span style={{ color: 'var(--text-muted)' }}>绑定「{confirmWorld.name}」？</span>
-              <button className="btn-primary btn-sm" onClick={() => void handleConfirmWorld()} style={{ padding: '2px 8px', fontSize: 'var(--font-size-xs)' }}>确认</button>
-              <button className="btn-ghost btn-sm" onClick={handleCancelWorld} style={{ padding: '2px 6px', fontSize: 'var(--font-size-xs)' }}>取消</button>
+              {!isPhone && <span style={{ color: 'var(--text-muted)' }}>绑定「{confirmWorld.name}」？</span>}
+              <button className="btn-primary btn-xs" onClick={() => void handleConfirmWorld()} style={{ padding: isPhone ? '2px 4px' : '2px 8px', fontSize: 'var(--font-size-xs)' }}>确认</button>
+              <button className="btn-ghost btn-xs" onClick={handleCancelWorld} style={{ padding: isPhone ? '2px 4px' : '2px 6px' }}><X size={12} /></button>
             </span>
           ) : showWorldPicker ? (
-            <select
-              autoFocus
-              value=""
-              onChange={(e) => e.target.value && handlePickWorld(e.target.value)}
-              onBlur={() => setShowWorldPicker(false)}
-              style={{ padding: '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', width: 140, flexShrink: 0 }}
-            >
-              <option value="" disabled>选择世界…</option>
-              {getAllWorlds().map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
+            <select autoFocus value="" onChange={(e) => e.target.value && handlePickWorld(e.target.value)} onBlur={() => setShowWorldPicker(false)} style={{ padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', width: isPhone ? 70 : 140, flexShrink: 0 }}>
+              <option value="" disabled>世界…</option>
+              {getAllWorlds().map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           ) : (
-            <button className="btn-secondary btn-sm" onClick={handleLoadWorld} disabled={!currentPackId} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <BookOpen size={14} /> 读取世界
+            <button className="btn-secondary btn-sm" onClick={handleLoadWorld} disabled={!currentPackId} style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 0 : 6, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px 6px' : undefined, flexShrink: 0, whiteSpace: 'nowrap' }}>
+              <BookOpen size={14} /> {!isPhone && '读取世界'}
             </button>
           )}
-          <button className="btn-secondary btn-sm" onClick={() => setShowPreview(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Eye size={15} /> 预览</button>
-          <button className="btn-secondary btn-sm" onClick={runValidate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> 校验</button>
-          <button className="btn-primary btn-sm" onClick={() => void handleSaveEvent()} disabled={saving} title="保存当前事件及事件包元信息" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Save size={15} /> 保存事件包</button>
-          <button className="btn-secondary btn-sm" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Download size={15} /> 导出</button>
-          <button
-            className={mode === 'json' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
-            onClick={() => (mode === 'json' ? backToVisual() : enterJson())}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <Braces size={15} /> {mode === 'json' ? '可视化' : '</> JSON'}
-          </button>
-          <button className="btn-ghost btn-sm" onClick={() => setShowSettings((s) => !s)} aria-label="事件设置" style={{ display: 'inline-flex', alignItems: 'center' }}>
-            <Settings size={15} />
-          </button>
+          {/* 保存 */}
+          <button className="btn-primary btn-sm" onClick={() => void handleSaveEvent()} disabled={saving} title="保存" style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 0 : 6, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px 6px' : undefined, flexShrink: 0 }}><Save size={14} /> {!isPhone && '保存事件包'}</button>
+          {/* 桌面端：预览/校验/导出/JSON/设置 */}
+          {!isPhone && <button className="btn-secondary btn-sm" onClick={() => setShowPreview(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Eye size={15} /> 预览</button>}
+          {!isPhone && <button className="btn-secondary btn-sm" onClick={runValidate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> 校验</button>}
+          {!isPhone && <button className="btn-secondary btn-sm" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Download size={15} /> 导出</button>}
+          <button className={mode === 'json' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={() => (mode === 'json' ? backToVisual() : enterJson())} style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 0 : 6, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px 6px' : undefined, flexShrink: 0 }}><Braces size={14} /> {mode === 'json' ? '可视化' : !isPhone && '</> JSON'}</button>
+          <button className="btn-ghost btn-sm" onClick={() => setShowSettings((s) => !s)} aria-label="事件设置" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: isPhone ? 32 : undefined, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px' : undefined, flexShrink: 0 }}><Settings size={isPhone ? 14 : 15} /></button>
         </div>
       </div>
 
@@ -902,8 +895,9 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* 叙事卡片编辑区（周期事件已移至专门的「周期包」编辑，见 EventsScreen.periodic） */}
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '240px 1fr var(--right-panel-width)', overflow: 'hidden' }}>
-          {/* 左栏：上=事件列表，下=组件库（不新增第 4 列，保持画布宽度） */}
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isPhone ? '1fr' : '240px 1fr var(--right-panel-width)', overflow: 'hidden', position: 'relative' }}>
+          {/* 左栏：上=事件列表，下=组件库（桌面端内联 / 移动端隐藏） */}
+          {!isPhone && (
           <div style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* 事件列表（上区，maxHeight 40%） */}
             <div style={{ maxHeight: '40%', overflow: 'auto', padding: 'var(--space-3)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -959,6 +953,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>点击或拖拽到画布添加</div>
             </div>
           </div>
+          )}
 
           {/* 画布 */}
           <div
@@ -967,7 +962,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               const t = e.dataTransfer.getData('text/block-type') as BlockType;
               if (t && BLOCK_TYPES.includes(t)) addBlock(t);
             }}
-            style={{ overflow: 'auto', padding: 'var(--space-4)', background: 'var(--bg-primary)', backgroundImage: 'linear-gradient(var(--canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px)', backgroundSize: '24px 24px' }}
+            style={{ overflow: 'auto', padding: 'var(--space-4)', background: 'var(--bg-primary)', backgroundImage: 'linear-gradient(var(--canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px)', backgroundSize: '24px 24px', position: 'relative' }}
           >
             {blocks.length === 0 ? (
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>从左侧拖入组件开始编辑</div>
@@ -1008,9 +1003,88 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
                 );
               })
             )}
+
+            {/* 移动端浮动按钮 */}
+            {isPhone && (
+              <div style={{ position: 'absolute', bottom: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', zIndex: 10 }}>
+                <button onClick={() => setMobileEventPanel(true)} aria-label="事件列表" style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}><Layers size={20} /></button>
+                <button onClick={() => setMobileBlockPanel(true)} aria-label="组件库" style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}><Plus size={20} /></button>
+                {selectedBlock && (
+                  <button onClick={() => setMobilePropsPanel(true)} aria-label="属性" style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--accent)', color: 'var(--color-on-accent, #fff)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}><SlidersHorizontal size={20} /></button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* 属性面板 */}
+          {/* 移动端事件列表 — 底部抽屉 */}
+          {isPhone && mobileEventPanel && (
+            <>
+              <div className="event-overlay" onClick={() => setMobileEventPanel(false)} />
+              <div className="event-bottom-sheet" style={{ padding: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>事件列表</span>
+                  <button onClick={() => setMobileEventPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><X size={18} /></button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>事件</span>
+                  <button className="btn-secondary btn-sm" onClick={() => void handleNewEvent()} disabled={saving} style={{ fontSize: 'var(--font-size-xs)' }}><Plus size={14} /> 新建</button>
+                </div>
+                {eventList.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 'var(--space-4)' }}>暂无事件</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                    {eventList.map((ev) => (
+                      <EventRow key={ev.id} event={ev} selected={ev.id === selectedEventId} loading={eventsLoading && ev.id === selectedEventId} disabled={saving || eventsLoading} onSelect={() => { void selectEvent(ev.id); setMobileEventPanel(false); }} onDelete={() => setDeleteTarget(ev.id)} onRename={(name) => { setEventName(name); if (currentPackId) void renameEventInPack(currentPackId, ev.id, name).then(() => void refreshEventList()); }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* 移动端组件库 — 底部抽屉 */}
+          {isPhone && mobileBlockPanel && (
+            <>
+              <div className="event-overlay" onClick={() => setMobileBlockPanel(false)} />
+              <div className="event-bottom-sheet" style={{ padding: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>组件库</span>
+                  <button onClick={() => setMobileBlockPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><X size={18} /></button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
+                  {BLOCK_TYPES.map((t) => {
+                    const Icon = BLOCK_META[t].icon;
+                    return (
+                      <button key={t} onClick={() => { addBlock(t); setMobileBlockPanel(false); }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-primary)', cursor: 'pointer', color: 'var(--text-primary)', minHeight: 44 }}>
+                        <Icon size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{BLOCK_META[t].label}</div>
+                          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', lineHeight: 1.3 }}>{BLOCK_META[t].desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* 移动端属性面板 — 右侧滑出 */}
+          {isPhone && mobilePropsPanel && selectedBlock && (
+            <>
+              <div className="event-overlay" onClick={() => setMobilePropsPanel(false)} />
+              <div className="event-right-sheet" style={{ padding: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>卡片属性</span>
+                  <button onClick={() => setMobilePropsPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><X size={18} /></button>
+                </div>
+                <BlockProperties block={selectedBlock} onChange={updateSelected} onOpenWorldBook={() => { setWbTarget(selectedBlock.id); setWbOpen(true); }} gameState={gameState} />
+              </div>
+            </>
+          )}
+
+          {/* 属性面板（桌面端内联 / 移动端隐藏） */}
+          {!isPhone && (
           <div style={{ borderLeft: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'auto', padding: 'var(--space-3)' }}>
             {!selectedBlock ? (
               <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>选中一个卡片以编辑属性</div>
@@ -1018,16 +1092,17 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <BlockProperties block={selectedBlock} onChange={updateSelected} onOpenWorldBook={() => { setWbTarget(selectedBlock.id); setWbOpen(true); }} gameState={gameState} />
             )}
           </div>
+          )}
           </div>
         </div>
       )}
 
       {/* 底栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: '6px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>
-        <span>缩放 100%</span>
-        <span>网格对齐 开</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-2)' : 'var(--space-4)', padding: isPhone ? '4px 8px' : '6px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flexShrink: 0, overflow: 'hidden' }}>
+        {!isPhone && <span>缩放 100%</span>}
+        {!isPhone && <span>网格对齐 开</span>}
         <span style={{ color: saved ? 'var(--success)' : 'var(--text-muted)' }}>{saved ? '● 已存库' : '○ 未保存'}</span>
-        <span>周期事件 {periodicRules.length}</span>
+        {!isPhone && <span>周期事件 {periodicRules.length}</span>}
         <span style={{ marginLeft: 'auto' }}>字数 {wordCount}</span>
       </div>
 

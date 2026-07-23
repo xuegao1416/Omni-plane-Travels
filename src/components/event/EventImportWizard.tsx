@@ -14,7 +14,7 @@ import { textOn } from './colorUtils';
    校验优先调用 eventApi.validate（Rust validate_event）；非 Tauri 环境下回退到本地结构化校验，
    二者合并展示。错误码沿用 API 文档的 EventErrorCode（MANIFEST_* 等）。 */
 
-const APP_VERSION = '2.6.6';
+const APP_VERSION = '2.6.7';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 

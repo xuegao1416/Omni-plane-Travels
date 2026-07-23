@@ -10,7 +10,7 @@ import EventCenter from './EventCenter';
 import EventLibrary from './EventLibrary';
 import CardEditor from './CardEditor';
 import EventErrorBoundary from './EventErrorBoundary';
-import RuleEditor from './RuleEditor';
+import WorkflowEditor from '../workflow/WorkflowEditor';
 import { WorldBookBrowser } from './WorldBookPicker';
 import EventImportWizard from './EventImportWizard';
 import './event.css';
@@ -20,6 +20,7 @@ type SubView = 'center' | 'library' | 'card' | 'rule' | 'worldbook' | 'wizard';
 /** 按事件包类型决定跳转的子视图 */
 function subViewForType(type: EventPackType): SubView {
   if (type === 'rule') return 'rule';
+  if (type === 'quest') return 'rule'; // 任务包用规则编辑器查看触发规则
   if (type === 'worldbook') return 'worldbook';
   return 'card'; // card / bundle 落入统一事件包编辑器
 }
@@ -31,7 +32,6 @@ export default function EventsScreen() {
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
   const [centerTab, setCenterTab] = useState<'rules' | 'custom'>('rules');
   const isPhone = useIsPhone();
-
   // 监听 packs:changed 自动失效缓存（非 Tauri 环境静默忽略）
   useEffect(() => {
     void ensureCacheListener();
@@ -44,13 +44,13 @@ export default function EventsScreen() {
 
   // 新建事件包：立即创建一个空白且已落盘的事件包，随后打开编辑器往里加事件
   const handleNewPack = async () => {
-    const packId = await createEmptyPack();
+    const packId = await createEmptyPack('我的卡片事件包');
     void eventApi.refresh();
     setSelectedPackId(packId);
     setSubView('card');
   };
 
-  // 新建规则 → 落库后直接打开 RuleEditor
+  // 新建规则 → 落库后直接打开工作流编辑器
   const handleNewRule = async () => {
     try {
       const id = await createRule();
@@ -100,7 +100,7 @@ export default function EventsScreen() {
           <h1 style={{ fontSize: isPhone ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 600, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap' }}>
             {title}
           </h1>
-          <div style={{ display: 'flex', gap: isPhone ? 'var(--space-2)' : 'var(--space-3)', marginLeft: 'auto' }}>
+          <div style={{ display: 'flex', gap: isPhone ? 'var(--space-2)' : 'var(--space-3)', marginLeft: 'auto', alignItems: 'center' }}>
             <TabButton active={subView === 'center'} onClick={() => setSubView('center')}>
               事件中心
             </TabButton>
@@ -166,7 +166,7 @@ export default function EventsScreen() {
         {subView === 'rule' && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
             <EventErrorBoundary onBack={goCenter}>
-              <RuleEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
+              <WorkflowEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
             </EventErrorBoundary>
           </div>
         )}
