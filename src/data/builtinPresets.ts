@@ -136,7 +136,7 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
   {
     id: 'builtin_display_dice_roll_start',
     scriptName: '骰子检定-开始',
-    findRegex: '\\[DICE_ROLL\\]\\s*\\{["\']?attr["\']?\\s*:\\s*"([^"]*)"\\s*,\\s*["\']?dc["\']?\\s*:\\s*([0-9]+)\\s*\\}',
+    findRegex: '\\[DICE_ROLL\\]\\s*\\{["\']?attr["\']?\\s*:\\s*"([^"]*)"\\s*,\\s*["\']?dc["\']?\\s*:\\s*([0-9]+)\\s*\\}\\s*(\\[/DICE_ROLL\\])?',
     replaceString: '<div class="dice-roll-placeholder" data-attr="$1" data-dc="$2"></div>',
     placement: [2],
     disabled: false,

@@ -6,8 +6,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import {
-  ArrowLeft, Save, Download, Trash2, Plus, Settings, BookOpen,
+  ArrowLeft, Save, Download, Trash2, Plus, Settings, MoreHorizontal,
   Layers, Loader2, Lock, Check, AlertTriangle, LayoutDashboard,
+  PanelLeft, SlidersHorizontal,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import type {
@@ -15,7 +16,6 @@ import type {
   PeriodicRule, EventDef, EventPackFile,
 } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
-import { getAllWorldBookEntries, WorldBookPicker } from './WorldBookPicker';
 import { getWebEvent, putWebEvent } from '../../modules/eventDb';
 import { saveEventToPack, listEventsInPack, savePackMeta, deleteEventFromPack } from '../../modules/webEventStore';
 import { findWorldDef, getAllWorlds } from '../../data/worldLoader';
@@ -96,8 +96,10 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
   const [saved, setSaved] = useState(true);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [showPalette, setShowPalette] = useState(true);
-  const [wbOpen, setWbOpen] = useState(false);
+  const [showPalette, setShowPalette] = useState(!isPhone);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [mobileNodePanel, setMobileNodePanel] = useState(false);
+  const [mobileEventList, setMobileEventList] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [worldBound, setWorldBound] = useState(false);
   const [localWorldDef, setLocalWorldDef] = useState<WorldDef | undefined>(worldDefProp);
@@ -345,118 +347,112 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
       {/* 顶部工具栏 */}
-      <div style={{
-        padding: 'var(--space-2) var(--space-3)',
+      <div className="event-toolbar-scroll" style={{
+        padding: isPhone ? '6px 8px' : 'var(--space-2) var(--space-3)',
         borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+        display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 'var(--space-2)',
+        flexShrink: 0, overflow: 'hidden',
       }}>
-        <button onClick={onBack} className="btn-ghost btn-sm" title="返回"><ArrowLeft size={16} /></button>
-        <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{manifest.name || '未命名事件包'}</span>
-
+        <button onClick={onBack} className="btn-ghost btn-sm" title="返回" style={{ minHeight: isPhone ? 36 : 'var(--touch-min)', minWidth: isPhone ? 36 : undefined, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isPhone ? '4px' : undefined }}>
+          <ArrowLeft size={16} />{!isPhone && ' 返回'}
+        </button>
+        <h1 style={{ fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-lg)', fontWeight: 600, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>
+          {manifest.name || '未命名事件包'}
+        </h1>
         {issues.length > 0 && (
-          <span style={{ color: 'var(--danger)', fontSize: 'var(--font-size-xs)', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+          <span style={{ color: 'var(--danger)', fontSize: 'var(--font-size-xs)', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <AlertTriangle size={14} /> {issues.length}
           </span>
         )}
-
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-          <button onClick={handleSaveEvent} className="btn-primary btn-sm" disabled={saving || saved} title="保存">
+        <div className="event-toolbar-scroll" style={{ marginLeft: 'auto', display: 'flex', gap: isPhone ? '2px' : 'var(--space-2)', alignItems: 'center', minWidth: 0, flexShrink: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+          {/* 保存 */}
+          <button onClick={handleSaveEvent} className="btn-primary btn-sm" disabled={saving || saved} title="保存" style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 0 : 6, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px 6px' : undefined, flexShrink: 0 }}>
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {!isPhone && (saved ? '已保存' : '保存')}
           </button>
-          <button onClick={handleDeleteSelected} className="btn-ghost btn-sm" title="删除选中节点" style={{ color: 'var(--danger)' }}>
-            <Trash2 size={14} />
-          </button>
-          <button onClick={handleAutoLayout} className="btn-ghost btn-sm" title="整理布局">
-            <LayoutDashboard size={14} /> {!isPhone && '整理'}
-          </button>
-          <button onClick={() => setShowPalette(!showPalette)} className="btn-ghost btn-sm" title="节点面板">
-            <Plus size={14} />
-          </button>
-          <button onClick={handleExport} className="btn-ghost btn-sm" title="导出">
-            <Download size={14} />
-          </button>
-          <button onClick={() => setShowSettings(!showSettings)} className="btn-ghost btn-sm" title="设置">
-            <Settings size={14} />
-          </button>
+          {/* 桌面端：删除/整理/导出/设置 */}
+          {!isPhone && (
+            <>
+              <button onClick={handleDeleteSelected} className="btn-ghost btn-sm" title="删除选中节点" style={{ color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Trash2 size={14} /></button>
+              <button onClick={handleAutoLayout} className="btn-ghost btn-sm" title="整理布局" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><LayoutDashboard size={14} /> 整理</button>
+              <button onClick={handleExport} className="btn-ghost btn-sm" title="导出" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Download size={14} /></button>
+              <button onClick={() => setShowSettings(!showSettings)} className="btn-ghost btn-sm" title="设置" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Settings size={14} /></button>
+            </>
+          )}
+          {/* 手机端：整理/删除 */}
+          {isPhone && (
+            <>
+              <button onClick={handleAutoLayout} title="整理" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32, padding: '4px', flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><LayoutDashboard size={14} /></button>
+            </>
+          )}
+          {/* 世界绑定 */}
+          {worldBound && worldDef && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <Lock size={12} /> {isPhone ? worldDef.name.slice(0, 3) : worldDef.name}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* 主体：事件列表 + 节点面板 + 画布 */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* 事件列表 */}
-        <div style={{
-          width: isPhone ? 48 : 180,
-          borderRight: '1px solid var(--border)',
-          overflow: 'auto',
-          background: 'var(--bg-secondary)',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border)' }}>
-            <button onClick={handleNewEvent} className="btn-secondary btn-sm" style={{ width: '100%' }}>
-              <Plus size={14} /> {!isPhone && '新事件'}
-            </button>
+      {/* 主体：桌面端 三栏 / 手机端 纯画布 */}
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isPhone ? '1fr' : '180px 1fr 220px', overflow: 'hidden', position: 'relative' }}>
+        {/* 左侧：事件列表（桌面端内联 / 手机端隐藏） */}
+        {!isPhone && (
+          <div style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border)' }}>
+              <button onClick={handleNewEvent} className="btn-secondary btn-sm" style={{ width: '100%' }}>
+                <Plus size={14} /> 新事件
+              </button>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {eventList.map((entry) => (
+                <div
+                  key={entry.id}
+                  onClick={() => handleSelectEvent(entry.id)}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    cursor: 'pointer',
+                    background: selectedEventId === entry.id ? 'var(--bg-active)' : 'transparent',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                  }}
+                >
+                  <Layers size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {entry.name}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteEvent(entry.id); }}
+                    className="btn-ghost btn-sm"
+                    style={{ color: 'var(--danger)', padding: 2 }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            {eventList.map((entry) => (
-              <div
-                key={entry.id}
-                onClick={() => handleSelectEvent(entry.id)}
-                style={{
-                  padding: isPhone ? 'var(--space-2)' : 'var(--space-2) var(--space-3)',
-                  cursor: 'pointer',
-                  background: selectedEventId === entry.id ? 'var(--bg-active)' : 'transparent',
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                }}
-              >
-                <Layers size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                {!isPhone && (
-                  <>
-                    <span style={{ flex: 1, fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {entry.name}
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteEvent(entry.id); }}
-                      className="btn-ghost btn-sm"
-                      style={{ color: 'var(--danger)', padding: 2 }}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
-        {/* 节点面板 */}
-        {showPalette && <CardNodePalette onAddNode={handleAddNode} />}
-
-        {/* 画布区域 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* 事件名 */}
-          <div style={{
-            padding: 'var(--space-2) var(--space-3)',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-            background: 'var(--bg-secondary)',
-          }}>
-            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>事件:</span>
-            <input
-              type="text"
-              value={eventName}
-              onChange={(e) => { setEventName(e.target.value); setSaved(false); }}
-              style={{ flex: 1, padding: '2px 6px', fontSize: 'var(--font-size-sm)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}
-            />
-            {worldBound && worldDef && (
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Lock size={12} /> {worldDef.name}
-              </span>
-            )}
-          </div>
+        {/* 中间：画布 */}
+        <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {/* 事件名（桌面端显示，手机端隐藏 — 手机端通过 FAB 切换事件） */}
+          {!isPhone && (
+            <div style={{
+              padding: 'var(--space-2) var(--space-3)',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+              background: 'var(--bg-secondary)', flexShrink: 0,
+            }}>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>事件:</span>
+              <input
+                type="text"
+                value={eventName}
+                onChange={(e) => { setEventName(e.target.value); setSaved(false); }}
+                style={{ flex: 1, padding: '2px 6px', fontSize: 'var(--font-size-sm)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}
+              />
+            </div>
+          )}
 
           {/* 工作流画布 */}
           <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -467,59 +463,152 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
                 gameState={gameState as unknown as Record<string, unknown>}
               />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                点击左侧「新事件」创建
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', padding: 16, textAlign: 'center' }}>
+                {isPhone ? '点击右下角按钮添加节点' : '点击左侧「新事件」创建'}
               </div>
             )}
           </div>
+
+          {/* 移动端浮动操作按钮（FAB） */}
+          {isPhone && (
+            <div style={{ position: 'absolute', bottom: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', zIndex: 10 }}>
+              {/* 事件列表 */}
+              <button
+                onClick={() => setMobileEventList(true)}
+                aria-label="事件列表"
+                style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+              >
+                <Layers size={20} />
+              </button>
+              {/* 节点面板 */}
+              <button
+                onClick={() => setMobileNodePanel(true)}
+                aria-label="节点面板"
+                style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+              >
+                <Plus size={20} />
+              </button>
+              {/* 设置 */}
+              <button
+                onClick={() => setShowSettings(true)}
+                aria-label="设置"
+                style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+              >
+                <Settings size={20} />
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* 右侧：节点面板（桌面端内联 / 手机端隐藏） */}
+        {!isPhone && (
+          <div style={{ borderLeft: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+            <CardNodePalette onAddNode={handleAddNode} />
+          </div>
+        )}
       </div>
+
+      {/* 移动端：节点面板浮层 */}
+      {isPhone && mobileNodePanel && (
+        <>
+          <div className="event-overlay" onClick={() => setMobileNodePanel(false)} />
+          <div className="event-right-sheet" style={{ zIndex: 42 }}>
+            <div style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', minHeight: 44 }}>
+              <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>添加节点</span>
+              <button onClick={() => setMobileNodePanel(false)} className="btn-ghost btn-sm" style={{ marginLeft: 'auto', minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+            <CardNodePalette onAddNode={(typeId) => { handleAddNode(typeId); setMobileNodePanel(false); }} />
+          </div>
+        </>
+      )}
+
+      {/* 移动端：事件列表浮层 */}
+      {isPhone && mobileEventList && (
+        <>
+          <div className="event-overlay" onClick={() => setMobileEventList(false)} />
+          <div className="event-bottom-sheet" style={{ zIndex: 42, maxHeight: '60vh' }}>
+            <div style={{ padding: 'var(--space-2) var(--space-3)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', minHeight: 44 }}>
+              <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>事件列表</span>
+              <button onClick={() => { handleNewEvent(); }} className="btn-secondary btn-sm" style={{ marginLeft: 'auto', marginRight: 8, minHeight: 32, padding: '4px 8px', fontSize: 'var(--font-size-xs)' }}>
+                <Plus size={12} /> 新事件
+              </button>
+              <button onClick={() => setMobileEventList(false)} className="btn-ghost btn-sm" style={{ minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+            <div style={{ overflow: 'auto' }}>
+              {eventList.map((entry) => (
+                <div
+                  key={entry.id}
+                  onClick={() => { handleSelectEvent(entry.id); setMobileEventList(false); }}
+                  style={{
+                    padding: 'var(--space-3) var(--space-3)',
+                    cursor: 'pointer',
+                    background: selectedEventId === entry.id ? 'var(--bg-active)' : 'transparent',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                  }}
+                >
+                  <Layers size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {entry.name}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteEvent(entry.id); }}
+                    className="btn-ghost btn-sm"
+                    style={{ color: 'var(--danger)', padding: 4, minHeight: 36, minWidth: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              {eventList.length === 0 && (
+                <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
+                  暂无事件，点击「新事件」创建
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* 设置面板 */}
       {showSettings && (
-        <div style={{
-          position: 'absolute', right: 0, top: 0, bottom: 0, width: 300,
-          background: 'var(--bg-elevated)', borderLeft: '1px solid var(--border)',
-          overflow: 'auto', zIndex: 20, boxShadow: 'var(--shadow-lg)',
-        }}>
-          <div style={{ padding: 'var(--space-3)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>事件包设置</span>
-            <button onClick={() => setShowSettings(false)} className="btn-ghost btn-sm" style={{ marginLeft: 'auto' }}>×</button>
-          </div>
-          <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-              名称
-              <input value={manifest.name} onChange={(e) => setManifest({ ...manifest, name: e.target.value })} style={{ width: '100%', padding: '4px 8px', marginTop: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }} />
-            </label>
-            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-              描述
-              <textarea value={manifest.description} onChange={(e) => setManifest({ ...manifest, description: e.target.value })} rows={3} style={{ width: '100%', padding: '4px 8px', marginTop: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }} />
-            </label>
-            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
-              作者
-              <input value={manifest.author} onChange={(e) => setManifest({ ...manifest, author: e.target.value })} style={{ width: '100%', padding: '4px 8px', marginTop: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }} />
-            </label>
-            {!worldBound && (
-              <div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 4 }}>绑定世界</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {getAllWorlds().map((w) => (
-                    <button key={w.id} onClick={() => handleBindWorld(w.id)} className="btn-ghost btn-sm" style={{ justifyContent: 'flex-start' }}>
-                      {w.name}
-                    </button>
-                  ))}
+        <>
+          {isPhone && <div className="event-overlay" onClick={() => setShowSettings(false)} />}
+          <div className={isPhone ? 'event-right-sheet' : undefined} style={isPhone ? { zIndex: 42 } : {
+            position: 'absolute', right: 0, top: 0, bottom: 0, width: 300,
+            background: 'var(--bg-elevated)', borderLeft: '1px solid var(--border)',
+            overflow: 'auto', zIndex: 20, boxShadow: 'var(--shadow-lg)',
+          }}>
+            <div style={{ padding: 'var(--space-3)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', minHeight: 44 }}>
+              <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>事件包设置</span>
+              <button onClick={() => setShowSettings(false)} className="btn-ghost btn-sm" style={{ marginLeft: 'auto', minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            </div>
+            <div style={{ padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                名称
+                <input value={manifest.name} onChange={(e) => setManifest({ ...manifest, name: e.target.value })} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)' }} />
+              </label>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                描述
+                <textarea value={manifest.description} onChange={(e) => setManifest({ ...manifest, description: e.target.value })} rows={3} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)' }} />
+              </label>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+                作者
+                <input value={manifest.author} onChange={(e) => setManifest({ ...manifest, author: e.target.value })} style={{ width: '100%', padding: '8px', marginTop: 4, border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)' }} />
+              </label>
+              {!worldBound && (
+                <div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 4 }}>绑定世界</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {getAllWorlds().map((w) => (
+                      <BindWorldRow key={w.id} world={w} onConfirm={() => handleBindWorld(w.id)} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            <button onClick={() => setWbOpen(true)} className="btn-ghost btn-sm">
-              <BookOpen size={14} /> 世界书引用
-            </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-
-      {wbOpen && (
-        <WorldBookPicker open={wbOpen} entries={getAllWorldBookEntries()} onConfirm={() => setWbOpen(false)} onClose={() => setWbOpen(false)} />
+        </>
       )}
 
       {toast && (
@@ -536,5 +625,44 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
         </div>
       )}
     </div>
+  );
+}
+
+/** 绑定世界行 — 点击后显示确认按钮 */
+function BindWorldRow({ world, onConfirm }: { world: { id: string; name: string }; onConfirm: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (confirming) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0' }}>
+        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', flex: 1 }}>
+          绑定「{world.name}」？
+        </span>
+        <button
+          onClick={onConfirm}
+          className="btn-ghost btn-sm"
+          style={{ fontSize: 'var(--font-size-xs)', color: 'var(--success)' }}
+        >
+          确定
+        </button>
+        <button
+          onClick={() => setConfirming(false)}
+          className="btn-ghost btn-sm"
+          style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}
+        >
+          取消
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setConfirming(true)}
+      className="btn-ghost btn-sm"
+      style={{ justifyContent: 'flex-start' }}
+    >
+      {world.name}
+    </button>
   );
 }

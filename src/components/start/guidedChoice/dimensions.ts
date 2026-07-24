@@ -20,7 +20,7 @@ export const GUIDED_DIMENSIONS: GuidedDimConfig[] = [
   { key: 'conflict',  label: '核心冲突', description: '核心冲突是驱动故事前进的引擎', icon: Swords, required: true, color: '#ef4444' },
   { key: 'geography', label: '地理格局', description: '世界的地理分布和区域特征', icon: Map, required: true, color: '#10b981', multiSelect: true, maxSelect: 3 },
   { key: 'factions',  label: '势力结构', description: '各方势力的关系和格局', icon: Flag, required: true, color: '#8b5cf6', multiSelect: true, maxSelect: 3 },
-  { key: 'npcs',      label: '关键人物', description: '这个世界中的重要角色', icon: User, required: true, color: '#ec4899', multiSelect: true, maxSelect: 3 },
+  { key: 'npcs',      label: '关键人物', description: '这个世界中的重要角色', icon: User, required: false, color: '#ec4899', multiSelect: true, maxSelect: 3 },
   { key: 'culture',   label: '文化风俗', description: '信仰、习俗、日常生活', icon: BookMarked, required: false, color: '#14b8a6', multiSelect: true, maxSelect: 2 },
   { key: 'rules',     label: '世界规则', description: '力量体系、社会结构、特殊规则', icon: ScrollText, required: true, color: '#f97316' },
 ];

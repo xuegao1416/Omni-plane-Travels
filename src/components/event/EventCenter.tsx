@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Upload, FilePlus, Loader2, AlertTriangle } from 'lucide-react';
+import { Upload, FilePlus, Loader2, AlertTriangle, Sparkles } from 'lucide-react';
 import type { EventRegistryEntry } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
 import { isTauri } from '../../utils/nativeFetch';
@@ -14,9 +14,10 @@ interface EventCenterProps {
   onNewPack: () => void;
   onNewRule: () => void;
   onGoImport: () => void;
+  onAiGenerate: () => void;
 }
 
-export default function EventCenter({ eventApi, onOpenPack, onNewPack, onNewRule, onGoImport }: EventCenterProps) {
+export default function EventCenter({ eventApi, onOpenPack, onNewPack, onNewRule, onGoImport, onAiGenerate }: EventCenterProps) {
   const { packs, loading, error, enable, disable, uninstall, exportPack, importPack, collections, deleteCollection } = eventApi;
   const isPhone = useIsPhone();
   const breakpoint = useBreakpoint();
@@ -50,8 +51,11 @@ export default function EventCenter({ eventApi, onOpenPack, onNewPack, onNewRule
         padding: isPhone ? 'var(--space-4)' : 'var(--space-6)',
       }}
     >
-      {/* 操作行：新建空白 / 新建周期 / 导入 */}
+      {/* 操作行：AI 生成 / 新建空白 / 新建周期 / 导入 */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: isPhone ? 'var(--space-1)' : 'var(--space-2)', flexWrap: 'wrap' }}>
+        <button className="btn-primary" onClick={onAiGenerate} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
+          <Sparkles size={14} /> {isPhone ? 'AI 生成' : 'AI 生成'}
+        </button>
         <button className="btn-secondary" onClick={onNewPack} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
           <FilePlus size={14} /> {isPhone ? '事件包' : '新建事件包'}
         </button>
@@ -59,7 +63,7 @@ export default function EventCenter({ eventApi, onOpenPack, onNewPack, onNewRule
           <FilePlus size={14} /> {isPhone ? '规则' : '新建规则'}
         </button>
         <button
-          className="btn-primary"
+          className="btn-secondary"
           onClick={() => (isTauri() ? importPack() : onGoImport())}
           style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}
         >

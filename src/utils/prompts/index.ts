@@ -5,6 +5,7 @@
 
 // 类型定义
 export type { CharacterFillOptions } from './editor-prompts';
+export type { EventGeneratorOptions } from './event-generator';
 
 // 编辑器 AI 相关
 export {
@@ -13,3 +14,9 @@ export {
   buildNpcFillPrompt,
   buildVariableExtractionPrompt,
 } from './editor-prompts';
+
+// 事件/规则模板生成器
+export {
+  buildEventGeneratorPrompt,
+  buildEventGeneratorUserMessage,
+} from './event-generator';

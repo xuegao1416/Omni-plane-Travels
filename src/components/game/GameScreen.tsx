@@ -91,7 +91,7 @@ export default function GameScreen() {
     for (const mod of worldDef.modules) {
       if (!mod.enabled) continue;
       const key = keyMap[mod.moduleId];
-      if (key && mod.moduleConfig) (result as any)[key] = mod.moduleConfig;
+      if (key && (mod.moduleConfig || mod.data)) (result as any)[key] = (mod.moduleConfig || mod.data);
     }
     return result;
   }, [worldDef]);

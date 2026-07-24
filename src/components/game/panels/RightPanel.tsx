@@ -80,15 +80,15 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
     for (const mod of worldDef.modules) {
       if (!mod.enabled) continue;
       const key = keyMap[mod.moduleId];
-      if (key && mod.moduleConfig) {
+      if (key && (mod.moduleConfig || mod.data)) {
         if (mod.moduleId === 'survival' && runtimeRecipes?.length) {
           // 合并运行时配方（AI 生成）与静态配方（世界定义）
-          const survData = mod.moduleConfig as SurvivalModuleSchema;
+          const survData = (mod.moduleConfig || mod.data) as SurvivalModuleSchema;
           const staticRecipes = Array.isArray(survData.recipes) ? survData.recipes : [];
           (worldSystem as any)[key] = { ...survData, recipes: [...staticRecipes, ...runtimeRecipes] };
         } else if (mod.moduleId === 'business') {
           // 合并运行时经营数据（AI 通过 UpdateVariable 更新）与静态配置
-          const bizConfig = mod.moduleConfig as BusinessModuleSchema;
+          const bizConfig = (mod.moduleConfig || mod.data) as BusinessModuleSchema;
           const runtimeBiz = player.经营资产;
           if (runtimeBiz) {
             (worldSystem as any)[key] = {
@@ -121,7 +121,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             (worldSystem as any)[key] = bizConfig;
           }
         } else {
-          (worldSystem as any)[key] = mod.moduleConfig;
+          (worldSystem as any)[key] = (mod.moduleConfig || mod.data);
         }
         if (mod.name) moduleNames[key] = mod.name;
       }

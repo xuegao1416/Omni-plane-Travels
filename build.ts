@@ -123,6 +123,24 @@ if (existsSync('./title-main.png')) {
   console.log('   ✅ title-main.png');
 }
 
+// 6. 复制代理教程图片
+console.log('📷 复制代理教程图片...');
+if (existsSync('./proxy-tutorial-images')) {
+  const { mkdirSync, readdirSync, statSync } = await import('fs');
+  const { join: pjoin } = await import('path');
+  const srcDir = './proxy-tutorial-images';
+  const destDir = join(DIST, 'proxy-tutorial-images');
+  mkdirSync(destDir, { recursive: true });
+  for (const file of readdirSync(srcDir)) {
+    const srcPath = pjoin(srcDir, file);
+    const destPath = pjoin(destDir, file);
+    if (statSync(srcPath).isFile()) {
+      copyFileSync(srcPath, destPath);
+      console.log(`   ✅ proxy-tutorial-images/${file}`);
+    }
+  }
+}
+
 console.log('\n✨ 构建完成！dist/ 目录结构：');
 console.log('   dist/');
 console.log('   ├── index.html');
@@ -132,4 +150,5 @@ console.log('   ├── manifest.json (PWA 配置)');
 console.log('   ├── icon.png (应用图标)');
 console.log('   ├── bg-main.png (主页背景-桌面)');
 console.log('   ├── bg-main-phone.png (主页背景-移动)');
-console.log('   └── title-main.png (主页标题)');
+console.log('   ├── title-main.png (主页标题)');
+console.log('   └── proxy-tutorial-images/ (代理教程图片 9 张)');

@@ -84,8 +84,8 @@ async function callAuxiliaryApiForEngine(
       stat: '数值属性', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系',
     };
     for (const mod of worldDef.modules) {
-      if (mod.enabled && mod.moduleConfig && keyMap[mod.moduleId]) {
-        worldSystemFromDef[keyMap[mod.moduleId]] = mod.moduleConfig;
+      if (mod.enabled && (mod.moduleConfig || mod.data) && keyMap[mod.moduleId]) {
+        worldSystemFromDef[keyMap[mod.moduleId]] = (mod.moduleConfig || mod.data);
       }
     }
   }

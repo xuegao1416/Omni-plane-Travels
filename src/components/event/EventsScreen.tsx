@@ -11,16 +11,15 @@ import EventLibrary from './EventLibrary';
 import CardEditor from './CardEditor';
 import EventErrorBoundary from './EventErrorBoundary';
 import WorkflowEditor from '../workflow/WorkflowEditor';
-import { WorldBookBrowser } from './WorldBookPicker';
 import EventImportWizard from './EventImportWizard';
+import AiEventGenerator from './AiEventGenerator';
 import './event.css';
 
-type SubView = 'center' | 'library' | 'card' | 'rule' | 'worldbook' | 'wizard';
+type SubView = 'center' | 'library' | 'card' | 'rule' | 'wizard' | 'ai-generator';
 
 /** 按事件包类型决定跳转的子视图 */
 function subViewForType(type: EventPackType): SubView {
   if (type === 'rule') return 'rule';
-  if (type === 'worldbook') return 'worldbook';
   return 'card'; // card / bundle 落入统一事件包编辑器
 }
 
@@ -58,6 +57,13 @@ export default function EventsScreen() {
     } catch (e) {
       console.error('[EventsScreen] 新建规则失败：', e);
     }
+  };
+
+  // AI 生成完成后：刷新列表并打开编辑器
+  const handleAiSaved = (packId: string, type: 'card' | 'rule') => {
+    void eventApi.refresh();
+    setSelectedPackId(packId);
+    setSubView(type === 'rule' ? 'rule' : 'card');
   };
 
   const goCenter = () => setSubView('center');
@@ -143,6 +149,7 @@ export default function EventsScreen() {
                 onNewPack={handleNewPack}
                 onNewRule={handleNewRule}
                 onGoImport={() => setSubView('wizard')}
+                onAiGenerate={() => setSubView('ai-generator')}
               />
               ) : (
                 <ModuleCustomPlaceholder />
@@ -169,17 +176,17 @@ export default function EventsScreen() {
             </EventErrorBoundary>
           </div>
         )}
-        {subView === 'worldbook' && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-            <EventErrorBoundary onBack={goCenter}>
-              <WorldBookBrowser onClose={goCenter} />
-            </EventErrorBoundary>
-          </div>
-        )}
         {subView === 'wizard' && (
           <EventErrorBoundary onBack={goCenter}>
             <EventImportWizard eventApi={eventApi} eventPackId={selectedPackId} onClose={goCenter} />
           </EventErrorBoundary>
+        )}
+        {subView === 'ai-generator' && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+            <EventErrorBoundary onBack={goCenter}>
+              <AiEventGenerator onBack={goCenter} onSaved={handleAiSaved} />
+            </EventErrorBoundary>
+          </div>
         )}
       </div>
     </div>

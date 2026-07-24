@@ -35,6 +35,32 @@ function withProxy(
   return { url, headers };
 }
 
+/**
+ * 将后端返回的错误体压缩为可读信息。
+ *
+ * 许多自建 / 代理生图服务在出错时返回的是整页 HTML（如 404 错误页），
+ * 若直接把整页塞进 Error.message，会污染控制台与 UI。
+ * 这里把它浓缩成一句话：优先提取 HTML 注释 / <title> 里的错误信息，
+ * 否则只提示「返回了 HTML 错误页」。
+ */
+function summarizeErrorBody(body: string, status: number, fallback: string): string {
+  const text = String(body || '').trim();
+  if (!text) return fallback || `HTTP ${status}`;
+  const looksLikeHtml =
+    /^<!doctype\s+html/i.test(text) ||
+    /^<html[\s>]/i.test(text) ||
+    /<html[\s>]/i.test(text.slice(0, 512));
+  if (!looksLikeHtml) {
+    return text.length > 400 ? `${text.slice(0, 400)}…` : text;
+  }
+  const commentMatch = text.match(/<!--([\s\S]*?)-->/i);
+  const titleMatch = text.match(/<title>([\s\S]*?)<\/title>/i);
+  const metaMatch = text.match(/<meta[^>]+content=["']([^"']+)["'][^>]*>/i);
+  const hint = (commentMatch?.[1] || titleMatch?.[1] || metaMatch?.[1] || '').trim();
+  const base = `生图服务返回 ${status}（HTML 错误页）`;
+  return hint ? `${base}：${hint}` : `${base}，请检查 API 地址 / 模型是否正确`;
+}
+
 // ─── 工具函数 ───
 
 export function normalizePromptText(text: string): string {
@@ -1105,7 +1131,7 @@ export async function generateNovelAIImage(prompt: string, config: Partial<Image
       const errData = await resp.json();
       errMsg = errData.message || errMsg;
     } catch {
-      errMsg += ': ' + (await resp.text().catch(() => resp.statusText));
+      errMsg += ': ' + summarizeErrorBody(await resp.text().catch(() => ''), resp.status, resp.statusText);
     }
     throw new Error(errMsg);
   }
@@ -1337,7 +1363,7 @@ export async function generateKreaImage(prompt: string, config: Partial<ImageGen
       const errData = JSON.parse(errText);
       errMsg = errData.message || errData.error || errMsg;
     } catch {
-      errMsg = errText || errMsg;
+      errMsg = summarizeErrorBody(errText, createRes.status, errMsg);
     }
     throw new Error(errMsg);
   }
