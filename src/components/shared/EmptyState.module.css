@@ -3,9 +3,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
+  padding: var(--space-8) var(--space-5);
   text-align: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .icon {
@@ -22,5 +22,5 @@
 
 .action {
   font-size: var(--font-size-sm);
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }

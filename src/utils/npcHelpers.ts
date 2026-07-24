@@ -574,36 +574,19 @@ export function formatSnapshotForMainAI(state: GameState): string {
     }
   }
 
-  // 记事本
-  const notebook = player.记事本;
-  if (notebook && typeof notebook === 'object') {
-    const crises = Object.entries(notebook.潜在危机 ?? {}).filter(([, v]) => v && typeof v === 'object');
-    const opportunities = Object.entries(notebook.当前机遇 ?? {}).filter(([, v]) => v && typeof v === 'object');
-    const todos = Object.entries(notebook.待办事项 ?? {}).filter(([, v]) => v && typeof v === 'object');
-    if (crises.length > 0 || opportunities.length > 0 || todos.length > 0) {
-      lines.push(`### 【记事本】`);
-      if (crises.length > 0) {
-        for (const [name, data] of crises.slice(0, 3)) {
-          const d = data as any;
-          const severity = d.严重程度 ?? '';
-          const measure = d.应对措施 ?? '';
-          lines.push(`> [危机] ${name}${severity ? `(${severity})` : ''}${measure ? `：${measure}` : ''}`);
-        }
-      }
-      if (opportunities.length > 0) {
-        for (const [name, data] of opportunities.slice(0, 3)) {
-          const d = data as any;
-          const plan = d.行动计划 ?? '';
-          lines.push(`> [机遇] ${name}${plan ? `：${plan}` : ''}`);
-        }
-      }
-      if (todos.length > 0) {
-        for (const [name, data] of todos.slice(0, 3)) {
-          const d = data as any;
-          const priority = d.优先级 ?? '';
-          const status = d.状态 ?? '';
-          lines.push(`> [待办] ${name}${priority ? `(${priority})` : ''}${status ? `(${status})` : ''}`);
-        }
+  // 纪事系统（统一情报板）
+  const chronicleSystem = player.纪事系统;
+  const chronicles = chronicleSystem?.纪事;
+  if (chronicles && typeof chronicles === 'object') {
+    const entries = Object.values(chronicles)
+      .filter((v: any) => v && typeof v === 'object' && v.状态 !== '已解决' && v.状态 !== '已过期')
+      .sort((a: any, b: any) => (b.$time ?? 0) - (a.$time ?? 0))
+      .slice(0, 6);
+    if (entries.length > 0) {
+      lines.push(`### 【纪事】`);
+      for (const entry of entries as any[]) {
+        const detail = entry.详情 ? Object.entries(entry.详情).map(([k, v]) => `${k}:${v}`).join(' ') : '';
+        lines.push(`> [${entry.类型}] ${entry.标题}${detail ? `(${detail})` : ''}${entry.描述 ? `：${entry.描述}` : ''}`);
       }
     }
   }

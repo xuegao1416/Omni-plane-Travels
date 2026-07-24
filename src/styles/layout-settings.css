@@ -36,8 +36,8 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  gap: 4px;
-  padding: 8px 12px;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -46,7 +46,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   white-space: nowrap;
   min-height: var(--touch-min);
   border-radius: var(--radius-md);
@@ -71,7 +71,7 @@
   padding: 2px;
 }
 .segmented-control-btn {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   border: none;
   border-radius: calc(var(--radius-md) - 2px);
   font-size: var(--font-size-sm);
@@ -116,13 +116,13 @@
   pointer-events: none;
 }
 .toggle-switch.on .toggle-switch-knob {
-  left: 20px;
+  left: var(--space-5);
 }
 
 /* 设置页文本域统一 focus */
 .settings-textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--space-5) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-primary);

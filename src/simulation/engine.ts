@@ -824,7 +824,11 @@ export class WorldSimulationEngine {
       .sort((a, b) => b.severity - a.severity);
     const topEvent = activeEvents[0];
 
-    const crises = Object.keys(gameState.玩家?.记事本?.潜在危机 ?? {});
+    const crises = Object.keys(
+      gameState.玩家?.纪事系统?.纪事
+        ? Object.fromEntries(Object.entries(gameState.玩家.纪事系统.纪事).filter(([, e]) => e.类型 === '风险'))
+        : gameState.玩家?.记事本?.潜在危机 ?? {}
+    );
     const parts: string[] = [];
     if (topEvent) parts.push(`重大事件: ${topEvent.title}`);
     if (crises.length > 0) parts.push(`玩家面临的危机: ${crises.join(', ')}`);

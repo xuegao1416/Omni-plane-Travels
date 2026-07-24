@@ -88,12 +88,15 @@ export class VariableManager {
     set(this.state, path, value);
   }
 
-  // 规范化状态：确保NPC分类、事迹、结构默认值 + 笔记本容量限制 + 模块数值校验
+  // 规范化状态：确保NPC分类、事迹、结构默认值 + 纪事迁移 + 任务系统迁移 + 模块数值校验
   private normalizeState(): void {
     ensureNpcCategoryDefaults(this.state);
     ensureNpcChronicleDefaults(this.state);
     ensureNpcStructureDefaults(this.state);
-    this.normalizeNotebook();
+    this.migrateNotebookToChronicle();
+    this.normalizeChronicle();
+    this.migrateNotebookToTaskSystem();
+    this.normalizeTaskSystem();
     this.validateAndClampModuleValues();
   }
 
@@ -104,20 +107,156 @@ export class VariableManager {
     // 世界系统已移除，属性范围约束由世界书条目中的提示词控制
   }
 
-  // 笔记本容量限制：每个分区最多 20 条，超出删除最旧的
-  private normalizeNotebook(): void {
-    const NOTEBOOK_SECTION_CAP = 20;
-    const notebook = this.state.玩家?.记事本;
+
+  private migrateNotebookToChronicle(): void {
+    const notebook = this.state.玩家?.记事本 as any;
     if (!notebook || typeof notebook !== 'object') return;
 
-    for (const section of ['潜在危机', '当前机遇', '待办事项'] as const) {
-      const entries = notebook[section];
+    // 确保纪事系统存在
+    if (!this.state.玩家.纪事系统) {
+      this.state.玩家.纪事系统 = { 纪事: {} };
+    }
+    const chronicles = this.state.玩家.纪事系统.纪事;
+
+    // 迁移潜在危机
+    if (notebook.潜在危机 && typeof notebook.潜在危机 === 'object') {
+      for (const [name, c] of Object.entries(notebook.潜在危机) as [string, any][]) {
+        if (!chronicles[name]) {
+          chronicles[name] = {
+            标题: name,
+            类型: '风险',
+            描述: c.应对措施 || '',
+            状态: '活跃',
+            详情: {
+              严重程度: c.严重程度 || '',
+              预计影响时间: c.预计影响时间 || '',
+            },
+            $time: c.$time || Date.now(),
+          };
+        }
+      }
+      delete notebook.潜在危机;
+    }
+
+    // 迁移当前机遇
+    if (notebook.当前机遇 && typeof notebook.当前机遇 === 'object') {
+      for (const [name, o] of Object.entries(notebook.当前机遇) as [string, any][]) {
+        if (!chronicles[name]) {
+          chronicles[name] = {
+            标题: name,
+            类型: '机遇',
+            描述: o.行动计划 || '',
+            状态: '活跃',
+            详情: {
+              时效性: o.时效性 || '',
+              所需资源: o.所需资源 || '',
+            },
+            $time: o.$time || Date.now(),
+          };
+        }
+      }
+      delete notebook.当前机遇;
+    }
+
+    // 迁移待办事项到任务系统（保留原有逻辑）
+    if (notebook.待办事项 && typeof notebook.待办事项 === 'object') {
+      const todos = notebook.待办事项;
+      if (Object.keys(todos).length > 0) {
+        if (!this.state.玩家.任务系统) {
+          this.state.玩家.任务系统 = { 活跃任务: {}, 已完成任务: {}, 已失败任务: {} };
+        }
+        const taskSystem = this.state.玩家.任务系统;
+        for (const [name, todo] of Object.entries(todos) as [string, any][]) {
+          const status = todo.状态 === '已完成' ? '已完成' : todo.状态 === '已取消' ? '已放弃' : '进行中';
+          const target = status === '已完成' ? '已完成任务' : status === '已放弃' ? '已失败任务' : '活跃任务';
+          if (!taskSystem[target][name]) {
+            taskSystem[target][name] = {
+              任务名: name, 任务类型: '支线', 描述: name, 状态: status as any,
+              优先级: todo.优先级 || '中', 目标: name, 截止时间: todo.截止时间, $time: todo.$time || Date.now(),
+            };
+          }
+        }
+      }
+      delete notebook.待办事项;
+    }
+
+    // 清理空的旧记事本
+    if (Object.keys(notebook).length === 0) {
+      delete this.state.玩家.记事本;
+    }
+
+    console.log('[VariableManager] 已迁移旧记事本到纪事系统');
+  }
+
+  /** 纪事系统容量限制：最多 30 条，超出删除最旧的 */
+  private normalizeChronicle(): void {
+    const chronicleSystem = this.state.玩家?.纪事系统;
+    if (!chronicleSystem?.纪事) return;
+
+    const CHRONICLE_CAP = 30;
+    const entries = Object.entries(chronicleSystem.纪事)
+      .sort(([,a], [,b]) => (a.$time ?? 0) - (b.$time ?? 0));
+
+    if (entries.length > CHRONICLE_CAP) {
+      const toRemove = entries.slice(0, entries.length - CHRONICLE_CAP);
+      for (const [key] of toRemove) {
+        delete chronicleSystem.纪事[key];
+      }
+    }
+  }
+
+  /** 旧存档迁移：将 记事本.待办事项 迁移到 任务系统 */
+  private migrateNotebookToTaskSystem(): void {
+    const notebook = this.state.玩家?.记事本 as any;
+    if (!notebook?.待办事项 || typeof notebook.待办事项 !== 'object') return;
+
+    const todos = notebook.待办事项;
+    if (Object.keys(todos).length === 0) {
+      delete notebook.待办事项;
+      return;
+    }
+
+    // 确保任务系统存在
+    if (!this.state.玩家.任务系统) {
+      this.state.玩家.任务系统 = { 活跃任务: {}, 已完成任务: {}, 已失败任务: {} };
+    }
+    const taskSystem = this.state.玩家.任务系统;
+
+    for (const [name, todo] of Object.entries(todos) as [string, any][]) {
+      const status = todo.状态 === '已完成' ? '已完成' : todo.状态 === '已取消' ? '已放弃' : '进行中';
+      const target = status === '已完成' ? '已完成任务' : status === '已放弃' ? '已失败任务' : '活跃任务';
+      if (!taskSystem[target][name]) {
+        taskSystem[target][name] = {
+          任务名: name,
+          任务类型: '支线',
+          描述: name,
+          状态: status as any,
+          优先级: todo.优先级 || '中',
+          目标: name,
+          截止时间: todo.截止时间,
+          $time: todo.$time || Date.now(),
+        };
+      }
+    }
+
+    delete notebook.待办事项;
+    console.log(`[VariableManager] 已迁移 ${Object.keys(todos).length} 条待办事项到任务系统`);
+  }
+
+  /** 任务系统容量限制 */
+  private normalizeTaskSystem(): void {
+    const taskSystem = this.state.玩家?.任务系统;
+    if (!taskSystem) return;
+
+    const CAPS = { 活跃任务: 15, 已完成任务: 50, 已失败任务: 20 } as const;
+
+    for (const [section, cap] of Object.entries(CAPS) as [keyof typeof CAPS, number][]) {
+      const entries = taskSystem[section];
       if (!entries || typeof entries !== 'object') continue;
-      const keys = Object.keys(entries);
-      if (keys.length > NOTEBOOK_SECTION_CAP) {
-        // 删除最旧的条目（保留最后 N 个，按插入顺序）
-        const toRemove = keys.slice(0, keys.length - NOTEBOOK_SECTION_CAP);
-        for (const key of toRemove) {
+      const sorted = Object.entries(entries).sort(([,a], [,b]) => ((a as any).$time ?? 0) - ((b as any).$time ?? 0));
+      if (sorted.length > cap) {
+        const toRemove = sorted.slice(0, sorted.length - cap);
+        for (const [key] of toRemove) {
           delete entries[key];
         }
       }

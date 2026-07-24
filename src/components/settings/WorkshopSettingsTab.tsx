@@ -147,19 +147,19 @@ export default function WorkshopSettingsTab() {
   const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString('zh-CN');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
       {DialogUI}
 
       {/* 标题 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600' }}>创意工坊</h3>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           {isAuthenticated && (
             <button
               onClick={() => setShowUpload(!showUpload)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '8px 12px', background: 'var(--accent-dim)', color: 'var(--accent)',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                padding: 'var(--space-2) var(--space-3)', background: 'var(--accent-dim)', color: 'var(--accent)',
                 border: 'none', borderRadius: 'var(--radius-md)',
                 cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '500',
               }}
@@ -172,8 +172,8 @@ export default function WorkshopSettingsTab() {
             onClick={() => fetchItems({ type: typeFilter || undefined })}
             disabled={isLoading}
             style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '8px 12px', background: 'transparent',
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              padding: 'var(--space-2) var(--space-3)', background: 'transparent',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
               color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
             }}
@@ -187,13 +187,13 @@ export default function WorkshopSettingsTab() {
       {/* 上传表单 */}
       {showUpload && (
         <div style={{
-          padding: '16px', background: 'var(--bg-secondary)',
+          padding: 'var(--space-4)', background: 'var(--bg-secondary)',
           borderRadius: 'var(--radius-lg)', border: '1px solid var(--accent)',
-          display: 'flex', flexDirection: 'column', gap: '12px',
+          display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
         }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                 标题 *
               </label>
               <input
@@ -205,7 +205,7 @@ export default function WorkshopSettingsTab() {
               />
             </div>
             <div style={{ width: '140px' }}>
-              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                 类型
               </label>
               <select
@@ -222,7 +222,7 @@ export default function WorkshopSettingsTab() {
           </div>
 
           <div>
-            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+            <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
               描述
             </label>
             <textarea
@@ -235,9 +235,9 @@ export default function WorkshopSettingsTab() {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                 标签（逗号分隔）
               </label>
               <input
@@ -249,7 +249,7 @@ export default function WorkshopSettingsTab() {
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                 文件（JSON）*
               </label>
               <input
@@ -280,7 +280,7 @@ export default function WorkshopSettingsTab() {
       )}
 
       {/* 类型筛选 */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <button
           onClick={() => setTypeFilter('')}
           style={{
@@ -313,7 +313,7 @@ export default function WorkshopSettingsTab() {
       {/* 错误提示 */}
       {error && (
         <div style={{
-          padding: '12px', background: 'var(--danger-dim)', color: 'var(--danger)',
+          padding: 'var(--space-3)', background: 'var(--danger-dim)', color: 'var(--danger)',
           borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)',
         }}>
           {error}
@@ -321,13 +321,13 @@ export default function WorkshopSettingsTab() {
       )}
 
       {/* 条目列表 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {items.length === 0 && !isLoading && (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '40px 20px', color: 'var(--text-muted)',
+            padding: 'var(--space-10) var(--space-5)', color: 'var(--text-muted)',
           }}>
-            <Store size={48} style={{ marginBottom: 16, opacity: 0.5 }} />
+            <Store size={48} style={{ marginBottom: 'var(--space-4)', opacity: 0.5 }} />
             <p style={{ fontSize: 'var(--font-size-base)' }}>
               {typeFilter ? '没有找到该类型的条目' : '创意工坊暂无内容'}
             </p>
@@ -341,26 +341,26 @@ export default function WorkshopSettingsTab() {
             <div
               key={item.id}
               style={{
-                padding: '16px', background: 'var(--bg-secondary)',
+                padding: 'var(--space-4)', background: 'var(--bg-secondary)',
                 borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
               }}
             >
               <div style={{
-                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '8px',
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--space-2)',
               }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
                     <TypeIcon size={16} color="var(--accent)" />
                     <span style={{
                       fontSize: 'var(--font-size-xs)', color: 'var(--accent)',
-                      background: 'var(--accent-dim)', padding: '2px 6px', borderRadius: '4px',
+                      background: 'var(--accent-dim)', padding: '2px 6px', borderRadius: 'var(--radius-sm)',
                     }}>
                       {typeInfo.label}
                     </span>
                   </div>
                   <div style={{ fontSize: 'var(--font-size-base)', fontWeight: '600' }}>{item.title}</div>
                   {item.description && (
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
                       {item.description}
                     </div>
                   )}
@@ -368,13 +368,13 @@ export default function WorkshopSettingsTab() {
               </div>
 
               {item.tags.length > 0 && (
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
                   {item.tags.map(tag => (
                     <span
                       key={tag}
                       style={{
                         fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
-                        background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: '4px',
+                        background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)',
                       }}
                     >
                       {tag}
@@ -384,20 +384,20 @@ export default function WorkshopSettingsTab() {
               )}
 
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '12px',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-3)',
               }}>
                 <span>下载 {item.downloadCount} 次</span>
                 <span>{formatTime(item.createdAt)}</span>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button
                   onClick={() => handleDownload(item)}
                   disabled={isLoading}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    padding: '8px 12px', background: 'var(--accent-dim)', color: 'var(--accent)',
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                    padding: 'var(--space-2) var(--space-3)', background: 'var(--accent-dim)', color: 'var(--accent)',
                     border: 'none', borderRadius: 'var(--radius-md)',
                     cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '500',
                   }}
@@ -411,8 +411,8 @@ export default function WorkshopSettingsTab() {
                     onClick={() => handleDelete(item.id)}
                     disabled={isLoading}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '4px',
-                      padding: '8px 12px', background: 'transparent', color: 'var(--danger)',
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                      padding: 'var(--space-2) var(--space-3)', background: 'transparent', color: 'var(--danger)',
                       border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
                       cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: '500',
                     }}
@@ -430,9 +430,9 @@ export default function WorkshopSettingsTab() {
       {isLoading && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '20px', color: 'var(--text-muted)',
+          padding: 'var(--space-5)', color: 'var(--text-muted)',
         }}>
-          <Loader size={20} className="animate-spin" style={{ marginRight: 8 }} />
+          <Loader size={20} className="animate-spin" style={{ marginRight: 'var(--space-2)' }} />
           <span>加载中...</span>
         </div>
       )}

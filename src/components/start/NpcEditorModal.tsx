@@ -46,7 +46,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--accent)',
-      padding: '6px 0 2px', borderBottom: '1px solid var(--border)', marginTop: '4px',
+      padding: '6px 0 2px', borderBottom: '1px solid var(--border)', marginTop: 'var(--space-1)',
     }}>
       {children}
     </div>
@@ -162,7 +162,7 @@ export default function NpcEditorModal({
           <span style={{ fontWeight: '600', fontSize: '1rem' }}>
             {initial ? '编辑NPC' : '创建NPC'}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <button
               className="pi-ai-btn"
               onClick={() => {
@@ -190,7 +190,7 @@ export default function NpcEditorModal({
                 {isFilling ? <><Loader size={12} className="animate-spin" /> 生成中{fillElapsed > 0 ? ` ${fillElapsed}s` : ''}</> : <><Wand2 size={12} /> AI 补全</>}
               </button>
             )}
-            <button onClick={onCancel} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}>
+            <button onClick={onCancel} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 'var(--space-1)' }}>
               <X size={18} />
             </button>
           </div>
@@ -299,7 +299,7 @@ export default function NpcEditorModal({
             expanded={expandedSections.has('skills')} onToggle={() => toggleSection('skills')}
           >
             {Object.entries(npc.skillsList).filter(([_, s]) => s != null).map(([name, skill]) => (
-              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
+              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <input type="text" defaultValue={name}
                     onBlur={e => { if (e.target.value !== name) renameMapKey('skillsList', name, e.target.value); }}
@@ -308,13 +308,13 @@ export default function NpcEditorModal({
                     style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-secondary)' }}>
                     {QUALITY_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                   </select>
-                  <button onClick={() => removeMapEntry('skillsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                  <button onClick={() => removeMapEntry('skillsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 'var(--space-1)' }}><Trash2 size={14} /></button>
                 </div>
                 <input type="text" value={skill?.描述 ?? ''} onChange={e => updateSkillField(name, '描述', e.target.value)} placeholder="技能描述..." style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
                 <input type="text" value={skill?.类型 ?? ''} onChange={e => updateSkillField(name, '类型', e.target.value)} placeholder="类型(攻击/防御/辅助...)" style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
               </div>
             ))}
-            <button className="btn-ghost" onClick={() => addMapEntry('skillsList', { 品质: '普通', 描述: '', 类型: '' })} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加技能</button>
+            <button className="btn-ghost" onClick={() => addMapEntry('skillsList', { 品质: '普通', 描述: '', 类型: '' })} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-1)' }}><Plus size={14} /> 添加技能</button>
           </CollapsibleSection>
 
           {/* ── 物品列表 ── */}
@@ -323,7 +323,7 @@ export default function NpcEditorModal({
             expanded={expandedSections.has('items')} onToggle={() => toggleSection('items')}
           >
             {Object.entries(npc.itemsList).filter(([_, it]) => it != null).map(([name, item]) => (
-              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
+              <div key={name} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', padding: 'var(--space-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <input type="text" defaultValue={name}
                     onBlur={e => { if (e.target.value !== name) renameMapKey('itemsList', name, e.target.value); }}
@@ -333,7 +333,7 @@ export default function NpcEditorModal({
                     style={{ fontSize: 'var(--font-size-base)', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-secondary)' }}>
                     {QUALITY_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                   </select>
-                  <button onClick={() => removeMapEntry('itemsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px' }}><Trash2 size={14} /></button>
+                  <button onClick={() => removeMapEntry('itemsList', name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 'var(--space-1)' }}><Trash2 size={14} /></button>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <input type="text" value={item?.类型 ?? ''} onChange={e => updateItemField(name, '类型', e.target.value)} placeholder="类型(武器/防具/消耗品...)" style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
@@ -341,7 +341,7 @@ export default function NpcEditorModal({
                 </div>
               </div>
             ))}
-            <button className="btn-ghost" onClick={() => addMapEntry('itemsList', { 数量: 1, 类型: '', 品质: '普通', 备注: '' })} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加物品</button>
+            <button className="btn-ghost" onClick={() => addMapEntry('itemsList', { 数量: 1, 类型: '', 品质: '普通', 备注: '' })} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-1)' }}><Plus size={14} /> 添加物品</button>
           </CollapsibleSection>
 
           {/* ── 人物事迹 ── */}
@@ -356,10 +356,10 @@ export default function NpcEditorModal({
                   const next = [...npc.chronicles]; next[i] = e.target.value; set('chronicles', next);
                 }} placeholder="事迹内容..." style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 8px' }} />
                 <button onClick={() => { const next = npc.chronicles.filter((_, j) => j !== i); set('chronicles', next); }}
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', flexShrink: 0 }}><Trash2 size={14} /></button>
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 'var(--space-1)', flexShrink: 0 }}><Trash2 size={14} /></button>
               </div>
             ))}
-            <button className="btn-ghost" onClick={() => set('chronicles', [...npc.chronicles, ''])} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', marginTop: '4px' }}><Plus size={14} /> 添加事迹</button>
+            <button className="btn-ghost" onClick={() => set('chronicles', [...npc.chronicles, ''])} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-1)' }}><Plus size={14} /> 添加事迹</button>
           </CollapsibleSection>
 
           {/* ── 生存属性（仅当世界启用 stat 模块时显示）── */}
@@ -368,8 +368,8 @@ export default function NpcEditorModal({
               title={statMod!.name || '生存属性'} count={npc.survivalStats ? Object.keys(npc.survivalStats).length : 0}
               expanded={expandedSections.has('stats')} onToggle={() => toggleSection('stats')}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                   {[{ key: '血量', cfg: statConfig.attrA, fallback: 100 }, { key: '体力值', cfg: statConfig.attrB, fallback: 100 }].map(({ key, cfg, fallback }) => (
                     <div key={key}>
                       <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>{cfg?.name || key}</span>
@@ -380,7 +380,7 @@ export default function NpcEditorModal({
                   ))}
                 </div>
                 {['dim1','dim2','dim3','dim4','dim5','dim6'].filter(k => statConfig[k]).length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
                     {(['dim1','dim2','dim3','dim4','dim5','dim6'] as const).map(key => {
                       const dim = statConfig[key];
                       if (!dim) return null;
@@ -405,10 +405,10 @@ export default function NpcEditorModal({
               title={progMod!.name || '成长体系'} count={npc.tierIndex != null ? 1 : 0}
               expanded={expandedSections.has('tier')} onToggle={() => toggleSection('tier')}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 {progConfig.tiers.map((tier: any, i: number) => (
                   <label key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px',
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 10px',
                     borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
                     background: (npc.tierIndex ?? 0) === i ? 'var(--accent-dim)' : 'transparent',
                     border: `1px solid ${(npc.tierIndex ?? 0) === i ? 'var(--accent)' : 'var(--border)'}`,
@@ -427,8 +427,8 @@ export default function NpcEditorModal({
         </div>
 
         <div className="world-editor-footer">
-          <button className="btn-secondary" onClick={onCancel} style={{ padding: '8px 20px' }}>{t('common.cancel')}</button>
-          <button className="btn-primary" onClick={() => onSave(npc)} disabled={!canSave} style={{ padding: '8px 24px' }}>
+          <button className="btn-secondary" onClick={onCancel} style={{ padding: 'var(--space-2) var(--space-5)' }}>{t('common.cancel')}</button>
+          <button className="btn-primary" onClick={() => onSave(npc)} disabled={!canSave} style={{ padding: 'var(--space-2) var(--space-6)' }}>
             {initial ? t('npcEditor.saveChanges') : t('npcEditor.createNpc')}
           </button>
         </div>

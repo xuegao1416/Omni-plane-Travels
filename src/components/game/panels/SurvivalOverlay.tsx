@@ -113,13 +113,13 @@ export default function SurvivalOverlay({
       >
         {/* ── 顶部栏 ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '12px 16px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+          padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border)',
           background: 'var(--bg-secondary)', flexShrink: 0,
         }}>
           <button onClick={onClose} style={{
-            background: 'var(--bg-tertiary)', border: 'none', borderRadius: '8px',
-            width: '32px', height: '32px', cursor: 'pointer',
+            background: 'var(--bg-tertiary)', border: 'none', borderRadius: 'var(--radius-md)',
+            width: 'var(--space-8)', height: 'var(--space-8)', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--text-muted)',
           }}>
@@ -137,12 +137,12 @@ export default function SurvivalOverlay({
         </div>
 
         {/* ── 内容区 ── */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
           {/* ── 系统描述 ── */}
           {data.description && (
-            <div className="surface-card" style={{ padding: '12px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <div className="surface-card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '6px' }}>
                 <Leaf size={16} color="var(--accent)" />
                 <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>系统说明</span>
               </div>
@@ -152,7 +152,7 @@ export default function SurvivalOverlay({
               {data.rules?.consumePerCycle && (
                 <div style={{
                   fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
-                  marginTop: '6px', padding: '4px 8px', borderRadius: '6px',
+                  marginTop: '6px', padding: 'var(--space-1) var(--space-2)', borderRadius: '6px',
                   background: 'var(--bg-tertiary)',
                 }}>
                   ⏱ {data.rules.consumePerCycle}
@@ -165,12 +165,12 @@ export default function SurvivalOverlay({
           <div>
             <div style={{
               fontSize: 'var(--font-size-sm)', fontWeight: 600,
-              color: 'var(--text-muted)', marginBottom: '8px',
+              color: 'var(--text-muted)', marginBottom: 'var(--space-2)',
               textTransform: 'uppercase', letterSpacing: '0.05em',
             }}>
               资源详情 ({mergedResources.length})
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {mergedResources.map(res => {
                 const pct = res.max > 0 ? Math.round((res.amount / res.max) * 100) : 0;
                 const isCritical = res.amount > 0 && res.amount <= threshold;
@@ -183,7 +183,7 @@ export default function SurvivalOverlay({
                     key={res.id}
                     onClick={() => setExpandedResource(isExpanded ? null : res.id)}
                     style={{
-                      padding: '10px 12px', borderRadius: '8px',
+                      padding: '10px 12px', borderRadius: 'var(--radius-md)',
                       border: `1px solid ${isCritical ? 'var(--danger-bg-soft)' : 'var(--border)'}`,
                       background: isCritical ? 'color-mix(in srgb, var(--danger) 8%, transparent)' : 'var(--bg-secondary)',
                       cursor: 'pointer',
@@ -220,7 +220,7 @@ export default function SurvivalOverlay({
                     {/* 进度条 */}
                     <div style={{
                       height: '6px', background: 'var(--bg-tertiary)',
-                      borderRadius: '3px', overflow: 'hidden', marginBottom: '4px',
+                      borderRadius: '3px', overflow: 'hidden', marginBottom: 'var(--space-1)',
                     }}>
                       <div style={{
                         width: `${pct}%`, height: '100%',
@@ -232,10 +232,10 @@ export default function SurvivalOverlay({
                     {/* 展开详情 */}
                     {isExpanded && (
                       <div style={{
-                        marginTop: '8px', paddingTop: '8px',
+                        marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)',
                         borderTop: '1px solid var(--border)',
                         fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)',
-                        display: 'flex', flexDirection: 'column', gap: '4px',
+                        display: 'flex', flexDirection: 'column', gap: 'var(--space-1)',
                       }}>
                         {res.description && (
                           <div style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>
@@ -243,13 +243,13 @@ export default function SurvivalOverlay({
                           </div>
                         )}
                         {res.gatherRate && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                             <Zap size={10} color="var(--accent)" />
                             <span>采集：{res.gatherRate}</span>
                           </div>
                         )}
                         {res.usage && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                             <Clock size={10} color="var(--text-muted)" />
                             <span>消耗：{res.usage}</span>
                           </div>
@@ -264,15 +264,15 @@ export default function SurvivalOverlay({
 
           {/* ── 演化蓝图 ── */}
           {data.resourceEvolution && data.resourceEvolution.length > 0 && (
-            <div className="surface-card" style={{ padding: '12px 16px' }}>
+            <div className="surface-card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 fontSize: 'var(--font-size-sm)', fontWeight: 600,
-                color: 'var(--text-muted)', marginBottom: '8px',
+                color: 'var(--text-muted)', marginBottom: 'var(--space-2)',
               }}>
                 🧬 演化蓝图
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {data.resourceEvolution.map((step, i) => (
                   <EvolutionStepCard key={step.id} step={step} index={i} />
                 ))}
@@ -282,11 +282,11 @@ export default function SurvivalOverlay({
 
           {/* ── 变更日志 ── */}
           {changeLog && changeLog.length > 0 && (
-            <div className="surface-card" style={{ padding: '12px 16px' }}>
+            <div className="surface-card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 fontSize: 'var(--font-size-sm)', fontWeight: 600,
-                color: 'var(--text-muted)', marginBottom: '8px',
+                color: 'var(--text-muted)', marginBottom: 'var(--space-2)',
               }}>
                 <ScrollText size={14} />
                 变更日志
@@ -300,13 +300,13 @@ export default function SurvivalOverlay({
                   }}>
                     {entry.changes.map((c, j) => (
                       <div key={j} style={{
-                        display: 'flex', alignItems: 'center', gap: '4px',
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
                         color: c.after < c.before ? 'var(--danger)' : c.after > c.before ? 'var(--success)' : 'var(--text-muted)',
                       }}>
                         <span>{c.symbol}</span>
                         <span>{c.resourceName}</span>
                         <span style={{ fontWeight: 600 }}>{c.before}→{c.after}</span>
-                        <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>{c.reason}</span>
+                        <span style={{ color: 'var(--text-muted)', marginLeft: 'var(--space-1)' }}>{c.reason}</span>
                       </div>
                     ))}
                   </div>
@@ -329,14 +329,14 @@ function EvolutionStepCard({ step, index }: { step: ResourceEvolutionStep; index
     }}>
       <div style={{
         fontSize: 'var(--font-size-xs)', fontWeight: 600,
-        color: 'var(--text-primary)', marginBottom: '4px',
+        color: 'var(--text-primary)', marginBottom: 'var(--space-1)',
       }}>
         阶段 {index + 1}：{step.id}
       </div>
 
       {/* 触发条件 */}
       {step.trigger?.keywords?.length > 0 && (
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>
           触发词：{step.trigger.keywords.join('、')}
         </div>
       )}
@@ -359,7 +359,7 @@ function EvolutionStepCard({ step, index }: { step: ResourceEvolutionStep; index
       {step.narrateHint && (
         <div style={{
           fontSize: '10px', color: 'var(--text-muted)',
-          fontStyle: 'italic', marginTop: '4px',
+          fontStyle: 'italic', marginTop: 'var(--space-1)',
         }}>
           "{step.narrateHint}"
         </div>

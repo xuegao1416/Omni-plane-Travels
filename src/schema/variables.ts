@@ -45,10 +45,163 @@ export interface InventoryItem {
   备注: string;
 }
 
+// ═══════════════════════════════════════════
+//  纪事系统（统一情报板）
+// ═══════════════════════════════════════════
+
+/** 纪事类型标签 */
+export type ChronicleType = '风险' | '机遇' | '线索' | '关系' | '地点' | '物品';
+
+/** 单条纪事 */
+export interface ChronicleEntry {
+  标题: string;
+  类型: ChronicleType;
+  描述: string;
+  /** 状态：活跃/已解决/已过期 */
+  状态?: '活跃' | '已解决' | '已过期';
+  /** 类型相关的详情字段（灵活结构，不同类型存不同数据） */
+  详情?: Record<string, string | number>;
+  $time: number;
+}
+
+/** 纪事系统容器 */
+export interface ChronicleSystem {
+  纪事: Record<string, ChronicleEntry>;
+}
+
+/** @deprecated 旧笔记结构，保留用于旧存档兼容迁移 */
 export interface Notebook {
-  潜在危机: Record<string, { 严重程度: string; 预计影响时间: string; 应对措施: string; $time: number }>;
-  当前机遇: Record<string, { 时效性: string; 所需资源: string; 行动计划: string; $time: number }>;
-  待办事项: Record<string, { 优先级: string; 截止时间: string; 状态: string; $time: number }>;
+  潜在危机?: Record<string, { 严重程度: string; 预计影响时间: string; 应对措施: string; $time: number }>;
+  当前机遇?: Record<string, { 时效性: string; 所需资源: string; 行动计划: string; $time: number }>;
+  待办事项?: Record<string, { 优先级: string; 截止时间: string; 状态: string; $time: number }>;
+}
+
+// ═══════════════════════════════════════════
+//  动态任务系统
+// ═══════════════════════════════════════════
+
+/** 任务类型 */
+export type TaskType = '主线' | '支线' | '日常' | '隐藏' | '成就';
+
+/** 任务状态 */
+export type TaskStatus = '进行中' | '已完成' | '已失败' | '已放弃';
+
+/** 物品需求 — 任务要求玩家拥有/交付指定物品 */
+export interface TaskItemRequirement {
+  物品名: string;
+  数量: number;
+  /** true=完成时扣除（交付型），false=仅检查拥有（收集型） */
+  消耗: boolean;
+}
+
+/** 属性需求 — 任务要求玩家属性达到指定值 */
+export interface TaskStatRequirement {
+  属性名: string;
+  最小值: number;
+}
+
+/** 资源需求 — 任务要求消耗生存资源 */
+export interface TaskResourceRequirement {
+  资源名: string;
+  数量: number;
+  /** true=完成时扣除 */
+  消耗: boolean;
+}
+
+/** 技能需求 */
+export interface TaskSkillRequirement {
+  技能名: string;
+  最低品质?: '普通' | '精良' | '稀有' | '史诗' | '传说';
+}
+
+/** NPC关系需求 */
+export interface TaskNPCRequirement {
+  NPC名: string;
+  最低好感度?: number;
+  需要关系类型?: string;
+}
+
+/** 骰子检定需求 */
+export interface TaskDiceRequirement {
+  属性名: string;
+  难度DC: number;
+  描述: string;
+}
+
+/** 货币需求 */
+export interface TaskCurrencyRequirement {
+  数量: number;
+  消耗: boolean;
+}
+
+/** 任务奖励 */
+export interface TaskReward {
+  经验值?: number;
+  金币?: number;
+  物品?: Array<{ 物品名: string; 数量: number; 类型: string; 品质: string; 备注: string }>;
+  技能?: Array<{ 技能名: string; 品质: string; 描述: string; 类型: string }>;
+  天赋?: Array<{ 天赋名: string; 品质: string; 描述: string }>;
+  属性提升?: Record<string, number>;
+  好感度变化?: Record<string, number>;
+  资源?: Record<string, number>;
+  解锁任务?: string[];
+  解锁段位?: number;
+}
+
+/** 任务阶段（多步骤任务链中的单个阶段） */
+export interface TaskStage {
+  名称: string;
+  描述: string;
+  状态: '未开始' | '进行中' | '已完成';
+  物品需求?: TaskItemRequirement[];
+  属性需求?: TaskStatRequirement[];
+  资源需求?: TaskResourceRequirement[];
+  技能需求?: TaskSkillRequirement[];
+  NPC需求?: TaskNPCRequirement[];
+  骰子检定?: TaskDiceRequirement;
+  货币需求?: TaskCurrencyRequirement;
+  阶段奖励?: Partial<TaskReward>;
+}
+
+/** 单个任务 */
+export interface Task {
+  任务名: string;
+  任务类型: TaskType;
+  描述: string;
+  状态: TaskStatus;
+  优先级: '低' | '中' | '高' | '紧急';
+  来源?: string;
+  关联NPC?: string;
+  截止时间?: string;
+  $time: number;
+
+  // ── 完成条件（单阶段任务） ──
+  目标: string;
+  进度?: number;
+  物品需求?: TaskItemRequirement[];
+  属性需求?: TaskStatRequirement[];
+  资源需求?: TaskResourceRequirement[];
+  技能需求?: TaskSkillRequirement[];
+  NPC需求?: TaskNPCRequirement[];
+  骰子检定?: TaskDiceRequirement;
+  货币需求?: TaskCurrencyRequirement;
+
+  // ── 多阶段任务链 ──
+  阶段?: TaskStage[];
+
+  // ── 奖励 ──
+  奖励?: TaskReward;
+
+  // ── 解锁链 ──
+  前置任务?: string[];
+  后续任务?: string[];
+}
+
+/** 任务系统容器 */
+export interface TaskSystem {
+  活跃任务: Record<string, Task>;
+  已完成任务: Record<string, Task>;
+  已失败任务: Record<string, Task>;
 }
 
 export interface PlayerState {
@@ -69,7 +222,12 @@ export interface PlayerState {
     主货币: { 名称: string; 数量: number };
   };
   物品栏: Record<string, InventoryItem>;
-  记事本: Notebook;
+  /** @deprecated 旧笔记，保留用于存档兼容 */
+  记事本?: Notebook;
+  /** 纪事系统 — 统一情报板（危机/机遇/线索/情报/承诺等） */
+  纪事系统?: ChronicleSystem;
+  /** 动态任务系统 — 与物品/属性/资源/技能/NPC深度联动 */
+  任务系统?: TaskSystem;
   // ── 成长体系状态（动态，AI可更新） ──
   /** 当前段位/等级索引 */
   当前段位索引?: number;
@@ -195,7 +353,8 @@ export function createDefaultGameState(): GameState {
       技能系统: {},
       货币资源: { 主货币: { 名称: '', 数量: 500 } },
       物品栏: {},
-      记事本: { 潜在危机: {}, 当前机遇: {}, 待办事项: {} },
+      纪事系统: { 纪事: {} },
+      任务系统: { 活跃任务: {}, 已完成任务: {}, 已失败任务: {} },
     },
     人物档案: {},
   };

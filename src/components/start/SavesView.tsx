@@ -84,12 +84,12 @@ export default function SavesView({
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
           <button
             onClick={onBack}
-            style={{ border: 'none', background: 'var(--bg-secondary)', width: '32px', height: '32px', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '12px' }}
+            style={{ border: 'none', background: 'var(--bg-secondary)', width: 'var(--space-8)', height: 'var(--space-8)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 'var(--space-3)' }}
           ><ArrowLeft size={16} /></button>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <Save size={18} strokeWidth={1.5} />选择存档
           </h2>
-          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginLeft: '8px' }}>{allSaves.length} 个存档</span>
+          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginLeft: 'var(--space-2)' }}>{allSaves.length} 个存档</span>
         </div>
 
         {/* 存档列表 */}
@@ -124,13 +124,13 @@ export default function SavesView({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ fontWeight: '600', fontSize: 'var(--font-size-md)', display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
                       {isEditing ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flex: 1 }}>
                           <input
                             value={editingName}
                             onChange={e => setEditingName(e.target.value)}
                             onClick={e => e.stopPropagation()}
                             onKeyDown={e => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') setEditingId(null); }}
-                            style={{ flex: 1, fontSize: 'var(--font-size-md)', padding: '2px 6px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                            style={{ flex: 1, fontSize: 'var(--font-size-md)', padding: '2px 6px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
                             autoFocus
                           />
                           <button onClick={e => { e.stopPropagation(); confirmRename(); }} style={{ border: 'none', background: 'none', color: 'var(--accent)', cursor: 'pointer', padding: '2px' }}><Check size={14} /></button>
@@ -139,15 +139,15 @@ export default function SavesView({
                       ) : (
                         <>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.name}</span>
-                          {isActive && <span style={{ fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '8px', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: '500', flexShrink: 0 }}>当前</span>}
+                          {isActive && <span style={{ fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: '500', flexShrink: 0 }}>当前</span>}
                         </>
                       )}
                     </div>
                     {!isEditing && (
                       <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
-                        <button onClick={e => { e.stopPropagation(); startRename(meta.id, meta.name); }} title="重命名" style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}><Edit3 size={13} /></button>
-                        <button onClick={e => { e.stopPropagation(); onExportSave(meta.id); }} title="导出" style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}><Download size={13} /></button>
-                        <button onClick={e => { e.stopPropagation(); onDeleteSave(meta.id); }} title="删除" style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
+                        <button onClick={e => { e.stopPropagation(); startRename(meta.id, meta.name); }} title="重命名" style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 'var(--space-1)', display: 'flex', alignItems: 'center' }}><Edit3 size={13} /></button>
+                        <button onClick={e => { e.stopPropagation(); onExportSave(meta.id); }} title="导出" style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 'var(--space-1)', display: 'flex', alignItems: 'center' }}><Download size={13} /></button>
+                        <button onClick={e => { e.stopPropagation(); onDeleteSave(meta.id); }} title="删除" style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 'var(--space-1)', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
                       </div>
                     )}
                   </div>
@@ -155,12 +155,12 @@ export default function SavesView({
                   {/* 预览信息 */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
                     {meta.preview && (
-                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} /> {meta.preview}</span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}><User size={11} /> {meta.preview}</span>
                     )}
                   </div>
 
                   {/* 时间 + 存档大小 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
                     <span>{new Date(meta.timestamp).toLocaleString(locale)}</span>
                     {meta.estBytes && meta.estBytes > 50 * 1024 * 1024 && (
                       <span style={{
@@ -186,7 +186,7 @@ export default function SavesView({
         {/* 底部操作栏 - 固定在底部 */}
         <div style={{
           display: 'flex',
-          gap: '8px',
+          gap: 'var(--space-2)',
           justifyContent: 'center',
           flexWrap: 'wrap',
           paddingTop: '1rem',

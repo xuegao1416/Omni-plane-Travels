@@ -8,7 +8,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   text-align: left;
   color: var(--text-primary);
   transition: all 0.15s;
@@ -20,8 +20,8 @@
 }
 
 .optionIcon {
-  width: 40px;
-  height: 40px;
+  width: var(--space-10);
+  height: var(--space-10);
   border-radius: var(--radius-md);
   background: var(--accent-dim);
   border: 1px solid var(--border);
@@ -46,7 +46,7 @@
 .templateCard {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -86,7 +86,7 @@
   font-size: var(--font-size-xs);
   color: var(--text-muted);
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 2px;
 }
 
@@ -142,7 +142,7 @@
 }
 
 .dialogHeader {
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
 }
@@ -163,7 +163,7 @@
 .dialogBody {
   flex: 1;
   overflow: auto;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
 }
 
 .optionList {
@@ -175,7 +175,7 @@
 .templateList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .backBtn {
@@ -190,7 +190,7 @@
 }
 
 .dialogFooter {
-  padding: 12px 20px;
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;

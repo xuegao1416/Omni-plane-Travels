@@ -756,11 +756,11 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       {/* 顶栏 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 'var(--space-3)', padding: isPhone ? '6px 8px' : '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0, overflow: 'hidden' }}>
-        <button className="btn-ghost btn-sm" onClick={onBack} style={{ minHeight: isPhone ? 36 : 'var(--touch-min)', minWidth: isPhone ? 36 : undefined, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isPhone ? '4px' : undefined }}>
+        <button className="btn-ghost btn-sm" onClick={onBack} style={{ minHeight: isPhone ? 36 : 'var(--touch-min)', minWidth: isPhone ? 36 : undefined, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isPhone ? 'var(--space-1)' : undefined }}>
           <ArrowLeft size={16} />{!isPhone && ' 返回'}
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2, flexShrink: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 4 : 6, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 6, minWidth: 0 }}>
             {!isPhone && <Package size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
             {!isPhone && <Pencil size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} aria-label="可编辑" />}
             <input
@@ -798,17 +798,17 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
         <div className="event-toolbar-scroll" style={{ marginLeft: 'auto', display: 'flex', gap: isPhone ? '2px' : 'var(--space-2)', alignItems: 'center', minWidth: 0, flexShrink: 1, overflowX: 'auto', overflowY: 'hidden' }}>
           {/* 世界绑定 */}
           {worldBound && worldDef ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: isPhone ? '2px 4px' : 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
               <Lock size={12} /> {isPhone ? worldDef.name.slice(0, 3) : worldDef.name}
             </span>
           ) : confirmWorld ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {!isPhone && <span style={{ color: 'var(--text-muted)' }}>绑定「{confirmWorld.name}」？</span>}
               <button className="btn-primary btn-xs" onClick={() => void handleConfirmWorld()} style={{ padding: isPhone ? '2px 4px' : '2px 8px', fontSize: 'var(--font-size-xs)' }}>确认</button>
               <button className="btn-ghost btn-xs" onClick={handleCancelWorld} style={{ padding: isPhone ? '2px 4px' : '2px 6px' }}><X size={12} /></button>
             </span>
           ) : showWorldPicker ? (
-            <select autoFocus value="" onChange={(e) => e.target.value && handlePickWorld(e.target.value)} onBlur={() => setShowWorldPicker(false)} style={{ padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', width: isPhone ? 70 : 140, flexShrink: 0 }}>
+            <select autoFocus value="" onChange={(e) => e.target.value && handlePickWorld(e.target.value)} onBlur={() => setShowWorldPicker(false)} style={{ padding: isPhone ? '2px 4px' : 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', width: isPhone ? 70 : 140, flexShrink: 0 }}>
               <option value="" disabled>世界…</option>
               {getAllWorlds().map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
@@ -824,7 +824,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
           {!isPhone && <button className="btn-secondary btn-sm" onClick={runValidate} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ShieldCheck size={15} /> 校验</button>}
           {!isPhone && <button className="btn-secondary btn-sm" onClick={handleExport} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Download size={15} /> 导出</button>}
           <button className={mode === 'json' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={() => (mode === 'json' ? backToVisual() : enterJson())} style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 0 : 6, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px 6px' : undefined, flexShrink: 0 }}><Braces size={14} /> {mode === 'json' ? '可视化' : !isPhone && '</> JSON'}</button>
-          <button className="btn-ghost btn-sm" onClick={() => setShowSettings((s) => !s)} aria-label="事件设置" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: isPhone ? 32 : undefined, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px' : undefined, flexShrink: 0 }}><Settings size={isPhone ? 14 : 15} /></button>
+          <button className="btn-ghost btn-sm" onClick={() => setShowSettings((s) => !s)} aria-label="事件设置" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: isPhone ? 32 : undefined, minHeight: isPhone ? 32 : undefined, padding: isPhone ? 'var(--space-1)' : undefined, flexShrink: 0 }}><Settings size={isPhone ? 14 : 15} /></button>
         </div>
       </div>
 
@@ -851,22 +851,22 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
             ['author', '作者', manifest.author, (v: string) => setManifest((d) => ({ ...d, author: v }))],
             ['icon', '图标名(Lucide)', manifest.icon, (v: string) => setManifest((d) => ({ ...d, icon: v }))],
           ] as Array<[string, string, string, (v: string) => void]>).map(([key, label, val, set]) => (
-            <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+            <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
               {label}
               <input value={val} onChange={(e) => set(e.target.value)} style={inputStyle} />
               {key === 'id' && (
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>
                   包 ID：小写英文/数字/连字符，内部标识；填中文名称时会自动生成，也可手动修改。
                 </span>
               )}
             </label>
           ))}
           {/* 事件名称改在顶栏面包屑内联编辑，避免与顶栏重复修改 */}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
             封面色（实色块，禁渐变）
             <input type="color" value={manifest.coverColor} onChange={(e) => setManifest((d) => ({ ...d, coverColor: e.target.value }))} style={{ width: '100%', height: 32, border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)' }} />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>
             描述
             <textarea value={manifest.description} onChange={(e) => setManifest((d) => ({ ...d, description: e.target.value }))} rows={2} style={inputStyle} />
           </label>
@@ -903,7 +903,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
             <div style={{ maxHeight: '40%', overflow: 'auto', padding: 'var(--space-3)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                 <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>事件</span>
-                <button className="btn-secondary btn-sm" onClick={() => void handleNewEvent()} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)' }}><Plus size={14} /> 新建事件</button>
+                <button className="btn-secondary btn-sm" onClick={() => void handleNewEvent()} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--font-size-xs)' }}><Plus size={14} /> 新建事件</button>
               </div>
               {eventList.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-2)', textAlign: 'center' }}>
@@ -984,14 +984,14 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
                     onClick={() => setSelected(b.id)}
                     style={{ display: 'flex', gap: 'var(--space-2)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`, background: 'var(--bg-secondary)', boxShadow: active ? 'var(--shadow-glow)' : 'var(--shadow-xs)', cursor: 'pointer' }}
                   >
-                    <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: 'var(--space-10)', height: 'var(--space-10)', borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Icon size={20} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{BLOCK_META[b.type].label}</div>
                       <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{blockTitle(b)}</div>
                       {b.props.worldbookRefs && b.props.worldbookRefs.length > 0 && (
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}><BookOpen size={12} /> 引用 {b.props.worldbookRefs.length} 条世界书</div>
+                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 2 }}><BookOpen size={12} /> 引用 {b.props.worldbookRefs.length} 条世界书</div>
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1006,7 +1006,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
 
             {/* 移动端浮动按钮 */}
             {isPhone && (
-              <div style={{ position: 'absolute', bottom: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', zIndex: 10 }}>
+              <div style={{ position: 'absolute', bottom: 'var(--space-4)', right: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', zIndex: 10 }}>
                 <button onClick={() => setMobileEventPanel(true)} aria-label="事件列表" style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}><Layers size={20} /></button>
                 <button onClick={() => setMobileBlockPanel(true)} aria-label="组件库" style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}><Plus size={20} /></button>
                 {selectedBlock && (
@@ -1023,7 +1023,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <div className="event-bottom-sheet" style={{ padding: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>事件列表</span>
-                  <button onClick={() => setMobileEventPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><X size={18} /></button>
+                  <button onClick={() => setMobileEventPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 'var(--space-2)' }}><X size={18} /></button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>事件</span>
@@ -1049,13 +1049,13 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <div className="event-bottom-sheet" style={{ padding: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>组件库</span>
-                  <button onClick={() => setMobileBlockPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><X size={18} /></button>
+                  <button onClick={() => setMobileBlockPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 'var(--space-2)' }}><X size={18} /></button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
                   {BLOCK_TYPES.map((t) => {
                     const Icon = BLOCK_META[t].icon;
                     return (
-                      <button key={t} onClick={() => { addBlock(t); setMobileBlockPanel(false); }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-primary)', cursor: 'pointer', color: 'var(--text-primary)', minHeight: 44 }}>
+                      <button key={t} onClick={() => { addBlock(t); setMobileBlockPanel(false); }} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', width: '100%', textAlign: 'left', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-primary)', cursor: 'pointer', color: 'var(--text-primary)', minHeight: 44 }}>
                         <Icon size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{BLOCK_META[t].label}</div>
@@ -1076,7 +1076,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <div className="event-right-sheet" style={{ padding: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>卡片属性</span>
-                  <button onClick={() => setMobilePropsPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 8 }}><X size={18} /></button>
+                  <button onClick={() => setMobilePropsPanel(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 'var(--space-2)' }}><X size={18} /></button>
                 </div>
                 <BlockProperties block={selectedBlock} onChange={updateSelected} onOpenWorldBook={() => { setWbTarget(selectedBlock.id); setWbOpen(true); }} gameState={gameState} />
               </div>
@@ -1098,7 +1098,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
       )}
 
       {/* 底栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-2)' : 'var(--space-4)', padding: isPhone ? '4px 8px' : '6px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-2)' : 'var(--space-4)', padding: isPhone ? 'var(--space-1) var(--space-2)' : '6px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flexShrink: 0, overflow: 'hidden' }}>
         {!isPhone && <span>缩放 100%</span>}
         {!isPhone && <span>网格对齐 开</span>}
         <span style={{ color: saved ? 'var(--success)' : 'var(--text-muted)' }}>{saved ? '● 已存库' : '○ 未保存'}</span>
@@ -1124,11 +1124,11 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
                 {b.type === 'narrative' && <div style={{ lineHeight: 1.7, fontSize: 'var(--font-size-base)' }}>{b.props.text}</div>}
                 {b.type === 'choice' && (
                   <div>
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: 4 }}>选择</div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1)' }}>选择</div>
                     {(b.props.choices ?? []).map((c, i) => {
                       const opt = typeof c === 'string' ? { label: c } : c;
                       return (
-                        <div key={i} style={{ padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: 4, background: 'var(--bg-primary)' }}>
+                        <div key={i} style={{ padding: '6px 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: 'var(--space-1)', background: 'var(--bg-primary)' }}>
                           · {opt.label}
                           {(opt.effect?.statId || opt.effect?.resourcePath) && (
                             <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
@@ -1159,7 +1159,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
         onClose={() => { setWbOpen(false); setWbTarget(null); }}
       />
       {saveToast && (
-        <div style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 'var(--font-size-sm)', boxShadow: 'var(--shadow-md)' }}>
+        <div style={{ position: 'fixed', bottom: 'var(--space-4)', left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 'var(--font-size-sm)', boxShadow: 'var(--shadow-md)' }}>
           {saveToast}
         </div>
       )}
@@ -1334,7 +1334,7 @@ function EventRow({ event, selected, loading, disabled, onSelect, onDelete, onRe
         title="删除该事件"
         disabled={disabled}
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, flexShrink: 0, borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent', color: 'var(--danger)', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}
+        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 'var(--space-8)', height: 'var(--space-8)', flexShrink: 0, borderRadius: 'var(--radius-md)', border: 'none', background: 'transparent', color: 'var(--danger)', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}
         onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--danger-bg-soft)'; }}
         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
         onMouseDown={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--danger-bg-hover)'; }}
@@ -1362,7 +1362,7 @@ function BlockProperties({ block, onChange, onOpenWorldBook, gameState }: { bloc
             const opt: ChoiceOption = typeof c === 'string' ? { label: c } : c;
             const effect: ChoiceEffect = opt.effect ?? { statId: '', delta: 0 };
             return (
-              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 8, marginBottom: 8, background: 'var(--bg-primary)' }}>
+              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-2)', marginBottom: 'var(--space-2)', background: 'var(--bg-primary)' }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   <input
                     value={opt.label}
@@ -1447,7 +1447,7 @@ function BlockProperties({ block, onChange, onOpenWorldBook, gameState }: { bloc
 const fieldLabel: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
+  gap: 'var(--space-1)',
   fontSize: 'var(--font-size-xs)',
   color: 'var(--text-secondary)',
 };

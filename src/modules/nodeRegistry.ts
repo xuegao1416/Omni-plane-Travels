@@ -479,21 +479,25 @@ registerNode({
 registerNode({
   typeId: 'actions.add_notebook',
   category: 'actions',
-  name: '记事本',
-  description: '向记事本添加一条记录',
+  name: '纪事',
+  description: '向纪事系统添加一条记录',
   icon: 'NotebookPen',
   color: 'var(--node-effect)',
   inputs: [socket('flow_in', 'flow', '触发')],
   outputs: [socket('flow_out', 'flow', '继续')],
   widgets: [
+    widget('string', '标题', 'title', { multiline: false }),
     widget('select', '类型', 'note_type', { options: [
-      { label: '危机', value: 'crises' },
-      { label: '机遇', value: 'opportunities' },
-      { label: '待办', value: 'todo' },
+      { label: '风险', value: '风险' },
+      { label: '机遇', value: '机遇' },
+      { label: '线索', value: '线索' },
+      { label: '关系', value: '关系' },
+      { label: '地点', value: '地点' },
+      { label: '物品', value: '物品' },
     ]}),
     widget('string', '内容', 'content', { multiline: true }),
   ],
-  searchTags: ['记事本', '笔记', '记录', '待办'],
+  searchTags: ['纪事', '笔记', '记录', '风险', '机遇', '线索'],
 });
 
 // ═══════════════════════════════════════════════════════════

@@ -279,12 +279,28 @@ registerNodeExecutor('actions.modify_currency', (inputs, _ctx, wv) => {
 });
 
 registerNodeExecutor('actions.add_notebook', (_inputs, _ctx, wv) => {
-  const noteType = (wv?.note_type as string) ?? 'todo';
+  const noteType = (wv?.note_type as string) ?? '情报';
   const content = (wv?.content as string) ?? '';
+  const title = (wv?.title as string) || content.slice(0, 20);
   if (!content) return { outputs: { flow_out: true } };
+  // 映射旧类型到新纪事类型
+  const typeMap: Record<string, string> = {
+    '潜在危机': '风险', '危机': '风险', '风险': '风险',
+    '当前机遇': '机遇', '机遇': '机遇',
+    '待办事项': '线索', 'todo': '线索',
+    '线索': '线索', '情报': '线索',
+    '承诺': '线索', '关系': '关系', '地点': '地点', '物品': '物品',
+  };
+  const chronicleType = typeMap[noteType] || '线索';
   return {
     outputs: { flow_out: true },
-    actions: [{ kind: 'set', payload: { path: `玩家.记事本.${noteType}`, value: content } }],
+    actions: [{
+      kind: 'set',
+      payload: {
+        path: `玩家.纪事系统.纪事.${title}`,
+        value: { 标题: title, 类型: chronicleType, 描述: content, 状态: '活跃', $time: Date.now() },
+      },
+    }],
   };
 });
 

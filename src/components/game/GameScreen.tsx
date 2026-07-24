@@ -7,6 +7,7 @@ import ChatPanel from './chat/ChatPanel';
 import ProfilePanel from './panels/ProfilePanel';
 import CharacterGrid from './panels/CharacterGrid';
 import NotebookPanel from './panels/NotebookPanel';
+import TaskPanel from './panels/TaskPanel';
 import VariableSnapshotPanel from './panels/VariableSnapshotPanel';
 import WorldBookPanel from './panels/WorldBookPanel';
 import RightPanel from './panels/RightPanel';
@@ -281,6 +282,7 @@ export default function GameScreen() {
     switch (panel) {
       case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} />;
       case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
+      case 'tasks': return <TaskPanel gameState={gameState} />;
       case 'notebook': return <NotebookPanel gameState={gameState} />;
       case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
       case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;

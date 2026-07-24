@@ -1,6 +1,6 @@
 .btn {
-  width: 32px;
-  height: 32px;
+  width: var(--space-8);
+  height: var(--space-8);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19,7 +19,7 @@
 
 .controls {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .scaleLabel {

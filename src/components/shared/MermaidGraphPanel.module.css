@@ -80,5 +80,5 @@
   font-size: var(--font-size-sm);
   color: #f85149;
   text-align: center;
-  padding: 24px;
+  padding: var(--space-6);
 }

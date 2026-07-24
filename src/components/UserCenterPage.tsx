@@ -1,10 +1,10 @@
 /**
  * 用户中心页面
  * 未登录 → 登录表单
- * 已登录 → 3 个 Tab：个人中心 / 云存档 / 创意工坊
+ * 已登录 → 4 个 Tab：个人中心 / 云存档 / 创意工坊 / 本地资产
  */
 import { useState } from 'react';
-import { ArrowLeft, User, Cloud, Store } from 'lucide-react';
+import { ArrowLeft, User, Cloud, Store, Package } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useAuthStore } from '../stores/authStore';
@@ -12,13 +12,15 @@ import { useIsPhone } from '../hooks/useIsMobile';
 import AuthSettingsTab from './settings/AuthSettingsTab';
 import CloudSaveSettingsTab from './settings/CloudSaveSettingsTab';
 import WorkshopSettingsTab from './settings/WorkshopSettingsTab';
+import LocalAssetsTab from './settings/LocalAssetsTab';
 
-type UserTab = 'profile' | 'cloud' | 'workshop';
+type UserTab = 'profile' | 'cloud' | 'workshop' | 'assets';
 
 const USER_TABS: { id: UserTab; icon: LucideIcon; label: string }[] = [
   { id: 'profile', icon: User, label: '个人中心' },
   { id: 'cloud', icon: Cloud, label: '云存档' },
   { id: 'workshop', icon: Store, label: '创意工坊' },
+  { id: 'assets', icon: Package, label: '本地资产' },
 ];
 
 export default function UserCenterPage() {
@@ -72,7 +74,7 @@ export default function UserCenterPage() {
     );
   }
 
-  // 已登录 → 3 个 Tab
+  // 已登录 → 4 个 Tab
   return (
     <div
       className="full-height"
@@ -136,7 +138,7 @@ export default function UserCenterPage() {
         {/* 桌面端：左侧 Tab 栏 */}
         {!isMobile && (
           <div style={{
-            width: '130px',
+            width: '140px',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
@@ -171,6 +173,7 @@ export default function UserCenterPage() {
           {tab === 'profile' && <AuthSettingsTab />}
           {tab === 'cloud' && <CloudSaveSettingsTab />}
           {tab === 'workshop' && <WorkshopSettingsTab />}
+          {tab === 'assets' && <LocalAssetsTab />}
         </div>
       </div>
     </div>
