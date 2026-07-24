@@ -296,7 +296,7 @@ export interface EmbeddedEventPack {
   events?: Array<{
     id: string;
     name: string;
-    cards: Array<{
+    cards?: Array<{
       id: string;
       componentId: string;
       title: string;
@@ -305,6 +305,8 @@ export interface EmbeddedEventPack {
       root: { props?: Record<string, unknown> };
       components: Record<string, Array<{ id: string; props: Record<string, unknown> }>>;
     };
+    /** 新格式：卡片工作流定义（CardWorkflowDefinition） */
+    workflow?: import('../modules/schema').CardWorkflowDefinition;
   }>;
   /** 拥有的权限（如 modify_world_state, add_card） */
   permissions?: Permission[];

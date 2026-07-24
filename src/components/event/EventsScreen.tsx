@@ -20,7 +20,6 @@ type SubView = 'center' | 'library' | 'card' | 'rule' | 'worldbook' | 'wizard';
 /** 按事件包类型决定跳转的子视图 */
 function subViewForType(type: EventPackType): SubView {
   if (type === 'rule') return 'rule';
-  if (type === 'quest') return 'rule'; // 任务包用规则编辑器查看触发规则
   if (type === 'worldbook') return 'worldbook';
   return 'card'; // card / bundle 落入统一事件包编辑器
 }
@@ -156,7 +155,7 @@ export default function EventsScreen() {
         {/* 全屏编辑器 / 抽屉 / 向导（自带头部与返回，覆盖外壳头部）
             每个路由包一层本地错误边界（P0-3）：任一面板渲染失败仅隔离自身，
             不拖垮整个事件中心，并给出错误文案 + 返回入口。 */}
-        {subView === 'card' && (
+        {subView === 'card' && selectedPackId && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
             <EventErrorBoundary onBack={goCenter}>
               <CardEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />

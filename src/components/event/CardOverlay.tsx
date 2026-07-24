@@ -1,17 +1,15 @@
 // ============================================================
-// 卡片浮层 — 订阅 EVENT_CARD 事件，按 eventPackId 取 schema/card.json，
-//   找到对应卡片 block 用 CardRenderer 渲染成居中浮层（带关闭按钮，点遮罩/关闭消失）。
-//   Web 端 getWebEvent 取不到卡片时静默降级（不崩）。
+//  卡片浮层 v2 — 执行 CardWorkflowDefinition 工作流
+//  订阅 EVENT_CARD 事件，加载工作流定义，执行 DAG，渲染结果
 // ============================================================
-import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { X, FileText, ScrollText, MessageCircle, Image, ListChecks, Sparkles, Filter, Dice5 } from 'lucide-react';
 import { eventBus, EVENTS } from '../../engine/eventBus';
 import { getWebEvent } from '../../modules/eventDb';
-import type { CardFile, EventPackFile } from '../../modules/schema';
-import { flattenEventPack } from '../../modules/schema';
-import CardRenderer, { cardFileToBlocks, type CardBlockView } from './CardRenderer';
+import type { CardWorkflowDefinition, CardNodeExecutionResult, CardExecutionContext } from '../../modules/schema';
+import { executeCardWorkflow, type CardWorkflowExecutionResult } from '../../modules/cardWorkflowEngine';
 import { useSaveStore } from '../../stores/saveStore';
-import { selectChoice } from '../../modules/eventChoiceState';
+import { selectChoice, applyEffectTarget } from '../../modules/eventChoiceState';
 import type { GameState } from '../../schema/variables';
 
 interface CardEvent {
@@ -20,130 +18,119 @@ interface CardEvent {
 }
 
 interface Props {
-  /** 实时 GameState（用于读取选中那一刻的属性基准值做预览） */
   gameState?: GameState;
 }
 
 export default function CardOverlay({ gameState }: Props) {
-  const [blocks, setBlocks] = useState<CardBlockView[] | null>(null);
+  const [result, setResult] = useState<CardWorkflowExecutionResult | null>(null);
   const [title, setTitle] = useState('');
   const [current, setCurrent] = useState<CardEvent | null>(null);
-  // 每选择块独立维护单选状态（blockId → 选项 index / 基准值）
-  const [selectedByBlock, setSelectedByBlock] = useState<Record<string, number>>({});
-  const [baseByBlock, setBaseByBlock] = useState<Record<string, number>>({});
+  const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
 
   useEffect(() => {
     const offCard = eventBus.on(EVENTS.EVENT_CARD, (evt: CardEvent) => {
       void openCard(evt);
     });
-    const offOverride = eventBus.on(EVENTS.EVENT_CARD_OVERRIDE, (evt: { cardId: string; patch: Record<string, unknown>; eventPackId: string }) => {
-      // 当前正在展示的卡片被覆盖：按 patch 更新 block props
-      if (!current || !blocks) return;
-      if (current.cardId !== evt.cardId && current.eventPackId !== evt.eventPackId) return;
-      setBlocks(prev => {
-        if (!prev) return prev;
-        return prev.map(block => {
-          if (block.id === evt.cardId) {
-            return { ...block, props: { ...block.props, ...evt.patch } };
-          }
-          return block;
-        });
-      });
-    });
-    return () => { offCard(); offOverride(); };
-  }, [current, blocks]);
+    return () => { offCard(); };
+  }, []);
 
-  async function openCard(evt: CardEvent): Promise<void> {
+  const openCard = useCallback(async (evt: CardEvent) => {
     try {
       const rec = await getWebEvent(evt.eventPackId).catch(() => undefined);
       if (!rec) return;
 
-      // 优先按事件 ID 读取该事件独立的画布文件（schema/event-<eventId>.json）
-      if (evt.cardId) {
-        const eventCanvas = rec.files[`schema/event-${evt.cardId}.json`];
-        if (typeof eventCanvas === 'string') {
-          const file = JSON.parse(eventCanvas) as CardFile;
-          const view = cardFileToBlocks(file);
-          if (view.length > 0) {
-            setTitle(rec.manifest?.name ?? '事件');
-            setCurrent(evt);
-            setSelectedByBlock({});
-            setBaseByBlock({});
-            setBlocks(view);
-            return;
-          }
+      const worldName = rec.manifest?.name ?? '事件';
+
+      // 读取工作流定义
+      const canvasRaw = rec.files[`schema/event-${evt.cardId}.json`];
+      if (typeof canvasRaw !== 'string') return;
+
+      let workflow: CardWorkflowDefinition;
+      try {
+        const parsed = JSON.parse(canvasRaw);
+        if (parsed.nodes && Array.isArray(parsed.nodes)) {
+          workflow = parsed as CardWorkflowDefinition;
+        } else {
+          return; // 旧格式，不支持
         }
+      } catch {
+        return;
       }
 
-      // 回退：读 events.json，展平取所有卡片
-      const evRaw = rec.files['schema/events.json'];
-      if (typeof evRaw !== 'string') return;
-      const evFile = JSON.parse(evRaw) as EventPackFile;
-      const flat = flattenEventPack(evFile);
-      const file: CardFile = { version: evFile.version, puck: { root: { props: {} }, components: {} }, cards: flat.cards };
-      let view = cardFileToBlocks(file);
-      // 命中指定卡片 id 时只渲染该 block；否则整卡预览
-      if (evt.cardId) {
-        const hit = view.filter((b) => b.id === evt.cardId);
-        if (hit.length > 0) view = hit;
-      }
-      if (view.length === 0) return;
-      setTitle(rec.manifest?.name ?? '事件');
+      // 执行工作流
+      const ctx: CardExecutionContext = {
+        tick: 0,
+        events: [],
+        permissions: ['modify_world_state', 'add_card'],
+        gameState: (gameState ?? {}) as Record<string, unknown>,
+      };
+
+      const execResult = executeCardWorkflow(workflow, ctx);
+
+      setTitle(worldName);
       setCurrent(evt);
-      setSelectedByBlock({});
-      setBaseByBlock({});
-      setBlocks(view);
-    } catch {
-      /* 静默降级，不崩 */
+      setSelectedChoice(null);
+      setResult(execResult);
+    } catch (err) {
+      console.error('[CardOverlay] 卡片加载失败:', evt, err);
     }
-  }
+  }, [gameState]);
 
-  const close = () => {
-    setBlocks(null);
+  const close = useCallback(() => {
+    setResult(null);
     setCurrent(null);
-  };
+    setSelectedChoice(null);
+  }, []);
 
-  // 单选：选中/切换 → 覆盖同 key 待选记录（天然非累加）；已是选中 → 无操作
-  const handleSelect = (blockId: string, index: number) => {
-    if (!blocks || !current) return;
-    if (selectedByBlock[blockId] === index) return; // 已是选中 → 无操作
-    const block = blocks.find((b) => b.id === blockId);
-    if (!block) return;
-    const raw = Array.isArray(block.props.choices) ? (block.props.choices as unknown[]) : [];
-    const o = raw[index] as Record<string, unknown> | string | undefined;
-    const obj = typeof o === 'string' ? { label: o } : (o as Record<string, unknown> | undefined);
-    const effect = obj && typeof obj === 'object' && obj.effect && typeof obj.effect === 'object'
-      ? (obj.effect as { statId?: string; delta?: number })
-      : undefined;
-    const aiNote = obj && typeof obj === 'object' && typeof obj.aiNote === 'string'
-      ? (obj.aiNote as string)
-      : undefined;
+  const handleSelectChoice = useCallback((index: number) => {
+    if (!result?.choices || !current) return;
+    if (selectedChoice === index) return; // 已选中
 
-    // 捕获选中那一刻的属性基准值（预览 = base + delta，绝不累加）
-    let base = 0;
-    const statId = effect?.statId;
-    if (statId && gameState) {
-      const stats = (gameState as { 玩家?: { 生存状态?: Record<string, number> } }).玩家?.生存状态;
-      if (stats && statId in stats) base = Number(stats[statId] ?? 0);
-    }
+    const choice = result.choices[index];
+    if (!choice) return;
 
-    setSelectedByBlock((prev) => ({ ...prev, [blockId]: index }));
-    setBaseByBlock((prev) => ({ ...prev, [blockId]: base }));
+    setSelectedChoice(index);
 
     const saveId = useSaveStore.getState().currentSaveId ?? 'default';
     selectChoice({
       saveId,
       eventPackId: current.eventPackId,
       cardId: current.cardId,
-      blockId,
+      blockId: 'choice-0',
       selectedIndex: index,
-      effect: effect ? { statId: String(effect.statId ?? ''), delta: Number(effect.delta ?? 0) } : undefined,
-      aiNote,
-      baseStatValue: base,
+      effect: choice.effect ? { statId: choice.effect.statId ?? '', resourcePath: choice.effect.resourcePath, delta: choice.effect.delta } : undefined,
+      aiNote: choice.aiNote,
+      baseStatValue: 0,
     });
-  };
 
-  if (!blocks) return null;
+    // 立即应用工作流中的 pendingEffects（不等下一 tick）
+    if (result.pendingEffects && result.pendingEffects.length > 0 && gameState) {
+      for (const pe of result.pendingEffects) {
+        if (pe.statId || pe.resourcePath) {
+          applyEffectTarget(gameState as unknown as import('../../schema/variables').GameState, {
+            statId: pe.statId,
+            resourcePath: pe.resourcePath,
+            delta: pe.delta ?? 0,
+          });
+        }
+        // 标记效果：直接写入 gameState
+        if (pe.flagPath && pe.value !== undefined) {
+          const parts = pe.flagPath.split('.');
+          let cur: Record<string, unknown> = gameState as unknown as Record<string, unknown>;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
+            cur = cur[parts[i]] as Record<string, unknown>;
+          }
+          cur[parts[parts.length - 1]] = pe.value;
+        }
+      }
+    }
+
+    // 延迟关闭，让玩家看到选中效果
+    setTimeout(close, 600);
+  }, [result, current, selectedChoice, close, gameState]);
+
+  if (!result || !current) return null;
 
   return (
     <div
@@ -164,17 +151,153 @@ export default function CardOverlay({ gameState }: Props) {
           border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)', padding: 'var(--space-5)', color: 'var(--text-primary)',
         }}
       >
+        {/* 标题栏 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
           <span style={{ flex: 1, fontWeight: 600, fontFamily: 'var(--font-display)' }}>{title}</span>
           <button className="btn-ghost btn-sm" onClick={close} aria-label="关闭"><X size={16} /></button>
         </div>
-        <CardRenderer
-          blocks={blocks}
-          onChoice={handleSelect}
-          selectedByBlock={selectedByBlock}
-          baseByBlock={baseByBlock}
-        />
+
+        {/* 叙事内容 */}
+        {result.renderData.map((r, i) => (
+          <NarrativeBlock key={i} data={r} />
+        ))}
+
+        {/* 选项 */}
+        {result.choices && result.choices.length > 0 && (
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {result.choices.map((choice, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSelectChoice(i)}
+                  style={{
+                    padding: 'var(--space-3) var(--space-4)',
+                    background: selectedChoice === i ? 'var(--accent)' : 'var(--bg-primary)',
+                    color: selectedChoice === i ? '#fff' : 'var(--text-primary)',
+                    border: `1px solid ${selectedChoice === i ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: 'var(--font-size-sm)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <div style={{ fontWeight: 500 }}>{choice.label}</div>
+                  {choice.effect && (
+                    <div style={{ fontSize: 'var(--font-size-xs)', opacity: 0.7, marginTop: 2 }}>
+                      {choice.effect.statId ?? choice.effect.resourcePath} {choice.effect.delta >= 0 ? '+' : ''}{choice.effect.delta}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 警告 */}
+        {result.warnings.length > 0 && (
+          <div style={{
+            marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)',
+            background: 'var(--bg-warning, #fef3c7)', borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-warning, #92400e)', fontSize: 'var(--font-size-xs)',
+          }}>
+            {result.warnings.join(', ')}
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+// ─── 叙事块渲染 ───
+
+function NarrativeBlock({ data }: { data: CardNodeExecutionResult['renderData'] }) {
+  if (!data) return null;
+
+  switch (data.type) {
+    case 'title':
+      return (
+        <div style={{
+          marginBottom: 'var(--space-3)',
+          padding: 'var(--space-3)',
+          background: 'var(--bg-primary)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <FileText size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>标题</span>
+          </div>
+          <div style={{ fontWeight: 600, fontSize: 'var(--font-size-lg)', fontFamily: 'var(--font-display)' }}>
+            {data.title}
+          </div>
+        </div>
+      );
+
+    case 'text':
+      return (
+        <div style={{
+          marginBottom: 'var(--space-3)',
+          padding: 'var(--space-3)',
+          background: 'var(--bg-primary)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <ScrollText size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>叙事</span>
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            {data.text}
+          </div>
+        </div>
+      );
+
+    case 'image':
+      return (
+        <div style={{
+          marginBottom: 'var(--space-3)',
+          padding: 'var(--space-3)',
+          background: 'var(--bg-primary)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <Image size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>图片</span>
+          </div>
+          {data.imageUrl && (
+            <img src={data.imageUrl} alt={data.text ?? ''} style={{ maxWidth: '100%', borderRadius: 'var(--radius-sm)', marginBottom: 4 }} />
+          )}
+          {data.text && (
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{data.text}</div>
+          )}
+        </div>
+      );
+
+    case 'dialog':
+      return (
+        <div style={{
+          marginBottom: 'var(--space-3)',
+          padding: 'var(--space-3)',
+          background: 'var(--bg-primary)',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <MessageCircle size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>对话</span>
+          </div>
+          <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', color: 'var(--accent)', marginBottom: 4 }}>
+            {data.npcName}
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: 1.6, fontStyle: 'italic' }}>
+            "{data.text}"
+          </div>
+        </div>
+      );
+
+    default:
+      return null;
+  }
 }

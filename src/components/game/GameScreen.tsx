@@ -22,6 +22,7 @@ import { useSaveStore } from '../../stores/saveStore';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
 import { getWebEvent, allWebEvents } from '../../modules/eventDb';
 import { installWorldEventPacks, getWebEnabledEventIds } from '../../modules/webEventStore';
+import { installWorldCardWorkflows } from '../../modules/cardWorldBindings';
 import CardOverlay from '../event/CardOverlay';
 import EventConfigPanel from '../event/EventConfigPanel';
 import type { OverlayPanel } from './gameScreen/types';
@@ -107,6 +108,7 @@ export default function GameScreen() {
       if (worldDef) {
         try {
           await installWorldEventPacks(worldDef);
+          await installWorldCardWorkflows(worldDef);
         } catch (e) {
           console.warn('[事件包] 世界事件包安装失败（已跳过）:', e);
         }

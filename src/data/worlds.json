@@ -8,7 +8,241 @@
     "coverColor": "#ffb7c5",
     "tags": ["青春", "日常", "恋爱", "社团", "现代"],
     "difficulty": "easy",
-    "modules": []
+    "modules": [],
+    "eventPacks": [
+      {
+        "id": "world:japanese_school:events",
+        "name": "日式校园事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "confession",
+            "name": "告白",
+            "workflow": {
+              "version": 1,
+              "id": "wf-js_confession",
+              "name": "告白时刻",
+              "nodes": [
+                {
+                  "id": "conf_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "告白时刻", "style": "important" }
+                },
+                {
+                  "id": "conf_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "放学后的教室里，夕阳透过窗户洒进来。你心仪的人正站在窗边，似乎在等什么。这是你鼓起勇气告白的机会。" }
+                },
+                {
+                  "id": "conf_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"鼓起勇气告白\",\"aiNote\":\"勇敢地说出心意\"},{label:\"约对方一起回家\",\"aiNote\":\"先从朋友做起\"},{\"label\":\"假装路过离开\",\"aiNote\":\"错过这次机会\"}]"
+                  }
+                },
+                {
+                  "id": "conf_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -120, "y": 350 },
+                  "widgetValues": { "statKey": "dim5", "delta": 10 }
+                },
+                {
+                  "id": "conf_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 120, "y": 350 },
+                  "widgetValues": { "statKey": "能量", "delta": -5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "conf_title", "sourceSocketKey": "flow_out", "targetNodeId": "conf_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "conf_text", "sourceSocketKey": "flow_out", "targetNodeId": "conf_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "conf_choice", "sourceSocketKey": "flow_out", "targetNodeId": "conf_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "conf_choice", "sourceSocketKey": "flow_out", "targetNodeId": "conf_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "festival",
+            "name": "文化祭",
+            "workflow": {
+              "version": 1,
+              "id": "wf-js_cultural_fest",
+              "name": "文化祭准备",
+              "nodes": [
+                {
+                  "id": "fest_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "文化祭准备", "style": "default" }
+                },
+                {
+                  "id": "fest_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "文化祭即将来临，班级里正在讨论要做什么活动。有同学提议开咖啡厅，有人想办鬼屋，还有人想表演话剧。" }
+                },
+                {
+                  "id": "fest_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"参与咖啡厅筹备\",\"aiNote\":\"负责咖啡厅的准备工作\"},{\"label\":\"加入话剧排练\",\"aiNote\":\"参与话剧表演\"},{\"label\":\"帮忙布置鬼屋\",\"aiNote\":\"参与鬼屋设计\"}]"
+                  }
+                },
+                {
+                  "id": "fest_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "体力值", "delta": -8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "fest_title", "sourceSocketKey": "flow_out", "targetNodeId": "fest_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "fest_text", "sourceSocketKey": "flow_out", "targetNodeId": "fest_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "fest_choice", "sourceSocketKey": "flow_out", "targetNodeId": "fest_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "rainy_day",
+            "name": "雨天",
+            "workflow": {
+              "version": 1,
+              "id": "wf-rainy_day",
+              "name": "雨天",
+              "nodes": [
+                {
+                  "id": "rain_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "雨天邂逅", "style": "default" }
+                },
+                {
+                  "id": "rain_dialog",
+                  "typeId": "narrative.dialog",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "npcName": "同学", "dialogText": "突然下起雨了，你没带伞吗？要不要一起走？", "emotion": "friendly" }
+                },
+                {
+                  "id": "rain_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"接受好意一起走\",\"aiNote\":\"和同学一起撑伞回家\"},{\"label\":\"婉拒后跑回家\",\"aiNote\":\"在雨中奔跑\"},{\"label\":\"在学校等雨停\",\"aiNote\":\"在教室里等待\"}]"
+                  }
+                },
+                {
+                  "id": "rain_effect1",
+                  "typeId": "effect.flag",
+                  "position": { "x": -120, "y": 350 },
+                  "widgetValues": { "flagPath": "flags.雨天邂逅", "value": true }
+                },
+                {
+                  "id": "rain_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 120, "y": 350 },
+                  "widgetValues": { "statKey": "dim5", "delta": 5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "rain_title", "sourceSocketKey": "flow_out", "targetNodeId": "rain_dialog", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "rain_dialog", "sourceSocketKey": "flow_out", "targetNodeId": "rain_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "rain_choice", "sourceSocketKey": "flow_out", "targetNodeId": "rain_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "rain_choice", "sourceSocketKey": "flow_out", "targetNodeId": "rain_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "sports_festival",
+            "name": "体育祭",
+            "workflow": {
+              "version": 1,
+              "id": "wf-sports_festival",
+              "name": "体育祭",
+              "nodes": [
+                {
+                  "id": "sport_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "体育祭", "style": "default" }
+                },
+                {
+                  "id": "sport_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一年一度的体育祭到了，全校都沉浸在欢乐的气氛中。你被选为班级接力赛的最后一棒。" }
+                },
+                {
+                  "id": "sport_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"全力以赴\",\"aiNote\":\"拼尽全力冲刺\"},{\"label\":\"正常发挥\",\"aiNote\":\"保持平常心\"},{\"label\":\"假装受伤\",\"aiNote\":\"不想太累\"}]"
+                  }
+                },
+                {
+                  "id": "sport_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "体力值", "delta": -15 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "sport_title", "sourceSocketKey": "flow_out", "targetNodeId": "sport_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "sport_text", "sourceSocketKey": "flow_out", "targetNodeId": "sport_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "sport_choice", "sourceSocketKey": "flow_out", "targetNodeId": "sport_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "valentine",
+            "name": "情人节",
+            "workflow": {
+              "version": 1,
+              "id": "wf-valentine",
+              "name": "情人节",
+              "nodes": [
+                {
+                  "id": "val_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "情人节", "style": "important" }
+                },
+                {
+                  "id": "val_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "今天是情人节，校园里弥漫着甜蜜的气氛。你的鞋柜里出现了一盒手工巧克力。" }
+                },
+                {
+                  "id": "val_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"寻找送礼人\",\"aiNote\":\"想知道是谁送的\"},{\"label\":\"开心收下\",\"aiNote\":\"享受这份心意\"},{\"label\":\"放在原地\",\"aiNote\":\"不想理会\"}]"
+                  }
+                },
+                {
+                  "id": "val_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "dim5", "delta": 8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "val_title", "sourceSocketKey": "flow_out", "targetNodeId": "val_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "val_text", "sourceSocketKey": "flow_out", "targetNodeId": "val_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "val_choice", "sourceSocketKey": "flow_out", "targetNodeId": "val_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "desire_metropolis",
@@ -19,7 +253,318 @@
     "coverColor": "#e74c8b",
     "tags": ["现代都市", "纸醉金迷", "情感博弈", "暧昧美学"],
     "difficulty": "medium",
-    "modules": ["stat"]
+    "modules": ["stat"],
+    "eventPacks": [
+      {
+        "id": "world:desire_metropolis:events",
+        "name": "欲望魔都事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "overtime",
+            "name": "加班",
+            "workflow": {
+              "version": 1,
+              "id": "wf-dm_overtime",
+              "name": "加班深夜",
+              "nodes": [
+                {
+                  "id": "ot_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "加班深夜", "style": "warning" }
+                },
+                {
+                  "id": "ot_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "已经是晚上十点了，办公室里只剩下你和几盏台灯。老板发来消息说明天要交的方案需要修改。" }
+                },
+                {
+                  "id": "ot_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"继续加班完成\",\"aiNote\":\"熬夜完成工作\"},{\"label\":\"明天再说\",\"aiNote\":\"先回家休息\"},{\"label\":\"找同事帮忙\",\"aiNote\":\"请同事协助\"}]"
+                  }
+                },
+                {
+                  "id": "ot_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": -8 }
+                },
+                {
+                  "id": "ot_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 360 },
+                  "widgetValues": { "statKey": "体力值", "delta": -15 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "ot_title", "sourceSocketKey": "flow_out", "targetNodeId": "ot_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "ot_text", "sourceSocketKey": "flow_out", "targetNodeId": "ot_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "ot_choice", "sourceSocketKey": "flow_out", "targetNodeId": "ot_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "ot_choice", "sourceSocketKey": "flow_out", "targetNodeId": "ot_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "date",
+            "name": "约会",
+            "workflow": {
+              "version": 1,
+              "id": "wf-dm_date_night",
+              "name": "约会之夜",
+              "nodes": [
+                {
+                  "id": "date_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "约会之夜", "style": "important" }
+                },
+                {
+                  "id": "date_dialog",
+                  "typeId": "narrative.dialog",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "npcName": "约会对象", "dialogText": "今晚想去哪吃饭？我知道一家很棒的餐厅。", "emotion": "friendly" }
+                },
+                {
+                  "id": "date_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"去高级餐厅\",\"aiNote\":\"享受精致晚餐\"},{\"label\":\"去街边小馆\",\"aiNote\":\"体验地道美食\"},{\"label\":\"去酒吧喝一杯\",\"aiNote\":\"在酒吧聊天\"}]"
+                  }
+                },
+                {
+                  "id": "date_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "statKey": "dim5", "delta": 8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "date_title", "sourceSocketKey": "flow_out", "targetNodeId": "date_dialog", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "date_dialog", "sourceSocketKey": "flow_out", "targetNodeId": "date_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "date_choice", "sourceSocketKey": "flow_out", "targetNodeId": "date_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "colleague_dinner",
+            "name": "同事聚餐",
+            "workflow": {
+              "version": 1,
+              "id": "wf-dm_party",
+              "name": "社交派对",
+              "nodes": [
+                {
+                  "id": "party_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "社交派对", "style": "default" }
+                },
+                {
+                  "id": "party_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "朋友邀请你参加一个高端派对，现场有很多成功人士和漂亮的男男女女。" }
+                },
+                {
+                  "id": "party_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"主动社交拓展人脉\",\"aiNote\":\"认识新朋友\"},{\"label\":\"找个角落观察\",\"aiNote\":\"安静地观察人群\"},{\"label\":\"早点离开\",\"aiNote\":\"不喜欢这种场合\"}]"
+                  }
+                },
+                {
+                  "id": "party_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "statKey": "dim5", "delta": 5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "party_title", "sourceSocketKey": "flow_out", "targetNodeId": "party_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "party_text", "sourceSocketKey": "flow_out", "targetNodeId": "party_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "party_choice", "sourceSocketKey": "flow_out", "targetNodeId": "party_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "cook",
+            "name": "做饭",
+            "workflow": {
+              "version": 1,
+              "id": "wf-cook",
+              "name": "做饭",
+              "nodes": [
+                {
+                  "id": "cook_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "做饭", "style": "default" }
+                },
+                {
+                  "id": "cook_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "下班后回到出租屋，冰箱里还有些食材。是随便对付一口，还是好好做顿饭？" }
+                },
+                {
+                  "id": "cook_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"做一顿丰盛的晚餐\",\"aiNote\":\"好好犒劳自己\"},{\"label\":\"煮碗泡面\",\"aiNote\":\"简单对付\"},{\"label\":\"点外卖\",\"aiNote\":\"省事\"]"
+                  }
+                },
+                {
+                  "id": "cook_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": 5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "cook_title", "sourceSocketKey": "flow_out", "targetNodeId": "cook_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "cook_text", "sourceSocketKey": "flow_out", "targetNodeId": "cook_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "cook_choice", "sourceSocketKey": "flow_out", "targetNodeId": "cook_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "gym",
+            "name": "健身",
+            "workflow": {
+              "version": 1,
+              "id": "wf-gym",
+              "name": "健身",
+              "nodes": [
+                {
+                  "id": "gym_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "健身", "style": "default" }
+                },
+                {
+                  "id": "gym_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "路过健身房，想起自己已经很久没运动了。今天要不要进去练一练？" }
+                },
+                {
+                  "id": "gym_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"进去好好练\",\"aiNote\":\"认真锻炼\"},{\"label\":\"在附近跑步\",\"aiNote\":\"户外运动\"},{\"label\":\"算了回家\",\"aiNote\":\"今天不想动\"]"
+                  }
+                },
+                {
+                  "id": "gym_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "体力值", "delta": -12 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "gym_title", "sourceSocketKey": "flow_out", "targetNodeId": "gym_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "gym_text", "sourceSocketKey": "flow_out", "targetNodeId": "gym_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "gym_choice", "sourceSocketKey": "flow_out", "targetNodeId": "gym_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "moving",
+            "name": "搬家",
+            "workflow": {
+              "version": 1,
+              "id": "wf-moving",
+              "name": "搬家",
+              "nodes": [
+                {
+                  "id": "mov_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "搬家", "style": "warning" }
+                },
+                {
+                  "id": "mov_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "房东通知要涨房租，现在的房子性价比越来越低了。是时候考虑搬家了吗？" }
+                },
+                {
+                  "id": "mov_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"开始找新房\",\"aiNote\":\"浏览租房信息\"},{\"label\":\"和房东谈\",\"aiNote\":\"尝试砍价\"},{\"label\":\"先忍忍\",\"aiNote\":\"暂时不搬\"]"
+                  }
+                },
+                {
+                  "id": "mov_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "体力值", "delta": -8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "mov_title", "sourceSocketKey": "flow_out", "targetNodeId": "mov_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "mov_text", "sourceSocketKey": "flow_out", "targetNodeId": "mov_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "mov_choice", "sourceSocketKey": "flow_out", "targetNodeId": "mov_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "pet_sick",
+            "name": "宠物生病",
+            "workflow": {
+              "version": 1,
+              "id": "wf-pet_sick",
+              "name": "宠物生病",
+              "nodes": [
+                {
+                  "id": "pet_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "宠物生病", "style": "warning" }
+                },
+                {
+                  "id": "pet_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你的猫咪今天不太对劲，不吃东西还一直呕吐。看起来需要带它去看兽医。" }
+                },
+                {
+                  "id": "pet_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"立刻带去宠物医院\",\"aiNote\":\"赶紧看病\"},{\"label\":\"先观察一天\",\"aiNote\":\"也许会好转\"},{\"label\":\"在网上查症状\",\"aiNote\":\"自己诊断\"]"
+                  }
+                },
+                {
+                  "id": "pet_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": -5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "pet_title", "sourceSocketKey": "flow_out", "targetNodeId": "pet_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "pet_text", "sourceSocketKey": "flow_out", "targetNodeId": "pet_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "pet_choice", "sourceSocketKey": "flow_out", "targetNodeId": "pet_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "wuxia_world",
@@ -30,7 +575,381 @@
     "coverColor": "#8d6e63",
     "tags": ["武侠", "架空", "江湖恩怨", "高武"],
     "difficulty": "hard",
-    "modules": ["stat", "progression"]
+    "modules": ["stat", "progression"],
+    "eventPacks": [
+      {
+        "id": "world:wuxia_world:events",
+        "name": "武侠世界事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "duel",
+            "name": "比武挑战",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wx_duel",
+              "name": "比武挑战",
+              "nodes": [
+                {
+                  "id": "duel_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "比武挑战", "style": "warning" }
+                },
+                {
+                  "id": "duel_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一位江湖人士向你发起挑战，声称要试试你的武功。周围已经聚集了不少看热闹的江湖人。" }
+                },
+                {
+                  "id": "duel_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"接受比武\",\"aiNote\":\"正面迎战\"},{\"label\":\"婉言谢绝\",\"aiNote\":\"避免冲突\"},{\"label\":\"提议切磋点到为止\",\"aiNote\":\"友好交流\"}]"
+                  }
+                },
+                {
+                  "id": "duel_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": -10 }
+                },
+                {
+                  "id": "duel_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 360 },
+                  "widgetValues": { "statKey": "dim1", "delta": 5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "duel_title", "sourceSocketKey": "flow_out", "targetNodeId": "duel_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "duel_text", "sourceSocketKey": "flow_out", "targetNodeId": "duel_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "duel_choice", "sourceSocketKey": "flow_out", "targetNodeId": "duel_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "duel_choice", "sourceSocketKey": "flow_out", "targetNodeId": "duel_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "treasure_map",
+            "name": "藏宝图",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wx_treasure_map",
+              "name": "藏宝图",
+              "nodes": [
+                {
+                  "id": "map_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "藏宝图", "style": "important" }
+                },
+                {
+                  "id": "map_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你在一家古玩店发现了一张破旧的藏宝图，上面标注着一处武林前辈的秘藏地点。" }
+                },
+                {
+                  "id": "map_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"买下藏宝图去寻宝\",\"aiNote\":\"踏上寻宝之路\"},{\"label\":\"怀疑是骗局\",\"aiNote\":\"谨慎对待\"},{\"label\":\"告诉朋友一起\",\"aiNote\":\"结伴同行\"}]"
+                  }
+                },
+                {
+                  "id": "map_effect",
+                  "typeId": "effect.flag",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "flagPath": "flags.获得藏宝图", "value": true }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "map_title", "sourceSocketKey": "flow_out", "targetNodeId": "map_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "map_text", "sourceSocketKey": "flow_out", "targetNodeId": "map_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "map_choice", "sourceSocketKey": "flow_out", "targetNodeId": "map_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "secret_realm",
+            "name": "秘境",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wx_secret_realm",
+              "name": "秘境探索",
+              "nodes": [
+                {
+                  "id": "realm_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "秘境探索", "style": "important" }
+                },
+                {
+                  "id": "realm_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你偶然发现了一处隐秘的山洞，洞内似乎别有天地。隐约能感受到一股强大的内力波动。" }
+                },
+                {
+                  "id": "realm_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"小心翼翼地进入\",\"aiNote\":\"谨慎探索\"},{\"label\":\"在洞口观察\",\"aiNote\":\"先了解情况\"},{\"label\":\"离开这里\",\"aiNote\":\"不冒险\"}]"
+                  }
+                },
+                {
+                  "id": "realm_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 360 },
+                  "widgetValues": { "statKey": "attrB", "delta": 15 }
+                },
+                {
+                  "id": "realm_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 360 },
+                  "widgetValues": { "statKey": "dim4", "delta": 8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "realm_title", "sourceSocketKey": "flow_out", "targetNodeId": "realm_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "realm_text", "sourceSocketKey": "flow_out", "targetNodeId": "realm_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "realm_choice", "sourceSocketKey": "flow_out", "targetNodeId": "realm_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "realm_choice", "sourceSocketKey": "flow_out", "targetNodeId": "realm_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "rival",
+            "name": "宿敌",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wx_rival",
+              "name": "宿敌遭遇",
+              "nodes": [
+                {
+                  "id": "rival_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "宿敌遭遇", "style": "warning" }
+                },
+                {
+                  "id": "rival_dialog",
+                  "typeId": "narrative.dialog",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "npcName": "宿敌", "dialogText": "没想到在这里遇到你，今天就做个了断吧！", "emotion": "angry" }
+                },
+                {
+                  "id": "rival_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"拔剑应战\",\"aiNote\":\"正面对决\"},{\"label\":\"试图化解恩怨\",\"aiNote\":\"以和为贵\"},{\"label\":\"转身离开\",\"aiNote\":\"避其锋芒\"}]"
+                  }
+                },
+                {
+                  "id": "rival_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": -15 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "rival_title", "sourceSocketKey": "flow_out", "targetNodeId": "rival_dialog", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "rival_dialog", "sourceSocketKey": "flow_out", "targetNodeId": "rival_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "rival_choice", "sourceSocketKey": "flow_out", "targetNodeId": "rival_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "poison",
+            "name": "中毒",
+            "workflow": {
+              "version": 1,
+              "id": "wf-poison",
+              "name": "中毒",
+              "nodes": [
+                {
+                  "id": "poison_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "中毒", "style": "warning" }
+                },
+                {
+                  "id": "poison_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你不慎中了敌人的暗算，毒素正在体内蔓延。必须尽快找到解药或运功逼毒。" }
+                },
+                {
+                  "id": "poison_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"运功逼毒\",\"aiNote\":\"消耗内力逼出毒素\"},{\"label\":\"寻找解药\",\"aiNote\":\"去采药\"},{\"label\":\"硬撑\",\"aiNote\":\"希望毒素自行消散\"]"
+                  }
+                },
+                {
+                  "id": "poison_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": -20 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "poison_title", "sourceSocketKey": "flow_out", "targetNodeId": "poison_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "poison_text", "sourceSocketKey": "flow_out", "targetNodeId": "poison_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "poison_choice", "sourceSocketKey": "flow_out", "targetNodeId": "poison_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "breakthrough",
+            "name": "武功突破",
+            "workflow": {
+              "version": 1,
+              "id": "wf-breakthrough",
+              "name": "武功突破",
+              "nodes": [
+                {
+                  "id": "bt_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "武功突破", "style": "important" }
+                },
+                {
+                  "id": "bt_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "经过长期修炼，你感到体内的真气开始涌动，武功即将突破瓶颈！" }
+                },
+                {
+                  "id": "bt_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"闭关修炼\",\"aiNote\":\"专心突破\"},{\"label\":\"请教高手\",\"aiNote\":\"寻求指点\"},{\"label\":\"顺其自然\",\"aiNote\":\"不强求\"]"
+                  }
+                },
+                {
+                  "id": "bt_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 350 },
+                  "widgetValues": { "statKey": "dim1", "delta": 10 }
+                },
+                {
+                  "id": "bt_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 350 },
+                  "widgetValues": { "statKey": "dim2", "delta": 8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "bt_title", "sourceSocketKey": "flow_out", "targetNodeId": "bt_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "bt_text", "sourceSocketKey": "flow_out", "targetNodeId": "bt_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "bt_choice", "sourceSocketKey": "flow_out", "targetNodeId": "bt_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "bt_choice", "sourceSocketKey": "flow_out", "targetNodeId": "bt_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "injury",
+            "name": "重伤",
+            "workflow": {
+              "version": 1,
+              "id": "wf-injury",
+              "name": "重伤",
+              "nodes": [
+                {
+                  "id": "inj_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "重伤", "style": "warning" }
+                },
+                {
+                  "id": "inj_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一场恶战之后，你身受重伤，鲜血染红了衣襟。需要尽快处理伤口。" }
+                },
+                {
+                  "id": "inj_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"运功疗伤\",\"aiNote\":\"用内力修复伤势\"},{\"label\":\"找郎中\",\"aiNote\":\"去医馆治疗\"},{\"label\":\"硬撑\",\"aiNote\":\"伤势不重\"]"
+                  }
+                },
+                {
+                  "id": "inj_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": -25 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "inj_title", "sourceSocketKey": "flow_out", "targetNodeId": "inj_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "inj_text", "sourceSocketKey": "flow_out", "targetNodeId": "inj_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "inj_choice", "sourceSocketKey": "flow_out", "targetNodeId": "inj_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "encounter",
+            "name": "奇遇",
+            "workflow": {
+              "version": 1,
+              "id": "wf-encounter",
+              "name": "奇遇",
+              "nodes": [
+                {
+                  "id": "enc_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "奇遇", "style": "important" }
+                },
+                {
+                  "id": "enc_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你在山间游历时，偶然遇到一位隐世高人。他似乎对你很感兴趣。" }
+                },
+                {
+                  "id": "enc_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"上前请教\",\"aiNote\":\"虚心求教\"},{\"label\":\"恭敬行礼\",\"aiNote\":\"礼貌问候\"},{\"label\":\"悄悄离开\",\"aiNote\":\"不打扰\"]"
+                  }
+                },
+                {
+                  "id": "enc_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 350 },
+                  "widgetValues": { "statKey": "dim4", "delta": 12 }
+                },
+                {
+                  "id": "enc_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 350 },
+                  "widgetValues": { "statKey": "dim6", "delta": 10 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "enc_title", "sourceSocketKey": "flow_out", "targetNodeId": "enc_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "enc_text", "sourceSocketKey": "flow_out", "targetNodeId": "enc_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "enc_choice", "sourceSocketKey": "flow_out", "targetNodeId": "enc_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "enc_choice", "sourceSocketKey": "flow_out", "targetNodeId": "enc_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "wasteland_apocalypse",
@@ -41,7 +960,339 @@
     "coverColor": "#795548",
     "tags": ["末日生存", "废土朋克", "异能觉醒", "辐射变异"],
     "difficulty": "hard",
-    "modules": ["stat", "progression", "talent", "dice"]
+    "modules": ["stat", "progression", "talent", "dice"],
+    "eventPacks": [
+      {
+        "id": "world:wasteland_apocalypse:events",
+        "name": "末日废土事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "radiation_storm",
+            "name": "辐射风暴",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wa_radiation_storm",
+              "name": "辐射风暴",
+              "nodes": [
+                {
+                  "id": "storm_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "辐射风暴", "style": "warning" }
+                },
+                {
+                  "id": "storm_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "天空突然变成了诡异的绿色，辐射风暴即将来临。你需要立即找到掩体躲避。" }
+                },
+                {
+                  "id": "storm_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"寻找废弃建筑躲避\",\"aiNote\":\"赶紧找掩体\"},{\"label\":\"用防护装备硬撑\",\"aiNote\":\"依靠装备防护\"},{\"label\":\"挖地洞躲避\",\"aiNote\":\"就地掩埋\"}]"
+                  }
+                },
+                {
+                  "id": "storm_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": -15 }
+                },
+                {
+                  "id": "storm_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 360 },
+                  "widgetValues": { "statKey": "体力值", "delta": -10 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "storm_title", "sourceSocketKey": "flow_out", "targetNodeId": "storm_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "storm_text", "sourceSocketKey": "flow_out", "targetNodeId": "storm_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "storm_choice", "sourceSocketKey": "flow_out", "targetNodeId": "storm_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "storm_choice", "sourceSocketKey": "flow_out", "targetNodeId": "storm_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "mutant_fight",
+            "name": "变异体袭击",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wa_mutant_fight",
+              "name": "变异体袭击",
+              "nodes": [
+                {
+                  "id": "mutant_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "变异体袭击", "style": "warning" }
+                },
+                {
+                  "id": "mutant_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一只变异生物从废墟中窜出，它有着扭曲的身体和锋利的爪子。战斗一触即发！" }
+                },
+                {
+                  "id": "mutant_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"用武器战斗\",\"aiNote\":\"正面对抗变异体\"},{\"label\":\"逃跑\",\"aiNote\":\"三十六计走为上\"},{\"label\":\"使用异能\",\"aiNote\":\"释放异能攻击\"}]"
+                  }
+                },
+                {
+                  "id": "mutant_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": -20 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "mutant_title", "sourceSocketKey": "flow_out", "targetNodeId": "mutant_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "mutant_text", "sourceSocketKey": "flow_out", "targetNodeId": "mutant_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "mutant_choice", "sourceSocketKey": "flow_out", "targetNodeId": "mutant_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "supply_cache",
+            "name": "补给点",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wa_supply_cache",
+              "name": "补给点",
+              "nodes": [
+                {
+                  "id": "supply_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "补给点", "style": "important" }
+                },
+                {
+                  "id": "supply_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你发现了一个废弃的军事掩体，里面似乎还有一些物资。门上有锈迹但没有锁。" }
+                },
+                {
+                  "id": "supply_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"小心进入搜索\",\"aiNote\":\"谨慎地搜索物资\"},{\"label\":\"先观察是否有危险\",\"aiNote\":\"确认安全再行动\"},{\"label\":\"离开\",\"aiNote\":\"可能是陷阱\"}]"
+                  }
+                },
+                {
+                  "id": "supply_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": 10 }
+                },
+                {
+                  "id": "supply_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 360 },
+                  "widgetValues": { "statKey": "体力值", "delta": 8 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "supply_title", "sourceSocketKey": "flow_out", "targetNodeId": "supply_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "supply_text", "sourceSocketKey": "flow_out", "targetNodeId": "supply_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "supply_choice", "sourceSocketKey": "flow_out", "targetNodeId": "supply_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "supply_choice", "sourceSocketKey": "flow_out", "targetNodeId": "supply_effect2", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "awakening",
+            "name": "异能觉醒",
+            "workflow": {
+              "version": 1,
+              "id": "wf-wa_awakening",
+              "name": "异能觉醒",
+              "nodes": [
+                {
+                  "id": "awake_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "异能觉醒", "style": "important" }
+                },
+                {
+                  "id": "awake_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "在一次濒死体验中，你感受到了体内涌动的奇异力量。你的异能正在觉醒！" }
+                },
+                {
+                  "id": "awake_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"尝试控制这股力量\",\"aiNote\":\"学习掌控异能\"},{\"label\":\"压制下去\",\"aiNote\":\"不敢轻易尝试\"},{\"label\":\"寻找导师\",\"aiNote\":\"找人指导\"}]"
+                  }
+                },
+                {
+                  "id": "awake_effect1",
+                  "typeId": "effect.stat",
+                  "position": { "x": -100, "y": 360 },
+                  "widgetValues": { "statKey": "dim1", "delta": 15 }
+                },
+                {
+                  "id": "awake_effect2",
+                  "typeId": "effect.stat",
+                  "position": { "x": 100, "y": 360 },
+                  "widgetValues": { "statKey": "dim3", "delta": 10 }
+                },
+                {
+                  "id": "awake_flag",
+                  "typeId": "effect.flag",
+                  "position": { "x": 0, "y": 440 },
+                  "widgetValues": { "flagPath": "flags.异能觉醒", "value": true }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "awake_title", "sourceSocketKey": "flow_out", "targetNodeId": "awake_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "awake_text", "sourceSocketKey": "flow_out", "targetNodeId": "awake_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "awake_choice", "sourceSocketKey": "flow_out", "targetNodeId": "awake_effect1", "targetSocketKey": "flow_in" },
+                { "id": "c4", "sourceNodeId": "awake_choice", "sourceSocketKey": "flow_out", "targetNodeId": "awake_effect2", "targetSocketKey": "flow_in" },
+                { "id": "c5", "sourceNodeId": "awake_choice", "sourceSocketKey": "flow_out", "targetNodeId": "awake_flag", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "radiation_sickness",
+            "name": "辐射病",
+            "workflow": {
+              "version": 1,
+              "id": "wf-radiation_sickness",
+              "name": "辐射病",
+              "nodes": [
+                {
+                  "id": "rs_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "辐射病", "style": "warning" }
+                },
+                {
+                  "id": "rs_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你的身体开始出现辐射病的症状：恶心、脱发、皮肤溃烂。需要尽快找到抗辐射药物。" }
+                },
+                {
+                  "id": "rs_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"寻找抗辐射药\",\"aiNote\":\"去废弃医院找药\"},{\"label\":\"用碘片缓解\",\"aiNote\":\"暂时缓解症状\"},{\"label\":\"硬撑\",\"aiNote\":\"希望身体能扛住\"]"
+                  }
+                },
+                {
+                  "id": "rs_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": -18 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "rs_title", "sourceSocketKey": "flow_out", "targetNodeId": "rs_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "rs_text", "sourceSocketKey": "flow_out", "targetNodeId": "rs_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "rs_choice", "sourceSocketKey": "flow_out", "targetNodeId": "rs_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "raider_ambush",
+            "name": "掠夺者伏击",
+            "workflow": {
+              "version": 1,
+              "id": "wf-raider_ambush",
+              "name": "掠夺者伏击",
+              "nodes": [
+                {
+                  "id": "raider_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "掠夺者伏击", "style": "warning" }
+                },
+                {
+                  "id": "raider_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一群掠夺者从废墟中窜出，他们手持武器，眼神凶狠。你被包围了！" }
+                },
+                {
+                  "id": "raider_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"战斗\",\"aiNote\":\"拼死一搏\"},{\"label\":\"交出物资\",\"aiNote\":\"破财免灾\"},{\"label\":\"逃跑\",\"aiNote\":\"寻找逃跑路线\"]"
+                  }
+                },
+                {
+                  "id": "raider_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": -15 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "raider_title", "sourceSocketKey": "flow_out", "targetNodeId": "raider_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "raider_text", "sourceSocketKey": "flow_out", "targetNodeId": "raider_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "raider_choice", "sourceSocketKey": "flow_out", "targetNodeId": "raider_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "trader_encounter",
+            "name": "商队遭遇",
+            "workflow": {
+              "version": 1,
+              "id": "wf-trader_encounter",
+              "name": "商队遭遇",
+              "nodes": [
+                {
+                  "id": "trader_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "商队遭遇", "style": "default" }
+                },
+                {
+                  "id": "trader_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你在废墟中遇到一支商队，他们携带着各种物资。队长向你招手，似乎想做交易。" }
+                },
+                {
+                  "id": "trader_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"交易物资\",\"aiNote\":\"用多余物资交换\"},{\"label\":\"加入商队\",\"aiNote\":\"结伴同行\"},{\"label\":\"离开\",\"aiNote\":\"不信任他们\"]"
+                  }
+                },
+                {
+                  "id": "trader_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "体力值", "delta": 5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "trader_title", "sourceSocketKey": "flow_out", "targetNodeId": "trader_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "trader_text", "sourceSocketKey": "flow_out", "targetNodeId": "trader_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "trader_choice", "sourceSocketKey": "flow_out", "targetNodeId": "trader_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "stranded_island",
@@ -52,7 +1303,269 @@
     "coverColor": "#059669",
     "tags": ["生存", "荒岛", "资源管理", "探索"],
     "difficulty": "medium",
-    "modules": ["survival"]
+    "modules": ["survival"],
+    "eventPacks": [
+      {
+        "id": "world:stranded_island:events",
+        "name": "荒岛求生事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "water_crisis",
+            "name": "淡水告急",
+            "workflow": {
+              "version": 1,
+              "id": "wf-si_water_crisis",
+              "name": "淡水告急",
+              "nodes": [
+                {
+                  "id": "water_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "淡水告急", "style": "warning" }
+                },
+                {
+                  "id": "water_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "储存的淡水已经见底了，你必须想办法找到新的水源。岛上有几处可能有淡水的地方。" }
+                },
+                {
+                  "id": "water_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"去山泉处取水\",\"aiNote\":\"冒险去山上找泉水\"},{\"label\":\"收集雨水\",\"aiNote\":\"等待下雨\"},{\"label\":\"蒸馏海水\",\"aiNote\":\"尝试海水淡化\"}]"
+                  }
+                },
+                {
+                  "id": "water_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "resourceKey": "water", "delta": 3 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "water_title", "sourceSocketKey": "flow_out", "targetNodeId": "water_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "water_text", "sourceSocketKey": "flow_out", "targetNodeId": "water_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "water_choice", "sourceSocketKey": "flow_out", "targetNodeId": "water_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "wild_animal",
+            "name": "野兽出没",
+            "workflow": {
+              "version": 1,
+              "id": "wf-si_wild_animal",
+              "name": "野兽出没",
+              "nodes": [
+                {
+                  "id": "animal_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "野兽出没", "style": "warning" }
+                },
+                {
+                  "id": "animal_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "夜晚，你听到营地附近传来野兽的嚎叫声。火堆快要熄灭了，你需要做出决定。" }
+                },
+                {
+                  "id": "animal_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"添加柴火保持火堆\",\"aiNote\":\"用火光驱赶野兽\"},{\"label\":\"制作武器防身\",\"aiNote\":\"准备战斗\"},{\"label\":\"躲进庇护所\",\"aiNote\":\"等待天亮\"}]"
+                  }
+                },
+                {
+                  "id": "animal_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "statKey": "attrA", "delta": -10 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "animal_title", "sourceSocketKey": "flow_out", "targetNodeId": "animal_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "animal_text", "sourceSocketKey": "flow_out", "targetNodeId": "animal_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "animal_choice", "sourceSocketKey": "flow_out", "targetNodeId": "animal_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "exploration",
+            "name": "探索发现",
+            "workflow": {
+              "version": 1,
+              "id": "wf-si_exploration",
+              "name": "探索发现",
+              "nodes": [
+                {
+                  "id": "explore_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "探索发现", "style": "default" }
+                },
+                {
+                  "id": "explore_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你在岛屿深处发现了一片从未见过的区域。这里有奇怪的植物和一个看起来像是人工开凿的洞穴。" }
+                },
+                {
+                  "id": "explore_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"进入洞穴探索\",\"aiNote\":\"探索未知洞穴\"},{\"label\":\"采集植物标本\",\"aiNote\":\"收集有用植物\"},{\"label\":\"做好标记后返回\",\"aiNote\":\"先回去准备\"}]"
+                  }
+                },
+                {
+                  "id": "explore_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "resourceKey": "food", "delta": 2 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "explore_title", "sourceSocketKey": "flow_out", "targetNodeId": "explore_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "explore_text", "sourceSocketKey": "flow_out", "targetNodeId": "explore_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "explore_choice", "sourceSocketKey": "flow_out", "targetNodeId": "explore_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "rescue_signal",
+            "name": "救援信号",
+            "workflow": {
+              "version": 1,
+              "id": "wf-si_rescue_signal",
+              "name": "救援信号",
+              "nodes": [
+                {
+                  "id": "rescue_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "救援信号", "style": "important" }
+                },
+                {
+                  "id": "rescue_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你在海边发现了飞机残骸中的一些电子设备，也许可以用来发送求救信号。" }
+                },
+                {
+                  "id": "rescue_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"尝试修理发报机\",\"aiNote\":\"修复通讯设备\"},{\"label\":\"用镜子反射阳光\",\"aiNote\":\"制作信号镜\"},{\"label\":\"点燃求救火堆\",\"aiNote\":\"用烟火信号\"}]"
+                  }
+                },
+                {
+                  "id": "rescue_flag",
+                  "typeId": "effect.flag",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "flagPath": "flags.发出救援信号", "value": true }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "rescue_title", "sourceSocketKey": "flow_out", "targetNodeId": "rescue_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "rescue_text", "sourceSocketKey": "flow_out", "targetNodeId": "rescue_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "rescue_choice", "sourceSocketKey": "flow_out", "targetNodeId": "rescue_flag", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "injury",
+            "name": "受伤",
+            "workflow": {
+              "version": 1,
+              "id": "wf-injury",
+              "name": "受伤",
+              "nodes": [
+                {
+                  "id": "inj_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "受伤", "style": "warning" }
+                },
+                {
+                  "id": "inj_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你在攀爬岩石时不慎滑倒，腿部被尖锐的礁石划伤。伤口很深，需要处理。" }
+                },
+                {
+                  "id": "inj_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"用衣物包扎\",\"aiNote\":\"简单处理伤口\"},{\"label\":\"寻找草药\",\"aiNote\":\"用植物止血\"},{\"label\":\"不管它\",\"aiNote\":\"小伤不碍事\"]"
+                  }
+                },
+                {
+                  "id": "inj_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "attrA", "delta": -12 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "inj_title", "sourceSocketKey": "flow_out", "targetNodeId": "inj_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "inj_text", "sourceSocketKey": "flow_out", "targetNodeId": "inj_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "inj_choice", "sourceSocketKey": "flow_out", "targetNodeId": "inj_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "conflict",
+            "name": "营地冲突",
+            "workflow": {
+              "version": 1,
+              "id": "wf-conflict",
+              "name": "营地冲突",
+              "nodes": [
+                {
+                  "id": "conflict_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "营地冲突", "style": "warning" }
+                },
+                {
+                  "id": "conflict_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "幸存者之间因为食物分配问题发生了争执，气氛越来越紧张。" }
+                },
+                {
+                  "id": "conflict_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"出面调解\",\"aiNote\":\"化解矛盾\"},{\"label\":\"保持中立\",\"aiNote\":\"不参与争执\"},{\"label\":\"支持一方\",\"aiNote\":\"选边站\"]"
+                  }
+                },
+                {
+                  "id": "conflict_effect",
+                  "typeId": "effect.stat",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "statKey": "dim5", "delta": -5 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "conflict_title", "sourceSocketKey": "flow_out", "targetNodeId": "conflict_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "conflict_text", "sourceSocketKey": "flow_out", "targetNodeId": "conflict_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "conflict_choice", "sourceSocketKey": "flow_out", "targetNodeId": "conflict_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   },
   {
     "id": "border_trade",
@@ -63,6 +1576,310 @@
     "coverColor": "#d97706",
     "tags": ["经营", "90年代", "中俄边境", "贸易"],
     "difficulty": "medium",
-    "modules": ["business"]
+    "modules": ["business"],
+    "eventPacks": [
+      {
+        "id": "world:border_trade:events",
+        "name": "边境贸易事件",
+        "type": "card",
+        "permissions": ["add_card"],
+        "events": [
+          {
+            "id": "deal",
+            "name": "大单生意",
+            "workflow": {
+              "version": 1,
+              "id": "wf-bt_big_deal",
+              "name": "大单生意",
+              "nodes": [
+                {
+                  "id": "deal_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "大单生意", "style": "important" }
+                },
+                {
+                  "id": "deal_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一个俄罗斯商人找到你，说有一批紧俏商品想跟你合作。利润丰厚，但需要大量资金进货。" }
+                },
+                {
+                  "id": "deal_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"全款拿下\",\"aiNote\":\"一次性投入全部资金\"},{\"label\":\"只进一半\",\"aiNote\":\"控制风险\"},{\"label\":\"找人合伙\",\"aiNote\":\"分散风险\"}]"
+                  }
+                },
+                {
+                  "id": "deal_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "resourceKey": "经营资产.资金", "delta": 500 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "deal_title", "sourceSocketKey": "flow_out", "targetNodeId": "deal_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "deal_text", "sourceSocketKey": "flow_out", "targetNodeId": "deal_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "deal_choice", "sourceSocketKey": "flow_out", "targetNodeId": "deal_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "smuggle",
+            "name": "走私机会",
+            "workflow": {
+              "version": 1,
+              "id": "wf-bt_smuggle",
+              "name": "走私机会",
+              "nodes": [
+                {
+                  "id": "smuggle_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "走私机会", "style": "warning" }
+                },
+                {
+                  "id": "smuggle_dialog",
+                  "typeId": "narrative.dialog",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "npcName": "神秘人", "dialogText": "兄弟，有批货想不想接？利润是正常贸易的三倍，就是过关的时候有点风险。", "emotion": "neutral" }
+                },
+                {
+                  "id": "smuggle_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"接下这单\",\"aiNote\":\"铤而走险\"},{\"label\":\"拒绝\",\"aiNote\":\"不想冒险\"},{\"label\":\"举报立功\",\"aiNote\":\"做个守法公民\"}]"
+                  }
+                },
+                {
+                  "id": "smuggle_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "resourceKey": "经营资产.资金", "delta": 300 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "smuggle_title", "sourceSocketKey": "flow_out", "targetNodeId": "smuggle_dialog", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "smuggle_dialog", "sourceSocketKey": "flow_out", "targetNodeId": "smuggle_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "smuggle_choice", "sourceSocketKey": "flow_out", "targetNodeId": "smuggle_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "currency_crisis",
+            "name": "资金危机",
+            "workflow": {
+              "version": 1,
+              "id": "wf-bt_currency_crisis",
+              "name": "资金危机",
+              "nodes": [
+                {
+                  "id": "crisis_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "资金危机", "style": "warning" }
+                },
+                {
+                  "id": "crisis_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "卢布突然大幅贬值，你手里的货款缩水严重。供货商又在催款，情况很棘手。" }
+                },
+                {
+                  "id": "crisis_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"借钱周转\",\"aiNote\":\"向朋友借钱\"},{\"label\":\"低价抛售库存\",\"aiNote\":\"割肉止损\"},{\"label\":\"谈判延期付款\",\"aiNote\":\"和供货商协商\"}]"
+                  }
+                },
+                {
+                  "id": "crisis_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "resourceKey": "经营资产.资金", "delta": -200 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "crisis_title", "sourceSocketKey": "flow_out", "targetNodeId": "crisis_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "crisis_text", "sourceSocketKey": "flow_out", "targetNodeId": "crisis_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "crisis_choice", "sourceSocketKey": "flow_out", "targetNodeId": "crisis_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "network",
+            "name": "人脉拓展",
+            "workflow": {
+              "version": 1,
+              "id": "wf-bt_network",
+              "name": "人脉拓展",
+              "nodes": [
+                {
+                  "id": "net_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "人脉拓展", "style": "default" }
+                },
+                {
+                  "id": "net_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "在边境市场上认识了几个有门路的商人，他们邀请你参加一个私人聚会。" }
+                },
+                {
+                  "id": "net_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"带上好酒参加\",\"aiNote\":\"给人留下好印象\"},{\"label\":\"空手去\",\"aiNote\":\"先看看情况\"},{\"label\":\"不去\",\"aiNote\":\"不信任陌生人\"}]"
+                  }
+                },
+                {
+                  "id": "net_effect",
+                  "typeId": "effect.flag",
+                  "position": { "x": 0, "y": 360 },
+                  "widgetValues": { "flagPath": "flags.建立人脉", "value": true }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "net_title", "sourceSocketKey": "flow_out", "targetNodeId": "net_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "net_text", "sourceSocketKey": "flow_out", "targetNodeId": "net_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "net_choice", "sourceSocketKey": "flow_out", "targetNodeId": "net_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "quality_issue",
+            "name": "质量问题",
+            "workflow": {
+              "version": 1,
+              "id": "wf-quality_issue",
+              "name": "质量问题",
+              "nodes": [
+                {
+                  "id": "qi_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "质量问题", "style": "warning" }
+                },
+                {
+                  "id": "qi_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "客户投诉说你卖的货有质量问题，要求退货退款。这批货确实是从不太靠谱的渠道拿的。" }
+                },
+                {
+                  "id": "qi_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"全额退款\",\"aiNote\":\"维护信誉\"},{\"label\":\"换货\",\"aiNote\":\"更换商品\"},{\"label\":\"拒绝退款\",\"aiNote\":\"不承认问题\"]"
+                  }
+                },
+                {
+                  "id": "qi_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "resourceKey": "经营资产.资金", "delta": -100 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "qi_title", "sourceSocketKey": "flow_out", "targetNodeId": "qi_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "qi_text", "sourceSocketKey": "flow_out", "targetNodeId": "qi_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "qi_choice", "sourceSocketKey": "flow_out", "targetNodeId": "qi_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "big_deal",
+            "name": "大买卖",
+            "workflow": {
+              "version": 1,
+              "id": "wf-big_deal",
+              "name": "大买卖",
+              "nodes": [
+                {
+                  "id": "bd_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "大买卖", "style": "important" }
+                },
+                {
+                  "id": "bd_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "一个大客户找上门来，要订购一大批货。这是笔大买卖，但风险也不小。" }
+                },
+                {
+                  "id": "bd_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"接单\",\"aiNote\":\"抓住机会\"},{\"label\":\"分期交付\",\"aiNote\":\"降低风险\"},{\"label\":\"拒绝\",\"aiNote\":\"风险太大\"]"
+                  }
+                },
+                {
+                  "id": "bd_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "resourceKey": "经营资产.资金", "delta": 800 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "bd_title", "sourceSocketKey": "flow_out", "targetNodeId": "bd_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "bd_text", "sourceSocketKey": "flow_out", "targetNodeId": "bd_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "bd_choice", "sourceSocketKey": "flow_out", "targetNodeId": "bd_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          },
+          {
+            "id": "scam",
+            "name": "骗局",
+            "workflow": {
+              "version": 1,
+              "id": "wf-scam",
+              "name": "骗局",
+              "nodes": [
+                {
+                  "id": "scam_title",
+                  "typeId": "narrative.title",
+                  "position": { "x": 0, "y": 0 },
+                  "widgetValues": { "title": "骗局", "style": "warning" }
+                },
+                {
+                  "id": "scam_text",
+                  "typeId": "narrative.text",
+                  "position": { "x": 0, "y": 100 },
+                  "widgetValues": { "text": "你发现之前的合作伙伴是个骗子，他卷款跑路了。你损失了一大笔钱。" }
+                },
+                {
+                  "id": "scam_choice",
+                  "typeId": "choice.static",
+                  "position": { "x": 0, "y": 220 },
+                  "widgetValues": {
+                    "options": "[{\"label\":\"报警\",\"aiNote\":\"寻求法律帮助\"},{\"label\":\"自己追讨\",\"aiNote\":\"找人帮忙追债\"},{\"label\":\"吸取教训\",\"aiNote\":\"当作学费\"]"
+                  }
+                },
+                {
+                  "id": "scam_effect",
+                  "typeId": "effect.resource",
+                  "position": { "x": 0, "y": 350 },
+                  "widgetValues": { "resourceKey": "经营资产.资金", "delta": -300 }
+                }
+              ],
+              "connections": [
+                { "id": "c1", "sourceNodeId": "scam_title", "sourceSocketKey": "flow_out", "targetNodeId": "scam_text", "targetSocketKey": "flow_in" },
+                { "id": "c2", "sourceNodeId": "scam_text", "sourceSocketKey": "flow_out", "targetNodeId": "scam_choice", "targetSocketKey": "flow_in" },
+                { "id": "c3", "sourceNodeId": "scam_choice", "sourceSocketKey": "flow_out", "targetNodeId": "scam_effect", "targetSocketKey": "flow_in" }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   }
 ]

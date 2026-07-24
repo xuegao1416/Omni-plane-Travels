@@ -36,10 +36,10 @@ const TYPE_FALLBACK: Record<EventPackType, LucideIcon> = {
 /** 由 manifest.icon 名解析 Lucide 组件；未命中则按类型兜底 */
 export function resolveEventIcon(iconName: string | undefined, type: EventPackType): LucideIcon {
   if (iconName && ICON_MAP[iconName]) return ICON_MAP[iconName];
-  return TYPE_FALLBACK[type];
+  return TYPE_FALLBACK[type] ?? FileText; // 未知类型兜底 FileText
 }
 
 /** 取类型对应的兜底图标 */
 export function typeIcon(type: EventPackType): LucideIcon {
-  return TYPE_FALLBACK[type];
+  return TYPE_FALLBACK[type] ?? FileText;
 }

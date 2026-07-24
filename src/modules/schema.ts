@@ -906,6 +906,48 @@ export interface ChoiceOption {
 }
 
 /**
+ * 动态选项配置 — 替代静态 choices，由 AI 根据当前游戏状态动态生成选项。
+ * 事件包作者只需定义「框架」（场景描述 + 生成指令），AI 负责填充具体选项。
+ */
+export interface DynamicChoiceConfig {
+  /** 生成指令：告诉 AI 如何生成选项（如"根据玩家当前资源给出3个可行的选择"） */
+  instruction: string;
+  /** 选项数量范围 [min, max]，默认 [2, 4] */
+  countRange?: [number, number];
+  /** 每个选项必须包含的字段约束 */
+  optionTemplate?: {
+    /** 是否必须包含 label（选项标题），默认 true */
+    labelRequired?: boolean;
+    /** 是否必须包含 effect（机械效果），默认 false */
+    effectRequired?: boolean;
+    /** 是否必须包含 aiNote（给 AI 的决策上下文），默认 true */
+    aiNoteRequired?: boolean;
+  };
+  /** 静态兜底选项：AI 生成失败或超时时使用 */
+  fallbackChoices?: ChoiceOption[];
+}
+
+/** AI 选项生成的输入上下文（从 GameState 提取的摘要） */
+export interface DynamicChoicePromptInput {
+  /** 事件包/世界名称 */
+  worldName?: string;
+  /** 当前卡片的叙事文本（场景描述） */
+  narrativeText: string;
+  /** 动态选项配置 */
+  config: DynamicChoiceConfig;
+  /** 玩家属性摘要（规范键 → 当前值） */
+  playerStats: Record<string, number>;
+  /** 玩家资源摘要（资源名 → 数量） */
+  playerResources: Record<string, number>;
+  /** 最近决策记录（aiNote 列表） */
+  recentDecisions: string[];
+  /** 当前游戏时间 */
+  gameTime?: string;
+  /** 世界书条目摘要（标题 → 内容），由调用方从 worldBookEntries 提取 */
+  worldBookContext?: Array<{ title: string; content: string }>;
+}
+
+/**
  * @deprecated 旧版「单文件卡片」落盘形态（schema/card.json）。
  * 修正后的数据模型改用 EventPackFile（聚合事件包，见下）。
  * 保留此类型仅用于向后兼容：CardEditor / CardRenderer / 旧存档仍产出/消费此形态。
@@ -915,6 +957,191 @@ export interface CardFile {
   version: number;
   puck: PuckData;
   cards: CardDef[];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  卡片节点系统 — 对齐规则包架构深度
+//  12 种节点类型 × typed socket × DAG 执行
+// ═══════════════════════════════════════════════════════════════
+
+/** 卡片节点类型枚举（12 种） */
+export type CardNodeType =
+  // 叙事节点（4 种）
+  | 'narrative.text'      // 文本叙事
+  | 'narrative.title'     // 标题卡
+  | 'narrative.image'     // 图片叙事
+  | 'narrative.dialog'    // 对话叙事（NPC 对话格式）
+  // 交互节点（4 种）
+  | 'choice.static'       // 静态选项
+  | 'choice.dynamic'      // AI 动态选项（根据玩家状态实时生成）
+  | 'choice.conditional'  // 条件选项（根据 gameState 显示/隐藏选项）
+  | 'choice.weighted'     // 权重选项（按权重随机展示选项子集）
+  // 效果节点（3 种）
+  | 'effect.stat'         // 属性效果（修改玩家属性）
+  | 'effect.resource'     // 资源效果（修改资源/物品栏数量）
+  | 'effect.flag'         // 标记效果（设置/清除游戏标记）
+  // 流程节点（1 种）
+  | 'flow.branch';        // 条件分支（根据状态跳转到不同节点）
+
+/** 卡片节点 socket 数据类型 */
+export type CardSocketType =
+  | 'flow'       // 执行流（触发信号）
+  | 'number'     // 数值
+  | 'string'     // 字符串
+  | 'boolean'    // 布尔
+  | 'stat'       // 属性引用
+  | 'resource'   // 资源引用
+  | 'flag'       // 标记引用
+  | 'any';       // 任意类型
+
+/** 卡片节点 socket 定义 */
+export interface CardNodeSocket {
+  key: string;
+  type: CardSocketType;
+  label: string;
+  description?: string;
+  /** 是否允许多根线接入（默认 false，仅 input 有效） */
+  multi?: boolean;
+  /** 默认值（未连接时使用） */
+  defaultValue?: unknown;
+  /** 是否必填 */
+  required?: boolean;
+}
+
+/** 卡片节点 widget 类型 */
+export type CardWidgetType =
+  | 'number'
+  | 'string'
+  | 'boolean'
+  | 'select'
+  | 'path_select'
+  | 'stat_key'
+  | 'resource_key'
+  | 'json';
+
+/** 卡片节点 widget 配置 */
+export interface CardWidgetConfig {
+  type: CardWidgetType;
+  label: string;
+  /** 绑定的输入 socket key */
+  socketKey: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: Array<{ label: string; value: string | number }>;
+  multiline?: boolean;
+  placeholder?: string;
+}
+
+/** 卡片节点定义（类型元数据） */
+export interface CardNodeDefinition {
+  typeId: CardNodeType;
+  category: 'narrative' | 'choice' | 'effect' | 'flow';
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  inputs: CardNodeSocket[];
+  outputs: CardNodeSocket[];
+  widgets?: CardWidgetConfig[];
+  searchTags?: string[];
+  /** 是否为终端节点（无输出流） */
+  terminal?: boolean;
+  /** 是否为源节点（无输入流） */
+  source?: boolean;
+}
+
+/** 卡片节点实例（画布上放置的节点） */
+export interface CardNodeInstance {
+  id: string;
+  typeId: CardNodeType;
+  label?: string;
+  position: { x: number; y: number };
+  /** widget 值覆盖（key = socketKey） */
+  widgetValues?: Record<string, unknown>;
+  /** 运行时状态（不持久化） */
+  runtimeState?: {
+    executed?: boolean;
+    outputs?: Record<string, unknown>;
+    error?: string;
+  };
+}
+
+/** 卡片工作流连接（边） */
+export interface CardWorkflowConnection {
+  id: string;
+  sourceNodeId: string;
+  sourceSocketKey: string;
+  targetNodeId: string;
+  targetSocketKey: string;
+}
+
+/** 卡片工作流定义（完整 DAG 图） */
+export interface CardWorkflowDefinition {
+  version: number;
+  id: string;
+  name: string;
+  description?: string;
+  nodes: CardNodeInstance[];
+  connections: CardWorkflowConnection[];
+  metadata?: {
+    author?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    tags?: string[];
+  };
+}
+
+/** 卡片执行上下文 */
+export interface CardExecutionContext {
+  tick: number;
+  events: Array<{ type: string; [key: string]: unknown }>;
+  permissions: string[];
+  gameState: Record<string, unknown>;
+  /** 执行限制 */
+  limits?: {
+    maxNodes?: number;
+    maxWallMs?: number;
+  };
+}
+
+/** 卡片节点执行结果 */
+export interface CardNodeExecutionResult {
+  /** 渲染数据（叙事节点输出） */
+  renderData?: {
+    type: 'title' | 'text' | 'image' | 'dialog';
+    title?: string;
+    text?: string;
+    imageUrl?: string;
+    npcName?: string;
+    npcEmotion?: string;
+  };
+  /** 选项列表（交互节点输出） */
+  choices?: Array<{
+    label: string;
+    aiNote?: string;
+    effect?: { statId?: string; resourcePath?: string; delta: number };
+    /** 条件选项的显示条件路径 */
+    conditionPath?: string;
+    /** 条件选项的期望值 */
+    conditionValue?: unknown;
+    /** 权重选项的权重值 */
+    weight?: number;
+  }>;
+  /** 效果列表（效果节点输出，待应用） */
+  pendingEffects?: Array<{
+    statId?: string;
+    resourcePath?: string;
+    flagPath?: string;
+    delta?: number;
+    value?: unknown;
+  }>;
+  /** 分支目标（流程节点输出） */
+  branchTarget?: string;
+  /** 输出 socket 值 */
+  outputs?: Record<string, unknown>;
+  /** 动态选项配置（choice.dynamic 节点输出） */
+  dynamicConfig?: Record<string, unknown>;
 }
 
 // ─── 修正后的事件数据模型（PACK 持有多个事件；卡片是事件的子单元） ───

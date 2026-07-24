@@ -43,7 +43,7 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.6.7';
+const APP_VERSION = '2.7.0';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
@@ -259,7 +259,7 @@ export async function webGetEventDetail(id: string): Promise<EventDetail> {
 export async function saveEventToPack(
   packId: string,
   event: EventDef,
-  opts?: { cardFile?: CardFile; periodicRules?: PeriodicRule[] },
+  opts?: { cardFile?: CardFile; cardWorkflow?: import('./schema').CardWorkflowDefinition; periodicRules?: PeriodicRule[] },
 ): Promise<void> {
   const rec = await getWebEvent(packId);
   if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
@@ -277,12 +277,16 @@ export async function saveEventToPack(
   if (idx >= 0) file.events[idx] = event;
   else file.events.push(event);
 
-  // 写入 per-event 画布
-  rec.files[`schema/event-${event.id}.json`] = JSON.stringify(
-    opts?.cardFile ?? eventDefToCardFile(event),
-    null,
-    2,
-  );
+  // 写入 per-event 画布（优先新格式 CardWorkflowDefinition，回退旧 CardFile）
+  if (opts?.cardWorkflow) {
+    rec.files[`schema/event-${event.id}.json`] = JSON.stringify(opts.cardWorkflow, null, 2);
+  } else {
+    rec.files[`schema/event-${event.id}.json`] = JSON.stringify(
+      opts?.cardFile ?? eventDefToCardFile(event),
+      null,
+      2,
+    );
+  }
 
   // 仅当显式传入时才覆盖周期规则（undefined 表示保持原值）
   if (opts?.periodicRules !== undefined) {
@@ -748,19 +752,25 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
         events: events.map(e => ({
           id: e.id,
           name: e.name,
-          cards: e.cards.map(c => ({ id: c.id, componentId: c.componentId, title: c.title })),
-          puck: e.puck,
+          cards: [], // 新格式不用 cards
         })),
       };
       files['schema/events.json'] = JSON.stringify(eventPackFile, null, 2);
-      // 每个事件单独写画布文件（CardOverlay 按 event-{id}.json 查找）
+      // 每个事件单独写画布文件（新格式 CardWorkflowDefinition）
       for (const evt of events) {
-        const cardFile = {
-          version: 1,
-          puck: evt.puck ?? { root: { props: {} }, components: {} },
-          cards: evt.cards.map(c => ({ id: c.id, componentId: c.componentId, title: c.title })),
-        };
-        files[`schema/event-${evt.id}.json`] = JSON.stringify(cardFile, null, 2);
+        if (evt.workflow) {
+          // 新格式：直接写 CardWorkflowDefinition
+          files[`schema/event-${evt.id}.json`] = JSON.stringify(evt.workflow, null, 2);
+        } else {
+          // 旧格式：创建空工作流（旧格式已废弃）
+          files[`schema/event-${evt.id}.json`] = JSON.stringify({
+            version: 1,
+            id: `card-wf-${evt.id}`,
+            name: evt.name,
+            nodes: [],
+            connections: [],
+          }, null, 2);
+        }
       }
     }
 

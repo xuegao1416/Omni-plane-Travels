@@ -424,6 +424,17 @@ export class WorldSimulationEngine {
                 if (typeof val !== 'string' || !key.startsWith('schema/event-')) continue;
                 try {
                   const parsed = JSON.parse(val);
+
+                  // 新格式：CardWorkflowDefinition（有 nodes 数组）
+                  if (parsed.nodes && Array.isArray(parsed.nodes)) {
+                    // 从文件名提取 eventId：schema/event-<eventId>.json
+                    const eventId = key.replace('schema/event-', '').replace('.json', '');
+                    eventBus.emit(EVENTS.EVENT_CARD, { cardId: eventId, eventPackId: packId });
+                    found = true;
+                    break;
+                  }
+
+                  // 旧格式：EventDef（有 cards 数组）— 向后兼容
                   const matchEvt = Array.isArray(parsed)
                     ? parsed.find((e: { id?: string }) => e.id === ev.eventId)
                     : parsed.id === ev.eventId ? parsed : null;
