@@ -64,6 +64,7 @@ test('(b) fake-indexeddb: webEventStore 导入 rule mod → getEventDetail + 注
   const rules: EventRule[] = [
     { id: 'r2', when: { all: [] }, then: [{ set: { path: 'web_mod_flag', value: 'on' } }] },
   ];
+  try {
   const buf = await buildRuleZip(rules);
   const meta = await webImportFromFile(buf);
   expect(meta.id).toBe('rule-mod-a');
@@ -92,8 +93,10 @@ test('(b) fake-indexeddb: webEventStore 导入 rule mod → getEventDetail + 注
   const ctx = runEventRulesOnTick({ 玩家: {} }, 1, []);
   expect((ctx as Record<string, unknown>).web_mod_flag).toBe('on');
 
-  eventWorldEvolution.clear();
+  } finally {
+    eventWorldEvolution.clear();
 
   // 防止污染共享的 fake-indexeddb（后续测试文件依赖干净的 mod 列表）
   await webUninstallPack('rule-mod-a').catch(() => {});
+  }
 });

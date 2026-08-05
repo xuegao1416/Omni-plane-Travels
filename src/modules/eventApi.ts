@@ -11,27 +11,20 @@ import type {
   EventRegistryEntry,
   EventDetail,
   EventError,
-  EventErrorCode,
   Manifest,
   ValidationResult,
   ValidationIssue,
   Collection,
 } from './schema';
+import { ensureEventApiError, EventApiError } from './eventErrors';
+export { EventApiError } from './eventErrors';
+export type { EventApiErrorCode, EventApiErrorDetails } from './eventErrors';
 // Web 端实现（!isTauri() 时委派；桌面端仍走下方 Tauri invoke）
 import * as web from './webEventStore';
 // 统一的 isTauri 检测（带缓存），避免与 nativeFetch.ts 各维护一份
 import { isTauri } from '../utils/nativeFetch';
 
-export class EventApiError extends Error {
-  code: EventErrorCode;
-  context?: Record<string, unknown>;
-  constructor(e: EventError) {
-    super(e.message);
-    this.name = 'EventApiError';
-    this.code = e.code;
-    this.context = e.context;
-  }
-}
+// EventApiError is shared from eventErrors.ts so Web imports do not form a runtime cycle.
 
 /** Tauri reject 的对象 message 即 EventError 的 JSON 字符串，解析回 EventError */
 export function unwrapEventError(err: unknown): EventApiError {
@@ -74,9 +67,6 @@ export function invalidateCache(): void {
   metaCache.clear();
 }
 
-/** @deprecated 请使用 invalidateCache */
-export const invalidateModCache = invalidateCache;
-
 /** 监听 packs:changed，自动失效缓存（非 Tauri 环境静默忽略） */
 export function ensureCacheListener(): Promise<void> {
   if (initPromise) return initPromise;
@@ -92,18 +82,12 @@ export function ensureCacheListener(): Promise<void> {
   return initPromise;
 }
 
-/** @deprecated 请使用 ensureCacheListener */
-export const ensureModListener = ensureCacheListener;
-
 /** 手动卸载事件监听（应用卸载时调用） */
 export function disposeCacheListener(): void {
   listener?.();
   listener = null;
   initPromise = null;
 }
-
-/** @deprecated 请使用 disposeCacheListener */
-export const disposeModListener = disposeCacheListener;
 
 // ─── 10 个操作：桌面走 Tauri invoke，Web 走 IndexedDB 实现 ───
 
@@ -177,9 +161,13 @@ export async function importPack(input?: { path?: string; file?: File }): Promis
     if (!input?.file) {
       throw new EventApiError({ code: 'IO_ERROR', message: 'Web 端导入需要传入 .opt-event 文件。' });
     }
-    const meta = await web.webImportFromFile(input.file);
-    invalidateCache();
-    return meta;
+    try {
+      const meta = await web.webImportFromFile(input.file);
+      invalidateCache();
+      return meta;
+    } catch (error) {
+      throw ensureEventApiError(error);
+    }
   }
   const r = await call<EventMeta>('import_event', input?.path ? { path: input.path } : {});
   invalidateCache();
@@ -194,23 +182,6 @@ export async function exportPack(id: string, _target?: string): Promise<void> {
   await call<void>('export_event', _target ? { id, target: _target } : { id });
   invalidateCache();
 }
-
-/** @deprecated 请使用 discoverPacks */
-export const discoverMods = discoverPacks;
-/** @deprecated 请使用 listPacks */
-export const listMods = listPacks;
-/** @deprecated 请使用 installPack */
-export const installMod = installPack;
-/** @deprecated 请使用 uninstallPack */
-export const uninstallMod = uninstallPack;
-/** @deprecated 请使用 enablePack */
-export const enableMod = enablePack;
-/** @deprecated 请使用 disablePack */
-export const disableMod = disablePack;
-/** @deprecated 请使用 importPack */
-export const importMod = importPack;
-/** @deprecated 请使用 exportPack */
-export const exportMod = exportPack;
 
 export async function getEventDetail(id: string): Promise<EventDetail> {
   if (!isTauri()) return web.webGetEventDetail(id);

@@ -1,5 +1,22 @@
 # 更新日志
 
+## v2.7.1 — 事件包格式统一 + 卡片工作流重构 + 世界书融合 (2026-08-06)
+
+### ✨ 新增
+
+- **事件包格式统一**：废弃旧版 `EventPack` 格式，全面迁移到 `CanonicalEventPack` 规范，统一事件、规则、工作流的数据结构
+- **卡片工作流重构**：`CardWorkflowEngine` 重写，节点注册表新增 25 种类型化节点，支持 DAG 拓扑执行、Socket 颜色区分、自动布局
+- **世界书深度融合**：内置 6 个世界恢复完整 `worldBookEntries`，新增 `NPCWorldbookGenerator` 自动从 NPC 数据生成世界书条目，支持去重、递归扫描
+- **测试补齐**：新增 12 个测试文件（EventIdSelect、StepWorldBrowser、pipelineExecutor、cardWorldBindings、enabledEventPack、eventPackFormat、eventPackLegacyGuard、workflowConverters、simulation engine 等）
+- **新增 6 个世界图标**：TreePalm、Plane、Sailboat、Tent、TentTree、Trees，丰富世界选择视觉表现
+
+### 🔧 改进
+
+- **事件导入/导出**：统一错误处理，新增 `EventIdSelect`、`EventPackBadge`、`EventPackPreview` 组件
+- **工作流转换器**：`workflowConverters.ts` 支持工作流 ↔ 规则双向转换，新增端口对齐验证
+- **遗留数据迁移**：`eventPackLegacyGuard.ts` 强化旧格式拦截，`eventPackFormat.ts` 规范化导入流程
+- **卡片世界绑定**：`cardWorldBindings.ts` 新增世界级卡片工作流绑定与激活逻辑
+
 ## v2.7.0 — AI 合集生成器 (2026-07-24)
 
 ### ✨ 新增

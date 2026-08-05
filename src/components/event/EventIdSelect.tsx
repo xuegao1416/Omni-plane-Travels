@@ -1,12 +1,13 @@
 // 事件 ID 选择器 —— 下拉事件列表 + 自定义兜底。
-// 事件 = EventDef（最小单位），包含 cards[] / rules[] / worldbook[]。
+// 事件 = canonical v2 索引条目，对应一个 CardWorkflowDefinition。
 // 数据来源：
 //   1. 当前事件包的 schema/events.json
 //   2. 关联世界的所有事件包的 schema/events.json（按包分组）
 import { useEffect, useState } from 'react';
 import { getWebEvent, allWebEvents } from '../../modules/eventDb';
-import type { EventPackFile } from '../../modules/schema';
+import type { WebEventRecord } from '../../modules/eventDb';
 import type { WorldDef } from '../../data/worlds-schema';
+import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 
 interface Props {
   value?: string;
@@ -34,28 +35,35 @@ const selectStyle: React.CSSProperties = {
 interface EventOption {
   id: string;
   name: string;
-  cardCount: number;
+  nodeCount: number;
   packName: string;
   packId: string;
+}
+
+export function getEventPackWorldId(pack: Pick<WebEventRecord, 'worldId' | 'manifest'>): string | undefined {
+  return pack.worldId ?? pack.manifest.worldId;
+}
+
+export function isCardEventPack(pack: Pick<WebEventRecord, 'manifest'>): boolean {
+  return pack.manifest.type === 'card';
 }
 
 /** 从一个事件包的 IndexedDB 记录中提取事件列表 */
 async function extractEventsFromPack(packId: string): Promise<EventOption[]> {
   const rec = await getWebEvent(packId);
-  if (!rec) return [];
-  const evRaw = rec.files['schema/events.json'];
-  if (typeof evRaw !== 'string') return [];
+  if (!rec || !isCardEventPack(rec)) return [];
   try {
-    const file = JSON.parse(evRaw) as EventPackFile;
-    const packName = file.name ?? rec.manifest?.name ?? packId;
-    return (file.events ?? []).map((ev) => ({
-      id: ev.id,
-      name: ev.name ?? ev.id,
-      cardCount: ev.cards?.length ?? 0,
+    const pack = readCanonicalEventPack(rec.files);
+    const packName = pack.index.name ?? rec.manifest?.name ?? packId;
+    return pack.index.events.map((event, index) => ({
+      id: event.id,
+      name: event.name,
+      nodeCount: pack.workflows[index].nodes.length,
       packName,
       packId,
     }));
-  } catch {
+  } catch (error) {
+    console.error('[EventIdSelect] 事件包读取失败:', packId, error);
     return [];
   }
 }
@@ -76,7 +84,7 @@ export default function EventIdSelect({ value, eventPackId, worldDef, onChange }
       if (worldDef?.id) {
         const packs = await allWebEvents();
         for (const pack of packs) {
-          if (pack.worldId === worldDef.id && pack.id !== eventPackId) {
+          if (isCardEventPack(pack) && getEventPackWorldId(pack) === worldDef.id && pack.id !== eventPackId) {
             all.push(...await extractEventsFromPack(pack.id));
           }
         }
@@ -145,7 +153,7 @@ export default function EventIdSelect({ value, eventPackId, worldDef, onChange }
         <optgroup key={pack} label={pack}>
           {evts.map((ev) => (
             <option key={ev.id} value={ev.id}>
-              {ev.name}（{ev.cardCount} 张卡片）
+              {ev.name}（{ev.nodeCount} 个节点）
             </option>
           ))}
         </optgroup>

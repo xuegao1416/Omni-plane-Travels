@@ -6,7 +6,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { X, FileText, ScrollText, MessageCircle, Image, ListChecks, Sparkles, Filter, Dice5 } from 'lucide-react';
 import { eventBus, EVENTS } from '../../engine/eventBus';
 import { getWebEvent } from '../../modules/eventDb';
-import type { CardWorkflowDefinition, CardNodeExecutionResult, CardExecutionContext } from '../../modules/schema';
+import type { CardNodeExecutionResult, CardExecutionContext } from '../../modules/schema';
+import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 import { executeCardWorkflow, type CardWorkflowExecutionResult } from '../../modules/cardWorkflowEngine';
 import { useSaveStore } from '../../stores/saveStore';
 import { selectChoice, applyEffectTarget } from '../../modules/eventChoiceState';
@@ -41,21 +42,9 @@ export default function CardOverlay({ gameState }: Props) {
 
       const worldName = rec.manifest?.name ?? '事件';
 
-      // 读取工作流定义
-      const canvasRaw = rec.files[`schema/event-${evt.cardId}.json`];
-      if (typeof canvasRaw !== 'string') return;
-
-      let workflow: CardWorkflowDefinition;
-      try {
-        const parsed = JSON.parse(canvasRaw);
-        if (parsed.nodes && Array.isArray(parsed.nodes)) {
-          workflow = parsed as CardWorkflowDefinition;
-        } else {
-          return; // 旧格式，不支持
-        }
-      } catch {
-        return;
-      }
+      const pack = readCanonicalEventPack(rec.files);
+      const workflow = pack.workflowByEventId.get(evt.cardId);
+      if (!workflow) throw new Error(`事件包中不存在工作流：${evt.cardId}`);
 
       // 执行工作流
       const ctx: CardExecutionContext = {

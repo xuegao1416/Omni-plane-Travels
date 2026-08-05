@@ -548,9 +548,6 @@ export interface WorldSystemData {
 /** 内容包分类：card = 事件包（弹卡片）/ rule = 规则（后台数值）/ worldbook = 世界书 / bundle = 混合包 */
 export type EventPackType = 'card' | 'rule' | 'worldbook' | 'bundle';
 
-/** @deprecated 请使用 EventPackType */
-export type EventType = EventPackType;
-
 /** 声明所需能力；规则引擎仅执行被授权的动作类型 */
 export type Permission =
   | 'read_world_state'
@@ -866,21 +863,6 @@ export interface EventError {
   context?: Record<string, unknown>;
 }
 
-// ─── 卡片文件（Puck 产物） ───
-export interface PuckData {
-  root: { props?: Record<string, unknown> };
-  components: Record<string, Array<{ id: string; props: Record<string, unknown> }>>;
-}
-
-export interface CardDef {
-  id: string;
-  componentId: string;
-  title: string;
-  category?: string;
-  kind?: 'add' | 'override';
-  overrideTarget?: string;
-}
-
 /**
  * 选择卡选项的效果（路径 C 反馈）。
  * - statId：指向 GameState.玩家.生存状态 的扁平 key（如「生命」「dim1.value」），二选一。
@@ -945,18 +927,6 @@ export interface DynamicChoicePromptInput {
   gameTime?: string;
   /** 世界书条目摘要（标题 → 内容），由调用方从 worldBookEntries 提取 */
   worldBookContext?: Array<{ title: string; content: string }>;
-}
-
-/**
- * @deprecated 旧版「单文件卡片」落盘形态（schema/card.json）。
- * 修正后的数据模型改用 EventPackFile（聚合事件包，见下）。
- * 保留此类型仅用于向后兼容：CardEditor / CardRenderer / 旧存档仍产出/消费此形态。
- * 新消费端请改用 EventDef + EventPackFile，并用 cardFileToEventPack() 做迁移桥接。
- */
-export interface CardFile {
-  version: number;
-  puck: PuckData;
-  cards: CardDef[];
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1092,6 +1062,20 @@ export interface CardWorkflowDefinition {
   };
 }
 
+/** Canonical metadata entry stored in schema/events.json. */
+export interface EventIndexEntry {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+/** Canonical version-2 event-pack index stored in schema/events.json. */
+export interface EventPackIndex {
+  version: 2;
+  name?: string;
+  events: EventIndexEntry[];
+}
+
 /** 卡片执行上下文 */
 export interface CardExecutionContext {
   tick: number;
@@ -1143,122 +1127,6 @@ export interface CardNodeExecutionResult {
   /** 动态选项配置（choice.dynamic 节点输出） */
   dynamicConfig?: Record<string, unknown>;
 }
-
-// ─── 修正后的事件数据模型（PACK 持有多个事件；卡片是事件的子单元） ───
-
-/**
- * 事件定义（PACK 的子单元）。
- * 一个事件（EventDef）由多张「卡片（CardDef）」组成 —— 卡片是事件的子单元，而非平级于包。
- * 事件还可携带自己的规则（rules）与世界书（worldbook）。
- */
-export interface EventDef {
-  /** 事件 ID（唯一标识） */
-  id: string;
-  /** 事件名（用于日志 / 编辑器展示） */
-  name: string;
-  /** 卡片：一个事件由多张卡片组成（卡片是事件的子单元） */
-  cards: CardDef[];
-  /** Puck 可视化布局数据（additive；与 CardFile.puck 同源，供 CardRenderer/CardOverlay 渲染卡片实际 props）。无布局数据时可为空。 */
-  puck?: PuckData;
-  /** 事件专属规则（可选） */
-  rules?: EventRule[];
-  /** 事件专属世界书条目（可选） */
-  worldbook?: WorldBookEntryDef[];
-}
-
-/**
- * 事件包落盘形态（schema/events.json）。
- * 用于 type='card' 的事件包：持有多个事件（EventDef），每个事件含卡片。
- * 包级 worldbook 与 events 内各自携带的 worldbook 平级合并。
- *
- * 规则（type='rule'）使用 RuleFile（schema/rules.json），不使用此类型。
- */
-export interface EventPackFile {
-  /** 版本号 */
-  version: number;
-  /** 包名（可选） */
-  name?: string;
-  /** 事件列表（每个事件包含其卡片 / 规则 / 世界书） */
-  events: EventDef[];
-  /** 周期规则（仅规则使用，事件包不应有此字段） */
-  periodicRules?: PeriodicRule[];
-  /** 包级世界书（与 events 平级，可选；events 内也可各自带 worldbook） */
-  worldbook?: WorldBookEntryDef[];
-}
-
-/** @deprecated 请使用 EventPackFile */
-export type OptEventFile = EventPackFile;
-
-/**
- * 把事件包文件展平成引擎可直接消费的扁平结构。
- * 遍历所有 events，拼接其 cards / rules / worldbook；再并入包级 worldbook。
- */
-export function flattenEventPack(file: EventPackFile): {
-  cards: CardDef[];
-  rules: EventRule[];
-  worldbook: WorldBookEntryDef[];
-} {
-  const cards: CardDef[] = [];
-  const rules: EventRule[] = [];
-  const worldbook: WorldBookEntryDef[] = [];
-
-  for (const ev of file.events ?? []) {
-    if (ev.cards) cards.push(...ev.cards);
-    if (ev.rules) rules.push(...ev.rules);
-    if (ev.worldbook) worldbook.push(...ev.worldbook);
-  }
-  // 包级 worldbook 追加（与事件内 worldbook 平级合并）
-  if (file.worldbook) worldbook.push(...file.worldbook);
-
-  return { cards, rules, worldbook };
-}
-
-/** @deprecated 请使用 flattenEventPack */
-export const flattenOptEvent = flattenEventPack;
-
-/**
- * 迁移辅助：把旧版 CardFile（单文件卡片形态）包装为一个 EventPackFile。
- * 将 cf.cards 包裹进一个 EventDef；事件名取自 manifest.name（缺失则回退 'event'）；
- * 事件 ID 使用 crypto.randomUUID() 生成（保证唯一）。
- */
-export function cardFileToEventPack(cf: CardFile, manifest: Manifest): EventPackFile {
-  const eventId = crypto.randomUUID();
-  const eventName = manifest?.name ?? 'event';
-  return {
-    version: cf.version,
-    name: manifest?.name ?? undefined,
-    events: [
-      {
-        id: eventId,
-        name: eventName,
-        cards: cf.cards,
-      },
-    ],
-  };
-}
-
-/** @deprecated 请使用 cardFileToEventPack */
-export const cardFileToOptEvent = cardFileToEventPack;
-
-/**
- * 迁移辅助（cardFileToOptEvent 的逆操作）：把单个 EventDef 还原为 CardFile（带 puck），
- * 供 CardRenderer / CardOverlay 等仍消费 CardFile 的 UI 兼容。
- * - version 固定为 1（EventDef 不携带 version，UI 渲染不依赖）。
- * - puck 取自 event.puck（additive 字段）；缺失时给一个空 PuckData，保证 CardFile 形态合法。
- *
- * 与 flattenOptEvent 互补：flattenOptEvent 展平供「引擎注册」消费（只取 cards/rules/worldbook，不渲染）；
- * 本函数供「卡片渲染」消费（需要 puck 携带实际 props），二者职责不同、互不冲突。
- */
-export function eventDefToCardFile(event: EventDef): CardFile {
-  return {
-    version: 1,
-    puck: event.puck ?? { root: {}, components: {} },
-    cards: event.cards,
-  };
-}
-
-/** @deprecated 请使用 eventDefToCardFile */
-export const optEventToCardFile = eventDefToCardFile;
 
 // ─── 世界书文件 ───
 export interface WorldBookFile {

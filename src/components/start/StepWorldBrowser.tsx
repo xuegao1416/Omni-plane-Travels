@@ -1,13 +1,17 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { Search, Globe, ChevronRight, Upload, ArrowLeft, ExternalLink } from 'lucide-react';
-import type { WorldDef } from '../../data/worlds-schema';
+import type { WorldDef, WorldModule } from '../../data/worlds-schema';
 import type { WorldBookEntry } from '../../worldbook/index';
 import WorldCard, { CreateWorldCard, getWorldIcon } from './WorldCard';
 import WorldBookEditor from './WorldBookEditor';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import { DIFFICULTY_FILTERS, TABS, type TabKey, normalizeExternal } from './stepWorldBrowser/constants';
 import { OverviewTab, LoreTab, FactionsTab, CultureTab, NpcsTab, RulesTab, SystemsTab, EconomyTab } from './stepWorldBrowser/WorldDetailTabs';
+
+export function hasEnabledSystemModule(modules?: Array<WorldModule | string>): boolean {
+  return modules?.some((module) => typeof module === 'string' ? module.trim().length > 0 : module.enabled) ?? false;
+}
 
 interface StepWorldBrowserProps {
   selectedWorld: string;
@@ -64,7 +68,7 @@ export default function StepWorldBrowser({
 
   const renderTabBar = () => (
     <div className={`world-tabs${isMobile ? ' world-tabs-icon-only' : ''}`}>
-      {TABS.filter(tab => tab.key !== 'systems' || (selected!.modules && selected!.modules.some(m => m.enabled))).map(tab => {
+      {TABS.filter(tab => tab.key !== 'systems' || hasEnabledSystemModule(selected!.modules)).map(tab => {
         const Icon = tab.icon;
         return <button key={tab.key} className={`world-tab${activeTab === tab.key ? ' active' : ''}`} onClick={() => setActiveTab(tab.key)} title={isMobile ? tab.label : undefined}><Icon size={isMobile ? 18 : 14} strokeWidth={2} />{!isMobile && tab.label}</button>;
       })}

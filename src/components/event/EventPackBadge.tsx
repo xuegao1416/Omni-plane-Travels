@@ -5,8 +5,8 @@
 //   PACK 的「内容类型」(computePackType 推断：装满卡片→'card') 当包标签，导致装满卡片的
 //   事件包被打成「卡片」。
 // 修正：顶层统一标【事件包】主 pill，次级标【内容构成 chips】，全部由各包真实
-//   EventPackFile 内容派生（含卡片 / 含周期 / 含世界书 / 含规则）。
-//   数据来源：懒加载 getWebEvent(packId).files → parseEventPackFile → derivePackFlags。
+//   canonical workflow 与 rules.json 内容派生（含节点 / 含周期 / 含规则）。
+//   数据来源：懒加载 getWebEvent(packId).files → parseCanonicalPackView → derivePackFlags。
 //
 // EventListRow（已装）/ EventLibrary（发现）共用本组件，消除重复。
 // 仅 Lucide 图标、零 emoji、全项目 Token。
@@ -14,7 +14,8 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Package, FileText, Repeat, BookOpen, Spline, type LucideIcon } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
-import type { EventPackFile, CardDef } from '../../modules/schema';
+import type { RuleFile } from '../../modules/schema';
+import { readCanonicalEventPack, type CanonicalEventPackView } from '../../modules/eventPackFormat';
 
 /** 事件包内容构成标记（库顶层徽章与筛选共用同一派生口径） */
 export interface EventPackFlags {
@@ -34,51 +35,36 @@ export const EMPTY_FLAGS: EventPackFlags = {
   eventCount: 0,
 };
 
-/** 由 EventPackFile 推导内容构成标记（遍历各事件 cards/rules/worldbook + 包级 periodic/worldbook） */
-export function derivePackFlags(file: EventPackFile | null | undefined): EventPackFlags {
+export interface ParsedEventPack {
+  view: CanonicalEventPackView;
+  rules: RuleFile | null;
+}
+
+/** 由 canonical workflow 与独立 rules.json 推导内容构成标记。 */
+export function derivePackFlags(file: ParsedEventPack | null | undefined): EventPackFlags {
   if (!file) return { ...EMPTY_FLAGS };
-  const events = file.events ?? [];
-  let cards = 0;
-  let rules = 0;
-  let wb = 0;
-  for (const ev of events) {
-    cards += ev.cards?.length ?? 0;
-    rules += ev.rules?.length ?? 0;
-    wb += ev.worldbook?.length ?? 0;
-  }
-  wb += file.worldbook?.length ?? 0;
   return {
-    hasCards: cards > 0,
-    hasPeriodic: (file.periodicRules?.length ?? 0) > 0,
-    hasWorldbook: wb > 0,
-    hasRules: rules > 0,
-    eventCount: events.length,
+    hasCards: file.view.workflowNodeCount > 0,
+    hasPeriodic: (file.rules?.periodicRules?.length ?? 0) > 0,
+    hasWorldbook: false,
+    hasRules: (file.rules?.rules?.length ?? 0) > 0,
+    eventCount: file.view.eventCount,
   };
 }
 
-const OPT_EVENTS_INDEX = 'schema/events.json';
-
-/** 从 WebEventRecord.files 解析出 EventPackFile；兼容旧包（仅 schema/card.json，包成单事件） */
-export function parseEventPackFile(files: Record<string, string | Blob> | undefined): EventPackFile | null {
+/** 保留现有调用形状，但只解析 canonical v2；旧格式由导入迁移层负责。 */
+export function parseCanonicalPackView(files: Record<string, string | Blob> | undefined): ParsedEventPack | null {
   if (!files) return null;
-  const idxRaw = files[OPT_EVENTS_INDEX];
-  if (typeof idxRaw === 'string') {
-    try {
-      return JSON.parse(idxRaw) as EventPackFile;
-    } catch {
-      /* 索引损坏：回退旧包 */
+  const view = readCanonicalEventPack(files);
+  let rules: RuleFile | null = null;
+  const rulesRaw = files['schema/rules.json'];
+  if (typeof rulesRaw === 'string') {
+    const parsed = JSON.parse(rulesRaw) as Partial<RuleFile>;
+    if (Array.isArray(parsed.rules) && Array.isArray(parsed.periodicRules)) {
+      rules = parsed as RuleFile;
     }
   }
-  const cRaw = files['schema/card.json'];
-  if (typeof cRaw === 'string') {
-    try {
-      const cf = JSON.parse(cRaw) as { cards?: CardDef[] };
-      return { version: 1, events: [{ id: 'legacy', name: '旧版卡片', cards: cf.cards ?? [] }] };
-    } catch {
-      /* 跳过 */
-    }
-  }
-  return null;
+  return { view, rules };
 }
 
 /** 中性 pill 基础样式（无渐变，仅 Token） */
@@ -103,7 +89,7 @@ interface EventPackBadgeProps {
 
 /**
  * 事件包顶层徽章：主 pill「事件包」+ 次级「内容构成 chips」。
- * 构成由包的真实 EventPackFile 内容派生，不再误用 PACK 的 content-type 单一字段。
+ * 构成由包的 canonical workflow 内容派生，不再误用 PACK 的 content-type 单一字段。
  */
 export default function EventPackBadge({ packId, flags: flagsProp }: EventPackBadgeProps) {
   const [flags, setFlags] = useState<EventPackFlags | null>(flagsProp ?? null);
@@ -121,7 +107,7 @@ export default function EventPackBadge({ packId, flags: flagsProp }: EventPackBa
       try {
         const rec = await getWebEvent(packId);
         if (cancelled) return;
-        setFlags(derivePackFlags(rec ? parseEventPackFile(rec.files) : null));
+        setFlags(derivePackFlags(rec ? parseCanonicalPackView(rec.files) : null));
       } catch {
         if (!cancelled) setFlags({ ...EMPTY_FLAGS });
       } finally {

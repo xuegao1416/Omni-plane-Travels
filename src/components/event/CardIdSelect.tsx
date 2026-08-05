@@ -1,6 +1,7 @@
 // 卡片 ID 选择器 —— 下拉当前事件包的卡片列表 + 自定义兜底。
 import { useEffect, useState } from 'react';
 import { getWebEvent } from '../../modules/eventDb';
+import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 
 interface Props {
   value?: string;
@@ -26,37 +27,21 @@ const selectStyle: React.CSSProperties = {
 export default function CardIdSelect({ value, eventPackId, onChange }: Props) {
   const [cards, setCards] = useState<{ id: string; name: string }[]>([]);
 
-  // 从 IndexedDB 读取当前事件包的 schema/card.json 和 schema/event-*.json，提取卡片 ID 列表
+  // canonical v2 中可触发的“卡片 ID”就是索引里的 event/workflow ID。
   useEffect(() => {
-    if (!eventPackId) return;
+    if (!eventPackId) {
+      setCards([]);
+      return;
+    }
     (async () => {
       try {
         const rec = await getWebEvent(eventPackId);
         if (!rec) return;
-        const ids: { id: string; name: string }[] = [];
-        // 读取所有可能的卡片文件
-        for (const [key, val] of Object.entries(rec.files)) {
-          if (typeof val !== 'string') continue;
-          if (key.startsWith('schema/card') || key.startsWith('schema/event-')) {
-            try {
-              const parsed = JSON.parse(val);
-              if (parsed.id) {
-                ids.push({ id: parsed.id, name: parsed.name ?? parsed.id });
-              }
-              // 如果是数组形式
-              if (Array.isArray(parsed)) {
-                for (const item of parsed) {
-                  if (item.id) ids.push({ id: item.id, name: item.name ?? item.id });
-                }
-              }
-            } catch {
-              // 忽略解析失败
-            }
-          }
-        }
-        setCards(ids);
-      } catch {
-        // 忽略
+        const pack = readCanonicalEventPack(rec.files);
+        setCards(pack.index.events.map((event) => ({ id: event.id, name: event.name })));
+      } catch (error) {
+        console.error('[CardIdSelect] 事件包读取失败:', eventPackId, error);
+        setCards([]);
       }
     })();
   }, [eventPackId]);

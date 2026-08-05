@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Lock, Layers } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { ensureCacheListener } from '../../modules/eventApi';
 import type { EventRegistryEntry, EventPackType } from '../../modules/schema';
@@ -22,13 +22,11 @@ function subViewForType(type: EventPackType): SubView {
   if (type === 'rule') return 'rule';
   return 'card'; // card / bundle 落入统一事件包编辑器
 }
-
 export default function EventsScreen() {
   const { navigate } = useGame();
   const eventApi = useEvents();
   const [subView, setSubView] = useState<SubView>('center');
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
-  const [centerTab, setCenterTab] = useState<'rules' | 'custom'>('rules');
   const isPhone = useIsPhone();
   // 监听 packs:changed 自动失效缓存（非 Tauri 环境静默忽略）
   useEffect(() => {
@@ -120,29 +118,7 @@ export default function EventsScreen() {
       <div style={{ flex: 1, position: 'relative', overflow: isShell ? 'auto' : 'hidden' }}>
         {subView === 'center' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* 事件中心内部 Tab 栏 */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 'var(--space-4)',
-                padding: '10px 16px 0',
-                borderBottom: '1px solid var(--border)',
-                background: 'var(--bg-secondary)',
-                flexShrink: 0,
-              }}
-            >
-              <InnerTab label="事件" active={centerTab === 'rules'} onClick={() => setCenterTab('rules')} />
-              <InnerTab
-                label="模块自定义"
-                disabled
-                hint="敬请期待"
-                active={false}
-                onClick={() => { /* 禁用占位：本期不建，点击无反应 */ }}
-              />
-            </div>
-            {/* 内部 Tab 内容 */}
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              {centerTab === 'rules' ? (
               <EventCenter
                 eventApi={eventApi}
                 onOpenPack={handleOpenPack}
@@ -151,9 +127,6 @@ export default function EventsScreen() {
                 onGoImport={() => setSubView('wizard')}
                 onAiGenerate={() => setSubView('ai-generator')}
               />
-              ) : (
-                <ModuleCustomPlaceholder />
-              )}
             </div>
           </div>
         )}
@@ -224,104 +197,5 @@ function TabButton({
     >
       {children}
     </button>
-  );
-}
-
-/** 事件中心内部 Tab：事件（启用）/ 模块自定义（禁用占位） */
-function InnerTab({
-  label,
-  active,
-  disabled,
-  hint,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  disabled?: boolean;
-  hint?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      aria-disabled={disabled}
-      title={disabled ? '本期未开放' : undefined}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: 'var(--space-2) var(--space-1)',
-        minHeight: 44,
-        background: 'none',
-        border: 'none',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        fontSize: 'var(--font-size-md)',
-        fontWeight: 600,
-        color: disabled ? 'var(--text-muted)' : active ? 'var(--accent)' : 'var(--text-secondary)',
-        borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
-        marginBottom: '-1px',
-        opacity: disabled ? 0.55 : 1,
-        transition: 'color var(--duration-fast) var(--ease-out)',
-      }}
-    >
-      {label}
-      {disabled && <Lock size={13} />}
-      {disabled && hint && (
-        <span
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            fontWeight: 500,
-            color: 'var(--text-muted)',
-            background: 'var(--bg-tertiary, var(--bg-primary))',
-            padding: '1px 6px',
-            borderRadius: 'var(--radius-md)',
-          }}
-        >
-          {hint}
-        </span>
-      )}
-    </button>
-  );
-}
-
-/** 模块自定义占位（未来功能，本期仅占位） */
-function ModuleCustomPlaceholder() {
-  return (
-    <div
-      className="event-fade-in"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'var(--space-3)',
-        height: '100%',
-        padding: 'var(--space-8)',
-        textAlign: 'center',
-        color: 'var(--text-muted)',
-      }}
-    >
-      <div
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 'var(--radius-lg)',
-          background: 'var(--accent-dim)',
-          color: 'var(--accent)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Layers size={28} strokeWidth={1.75} />
-      </div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--font-size-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>
-        模块自定义
-      </div>
-      <div style={{ fontSize: 'var(--font-size-sm)', maxWidth: 360 }}>
-        真正的模块级自定义（自定义资源、专属规则、世界级变量）将在后续版本开放。敬请期待。
-      </div>
-    </div>
   );
 }

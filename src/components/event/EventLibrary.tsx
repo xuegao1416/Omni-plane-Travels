@@ -17,7 +17,7 @@ import { resolveEventIcon } from './eventIcons';
 import EventSwitch from './EventSwitch';
 import EventPackBadge, {
   derivePackFlags,
-  parseEventPackFile,
+  parseCanonicalPackView,
   type EventPackFlags,
 } from './EventPackBadge';
 import { getWebEvent } from '../../modules/eventDb';
@@ -46,7 +46,7 @@ export default function EventLibrary({ eventApi, onOpenPack }: EventLibraryProps
     [packs],
   );
 
-  // 包内容构成标记缓存（id → flags），由事件包真实 EventPackFile 内容派生（与 EventPackBadge 同源，
+  // 包内容构成标记缓存（id → flags），由事件包 canonical workflow 内容派生（与 EventPackBadge 同源，
   // 而非只看陈旧的 meta.type 单一字段）。发现态包无内容摘要，需惰性读 IndexedDB。
   const [flagsMap, setFlagsMap] = useState<Record<string, EventPackFlags | null>>({});
 
@@ -63,7 +63,7 @@ export default function EventLibrary({ eventApi, onOpenPack }: EventLibraryProps
             const rec = await getWebEvent(m.id);
             // rec 不存在（如非 IndexedDB 环境）→ null，交由筛选回退到旧 type
             if (!rec) return [m.id, null] as const;
-            return [m.id, derivePackFlags(parseEventPackFile(rec.files))] as const;
+            return [m.id, derivePackFlags(parseCanonicalPackView(rec.files))] as const;
           } catch {
             return [m.id, null] as const;
           }

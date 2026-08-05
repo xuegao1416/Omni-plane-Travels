@@ -2,10 +2,10 @@
 //  卡片工作流世界绑定 — 将卡片工作流与世界关联
 //  世界加载时自动注册卡片工作流进 IndexedDB
 // ============================================================
-import type { CardWorkflowDefinition } from './schema';
+import type { CardWorkflowDefinition, EventIndexEntry, Manifest } from './schema';
 import type { WorldDef } from '../data/worlds-schema';
-import { getWebEvent, putWebEvent } from './eventDb';
-import { installWorldEventPacks } from './webEventStore';
+import { getWebEvent, putWebEvent, type WebEventRecord } from './eventDb';
+import { buildCanonicalCardPackFiles } from './webEventStore';
 
 /**
  * 为世界安装卡片工作流
@@ -24,38 +24,41 @@ export async function installWorldCardWorkflows(worldDef: WorldDef): Promise<voi
     const existing = await getWebEvent(packId).catch(() => undefined);
     if (existing) continue;
 
-    // 创建事件包记录
-    const rec = {
+    const manifest: Manifest = {
       id: packId,
-      manifest: {
-        id: packId,
-        name: `${worldDef.name} - ${entry.name}`,
-        description: `世界 ${worldDef.name} 的卡片工作流`,
-        author: 'system',
-        engine: 'opt-event' as const,
-        schemaVersion: 1,
-        minAppVersion: '2.7.0',
-        type: 'card' as const,
-        coverColor: '#3b82f6',
-        icon: 'FileText',
-        worldId: worldDef.id,
-        builtin: true,
-        version: '1.0.0',
-      },
-      enabled: true,
-      status: 'installed' as const,
-      installedAt: Date.now(),
-      files: {
-        'schema/events.json': JSON.stringify({
-          version: 1,
-          name: entry.name,
-          events: [{ id: entry.id, name: entry.name, cards: [] }],
-        }, null, 2),
-        [`schema/event-${entry.id}.json`]: JSON.stringify(entry.workflow, null, 2),
-      },
+      name: `${worldDef.name} - ${entry.name}`,
+      description: `世界 ${worldDef.name} 的卡片工作流`,
+      author: 'system',
+      engine: 'opt-event',
+      schemaVersion: 1,
+      minAppVersion: '2.7.0',
+      type: 'card',
+      coverColor: '#3b82f6',
+      icon: 'FileText',
+      worldId: worldDef.id,
+      version: '1.0.0',
+    };
+    const event: EventIndexEntry = { id: entry.id, name: entry.name };
+    const files = {
+      'manifest.json': JSON.stringify(manifest, null, 2),
+      ...buildCanonicalCardPackFiles(manifest.name, [{
+        entry: event,
+        workflow: { ...entry.workflow, id: event.id, name: event.name },
+      }]),
     };
 
-    await putWebEvent(rec as unknown as import('./eventDb').WebEventRecord);
+    const rec: WebEventRecord = {
+      id: packId,
+      manifest,
+      enabled: true,
+      status: 'installed',
+      installedAt: new Date().toISOString(),
+      builtin: true,
+      worldId: worldDef.id,
+      files,
+    };
+
+    await putWebEvent(rec);
   }
 }
 

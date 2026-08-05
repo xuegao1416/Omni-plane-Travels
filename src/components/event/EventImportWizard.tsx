@@ -83,9 +83,14 @@ export default function EventImportWizard({ eventApi, onClose }: EventImportWiza
       if (!mFile) throw new Error('压缩包内缺少 manifest.json');
       const manifestText = await mFile.async('string');
       const m = JSON.parse(manifestText) as Manifest;
-      const card = zip.file('schema/card.json');
+      const eventsIndex = zip.file('schema/events.json');
       const rules = zip.file('schema/rules.json');
-      setCardCount(card ? 1 : 0);
+      if (eventsIndex) {
+        const parsed = JSON.parse(await eventsIndex.async('string')) as { events?: unknown[] };
+        setCardCount(Array.isArray(parsed.events) ? parsed.events.length : 0);
+      } else {
+        setCardCount(0);
+      }
       setRuleCount(rules ? 1 : 0);
       setManifest(m);
       setStep(1);

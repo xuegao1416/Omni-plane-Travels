@@ -93,7 +93,7 @@ impl ModError {
     }
 
     pub fn zip_invalid(path: &str) -> Self {
-        ModError::new("ZIP_INVALID", "非法的 .wtgmod 文件（魔数不符）")
+        ModError::new("ZIP_INVALID", "非法的 .opt-event 文件（魔数不符）")
             .with_context(serde_json::json!({ "path": path }))
     }
 

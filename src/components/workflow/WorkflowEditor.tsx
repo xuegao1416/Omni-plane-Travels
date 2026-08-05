@@ -673,7 +673,12 @@ function SelectedNodePanel({
           <WidgetRendererInline
             widget={widget}
             value={widgetValues[widget.socketKey]}
-            onChange={(val) => onWidgetChange(widget.socketKey, val)}
+            onChange={(val, auxiliary) => {
+              onWidgetChange(widget.socketKey, val);
+              if (widget.socketKey === 'event_id' && typeof auxiliary === 'string') {
+                onWidgetChange('event_pack_id', auxiliary);
+              }
+            }}
             gameState={gameState}
             worldDef={worldDef}
             eventPackId={eventPackId}
@@ -696,7 +701,7 @@ function WidgetRendererInline({
 }: {
   widget: { type: string; label: string; options?: Array<{ label: string; value: string | number }>; min?: number; max?: number; step?: number; multiline?: boolean; placeholder?: string };
   value: unknown;
-  onChange: (v: unknown) => void;
+  onChange: (v: unknown, auxiliary?: unknown) => void;
   gameState?: GameState;
   worldDef?: WorldDef;
   eventPackId?: string | null;
@@ -749,7 +754,7 @@ function WidgetRendererInline({
     case 'path_select':
       return <WhenPathSelect value={String(value ?? '')} onChange={(v) => onChange(v)} worldDef={worldDef} />;
     case 'event_id':
-      return <EventIdSelect value={String(value ?? '')} eventPackId={eventPackId ?? undefined} worldDef={worldDef} onChange={(v) => onChange(v)} />;
+      return <EventIdSelect value={String(value ?? '')} eventPackId={eventPackId ?? undefined} worldDef={worldDef} onChange={(v, packId) => onChange(v, packId)} />;
     case 'npc_select':
       return <input type="text" value={String(value ?? '')} onChange={(e) => onChange(e.target.value)} placeholder="NPC 名称" style={inputStyle} />;
     default:

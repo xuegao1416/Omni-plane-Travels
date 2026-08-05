@@ -85,8 +85,7 @@ registerCardNode({
   description: '事件卡的标题，用于展示事件名称',
   icon: 'Type',
   color: '#8b5cf6',
-  source: true,
-  inputs: [],
+  inputs: [socket('flow_in', 'flow', '输入')],
   outputs: [socket('flow_out', 'flow', '继续')],
   widgets: [
     widget('string', '标题文本', 'title', { placeholder: '如：神秘的森林' }),

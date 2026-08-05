@@ -1,14 +1,14 @@
 // ============================================================
 // 事件包预览 — 折叠列表：事件名 → 点开看卡片
-//   支持新格式（CardWorkflowDefinition）和旧格式（CardFile）
+//   仅支持 canonical v2 CardWorkflowDefinition
 // ============================================================
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, X, Loader2, FileText, ScrollText, MessageCircle } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
-import type { EventPackFile, CardWorkflowDefinition, CardNodeExecutionResult } from '../../modules/schema';
+import type { CardNodeExecutionResult } from '../../modules/schema';
 import { executeCardWorkflow } from '../../modules/cardWorkflowEngine';
-import { getCardNodeDefinition } from '../../modules/cardNodeRegistry';
+import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 
 interface EventEntry {
   id: string;
@@ -38,48 +38,30 @@ export default function EventPackPreview({ eventPackId, onClose }: Props) {
         if (!rec || cancelled) return;
         setPackName(rec.manifest?.name ?? '事件包');
 
-        const evRaw = rec.files['schema/events.json'];
-        if (typeof evRaw !== 'string') { setLoading(false); return; }
-        const evFile = JSON.parse(evRaw) as EventPackFile;
+        const pack = readCanonicalEventPack(rec.files);
         const entries: EventEntry[] = [];
 
-        for (const ev of evFile.events ?? []) {
-          const canvasRaw = rec.files[`schema/event-${ev.id}.json`];
-          if (typeof canvasRaw !== 'string') {
-            entries.push({ id: ev.id, name: ev.name });
-            continue;
-          }
-
-          try {
-            const parsed = JSON.parse(canvasRaw);
-
-            // 新格式：CardWorkflowDefinition
-            if (parsed.nodes && Array.isArray(parsed.nodes)) {
-              const wf = parsed as CardWorkflowDefinition;
-              const result = executeCardWorkflow(wf, {
-                tick: 0, events: [], permissions: [],
-                gameState: {},
-              });
-              entries.push({
-                id: ev.id,
-                name: ev.name,
-                renderData: result.renderData,
-                choices: result.choices,
-              });
-              continue;
-            }
-
-            // 旧格式：CardFile — 跳过，不预览
-          } catch { /* skip */ }
-
-          entries.push({ id: ev.id, name: ev.name });
+        for (let index = 0; index < pack.index.events.length; index++) {
+          const event = pack.index.events[index];
+          const workflow = pack.workflows[index];
+          const result = executeCardWorkflow(workflow, {
+            tick: 0, events: [], permissions: [],
+            gameState: {},
+          });
+          entries.push({
+            id: event.id,
+            name: event.name,
+            renderData: result.renderData,
+            choices: result.choices,
+          });
         }
 
         if (!cancelled) {
           setEvents(entries);
           setLoading(false);
         }
-      } catch {
+      } catch (error) {
+        console.error('[EventPackPreview] 事件包读取失败:', eventPackId, error);
         if (!cancelled) setLoading(false);
       }
     })();

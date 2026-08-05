@@ -2,8 +2,8 @@
 // 事件包内事件清单（3 级层级：事件库/已装列表 → 事件包 → 事件 → 卡片）
 //
 // 职责：给定一个事件包 id，读取其 WebEventRecord.files 中的
-//   - schema/events.json     → EventPackFile（事件索引：events[] + 包级 periodicRules）
-//   - 旧包回退：schema/card.json → 包成单事件
+//   - schema/events.json     → canonical v2 元数据索引
+//   - schema/event-<id>.json → CardWorkflowDefinition
 // 并渲染为「事件（tier2，name + 卡片数）」列表，每个事件可展开显示其
 // 「卡片（tier3）」。事件与卡片是两层结构，不再把卡片拍平成事件。
 //
@@ -16,39 +16,36 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Layers, AlertTriangle, PackageX, ListTree, ChevronRight } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
-import type { EventDef, CardDef, EventPackFile, PeriodicRule } from '../../modules/schema';
+import type { CardWorkflowDefinition, EventIndexEntry, PeriodicRule, RuleFile } from '../../modules/schema';
+import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 
-const OPT_EVENTS_INDEX = 'schema/events.json';
+interface PackEventEntry {
+  entry: EventIndexEntry;
+  workflow: CardWorkflowDefinition;
+}
 
 interface PackEventView {
-  events: EventDef[];
+  events: PackEventEntry[];
   periodicRules: PeriodicRule[];
 }
 
-/** 解析事件包存储为「事件视图」；兼容旧包（无索引时把 schema/card.json 包成单事件）。 */
-function parseOptEvents(files: Record<string, string | Blob>): PackEventView {
-  const view: PackEventView = { events: [], periodicRules: [] };
-  const idxRaw = files[OPT_EVENTS_INDEX];
-  if (typeof idxRaw === 'string') {
+/** 严格解析 canonical v2 事件包，并从 rules.json 单独读取周期规则。 */
+function parseCanonicalEvents(files: Record<string, string | Blob>): PackEventView {
+  const pack = readCanonicalEventPack(files);
+  let periodicRules: PeriodicRule[] = [];
+  const rulesRaw = files['schema/rules.json'];
+  if (typeof rulesRaw === 'string') {
     try {
-      const idx = JSON.parse(idxRaw) as EventPackFile;
-      view.events = idx.events ?? [];
-      view.periodicRules = idx.periodicRules ?? [];
-      return view;
+      const rules = JSON.parse(rulesRaw) as Partial<RuleFile>;
+      if (Array.isArray(rules.periodicRules)) periodicRules = rules.periodicRules;
     } catch {
-      /* 索引损坏：走旧回退 */
+      /* rules.json 的错误不掩盖已经通过严格校验的卡片工作流。 */
     }
   }
-  const cRaw = files['schema/card.json'];
-  if (typeof cRaw === 'string') {
-    try {
-      const cf = JSON.parse(cRaw) as { cards?: CardDef[] };
-      view.events = [{ id: 'legacy', name: '旧版卡片', cards: cf.cards ?? [] }];
-    } catch {
-      /* 跳过 */
-    }
-  }
-  return view;
+  return {
+    events: pack.index.events.map((entry, index) => ({ entry, workflow: pack.workflows[index] })),
+    periodicRules,
+  };
 }
 
 interface PackEventListProps {
@@ -77,7 +74,7 @@ export default function PackEventList({ packId }: PackEventListProps) {
           setLoading(false);
           return;
         }
-        setView(parseOptEvents(rec.files));
+        setView(parseCanonicalEvents(rec.files));
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : '读取事件包内容失败');
@@ -133,8 +130,8 @@ export default function PackEventList({ packId }: PackEventListProps) {
         共 {view.events.length} 个事件
       </div>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {view.events.map((ev, i) => (
-          <EventRow key={ev.id || i} event={ev} />
+        {view.events.map((event) => (
+          <EventRow key={event.entry.id} event={event} />
         ))}
       </ul>
     </div>
@@ -142,11 +139,9 @@ export default function PackEventList({ packId }: PackEventListProps) {
 }
 
 // ─── Tier 2：事件（name + 卡片数），可展开 ───
-function EventRow({ event }: { event: EventDef }) {
+function EventRow({ event }: { event: PackEventEntry }) {
   const [open, setOpen] = useState(false);
-  const cards = event.cards ?? [];
-  const rules = event.rules?.length ?? 0;
-  const wb = event.worldbook?.length ?? 0;
+  const nodes = event.workflow.nodes;
   return (
     <li
       style={{
@@ -166,29 +161,23 @@ function EventRow({ event }: { event: EventDef }) {
         />
         <Layers size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
         <span style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {event.name || '(未命名事件)'}
+          {event.entry.name || '(未命名事件)'}
         </span>
         <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', padding: '2px 8px' }}>
-          {cards.length} 张卡片
+          {nodes.length} 个节点
         </span>
       </div>
-      {(rules > 0 || wb > 0) && (
-        <div style={{ display: 'flex', gap: 'var(--space-2)', padding: '0 10px 8px 34px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-          {rules > 0 && <span>· {rules} 规则</span>}
-          {wb > 0 && <span>· {wb} 世界书</span>}
-        </div>
-      )}
-      {open && <CardsTier cards={cards} />}
+      {open && <WorkflowNodesTier workflow={event.workflow} />}
     </li>
   );
 }
 
-// ─── Tier 3：事件内的卡片 ───
-function CardsTier({ cards }: { cards: CardDef[] }) {
-  if (cards.length === 0) {
+// ─── Tier 3：事件工作流节点摘要 ───
+function WorkflowNodesTier({ workflow }: { workflow: CardWorkflowDefinition }) {
+  if (workflow.nodes.length === 0) {
     return (
       <div style={{ padding: '8px 10px 10px 34px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-        该事件暂无卡片
+        该事件暂无工作流节点
       </div>
     );
   }
@@ -204,16 +193,16 @@ function CardsTier({ cards }: { cards: CardDef[] }) {
         borderTop: '1px solid var(--border)',
       }}
     >
-      {cards.map((c, i) => (
+      {workflow.nodes.map((node) => (
         <li
-          key={c.id || i}
+          key={node.id}
           style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '5px 8px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
         >
-          <CardTypeBadge type={c.componentId} />
+          <CardTypeBadge type={node.typeId} />
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {c.title || c.id}
+            {node.label || node.typeId}
           </span>
-          <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{c.id}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{node.id}</span>
         </li>
       ))}
     </ul>
@@ -221,13 +210,13 @@ function CardsTier({ cards }: { cards: CardDef[] }) {
 }
 
 const CARD_TYPE_META: Record<string, { label: string; color: string }> = {
-  title: { label: '标题', color: 'var(--accent)' },
-  narrative: { label: '叙述', color: 'var(--text-secondary)' },
-  choice: { label: '选择', color: 'var(--warning)' },
+  'narrative.title': { label: '标题', color: 'var(--accent)' },
+  'narrative.text': { label: '叙述', color: 'var(--text-secondary)' },
+  'choice.static': { label: '选择', color: 'var(--warning)' },
 };
 
 function CardTypeBadge({ type }: { type?: string }) {
-  const meta = (type && CARD_TYPE_META[type]) || { label: type || '卡片', color: 'var(--text-muted)' };
+  const meta = (type && CARD_TYPE_META[type]) || { label: type || '节点', color: 'var(--text-muted)' };
   return (
     <span
       style={{

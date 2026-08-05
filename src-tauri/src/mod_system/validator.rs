@@ -4,7 +4,7 @@
 //! These run on the backend only as *data* validation — no rule evaluation.
 //! The rule engine itself lives in the frontend (pure TypeScript).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use serde::Deserialize;
@@ -32,6 +32,16 @@ pub fn is_valid_mod_id(s: &str) -> bool {
         }
     }
     true
+}
+
+/// Canonical event IDs are also safe as `schema/event-<id>.json` path segments.
+pub fn is_valid_event_id(s: &str) -> bool {
+    let b = s.as_bytes();
+    if b.is_empty() || b.len() > 64 {
+        return false;
+    }
+    let is_base = |c: u8| c.is_ascii_digit() || c.is_ascii_lowercase();
+    is_base(b[0]) && b[1..].iter().all(|c| is_base(*c) || *c == b'_' || *c == b'-')
 }
 
 /// `^\d+\.\d+\.\d+$`
@@ -76,8 +86,8 @@ pub fn validate_structure(m: &ModManifest) -> Vec<ValidationIssue> {
     if !is_version_triple(&m.version) {
         issues.push(issue("SCHEMA", Some("version"), "version 必须匹配 ^\\d+\\.\\d+\\.\\d+$"));
     }
-    if m.engine != "wtg-mod" {
-        issues.push(issue("SCHEMA", Some("engine"), "engine 必须为 \"wtg-mod\""));
+    if m.engine != "opt-event" {
+        issues.push(issue("SCHEMA", Some("engine"), "engine 必须为 \"opt-event\""));
     }
     if m.schema_version < 1 {
         issues.push(issue("SCHEMA", Some("schemaVersion"), "schemaVersion 必须 >= 1"));
@@ -129,6 +139,94 @@ pub fn validate_structure(m: &ModManifest) -> Vec<ValidationIssue> {
         }
     }
     issues
+}
+
+/// Validate the canonical v2 index and every referenced workflow before install writes files.
+pub fn validate_event_pack_files(files: &HashMap<String, Vec<u8>>) -> Result<(), ModError> {
+    if files.contains_key("schema/card.json") {
+        return Err(ModError::manifest_invalid("不允许旧格式 schema/card.json"));
+    }
+    let index_bytes = files
+        .get("schema/events.json")
+        .ok_or_else(|| ModError::manifest_invalid("缺少 schema/events.json"))?;
+    let index: EventPackIndex = serde_json::from_slice(index_bytes)
+        .map_err(|e| ModError::manifest_invalid(format!("schema/events.json 无效：{e}")))?;
+    if index.version != 2 {
+        return Err(ModError::manifest_invalid("schema/events.json version 必须为 2"));
+    }
+    if index.name.as_ref().is_some_and(|name| name.trim().is_empty()) {
+        return Err(ModError::manifest_invalid("事件包 name 不能为空"));
+    }
+
+    let mut event_ids = HashSet::new();
+    let mut expected_files = HashSet::new();
+    for event in &index.events {
+        if !is_valid_event_id(&event.id) {
+            return Err(ModError::manifest_invalid(format!("事件 id 非法：{}", event.id)));
+        }
+        if event.name.trim().is_empty() {
+            return Err(ModError::manifest_invalid(format!("事件 name 不能为空：{}", event.id)));
+        }
+        if event.description.as_ref().is_some_and(|description| description.len() > 4096) {
+            return Err(ModError::manifest_invalid(format!("事件 description 过长：{}", event.id)));
+        }
+        if !event_ids.insert(event.id.clone()) {
+            return Err(ModError::manifest_invalid(format!("事件 id 重复：{}", event.id)));
+        }
+
+        let file = format!("schema/event-{}.json", event.id);
+        expected_files.insert(file.clone());
+        let bytes = files
+            .get(&file)
+            .ok_or_else(|| ModError::manifest_invalid(format!("缺少 workflow：{file}")))?;
+        let workflow: CardWorkflow = serde_json::from_slice(bytes)
+            .map_err(|e| ModError::manifest_invalid(format!("workflow 无效 {file}：{e}")))?;
+        if workflow.version < 1 || workflow.id != event.id || workflow.name != event.name {
+            return Err(ModError::manifest_invalid(format!("workflow 与索引不一致：{file}")));
+        }
+        if workflow.description.as_ref().is_some_and(|description| description.len() > 4096)
+            || workflow.metadata.as_ref().is_some_and(|metadata| !metadata.is_object())
+        {
+            return Err(ModError::manifest_invalid(format!("workflow 元数据无效：{file}")));
+        }
+
+        let mut node_ids = HashSet::new();
+        for node in &workflow.nodes {
+            if node.id.trim().is_empty()
+                || node.type_id.trim().is_empty()
+                || !node.position.x.is_finite()
+                || !node.position.y.is_finite()
+                || !node_ids.insert(node.id.clone())
+                || node.label.as_ref().is_some_and(|label| label.len() > 256)
+                || node.widget_values.as_ref().is_some_and(|value| !value.is_object())
+                || node.runtime_state.as_ref().is_some_and(|value| !value.is_object())
+            {
+                return Err(ModError::manifest_invalid(format!("workflow 节点无效：{file}")));
+            }
+        }
+        let mut connection_ids = HashSet::new();
+        for connection in &workflow.connections {
+            if connection.id.trim().is_empty()
+                || !connection_ids.insert(connection.id.clone())
+                || !node_ids.contains(&connection.source_node_id)
+                || !node_ids.contains(&connection.target_node_id)
+                || connection.source_socket_key.trim().is_empty()
+                || connection.target_socket_key.trim().is_empty()
+            {
+                return Err(ModError::manifest_invalid(format!("workflow 连接无效：{file}")));
+            }
+        }
+    }
+
+    for path in files.keys() {
+        if path.starts_with("schema/event-")
+            && path.ends_with(".json")
+            && !expected_files.contains(path)
+        {
+            return Err(ModError::manifest_invalid(format!("索引外 workflow 文件：{path}")));
+        }
+    }
+    Ok(())
 }
 
 fn issue(code: &str, field: Option<&str>, message: &str) -> ValidationIssue {
@@ -412,5 +510,83 @@ fn perm_name(p: &Permission) -> &'static str {
         Permission::RegisterTick => "register_tick",
         Permission::EmitWorldEvent => "emit_world_event",
         Permission::ProvideAssets => "provide_assets",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn manifest(engine: &str) -> ModManifest {
+        serde_json::from_value(json!({
+            "id": "test-pack",
+            "name": "Test Pack",
+            "version": "1.0.0",
+            "author": "test",
+            "engine": engine,
+            "schemaVersion": 1,
+            "minAppVersion": "2.7.0",
+            "type": "card",
+            "coverColor": "#112233",
+            "icon": "Package"
+        })).unwrap()
+    }
+
+    fn canonical_files() -> HashMap<String, Vec<u8>> {
+        HashMap::from([
+            ("schema/events.json".to_string(), serde_json::to_vec(&json!({
+                "version": 2,
+                "events": [{ "id": "event-one", "name": "Event One" }]
+            })).unwrap()),
+            ("schema/event-event-one.json".to_string(), serde_json::to_vec(&json!({
+                "version": 1,
+                "id": "event-one",
+                "name": "Event One",
+                "nodes": [],
+                "connections": []
+            })).unwrap()),
+        ])
+    }
+
+    #[test]
+    fn accepts_opt_event_engine_and_rejects_wtg_mod() {
+        assert!(validate_structure(&manifest("opt-event")).iter().all(|issue| issue.field.as_deref() != Some("engine")));
+        assert!(validate_structure(&manifest("wtg-mod")).iter().any(|issue| issue.field.as_deref() == Some("engine")));
+    }
+
+    #[test]
+    fn validates_canonical_index_and_workflow() {
+        assert!(validate_event_pack_files(&canonical_files()).is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_event_ids_and_missing_workflows() {
+        let mut duplicate = canonical_files();
+        duplicate.insert("schema/events.json".to_string(), serde_json::to_vec(&json!({
+            "version": 2,
+            "events": [
+                { "id": "event-one", "name": "Event One" },
+                { "id": "event-one", "name": "Event One" }
+            ]
+        })).unwrap());
+        assert!(validate_event_pack_files(&duplicate).is_err());
+
+        let mut missing = canonical_files();
+        missing.remove("schema/event-event-one.json");
+        assert!(validate_event_pack_files(&missing).is_err());
+    }
+
+    #[test]
+    fn rejects_workflow_index_mismatch() {
+        let mut files = canonical_files();
+        files.insert("schema/event-event-one.json".to_string(), serde_json::to_vec(&json!({
+            "version": 1,
+            "id": "event-two",
+            "name": "Event One",
+            "nodes": [],
+            "connections": []
+        })).unwrap());
+        assert!(validate_event_pack_files(&files).is_err());
     }
 }

@@ -9,7 +9,7 @@
 //! - `error`    — unified `ModError` envelope
 //! - `types`    — manifest + API response data types
 //! - `registry` — in-memory `ModRegistry` (persisted to `registry.json`)
-//! - `package`  — `.wtgmod` zip pack/unpack, zip-bomb + checksum guards
+//! - `package`  — `.opt-event` zip pack/unpack, zip-bomb + checksum guards
 //! - `validator`— manifest structure / version / dependency / permission checks
 //! - `commands` — the 10 Tauri commands
 

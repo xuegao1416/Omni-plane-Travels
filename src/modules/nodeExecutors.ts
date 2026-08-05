@@ -226,10 +226,11 @@ registerNodeExecutor('actions.modify_stat', (inputs, _ctx, wv) => {
 
 registerNodeExecutor('actions.add_event', (_inputs, _ctx, wv) => {
   const eventId = (wv?.event_id as string) ?? '';
+  const eventPackId = (wv?.event_pack_id as string) ?? '';
   if (!eventId) return { outputs: { flow_out: true } };
   return {
     outputs: { flow_out: true },
-    actions: [{ kind: 'addEvent', payload: { eventId } }],
+    actions: [{ kind: 'addEvent', payload: { eventId, ...(eventPackId ? { eventPackId } : {}) } }],
   };
 });
 

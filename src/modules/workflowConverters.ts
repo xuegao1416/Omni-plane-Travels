@@ -83,6 +83,7 @@ function eventNodeToWorkflowNode(node: EventGraphNode): NodeInstance {
     const first = node.actions[0];
     if ('addEvent' in first) {
       widgetValues.event_id = first.addEvent.eventId;
+      if (first.addEvent.eventPackId) widgetValues.event_pack_id = first.addEvent.eventPackId;
     } else if ('modifyResource' in first) {
       widgetValues.resource_key = first.modifyResource.key;
       widgetValues.delta = first.modifyResource.delta;
@@ -200,7 +201,12 @@ function workflowNodeToEventNode(node: NodeInstance): EventGraphNode | null {
     const actions: Action[] = [];
 
     if (node.typeId === 'actions.add_event' && wv.event_id) {
-      actions.push({ addEvent: { eventId: wv.event_id as string } });
+      actions.push({
+        addEvent: {
+          eventId: wv.event_id as string,
+          ...(wv.event_pack_id ? { eventPackId: wv.event_pack_id as string } : {}),
+        },
+      });
     } else if (node.typeId === 'actions.modify_resource') {
       actions.push({ modifyResource: { key: (wv.resource_key as string) ?? '', delta: (wv.delta as number) ?? 0 } });
     } else if (node.typeId === 'actions.schedule_tick') {
@@ -399,7 +405,12 @@ function collectActions(nodes: NodeInstance[], nodeMap: Map<string, NodeInstance
     const wv = node.widgetValues ?? {};
 
     if (node.typeId === 'actions.add_event' && wv.event_id) {
-      actions.push({ addEvent: { eventId: wv.event_id as string } });
+      actions.push({
+        addEvent: {
+          eventId: wv.event_id as string,
+          ...(wv.event_pack_id ? { eventPackId: wv.event_pack_id as string } : {}),
+        },
+      });
     } else if (node.typeId === 'actions.modify_resource') {
       actions.push({ modifyResource: { key: (wv.resource_key as string) ?? '', delta: (wv.delta as number) ?? 0 } });
     } else if (node.typeId === 'actions.modify_stat') {

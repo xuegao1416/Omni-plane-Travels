@@ -3,6 +3,7 @@
 // ============================================================
 import { test, expect, describe } from 'bun:test';
 import { executeCardWorkflow } from './cardWorkflowEngine';
+import { migrateLegacyCardFile, type LegacyCardFile as CardFile } from './eventPackFormat';
 import type { CardWorkflowDefinition, CardExecutionContext } from './schema';
 
 // ─── 测试用数据 ───
@@ -55,6 +56,101 @@ describe('线性流程', () => {
     expect(result.pendingEffects!.length).toBe(1);
     expect(result.pendingEffects![0]?.statId).toBe('能量');
     expect(result.pendingEffects![0]?.delta).toBe(-10);
+  });
+
+  test('multiple titles execute in connection order instead of all entering at once', () => {
+    const workflow: CardWorkflowDefinition = {
+      version: 1,
+      id: 'test-multiple-titles',
+      name: 'Multiple titles',
+      nodes: [
+        {
+          id: 'title-one',
+          typeId: 'narrative.title',
+          position: { x: 0, y: 0 },
+          widgetValues: { title: 'Chapter one' },
+        },
+        {
+          id: 'narrative',
+          typeId: 'narrative.text',
+          position: { x: 0, y: 120 },
+          widgetValues: { text: 'Between titles' },
+        },
+        {
+          id: 'title-two',
+          typeId: 'narrative.title',
+          position: { x: 0, y: 240 },
+          widgetValues: { title: 'Chapter two' },
+        },
+      ],
+      connections: [
+        {
+          id: 'flow-one',
+          sourceNodeId: 'title-one',
+          sourceSocketKey: 'flow_out',
+          targetNodeId: 'narrative',
+          targetSocketKey: 'flow_in',
+        },
+        {
+          id: 'flow-two',
+          sourceNodeId: 'narrative',
+          sourceSocketKey: 'flow_out',
+          targetNodeId: 'title-two',
+          targetSocketKey: 'flow_in',
+        },
+      ],
+    };
+
+    const result = executeCardWorkflow(workflow, baseCtx);
+
+    expect(result.executedNodeIds).toEqual([
+      'title-one',
+      'narrative',
+      'title-two',
+    ]);
+    expect(result.renderData.map((rendered) => rendered?.type)).toEqual([
+      'title',
+      'text',
+      'title',
+    ]);
+    expect(result.renderData.map((rendered) => rendered?.title ?? rendered?.text)).toEqual([
+      'Chapter one',
+      'Between titles',
+      'Chapter two',
+    ]);
+  });
+
+  test('migrated multiple titles execute in legacy connection order', () => {
+    const legacy: CardFile = {
+      version: 1,
+      puck: {
+        root: { props: {} },
+        components: {
+          title: [
+            { id: 'legacy-title-one', props: { title: 'Legacy chapter one' } },
+            { id: 'legacy-title-two', props: { title: 'Legacy chapter two' } },
+          ],
+        },
+      },
+      cards: [
+        { id: 'legacy-title-one', componentId: 'title', title: 'Legacy chapter one' },
+        { id: 'legacy-title-two', componentId: 'title', title: 'Legacy chapter two' },
+      ],
+    };
+
+    const workflow = migrateLegacyCardFile(legacy, 'test-migrated-titles', 'Migrated titles');
+    const result = executeCardWorkflow(workflow, baseCtx);
+
+    expect(result.aborted).toBe(false);
+    expect(result.warnings).toEqual([]);
+    expect(result.executedNodeIds).toEqual([
+      'legacy-title-one',
+      'legacy-title-two',
+    ]);
+    expect(result.renderData.map((rendered) => rendered?.title)).toEqual([
+      'Legacy chapter one',
+      'Legacy chapter two',
+    ]);
   });
 });
 

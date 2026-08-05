@@ -7,9 +7,6 @@ import type { Manifest, EventPackType, Permission, AssetKind, EventRule, RuleFil
 
 export const packTypeSchema = z.enum(['card', 'rule', 'worldbook', 'bundle']);
 
-/** @deprecated 请使用 packTypeSchema */
-export const modTypeSchema = packTypeSchema;
-
 export const permissionSchema = z.enum([
   'read_world_state',
   'modify_world_state',
@@ -86,4 +83,4 @@ export function parseRuleFile(input: unknown): { ok: boolean; data?: RuleFile; i
   return { ok: false, issues: res.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
 }
 
-export type { EventPackType, EventPackType as EventType, Permission, AssetKind, EventRule };
+export type { EventPackType, Permission, AssetKind, EventRule };

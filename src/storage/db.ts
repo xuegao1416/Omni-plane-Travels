@@ -5,6 +5,7 @@ import type { GameState } from '../schema/variables';
 import { STORAGE_KEYS } from '@/config/storageKeys';
 import { slimMemoryRuntimeForSave } from '@/memory/memoryStore';
 import type { SimulationState } from '@/simulation/types';
+import { findWorldDef } from '@/data/worldLoader';
 
 // ─── 类型定义 ─────────────────────────────────────────
 
@@ -1180,34 +1181,7 @@ export function buildPreview(save: GameSave): string {
 
 /** 根据世界 ID 获取世界名（支持内置世界和自建世界） */
 function getWorldNameById(worldId: string): string {
-  // 内置世界 ID → 中文名映射
-  const BUILTIN_WORLD_NAMES: Record<string, string> = {
-    desire_metropolis: '烟火人间',
-    wasteland_apocalypse: '余烬废土',
-    japanese_school: '日式校园',
-    wuxia_world: '武林风云',
-    stranded_island: '孤岛求生',
-    border_trade: '绥芬边贸',
-  };
-
-  // 先检查内置世界
-  if (BUILTIN_WORLD_NAMES[worldId]) {
-    return BUILTIN_WORLD_NAMES[worldId];
-  }
-
-  // 再检查自建世界
-  try {
-    const createdWorlds = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
-    const world = createdWorlds.find((w: any) => w.id === worldId);
-    if (world?.name) {
-      return world.name;
-    }
-  } catch {
-    // 忽略解析错误
-  }
-
-  // 都找不到，返回原始 ID
-  return worldId;
+  return findWorldDef(worldId)?.name || worldId;
 }
 
 export type { GameSave, PlayerProfile, CustomNpc };

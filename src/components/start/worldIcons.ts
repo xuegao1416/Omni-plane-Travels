@@ -3,10 +3,11 @@ import {
   Rocket, Star, Shield, Zap, Brain, Gem, Ghost, Snowflake, Sun, Moon,
   Wind, Waves, Anchor, Eye, Heart, Target, Wand2, Fish, Bug,
   Flower, TreePine, Cloud, Sunrise, Eclipse, Hexagon, Diamond, Atom,
+  TreePalm, Plane, Sailboat, Tent, TentTree, Trees,
   type LucideIcon,
 } from 'lucide-react';
 
-/** 内置图标列表（30个） */
+/** 内置图标列表（31个） */
 export const WORLD_ICONS: Array<{ name: string; icon: LucideIcon }> = [
   { name: 'Globe', icon: Globe },
   { name: 'Compass', icon: Compass },
@@ -38,4 +39,10 @@ export const WORLD_ICONS: Array<{ name: string; icon: LucideIcon }> = [
   { name: 'Flower', icon: Flower },
   { name: 'TreePine', icon: TreePine },
   { name: 'Cloud', icon: Cloud },
+  { name: 'TreePalm', icon: TreePalm },
+  { name: 'Plane', icon: Plane },
+  { name: 'Sailboat', icon: Sailboat },
+  { name: 'Tent', icon: Tent },
+  { name: 'TentTree', icon: TentTree },
+  { name: 'Trees', icon: Trees },
 ];

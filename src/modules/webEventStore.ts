@@ -12,6 +12,9 @@ import type {
   EventDetail,
   EventRule,
   EventPackType,
+  EventIndexEntry,
+  EventPackIndex,
+  CardWorkflowDefinition,
   RuleFile,
   ValidationResult,
   ValidationIssue,
@@ -21,14 +24,12 @@ import type {
   ActionKind,
   DepIssue,
   ConflictStatus,
-  EventDef,
   PeriodicRule,
-  EventPackFile,
-  PuckData,
-  CardFile,
   Collection,
 } from './schema';
-import { flattenEventPack, eventDefToCardFile, cardFileToEventPack } from './schema';
+import { EventPackFormatError, normalizeCardPackFiles, parseCanonicalEventIndex } from './eventPackFormat';
+import { ensureEventApiError, EventApiError } from './eventErrors';
+import type { EventApiErrorCode } from './eventErrors';
 import {
   putWebEvent,
   getWebEvent,
@@ -47,15 +48,32 @@ const APP_VERSION = '2.7.0';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
+const EVENTS_FILE_PATH = 'schema/events.json';
+const RULES_FILE_PATH = 'schema/rules.json';
+const EVENT_WORKFLOW_FILE_RE = /^schema\/event-[^/]+\.json$/;
 
 /** Web 端结构化错误（eventApi 捕获后转 EventApiError） */
-class WebEventError extends Error {
-  code: string;
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = 'WebEventError';
-    this.code = code;
+function createWebEventError(
+  code: EventApiErrorCode,
+  message: string,
+  details: { context?: Readonly<Record<string, unknown>>; filePath?: string } = {},
+): EventApiError {
+  return new EventApiError({ code, message, ...details });
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function ensureWebImportApiError(error: unknown): EventApiError {
+  if (error instanceof EventApiError) return error;
+  if (error instanceof EventPackFormatError) {
+    return createWebEventError(error.code, error.message, {
+      context: error.context,
+      filePath: error.filePath,
+    });
   }
+  return ensureEventApiError(error);
 }
 
 /** 本地结构化校验（与 EventImportWizard.localValidate 同源，输出 ValidationResult） */
@@ -78,20 +96,226 @@ export function localValidate(m: Manifest): ValidationResult {
 /** 解析一个 .opt-event 包，返回 manifest + 内联文件内容（zip-slip 防护）。
  *  入参兼容浏览器 File / Blob / ArrayBuffer / Uint8Array（File 继承 Blob，真实 UI 传 File 即可）。 */
 async function parseWtgmod(file: File | Blob | ArrayBuffer | Uint8Array): Promise<{ manifest: Manifest; files: Record<string, string | Blob> }> {
-  const zip = await JSZip.loadAsync(file);
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(file);
+  } catch (error) {
+    if (error instanceof EventApiError || error instanceof EventPackFormatError) throw error;
+    throw createWebEventError('ZIP_INVALID', `Invalid ZIP archive: ${errorMessage(error)}`);
+  }
   const mFile = zip.file('manifest.json');
-  if (!mFile) throw new WebEventError('ZIP_INVALID', '压缩包内缺少 manifest.json');
-  const manifest = JSON.parse(await mFile.async('string')) as Manifest;
+  if (!mFile) throw createWebEventError('ZIP_INVALID', '压缩包内缺少 manifest.json');
+  let manifestText: string;
+  try {
+    manifestText = await mFile.async('string');
+  } catch (error) {
+    if (error instanceof EventApiError || error instanceof EventPackFormatError) throw error;
+    throw createWebEventError('ZIP_INVALID', `Unable to read manifest.json: ${errorMessage(error)}`, {
+      context: { filePath: 'manifest.json' },
+      filePath: 'manifest.json',
+    });
+  }
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(manifestText) as Manifest;
+  } catch (error) {
+    if (error instanceof EventApiError || error instanceof EventPackFormatError) throw error;
+    throw createWebEventError('MANIFEST_INVALID', `Malformed manifest.json: ${errorMessage(error)}`, {
+      context: { filePath: 'manifest.json' },
+      filePath: 'manifest.json',
+    });
+  }
   const files: Record<string, string | Blob> = { 'manifest.json': JSON.stringify(manifest, null, 2) };
   for (const [path, entry] of Object.entries(zip.files)) {
     if (entry.dir || path === 'manifest.json') continue;
     if (!/^(schema|assets)\//.test(path)) continue; // 仅收 schema/ 与 assets/
     if (path.includes('..') || /^(schema|assets)\/\.\./.test(path)) {
-      throw new WebEventError('PATH_INVALID', `非法路径：${path}`);
+      throw createWebEventError('PATH_INVALID', `非法路径：${path}`);
     }
     files[path] = TEXT_RE.test(path) ? await entry.async('string') : await entry.async('blob');
   }
   return { manifest, files };
+}
+
+function isWebEventFile(value: unknown): value is string | Blob {
+  return typeof value === 'string' || (typeof Blob !== 'undefined' && value instanceof Blob);
+}
+
+/** The format layer accepts broader inputs; the web store keeps only its string/Blob contract. */
+function toWebEventFiles(files: Record<string, unknown>): Record<string, string | Blob> {
+  const result: Record<string, string | Blob> = {};
+  for (const [path, content] of Object.entries(files)) {
+    if (!isWebEventFile(content)) {
+      throw createWebEventError('FILE_INVALID', `导入文件内容类型无效：${path}`);
+    }
+    result[path] = content;
+  }
+  return result;
+}
+
+function readJsonFile(raw: string | Blob | undefined, filePath: string): unknown {
+  if (typeof raw !== 'string') {
+    throw createWebEventError('FILE_INVALID', `文件内容不是 JSON 文本：${filePath}`, {
+      context: { filePath },
+      filePath,
+    });
+  }
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch (error) {
+    throw createWebEventError('JSON_MALFORMED', `JSON 文件损坏：${filePath}`, {
+      context: { filePath, cause: errorMessage(error) },
+      filePath,
+    });
+  }
+}
+
+function readCanonicalIndex(rec: WebEventRecord): EventPackIndex {
+  const raw = rec.files[EVENTS_FILE_PATH];
+  if (raw === undefined) {
+    throw createWebEventError('INDEX_MISSING', `事件包缺少 ${EVENTS_FILE_PATH}`, {
+      context: { filePath: EVENTS_FILE_PATH },
+      filePath: EVENTS_FILE_PATH,
+    });
+  }
+
+  try {
+    return parseCanonicalEventIndex(readJsonFile(raw, EVENTS_FILE_PATH));
+  } catch (error) {
+    if (error instanceof EventApiError) throw error;
+    throw createWebEventError('INDEX_INVALID', `事件索引不是 canonical v2：${EVENTS_FILE_PATH}`, {
+      context: { filePath: EVENTS_FILE_PATH, cause: errorMessage(error) },
+      filePath: EVENTS_FILE_PATH,
+    });
+  }
+}
+
+function validateWorkflow(
+  entry: EventIndexEntry,
+  raw: unknown,
+  filePath: string,
+): CardWorkflowDefinition {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw createWebEventError('WORKFLOW_INVALID', `工作流文件不是对象：${filePath}`, {
+      context: { filePath, eventId: entry.id },
+      filePath,
+    });
+  }
+  const workflow = raw as Partial<CardWorkflowDefinition>;
+  if (
+    typeof workflow.version !== 'number' ||
+    !Number.isInteger(workflow.version) ||
+    workflow.version <= 0 ||
+    typeof workflow.id !== 'string' ||
+    typeof workflow.name !== 'string' ||
+    !Array.isArray(workflow.nodes) ||
+    !Array.isArray(workflow.connections)
+  ) {
+    throw createWebEventError('WORKFLOW_INVALID', `工作流文件字段无效：${filePath}`, {
+      context: { filePath, eventId: entry.id },
+      filePath,
+    });
+  }
+  if (workflow.id !== entry.id || workflow.name !== entry.name) {
+    throw createWebEventError('INDEX_FILE_MISMATCH', `工作流与事件索引不一致：${filePath}`, {
+      context: {
+        filePath,
+        expectedId: entry.id,
+        actualId: workflow.id,
+        expectedName: entry.name,
+        actualName: workflow.name,
+      },
+      filePath,
+    });
+  }
+  return workflow as CardWorkflowDefinition;
+}
+
+function readCanonicalWorkflows(
+  rec: WebEventRecord,
+  index: EventPackIndex,
+): Map<string, CardWorkflowDefinition> {
+  const workflows = new Map<string, CardWorkflowDefinition>();
+  for (const entry of index.events) {
+    const filePath = `schema/event-${entry.id}.json`;
+    const raw = rec.files[filePath];
+    if (raw === undefined) {
+      throw createWebEventError('WORKFLOW_MISSING', `缺少工作流文件：${filePath}`, {
+        context: { filePath, eventId: entry.id },
+        filePath,
+      });
+    }
+    workflows.set(entry.id, validateWorkflow(entry, readJsonFile(raw, filePath), filePath));
+  }
+  return workflows;
+}
+
+function canonicalIndex(
+  name: string | undefined,
+  events: EventIndexEntry[],
+): EventPackIndex {
+  try {
+    return parseCanonicalEventIndex({
+      version: 2,
+      ...(name === undefined ? {} : { name }),
+      events,
+    });
+  } catch (error) {
+    throw createWebEventError('INDEX_INVALID', '事件索引不是有效的 canonical v2', {
+      context: { filePath: EVENTS_FILE_PATH, cause: errorMessage(error) },
+      filePath: EVENTS_FILE_PATH,
+    });
+  }
+}
+
+export interface CanonicalCardPackEvent {
+  entry: EventIndexEntry;
+  workflow: CardWorkflowDefinition;
+}
+
+/** Build the complete canonical schema file set for a card pack. */
+export function buildCanonicalCardPackFiles(
+  name: string | undefined,
+  events: CanonicalCardPackEvent[],
+): Record<string, string> {
+  const index = canonicalIndex(name, events.map(({ entry }) => entry));
+  const files: Record<string, string> = {
+    [EVENTS_FILE_PATH]: JSON.stringify(index, null, 2),
+  };
+
+  for (const { entry, workflow } of events) {
+    const filePath = `schema/event-${entry.id}.json`;
+    files[filePath] = JSON.stringify(validateWorkflow(entry, workflow, filePath), null, 2);
+  }
+
+  return files;
+}
+
+function removeLegacyAndStaleEventFiles(
+  rec: WebEventRecord,
+  index: EventPackIndex,
+): void {
+  const expected = new Set(index.events.map((entry) => `schema/event-${entry.id}.json`));
+  for (const filePath of Object.keys(rec.files)) {
+    if (EVENT_WORKFLOW_FILE_RE.test(filePath) && !expected.has(filePath)) {
+      delete rec.files[filePath];
+    }
+  }
+}
+
+function writePeriodicRulesToRecord(rec: WebEventRecord, periodicRules: PeriodicRule[]): void {
+  let rules: EventRule[] = [];
+  const existing = rec.files[RULES_FILE_PATH];
+  if (typeof existing === 'string') {
+    try {
+      const parsed = JSON.parse(existing) as Partial<RuleFile>;
+      if (Array.isArray(parsed.rules)) rules = parsed.rules as EventRule[];
+    } catch {
+      // 损坏的规则图不会阻止周期规则写入；以空规则图重建 rules.json。
+    }
+  }
+  const file: RuleFile = { version: 1, rules, periodicRules };
+  rec.files[RULES_FILE_PATH] = JSON.stringify(file, null, 2);
 }
 
 // ─── 10 个操作（Web 实现） ───
@@ -111,12 +335,18 @@ export async function webValidatePack(manifest: Manifest): Promise<ValidationRes
 }
 
 /** 从浏览器选择的 .opt-event 文件导入并落 IndexedDB（Web 端的「安装」） */
-export async function webImportFromFile(file: File | Blob | ArrayBuffer | Uint8Array): Promise<EventMeta> {
+async function webImportFromFileImpl(file: File | Blob | ArrayBuffer | Uint8Array): Promise<EventMeta> {
   const { manifest, files } = await parseWtgmod(file);
   const v = localValidate(manifest);
   if (!v.ok) {
-    throw new WebEventError('MANIFEST_INVALID', `校验未通过：${v.errors.map((e) => e.message).join('；')}`);
+    throw createWebEventError('MANIFEST_INVALID', `校验未通过：${v.errors.map((e) => e.message).join('；')}`);
   }
+
+  let storedFiles = files;
+  if (manifest.type === 'card') {
+    storedFiles = toWebEventFiles(normalizeCardPackFiles(manifest, files).files);
+  }
+
   const existing = await getWebEvent(manifest.id);
   const enabled = existing?.enabled ?? (manifest.enabledByDefault ?? false);
   const rec: WebEventRecord = {
@@ -125,26 +355,18 @@ export async function webImportFromFile(file: File | Blob | ArrayBuffer | Uint8A
     enabled,
     status: enabled ? 'enabled' : 'installed',
     installedAt: existing?.installedAt ?? new Date().toISOString(),
-    files,
+    files: storedFiles,
   };
-  // 修正后模型兼容桥：若以 schema/events.json（EventPackFile）导入且缺 schema/card.json，
-  // 经 flattenEventPack 派生 schema/card.json，使仍直接读旧拆分文件的消费端（CardOverlay 等）可工作。
-  const evRaw = rec.files['schema/events.json'];
-  if (typeof evRaw === 'string' && !rec.files['schema/card.json']) {
-    try {
-      const file = JSON.parse(evRaw) as EventPackFile;
-      const flat = flattenEventPack(file);
-      rec.files['schema/card.json'] = JSON.stringify(
-        { version: file.version, puck: { root: { props: {} }, components: {} }, cards: flat.cards } as CardFile,
-        null, 2,
-      );
-    } catch (e) {
-      // 损坏数据可见化（P0-3）：兼容桥失败不阻断导入，但不再完全静默
-      console.error('[webEventStore] 派生 schema/card.json 失败（已跳过）：', e);
-    }
-  }
   await putWebEvent(rec);
   return manifestToMeta(manifest);
+}
+
+export async function webImportFromFile(file: File | Blob | ArrayBuffer | Uint8Array): Promise<EventMeta> {
+  try {
+    return await webImportFromFileImpl(file);
+  } catch (error) {
+    throw ensureWebImportApiError(error);
+  }
 }
 
 export async function webUninstallPack(id: string): Promise<void> {
@@ -153,7 +375,7 @@ export async function webUninstallPack(id: string): Promise<void> {
 
 export async function webEnablePack(id: string): Promise<void> {
   const rec = await getWebEvent(id);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
   rec.enabled = true;
   rec.status = 'enabled';
   await putWebEvent(rec);
@@ -161,7 +383,7 @@ export async function webEnablePack(id: string): Promise<void> {
 
 export async function webDisablePack(id: string): Promise<void> {
   const rec = await getWebEvent(id);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
   rec.enabled = false;
   rec.status = 'disabled';
   await putWebEvent(rec);
@@ -170,7 +392,7 @@ export async function webDisablePack(id: string): Promise<void> {
 /** 重建 .opt-event 并触发浏览器下载（Web 端无原生保存对话框，走 Blob） */
 export async function webExportPack(id: string): Promise<void> {
   const rec = await getWebEvent(id);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
   const zip = new JSZip();
   for (const [path, content] of Object.entries(rec.files)) {
     zip.file(path, content);
@@ -188,17 +410,17 @@ export async function webExportPack(id: string): Promise<void> {
 
 export async function webGetEventDetail(id: string): Promise<EventDetail> {
   const rec = await getWebEvent(id);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件：${id}`);
   const entry = recordToEntry(rec);
   // 规则汇总以 events.json 中的周期规则为真值（authoring 路径从不写 manifest.rules，故直接读 events.json；P0-5 Web 修复）
   let rulesSummary: RuleSummary[] = [];
-  const evRaw = rec.files['schema/events.json'];
-  if (typeof evRaw === 'string') {
+  const rulesRaw = rec.files[RULES_FILE_PATH];
+  if (typeof rulesRaw === 'string') {
     try {
-      const file = JSON.parse(evRaw) as EventPackFile;
+      const file = JSON.parse(rulesRaw) as RuleFile;
       rulesSummary = (file.periodicRules ?? []).map((p) => ({
         id: p.id,
-        file: 'schema/events.json',
+        file: RULES_FILE_PATH,
         priority: 0,
         once: false,
         cooldownTicks: p.intervalTicks ?? 0,
@@ -247,186 +469,96 @@ export async function webGetEventDetail(id: string): Promise<EventDetail> {
   };
 }
 
-// ─── 3 个 pack 内事件读写辅助（side-card 格式，schema/card.json 保持派生/同步） ───
+// ─── canonical v2 pack 内事件读写辅助 ───
 
-/**
- * 向指定事件包写入（新建或覆盖）一个事件，并同步维护 side-card 物理布局：
- *   - schema/events.json          EventPackFile 索引（upsert by event.id）
- *   - schema/event-<id>.json     该事件的 CardFile 画布
- *   - schema/card.json           旧消费端兼容派生（flattenEventPack(file).cards 包成 CardFile）
- * 旧 pack 若仅有 schema/card.json（无 events.json），自动经 cardFileToEventPack 回退派生索引。
- */
+/** 写入 canonical v2 事件元数据、对应工作流，以及可选的包级周期规则。 */
 export async function saveEventToPack(
   packId: string,
-  event: EventDef,
-  opts?: { cardFile?: CardFile; cardWorkflow?: import('./schema').CardWorkflowDefinition; periodicRules?: PeriodicRule[] },
+  entry: EventIndexEntry,
+  workflow: CardWorkflowDefinition,
+  periodicRules?: PeriodicRule[],
 ): Promise<void> {
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
 
-  // 解析已有索引；优先 events.json，否则回退旧 card.json 派生，再否则建空索引
-  let file: EventPackFile = rec.files['schema/events.json']
-    ? (JSON.parse(rec.files['schema/events.json'] as string) as EventPackFile)
-    : { version: 1, name: rec.manifest.name, events: [] };
-  if (!rec.files['schema/events.json'] && rec.files['schema/card.json']) {
-    file = cardFileToEventPack(JSON.parse(rec.files['schema/card.json'] as string) as CardFile, rec.manifest);
-  }
+  const filePath = `schema/event-${entry.id}.json`;
+  const validWorkflow = validateWorkflow(entry, workflow, filePath);
+  const current = readCanonicalIndex(rec);
+  const events = [...current.events];
+  const index = events.findIndex((event) => event.id === entry.id);
+  if (index >= 0) events[index] = entry;
+  else events.push(entry);
 
-  // upsert：相同 id 覆盖，否则追加
-  const idx = file.events.findIndex((e) => e.id === event.id);
-  if (idx >= 0) file.events[idx] = event;
-  else file.events.push(event);
-
-  // 写入 per-event 画布（优先新格式 CardWorkflowDefinition，回退旧 CardFile）
-  if (opts?.cardWorkflow) {
-    rec.files[`schema/event-${event.id}.json`] = JSON.stringify(opts.cardWorkflow, null, 2);
-  } else {
-    rec.files[`schema/event-${event.id}.json`] = JSON.stringify(
-      opts?.cardFile ?? eventDefToCardFile(event),
-      null,
-      2,
-    );
-  }
-
-  // 仅当显式传入时才覆盖周期规则（undefined 表示保持原值）
-  if (opts?.periodicRules !== undefined) {
-    file.periodicRules = opts.periodicRules;
-  }
-
-  // 写回索引
-  rec.files['schema/events.json'] = JSON.stringify(file, null, 2);
-
-  rec.manifest = { ...rec.manifest };
+  const next = canonicalIndex(current.name ?? rec.manifest.name, events);
+  rec.files[EVENTS_FILE_PATH] = JSON.stringify(next, null, 2);
+  rec.files[filePath] = JSON.stringify(validWorkflow, null, 2);
+  if (periodicRules !== undefined) writePeriodicRulesToRecord(rec, periodicRules);
+  removeLegacyAndStaleEventFiles(rec, next);
   await putWebEvent(rec);
 }
 
-/**
- * 从事件包内删除一个事件（按 eventId）。
- *
- * 职责：
- *   - 从 EventPackFile 索引（schema/events.json，旧包回退 schema/card.json）中移除指定 eventId 的事件。
- *   - 删除该事件对应的画布文件 schema/event-<id>.json。
- *   - 同步重建派生 card.json（与 saveEventToPack 派生写法一致：version + 首事件 puck + flattenEventPack(file).cards；删光后 cards=[]）。
- *
- * 边界：
- *   - 包不存在 → 抛 WebEventError('MOD_NOT_FOUND')。
- *   - 新格式包（有 events.json）：按 id 过滤，即便 events 为空也写回空数组；同时更新派生 card.json。
- *   - 旧格式包（仅 card.json，无稳定事件 id）：其唯一事件即删除目标，删除即清空；card.json 清空为空白 CardFile(cards:[])，且不生成 events.json（保留旧格式）。
- *   - 既无 events.json 也无 card.json：视为空包，仅尝试删除残留画布文件后落盘。
- *   - 不修改 rec.manifest（保持 type 等字段）。
- *
- * 与 saveEventToPack 的关系：
- *   saveEventToPack 负责 upsert + 写画布 + 派生 card.json；本函数是其逆操作（删除 + 同步派生）。
- *   二者共用同一套「events.json 为索引、event-<id>.json 为画布、card.json 为派生」的存储约定，
- *   因此 delete 后仍需像 save 一样重建 card.json，确保 CardOverlay / EventConfigPanel / CardRenderer 读到一致数据。
- */
+/** 从 canonical v2 索引删除事件，并清理所有不再被索引引用的工作流文件。 */
 export async function deleteEventFromPack(packId: string, eventId: string): Promise<void> {
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', '未找到事件包：' + packId);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', '未找到事件包：' + packId);
 
-  const hasEventsJson = !!rec.files['schema/events.json'];
-  let file: EventPackFile;
-
-  if (hasEventsJson) {
-    // 新格式：events.json 即索引
-    file = JSON.parse(rec.files['schema/events.json'] as string) as EventPackFile;
-  } else if (rec.files['schema/card.json']) {
-    // 旧格式回退：经 cardFileToEventPack 派生 EventPackFile（仅含一个事件，id 为随机 UUID）。
-    // 旧包无稳定事件 id，其唯一事件即删除目标 → 清空。
-    file = cardFileToEventPack(JSON.parse(rec.files['schema/card.json'] as string) as CardFile, rec.manifest);
-    file.events = [];
-  } else {
-    // 既无 events.json 也无 card.json：视为空包，仅删除可能的残留画布文件后落盘
-    delete rec.files['schema/event-' + eventId + '.json'];
-    await putWebEvent(rec);
-    return;
-  }
-
-  // 新格式按 id 过滤掉目标事件（旧格式已在上面清空）
-  if (hasEventsJson) {
-    file.events = file.events.filter((e) => e.id !== eventId);
-  }
-
-  // 删除该事件对应的画布文件（值可能是 string 或 Blob，直接 delete 即可）
-  delete rec.files['schema/event-' + eventId + '.json'];
-
-  if (hasEventsJson) {
-    // 新格式：即便 events 为空也写回空数组，保持索引存在
-    rec.files['schema/events.json'] = JSON.stringify(file, null, 2);
-  }
-
-  // rec.manifest 保持不变（不修改 type）
+  const current = readCanonicalIndex(rec);
+  const next = canonicalIndex(
+    current.name ?? rec.manifest.name,
+    current.events.filter((event) => event.id !== eventId),
+  );
+  rec.files[EVENTS_FILE_PATH] = JSON.stringify(next, null, 2);
+  removeLegacyAndStaleEventFiles(rec, next);
   await putWebEvent(rec);
 }
 
-/**
- * 重命名事件包内的一个事件（按 eventId）。
- *
- * 职责：
- *   - 更新 EventPackFile 索引（schema/events.json）中该事件的 name。
- *   - 若该事件的画布文件 schema/event-<id>.json 存在，解析后更新其 name 并写回（保留其它字段）；不存在则跳过画布文件更新。
- *
- * 边界：
- *   - 包不存在 → 抛 WebEventError('MOD_NOT_FOUND')。
- *   - newName 去除首尾空白后为空 → 直接 return，不做任何更新（不抛错）。
- *   - 旧格式包（无 events.json，仅有 card.json）：无稳定事件 id，无法按 id 定位，直接 return 跳过。
- *   - 画布文件损坏（解析失败）→ 跳过其 name 更新，不阻断整体重命名。
- *
- * 与 saveEventToPack 的关系：
- *   saveEventToPack 在 upsert 事件时已把 name 写入 events.json（画布 CardFile 本身不含 name 字段）。
- *   本函数仅就地修改既有存储中的 name，不重建 card.json（card.json 不含 name 字段，无需同步）。
- */
+/** 同步重命名 canonical v2 索引条目和对应工作流。 */
 export async function renameEventInPack(packId: string, eventId: string, newName: string): Promise<void> {
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', '未找到事件包：' + packId);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', '未找到事件包：' + packId);
 
   const trimmed = (newName ?? '').trim();
   if (trimmed === '') return; // 空名不更新，直接返回
 
-  // 旧格式包（仅 card.json，无 events.json）：无稳定事件 id，无法按 id 定位，跳过
-  if (!rec.files['schema/events.json']) return;
+  const current = readCanonicalIndex(rec);
+  const events = current.events.map((event) => (
+    event.id === eventId ? { ...event, name: trimmed } : event
+  ));
+  if (!events.some((event) => event.id === eventId)) return;
 
-  const file = JSON.parse(rec.files['schema/events.json'] as string) as EventPackFile;
-  const ev = file.events.find((e) => e.id === eventId);
-  if (ev) ev.name = trimmed;
+  const workflows = readCanonicalWorkflows(rec, current);
+  const workflow = workflows.get(eventId);
+  if (!workflow) return;
 
-  // 若该事件画布文件存在，解析后更新其 name 并写回（保留其它字段）；不存在则跳过
-  const canvasKey = 'schema/event-' + eventId + '.json';
-  const canvasRaw = rec.files[canvasKey];
-  if (canvasRaw && typeof canvasRaw === 'string') {
-    try {
-      const cf = JSON.parse(canvasRaw) as CardFile & { name?: string };
-      cf.name = trimmed; // 画布 CardFile 本身不含 name，这里兼容写入（保留其它字段）
-      rec.files[canvasKey] = JSON.stringify(cf, null, 2);
-    } catch {
-      /* 画布文件损坏：跳过其 name 更新，不阻断整体重命名 */
-    }
-  }
-
-  // 写回索引（name 仅存于 events.json，无需重建 card.json）
-  rec.files['schema/events.json'] = JSON.stringify(file, null, 2);
+  const next = canonicalIndex(current.name ?? rec.manifest.name, events);
+  rec.files[EVENTS_FILE_PATH] = JSON.stringify(next, null, 2);
+  rec.files[`schema/event-${eventId}.json`] = JSON.stringify({ ...workflow, name: trimmed }, null, 2);
+  removeLegacyAndStaleEventFiles(rec, next);
   await putWebEvent(rec);
 }
 
 /**
  * 落盘事件包元信息（名称/描述/作者/版本/封面/图标）。
- * 注意：saveEventToPack 只更新 manifest.cards，不写 manifest.name，
- * 因此事件包改名必须显式调用本函数才会持久化。
+ * 同时同步 canonical v2 索引的包级名称。
  */
 export async function savePackMeta(
   packId: string,
   meta: Partial<Pick<Manifest, 'name' | 'description' | 'author' | 'version' | 'coverColor' | 'icon'>>,
 ): Promise<void> {
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
   rec.manifest = { ...rec.manifest, ...meta };
-  // 同步 EventPackFile.name（events.json 顶层），保持索引与 manifest 一致
+  rec.files['manifest.json'] = JSON.stringify(rec.manifest, null, 2);
+  // 同步 canonical index 顶层名称，保持索引与 manifest 一致
   const evRaw = rec.files['schema/events.json'];
   if (typeof evRaw === 'string') {
     try {
-      const file = JSON.parse(evRaw) as EventPackFile;
-      file.name = rec.manifest.name;
-      rec.files['schema/events.json'] = JSON.stringify(file, null, 2);
+      const file = readCanonicalIndex(rec);
+      rec.files[EVENTS_FILE_PATH] = JSON.stringify(
+        canonicalIndex(rec.manifest.name, file.events),
+        null,
+        2,
+      );
     } catch {
       /* events.json 损坏：仅更新 manifest，不阻断改名 */
     }
@@ -438,11 +570,11 @@ export async function savePackMeta(
  * 向指定事件包写入规则图产出的 EventRule[]（落 schema/rules.json）。
  * 与 saveEventToPack（写 events.json / 卡片画布）互不干扰；
  * 此处仅替换 rules 字段，保留同一文件中的 periodicRules（周期事件包由 EventConfigPanel 维护）。
- * 不存在该 pack 时抛 WebEventError（调用方应保证 eventPackId 来自已安装包）。
+ * 不存在该 pack 时抛 EventApiError（调用方应保证 eventPackId 来自已安装包）。
  */
 export async function saveRulesToPack(packId: string, rules: EventRule[], periodicRules?: PeriodicRule[]): Promise<void> {
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
   // 若未显式传入 periodicRules，从已有文件读回（向后兼容旧调用方）
   let effectivePeriodic = periodicRules;
   if (effectivePeriodic === undefined) {
@@ -468,7 +600,7 @@ export async function saveRulesToPack(packId: string, rules: EventRule[], period
  */
 export async function savePeriodicRulesToPack(packId: string, periodicRules: PeriodicRule[]): Promise<void> {
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
   // 读取已有文件以保留 rules（规则图由另一入口维护，避免互相覆盖）
   let rules: EventRule[] = [];
   const existing = rec.files['schema/rules.json'];
@@ -492,7 +624,7 @@ export async function savePeriodicRulesToPack(packId: string, periodicRules: Per
 export async function saveWorkflowToPack(packId: string, workflow: import('./workflowSchema').WorkflowDefinition): Promise<void> {
   const { workflowToRuleFile } = await import('./workflowConverters');
   const rec = await getWebEvent(packId);
-  if (!rec) throw new WebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
   // 保存工作流原始格式
   rec.files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
   // 同时生成 rules.json 兼容旧引擎
@@ -546,7 +678,6 @@ export async function createRule(worldId?: string): Promise<string> {
     enabledByDefault: false,
     loadOrder: 100,
     permissions: [],
-    cards: [],
     ...(worldId ? { worldId } : {}),
   };
   const rec: WebEventRecord = {
@@ -586,10 +717,9 @@ export async function createEmptyPack(defaultName = '我的卡片事件包', wor
     enabledByDefault: false,
     loadOrder: 100,
     permissions: ['add_card'],
-    cards: [],
     ...(worldId ? { worldId } : {}),
   };
-  const file: EventPackFile = { version: 1, name: defaultName, events: [] };
+  const file = canonicalIndex(defaultName, []);
   const rec: WebEventRecord = {
     id,
     manifest,
@@ -605,28 +735,17 @@ export async function createEmptyPack(defaultName = '我的卡片事件包', wor
   return id;
 }
 
-/**
- * 列出事件包内的所有事件（EventDef[]）。
- * 旧 pack（仅 schema/card.json）回退：经 cardFileToEventPack 包装成单一事件返回。
- * 包不存在或两种存储均缺时返回空数组。
- */
-export async function listEventsInPack(packId: string): Promise<EventDef[]> {
+/** 列出 canonical v2 索引中的事件元数据；包不存在时返回空数组。 */
+export async function listEventsInPack(packId: string): Promise<EventIndexEntry[]> {
   const rec = await getWebEvent(packId);
   if (!rec) return [];
-  if (rec.files['schema/events.json']) {
-    return (JSON.parse(rec.files['schema/events.json'] as string) as EventPackFile).events;
-  } else if (rec.files['schema/card.json']) {
-    return [cardFileToEventPack(JSON.parse(rec.files['schema/card.json'] as string) as CardFile, rec.manifest).events[0]];
-  }
-  return [];
+  return readCanonicalIndex(rec).events;
 }
 
-/**
- * 以单个事件新建一个完整事件包（含 manifest / events.json / per-event 画布 / 派生 card.json），落 IndexedDB。
- * 返回新建的包 id（= meta.id）。manifest 缺省字段补默认值；author/schemaVersion/minAppVersion 为 Manifest 必填项，补空/默认。
- */
+/** 以单个事件和工作流新建 canonical v2 事件包。 */
 export async function createPackWithEvent(
-  event: EventDef,
+  entry: EventIndexEntry,
+  workflow: CardWorkflowDefinition,
   meta: { id: string; name: string; version?: string; coverColor?: string; icon?: string; type: EventPackType; periodicRules?: PeriodicRule[]; worldId?: string },
 ): Promise<string> {
   const manifest: Manifest = {
@@ -643,12 +762,9 @@ export async function createPackWithEvent(
     enabledByDefault: false,
     ...(meta.worldId ? { worldId: meta.worldId } : {}),
   };
-  const file: EventPackFile = {
-    version: 1,
-    name: meta.name,
-    events: [event],
-    periodicRules: meta.periodicRules,
-  };
+  const file = canonicalIndex(meta.name, [entry]);
+  const workflowPath = `schema/event-${entry.id}.json`;
+  const validWorkflow = validateWorkflow(entry, workflow, workflowPath);
   const rec: WebEventRecord = {
     id: meta.id,
     manifest,
@@ -658,14 +774,10 @@ export async function createPackWithEvent(
     files: {
       'manifest.json': JSON.stringify(manifest, null, 2),
       'schema/events.json': JSON.stringify(file, null, 2),
-      ['schema/event-' + event.id + '.json']: JSON.stringify(eventDefToCardFile(event), null, 2),
-      'schema/card.json': JSON.stringify(
-        { version: file.version, puck: eventDefToCardFile(event).puck, cards: flattenEventPack(file).cards },
-        null,
-        2,
-      ),
+      [workflowPath]: JSON.stringify(validWorkflow, null, 2),
     },
   };
+  if (meta.periodicRules !== undefined) writePeriodicRulesToRecord(rec, meta.periodicRules);
   await putWebEvent(rec);
   return meta.id;
 }
@@ -741,37 +853,20 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
           files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
         }
       } catch { /* 世界工作流生成失败不影响旧规则 */ }
-      // 规则包也需要 events.json（空的，供索引用）
-      files['schema/events.json'] = JSON.stringify({ version: 1, events: [] } as EventPackFile, null, 2);
+      // 规则包也使用 canonical v2 空索引。
+      Object.assign(files, buildCanonicalCardPackFiles(manifest.name, []));
     } else if (packType === 'card') {
-      // 事件包：写 events.json + 每个事件的画布文件
-      const events = pack.events ?? [];
-      const eventPackFile: EventPackFile = {
-        version: 1,
-        name: pack.name,
-        events: events.map(e => ({
-          id: e.id,
-          name: e.name,
-          cards: [], // 新格式不用 cards
-        })),
-      };
-      files['schema/events.json'] = JSON.stringify(eventPackFile, null, 2);
-      // 每个事件单独写画布文件（新格式 CardWorkflowDefinition）
-      for (const evt of events) {
-        if (evt.workflow) {
-          // 新格式：直接写 CardWorkflowDefinition
-          files[`schema/event-${evt.id}.json`] = JSON.stringify(evt.workflow, null, 2);
-        } else {
-          // 旧格式：创建空工作流（旧格式已废弃）
-          files[`schema/event-${evt.id}.json`] = JSON.stringify({
-            version: 1,
-            id: `card-wf-${evt.id}`,
-            name: evt.name,
-            nodes: [],
-            connections: [],
-          }, null, 2);
+      const events: CanonicalCardPackEvent[] = (pack.events ?? []).map((event) => {
+        if (!event.workflow) {
+          throw new Error(`Card event ${event.id} is missing workflow`);
         }
-      }
+        const entry: EventIndexEntry = { id: event.id, name: event.name };
+        return {
+          entry,
+          workflow: { ...event.workflow, id: entry.id, name: entry.name },
+        };
+      });
+      Object.assign(files, buildCanonicalCardPackFiles(manifest.name, events));
     }
 
     const rec: WebEventRecord = {
@@ -853,26 +948,7 @@ export async function importPacksFromSave(snapshots: EventPackSnapshot[]): Promi
   return imported;
 }
 
-// ─── 兼容别名（旧名 → 新名） ───
-
-/** @deprecated 请使用 webDiscoverPacks */
-export const webDiscoverMods = webDiscoverPacks;
-/** @deprecated 请使用 webListPacks */
-export const webListMods = webListPacks;
-/** @deprecated 请使用 webValidatePack */
-export const webValidateMod = webValidatePack;
-/** @deprecated 请使用 webUninstallPack */
-export const webUninstallMod = webUninstallPack;
-/** @deprecated 请使用 webEnablePack */
-export const webEnableMod = webEnablePack;
-/** @deprecated 请使用 webDisablePack */
-export const webDisableMod = webDisablePack;
-/** @deprecated 请使用 webExportPack */
-export const webExportMod = webExportPack;
-/** @deprecated 请使用 createRule */
-export const createRulePack = createRule;
-
-export type { EventPackType, EventPackType as EventType };
+export type { EventPackType };
 
 // ─────────────────────────────────────────────────────────────
 //  合集（Collection）Web 端操作

@@ -12,8 +12,7 @@ import {
 } from 'lucide-react';
 import JSZip from 'jszip';
 import type {
-  CardWorkflowDefinition, Manifest, ValidationIssue, EventPackType,
-  PeriodicRule, EventDef, EventPackFile,
+  CardWorkflowDefinition, EventIndexEntry, Manifest, ValidationIssue,
 } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
 import { getWebEvent, putWebEvent } from '../../modules/eventDb';
@@ -39,14 +38,6 @@ export function validateCardWorkflow(wf: CardWorkflowDefinition): ValidationIssu
     issues.push({ code: 'MISSING_FIELD', field: 'nodes', message: '工作流至少需要一个叙事节点' });
   }
   return issues;
-}
-
-function computePackType(pack: EventPackFile): EventPackType {
-  const hasCards = pack.events.some((e) => e.cards && e.cards.length > 0);
-  const hasPeriodic = (pack.periodicRules ?? []).length > 0;
-  if (hasCards && hasPeriodic) return 'bundle';
-  if (hasPeriodic) return 'rule';
-  return 'card';
 }
 
 interface ManifestDraft {
@@ -87,7 +78,6 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
 
   // 包状态
   const [manifest, setManifest] = useState<ManifestDraft>(emptyManifest());
-  const [periodicRules] = useState<PeriodicRule[]>([]);
   const [eventList, setEventList] = useState<EventListEntry[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
@@ -121,18 +111,15 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
         icon: rec.manifest?.icon ?? 'FileText',
       });
 
-      // 加载事件列表
-      const eventsRaw = rec.files['schema/events.json'];
-      if (typeof eventsRaw === 'string') {
-        const pack = JSON.parse(eventsRaw) as EventPackFile;
-        setEventList(pack.events.map((e) => ({ id: e.id, name: e.name })));
-        if (pack.events.length > 0) {
-          const first = pack.events[0];
-          setSelectedEventId(first.id);
-          setEventName(first.name);
-          setEditingEventId(first.id);
-          loadEventWorkflow(eventPackId, first.id);
-        }
+      // 加载 canonical v2 事件索引
+      const events = await listEventsInPack(eventPackId).catch(() => []);
+      setEventList(events.map((event) => ({ id: event.id, name: event.name })));
+      if (events.length > 0) {
+        const first = events[0];
+        setSelectedEventId(first.id);
+        setEventName(first.name);
+        setEditingEventId(first.id);
+        loadEventWorkflow(eventPackId, first.id);
       }
 
       if (rec.manifest?.worldId) {
@@ -146,7 +133,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
   const loadEventWorkflow = useCallback(async (packId: string, eventId: string) => {
     const rec = await getWebEvent(packId).catch(() => undefined);
     if (!rec) {
-      setWorkflow({ version: 1, id: `card-wf-${Date.now().toString(36)}`, name: '', nodes: [], connections: [] });
+      setWorkflow({ version: 1, id: eventId, name: '', nodes: [], connections: [] });
       return;
     }
 
@@ -159,12 +146,12 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
           setWorkflow(parsed as CardWorkflowDefinition);
           return;
         }
-        // 旧格式（CardFile/puck）→ 忽略，创建空工作流
+        // 非 canonical workflow → 忽略，创建空工作流
       } catch { /* fallthrough */ }
     }
 
     // 没有工作流数据或旧格式，创建空工作流
-    setWorkflow({ version: 1, id: `card-wf-${Date.now().toString(36)}`, name: '', nodes: [], connections: [] });
+    setWorkflow({ version: 1, id: eventId, name: '', nodes: [], connections: [] });
   }, []);
 
   // ── 辅助函数（无依赖） ──
@@ -179,23 +166,11 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
     setEventList(list.map((e) => ({ id: e.id, name: e.name })));
   }, [eventPackId]);
 
-  const persistPackType = useCallback(async (type: EventPackType) => {
-    try {
-      const rec = await getWebEvent(eventPackId);
-      if (rec) {
-        rec.manifest = { ...rec.manifest, type } as Manifest;
-        await putWebEvent(rec);
-      }
-    } catch (e) {
-      console.error('[CardEditor] persistPackType 失败：', e);
-    }
-  }, [eventPackId]);
-
-  // ── 保存当前事件（依赖 showSaveToast, persistPackType） ──
+  // ── 保存当前事件 ──
   const handleSaveEvent = useCallback(async (): Promise<boolean> => {
     if (!workflow || !editingEventId) return false;
 
-    const wfWithName = { ...workflow, name: eventName };
+    const wfWithName: CardWorkflowDefinition = { ...workflow, id: editingEventId, name: eventName };
     const errs = validateCardWorkflow(wfWithName);
     if (errs.length > 0) {
       setIssues(errs);
@@ -203,11 +178,10 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
       return false;
     }
 
-    const eventDef: EventDef = { id: editingEventId, name: eventName, cards: [] };
+    const entry: EventIndexEntry = { id: editingEventId, name: eventName };
     setSaving(true);
     try {
-      await saveEventToPack(eventPackId, eventDef, { cardWorkflow: wfWithName, periodicRules });
-      await persistPackType(computePackType({ version: 1, events: [eventDef], periodicRules }));
+      await saveEventToPack(eventPackId, entry, wfWithName);
       await savePackMeta(eventPackId, {
         name: manifest.name,
         description: manifest.description,
@@ -227,7 +201,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
     } finally {
       setSaving(false);
     }
-  }, [workflow, editingEventId, eventName, eventPackId, manifest, periodicRules, onSaved, showSaveToast, persistPackType, refreshEventList]);
+  }, [workflow, editingEventId, eventName, eventPackId, manifest, onSaved, showSaveToast, refreshEventList]);
 
   // ── 切换事件（依赖 handleSaveEvent） ──
   const handleSelectEvent = useCallback(async (eventId: string) => {
@@ -261,7 +235,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
     // 创建新的空工作流
     const newWorkflow: CardWorkflowDefinition = {
       version: 1,
-      id: `card-wf-${Date.now().toString(36)}`,
+      id: newId,
       name: newName,
       nodes: [],
       connections: [],
@@ -269,8 +243,8 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
 
     // 立即落盘：保存空工作流 + 更新事件索引
     try {
-      const eventDef: EventDef = { id: newId, name: newName, cards: [] };
-      await saveEventToPack(eventPackId, eventDef, { cardWorkflow: newWorkflow });
+      const entry: EventIndexEntry = { id: newId, name: newName };
+      await saveEventToPack(eventPackId, entry, newWorkflow);
       await refreshEventList();
     } catch (e) {
       console.error('[CardEditor] 新建事件落盘失败:', e);

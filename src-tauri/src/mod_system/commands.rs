@@ -188,6 +188,7 @@ fn install_event_impl(
             manifest.id
         )));
     }
+    validator::validate_event_pack_files(&files)?;
 
     // Already installed?
     let dir = mod_dir(app, &manifest.id)?;
@@ -322,7 +323,7 @@ pub fn import_event(
 ) -> Result<ModMeta, ModError> {
     let pkg = match path {
         Some(p) => p,
-        None => match pick_wtgmod(&app)? {
+        None => match pick_event_pack(&app)? {
             Some(p) => p.to_string_lossy().to_string(),
             None => return Err(ModError::import_cancelled()),
         },
@@ -356,8 +357,8 @@ pub fn export_event(
             p
         }
         None => {
-            let default_name = format!("{}-{}.wtgmod", manifest.name, manifest.version);
-            match save_wtgmod(&app, &default_name)? {
+            let default_name = default_export_name(&manifest.name, &manifest.version);
+            match save_event_pack(&app, &default_name)? {
                 Some(p) => p,
                 None => return Err(ModError::import_cancelled()),
             }
@@ -391,14 +392,8 @@ pub fn get_event_detail(
         .clone()
         .and_then(|r| r.first().cloned())
         .unwrap_or_else(|| "schema/rules.json".to_string());
-    let cards_path = manifest
-        .cards
-        .clone()
-        .and_then(|c| c.first().cloned())
-        .unwrap_or_else(|| "schema/card.json".to_string());
-
     let rules_summary = parse_rules(&dir, &rules_path);
-    let cards_summary = parse_cards(&dir, &cards_path);
+    let cards_summary = parse_cards(&dir)?;
     let worldbook_summary = parse_worldbook(&dir);
 
     let dependency_status = manifest
@@ -457,13 +452,17 @@ pub fn get_event_detail(
 // Dialog helpers
 // ===========================================================================
 
-/// Open a native file picker filtered to `.wtgmod`. Blocks until the user
+fn default_export_name(name: &str, version: &str) -> String {
+    format!("{name}-{version}.opt-event")
+}
+
+/// Open a native file picker filtered to `.opt-event`. Blocks until the user
 /// chooses a file or cancels. Returns `None` on cancel.
-fn pick_wtgmod(app: &AppHandle) -> Result<Option<PathBuf>, ModError> {
+fn pick_event_pack(app: &AppHandle) -> Result<Option<PathBuf>, ModError> {
     let (tx, rx) = mpsc::channel();
     app.dialog()
         .file()
-        .add_filter("WTG Mod", &["wtgmod"])
+        .add_filter("OPT Event", &["opt-event"])
         .pick_file(move |p: Option<FilePath>| {
             let _ = tx.send(p);
         });
@@ -476,11 +475,11 @@ fn pick_wtgmod(app: &AppHandle) -> Result<Option<PathBuf>, ModError> {
 
 /// Open a native save dialog with a default file name. Blocks until the user
 /// confirms or cancels. Returns `None` on cancel.
-fn save_wtgmod(app: &AppHandle, default_name: &str) -> Result<Option<PathBuf>, ModError> {
+fn save_event_pack(app: &AppHandle, default_name: &str) -> Result<Option<PathBuf>, ModError> {
     let (tx, rx) = mpsc::channel();
     app.dialog()
         .file()
-        .add_filter("WTG Mod", &["wtgmod"])
+        .add_filter("OPT Event", &["opt-event"])
         .set_file_name(default_name)
         .save_file(move |p: Option<FilePath>| {
             let _ = tx.send(p);
@@ -489,5 +488,15 @@ fn save_wtgmod(app: &AppHandle, default_name: &str) -> Result<Option<PathBuf>, M
         Some(FilePath::Path(p)) => Ok(Some(p)),
         Some(FilePath::Url(_)) => Err(ModError::path_invalid("不支持的 URL 路径")),
         None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::default_export_name;
+
+    #[test]
+    fn export_name_uses_opt_event_extension() {
+        assert_eq!(default_export_name("Pack", "1.2.3"), "Pack-1.2.3.opt-event");
     }
 }

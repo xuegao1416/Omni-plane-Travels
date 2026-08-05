@@ -11,9 +11,10 @@ import { useConfigStore } from '../../stores/configStore';
 import { requestStreamWithRetry } from '../../api/client';
 import { getAllWorlds, findWorldDef } from '../../data/worldLoader';
 import type { WorldDef } from '../../data/worlds-schema';
-import type { EventPackFile, Manifest, CardWorkflowDefinition } from '../../modules/schema';
+import type { EventIndexEntry, Manifest, CardWorkflowDefinition } from '../../modules/schema';
 import { putWebEvent } from '../../modules/eventDb';
 import type { WebEventRecord } from '../../modules/eventDb';
+import { buildCanonicalCardPackFiles, type CanonicalCardPackEvent } from '../../modules/webEventStore';
 import {
   buildEventGeneratorPrompt,
   buildEventGeneratorUserMessage,
@@ -233,35 +234,26 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
       let totalNodes = 0;
 
       // ── 1. 保存事件包 ──
-      const eventDefs = events.map(ev => ({
-        id: (ev.id as string) || `evt-${Math.random().toString(36).slice(2, 8)}`,
-        name: (ev.name as string) || '未命名事件',
-        cards: [] as Array<{ id: string; componentId: string; title: string }>,
-      }));
-
-      const workflowFiles: Record<string, string> = {};
-      for (let i = 0; i < events.length; i++) {
-        const ev = events[i];
-        const wf = ev.workflow as Record<string, unknown> | undefined;
-        if (wf) {
-          const nodes = (wf.nodes as unknown[]) || [];
-          totalNodes += nodes.length;
-          const workflow: CardWorkflowDefinition = {
-            version: 1,
-            id: `card-wf-${Date.now().toString(36)}-${i}`,
-            name: (ev.name as string) || '未命名',
-            nodes: nodes as CardWorkflowDefinition['nodes'],
-            connections: (wf.connections as CardWorkflowDefinition['connections']) || [],
-          };
-          workflowFiles[`schema/event-${eventDefs[i].id}.json`] = JSON.stringify(workflow, null, 2);
+      const cardEvents: CanonicalCardPackEvent[] = events.map((event) => {
+        const entry: EventIndexEntry = {
+          id: (event.id as string) || `evt-${Math.random().toString(36).slice(2, 8)}`,
+          name: (event.name as string) || '未命名事件',
+        };
+        const generated = event.workflow as Record<string, unknown> | undefined;
+        if (!generated) {
+          throw new Error(`AI event ${entry.id} is missing workflow`);
         }
-      }
-
-      const eventPackFile: EventPackFile = {
-        version: 1,
-        name: bundleName,
-        events: eventDefs.map(ev => ({ id: ev.id, name: ev.name, cards: ev.cards })),
-      };
+        const nodes = (generated.nodes as unknown[]) || [];
+        totalNodes += nodes.length;
+        const workflow: CardWorkflowDefinition = {
+          version: 1,
+          id: entry.id,
+          name: entry.name,
+          nodes: nodes as CardWorkflowDefinition['nodes'],
+          connections: (generated.connections as CardWorkflowDefinition['connections']) || [],
+        };
+        return { entry, workflow };
+      });
 
       const cardPackId = `ai-card-${Date.now()}`;
       const cardManifest: Manifest = {
@@ -279,14 +271,12 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
         enabledByDefault: false,
         loadOrder: 100,
         permissions: ['add_card'],
-        cards: [],
         worldId: world.id,
       };
 
       const cardFiles: Record<string, string> = {
         'manifest.json': JSON.stringify(cardManifest, null, 2),
-        'schema/events.json': JSON.stringify(eventPackFile, null, 2),
-        ...workflowFiles,
+        ...buildCanonicalCardPackFiles(cardManifest.name, cardEvents),
       };
 
       await putWebEvent({

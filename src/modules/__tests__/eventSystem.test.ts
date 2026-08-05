@@ -57,6 +57,11 @@ mock.module('@tauri-apps/api/core', () => ({ invoke: invokeImpl }));
 mock.module('@tauri-apps/api/event', () => ({
   listen: () => Promise.resolve(() => {}),
 }));
+// nativeFetch 的 isTauri() 带有模块级缓存；其它测试可能先走过 Web 分支。
+// 在本测试边界固定 Tauri 结果，避免依赖测试文件加载顺序。
+mock.module('../../utils/nativeFetch', () => ({
+  isTauri: () => true,
+}));
 
 // eventApi 现以 window.__TAURI_INTERNALS__ 判定是否在 Tauri 运行时（@tauri-apps/api/core 内部亦依赖之）。
 // 测试环境已用 mock.module 替换 invoke，这里补上运行时标记，让 isTauri() 返回 true 以走 mock。

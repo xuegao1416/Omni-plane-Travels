@@ -1,4 +1,4 @@
-//! `.wtgmod` (ZIP) pack/unpack with integrity and anti-zip-bomb guards.
+//! `.opt-event` (ZIP) pack/unpack with integrity and anti-zip-bomb guards.
 //!
 //! Constants mirror `docs/storage-mod-system.md` §4.2. All paths are resolved
 //! relative to `app_data_dir`; absolute paths, `..` traversal, and symlinks
@@ -36,7 +36,7 @@ pub fn compute_sha256(bytes: &[u8]) -> String {
     s
 }
 
-/// Read a `.wtgmod` archive into an in-memory `name -> bytes` map, enforcing:
+/// Read a `.opt-event` archive into an in-memory `name -> bytes` map, enforcing:
 /// ZIP magic number, entry count, per-entry & total uncompressed size,
 /// compression-ratio heuristic, symlink rejection, and path traversal.
 pub fn read_archive(path: &Path) -> Result<HashMap<String, Vec<u8>>, ModError> {
@@ -138,7 +138,7 @@ pub fn write_mod_files(root: &Path, files: &HashMap<String, Vec<u8>>) -> Result<
 }
 
 /// Recompute the manifest's checksum block from the on-disk mod directory.
-/// Used on export so the produced `.wtgmod` is internally consistent.
+/// Used on export so the produced `.opt-event` is internally consistent.
 pub fn recompute_manifest_checksums(
     manifest: &ModManifest,
     dir: &Path,
@@ -171,7 +171,7 @@ pub fn recompute_manifest_checksums(
 }
 
 /// Collect `manifest.json` + `schema/*` + `assets/*` + optional `README.md`
-/// from `mod_dir` and pack them into a `.wtgmod` ZIP at `target`.
+/// from `mod_dir` and pack them into a `.opt-event` ZIP at `target`.
 /// `manifest` is written as-is (caller may have refreshed its checksum).
 pub fn pack_mod(
     mod_dir: &Path,

@@ -28,6 +28,7 @@ import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
 import { eventWorldEvolution, collectAddEventEvents, collectScheduledTickEntries, getPeriodicRules } from '../modules/eventIntegration';
 import { getWebEvent } from '../modules/eventDb';
+import { readCanonicalEventPack } from '../modules/eventPackFormat';
 import { checkCondition, applyAction } from '../modules/ruleEngine';
 import { moduleEffectsToActions } from '../modules/ruleGraph';
 import { resolvePendingChoices } from '../modules/eventChoiceState';
@@ -37,6 +38,21 @@ import type { WorldContext } from '../modules/schema';
 import { eventBus, EVENTS } from '../engine/eventBus';
 import { buildSimulationPrompt, parseSimulationResponse } from './llmIntegration';
 import { SIM_STORAGE_KEY } from './storage';
+
+export async function emitCanonicalEventCard(
+  eventId: string,
+  eventPackIds: readonly string[],
+): Promise<boolean> {
+  for (const eventPackId of eventPackIds) {
+    const record = await getWebEvent(eventPackId);
+    if (!record) continue;
+    const view = readCanonicalEventPack(record.files);
+    if (!view.workflowByEventId.has(eventId)) continue;
+    eventBus.emit(EVENTS.EVENT_CARD, { cardId: eventId, eventPackId });
+    return true;
+  }
+  return false;
+}
 
 /** 规范化 activePresetId：过滤空/垃圾值，回退到 'default' */
 function sanitizeActivePresetId(raw: unknown): string {
@@ -301,6 +317,11 @@ export class WorldSimulationEngine {
     // 4. 调用 LLM 生成新的事件和暗线
     const activePreset = this.resolvePreset(preset);
     const prompt = buildSimulationPrompt(context, activePreset, this._worldContext ?? undefined);
+
+    // 先执行只依赖当前状态/已到期 scheduled 事件的本地规则。
+    // 这些规则不依赖 AI 生成结果，不能被外部模拟请求阻塞；本 tick 只求值一次。
+    await this.evaluateDeterministicEventRules(gameState, this.state.tickCount + 1);
+
     try {
       const result = await requestCompletion(this.effectiveApiConfig!, [
         { role: 'system', content: prompt },
@@ -365,126 +386,88 @@ export class WorldSimulationEngine {
 
       this.saveState();
 
-      // 10. 应用按存档绑定的 mod 规则（每 tick 确定性求值；异常隔离，不拖垮内核）
-      //     gameState 即 varMgr 的实时状态引用，写回后变量自动生效。
+      // 选择卡效果仍在 AI 模拟完成后结算，保持原有叙事顺序。
       try {
-        // 10.0 收集本轮可用事件：到期的 scheduledTicks
-        const runtime10 = gameState.simulationRuntime;
-        const tickEvents: Array<{ type: string; where?: Record<string, Literal> }> = [];
-        if (runtime10) {
-          // 消费到期的 scheduledTicks
-          if (runtime10.scheduledTicks?.length) {
-            const due = runtime10.scheduledTicks.filter(e => e.scheduledAt <= this.state.tickCount);
-            const remaining = runtime10.scheduledTicks.filter(e => e.scheduledAt > this.state.tickCount);
-            for (const entry of due) {
-              const type = (entry.payload?.type as string) ?? 'scheduled';
-              const where = entry.payload?.where as Record<string, Literal> | undefined;
-              tickEvents.push({ type, where });
-            }
-            runtime10.scheduledTicks = remaining;
-          }
+        const saveId = useSaveStore.getState().currentSaveId ?? undefined;
+        if (saveId) {
+          resolvePendingChoices(gameState as unknown as GameState, saveId);
         }
-
-        const { ctx: newCtx, results, packRuntimes } = eventWorldEvolution.evaluateTick(
-          gameState as unknown as WorldContext,
-          this.state.tickCount,
-          tickEvents,
-        );
-        const live = gameState as unknown as Record<string, unknown>;
-        if (newCtx !== (gameState as unknown as WorldContext)) {
-          for (const k of Object.keys(newCtx)) {
-            live[k] = (newCtx as Record<string, unknown>)[k];
-          }
-        }
-        // 10.0e 持久化包 runtime（onceFired / cooldown）到 simulationRuntime
-        if (packRuntimes && gameState.simulationRuntime) {
-          gameState.simulationRuntime.eventRuntimes = packRuntimes;
-        }
-        // 10.1 收集 addEvent 动作：查事件包获取全部卡片，逐张广播
-        try {
-          const addEventActions = [
-            ...collectAddEventEvents(results),
-            ...(gameState.simulationRuntime?.pendingAddEvents ?? []),
-          ];
-          // 清空 pending
-          if (gameState.simulationRuntime) gameState.simulationRuntime.pendingAddEvents = [];
-          for (const ev of addEventActions) {
-            // 先查指定包，找不到再搜所有已启用包（fallback）
-            const packsToSearch = [ev.eventPackId];
-            if (eventWorldEvolution.has(ev.eventPackId) === false) {
-              // eventPackId 指向的包未注册，搜所有已注册包
-              packsToSearch.push(...eventWorldEvolution.list().map(p => p.eventPackId));
-            }
-            let found = false;
-            for (const packId of packsToSearch) {
-              if (found) break;
-              const rec = await getWebEvent(packId);
-              if (!rec) continue;
-              for (const [key, val] of Object.entries(rec.files)) {
-                if (typeof val !== 'string' || !key.startsWith('schema/event-')) continue;
-                try {
-                  const parsed = JSON.parse(val);
-
-                  // 新格式：CardWorkflowDefinition（有 nodes 数组）
-                  if (parsed.nodes && Array.isArray(parsed.nodes)) {
-                    // 从文件名提取 eventId：schema/event-<eventId>.json
-                    const eventId = key.replace('schema/event-', '').replace('.json', '');
-                    eventBus.emit(EVENTS.EVENT_CARD, { cardId: eventId, eventPackId: packId });
-                    found = true;
-                    break;
-                  }
-
-                  // 旧格式：EventDef（有 cards 数组）— 向后兼容
-                  const matchEvt = Array.isArray(parsed)
-                    ? parsed.find((e: { id?: string }) => e.id === ev.eventId)
-                    : parsed.id === ev.eventId ? parsed : null;
-                  if (matchEvt?.cards) {
-                    for (const card of matchEvt.cards) {
-                      eventBus.emit(EVENTS.EVENT_CARD, { cardId: card.id, eventPackId: packId });
-                    }
-                    found = true;
-                    break;
-                  }
-                } catch { /* 单文件隔离 */ }
-              }
-            }
-          }
-        } catch (addEventErr) {
-          console.warn('[WorldSim] Mod 事件广播失败（已忽略）:', addEventErr);
-        }
-
-        // 10.1b 收集 scheduleTick 产出的延迟条目，写入 runtime
-        try {
-          const scheduled = collectScheduledTickEntries(results);
-          if (scheduled.length > 0) {
-            const rt = gameState.simulationRuntime;
-            if (rt) {
-              if (!rt.scheduledTicks) rt.scheduledTicks = [];
-              rt.scheduledTicks.push(...scheduled);
-            }
-          }
-        } catch (scheduledErr) {
-          console.warn('[WorldSim] Mod scheduleTick 收集失败（已忽略）:', scheduledErr);
-        }
-
-        // 10.2 结算玩家待定的选择卡（路径 C）：应用最终选中项的 delta 到 stat，
-        //      并把 aiNote 记入玩家决策日志（供下一轮 AI 叙事）。逐条 try/catch 隔离。
-        try {
-          const saveId = useSaveStore.getState().currentSaveId ?? undefined;
-          if (saveId) {
-            resolvePendingChoices(gameState as unknown as GameState, saveId);
-          }
-        } catch (choiceErr) {
-          console.warn('[WorldSim] 选择卡结算失败（已忽略）:', choiceErr);
-        }
-      } catch (err) {
-        console.warn('[WorldSim] Mod 规则求值失败（已隔离，不影响内核）:', err);
+      } catch (choiceErr) {
+        console.warn('[WorldSim] 选择卡结算失败（已忽略）:', choiceErr);
       }
 
       return generation;
     } catch (err) {
       console.error('[WorldSim] 推演失败:', err);
       return null;
+    }
+  }
+
+  /**
+   * 在外部模拟请求前执行只依赖 tick 起始状态的事件包规则。
+   *
+   * EventRule 的输入只有 WorldContext 和本 tick 已到期的 scheduled 事件；
+   * AI 生成的事件/世界状态由下方 worldStateRules 单独在生成结果后处理。
+   * 因此本地规则应与外部 LLM 解耦，并且每个 tick 只允许经过这一处求值。
+   */
+  private async evaluateDeterministicEventRules(gameState: GameState, tick: number): Promise<void> {
+    try {
+      const runtime = gameState.simulationRuntime;
+      const tickEvents: Array<{ type: string; where?: Record<string, Literal> }> = [];
+
+      if (runtime?.scheduledTicks?.length) {
+        const due = runtime.scheduledTicks.filter(e => e.scheduledAt <= tick);
+        runtime.scheduledTicks = runtime.scheduledTicks.filter(e => e.scheduledAt > tick);
+        for (const entry of due) {
+          tickEvents.push({
+            type: (entry.payload?.type as string) ?? 'scheduled',
+            where: entry.payload?.where as Record<string, Literal> | undefined,
+          });
+        }
+      }
+
+      const { ctx, results, packRuntimes } = eventWorldEvolution.evaluateTick(
+        gameState as unknown as WorldContext,
+        tick,
+        tickEvents,
+      );
+      const live = gameState as unknown as Record<string, unknown>;
+      for (const key of Object.keys(ctx)) {
+        live[key] = (ctx as Record<string, unknown>)[key];
+      }
+
+      if (packRuntimes && runtime) {
+        runtime.eventRuntimes = packRuntimes;
+      }
+
+      try {
+        const addEventActions = [
+          ...collectAddEventEvents(results),
+          ...(runtime?.pendingAddEvents ?? []),
+        ];
+        if (runtime) runtime.pendingAddEvents = [];
+
+        for (const event of addEventActions) {
+          const packsToSearch = [event.eventPackId];
+          if (!eventWorldEvolution.has(event.eventPackId)) {
+            packsToSearch.push(...eventWorldEvolution.list().map(pack => pack.eventPackId));
+          }
+          await emitCanonicalEventCard(event.eventId, packsToSearch);
+        }
+      } catch (addEventErr) {
+        console.warn('[WorldSim] Mod 事件广播失败（已忽略）:', addEventErr);
+      }
+
+      try {
+        const scheduled = collectScheduledTickEntries(results);
+        if (scheduled.length > 0 && runtime) {
+          runtime.scheduledTicks = [...(runtime.scheduledTicks ?? []), ...scheduled];
+        }
+      } catch (scheduledErr) {
+        console.warn('[WorldSim] Mod scheduleTick 收集失败（已忽略）:', scheduledErr);
+      }
+    } catch (err) {
+      console.warn('[WorldSim] Mod 规则求值失败（已隔离，不影响内核）:', err);
     }
   }
 

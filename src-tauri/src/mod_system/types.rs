@@ -302,22 +302,66 @@ struct RuleNode {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct CardFile {
-    #[allow(dead_code)]
-    version: i64,
+#[serde(deny_unknown_fields)]
+pub(crate) struct EventPackIndex {
+    pub version: i64,
     #[serde(default)]
-    cards: Vec<CardNode>,
+    pub name: Option<String>,
+    pub events: Vec<EventIndexEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct CardNode {
-    id: String,
+#[serde(deny_unknown_fields)]
+pub(crate) struct EventIndexEntry {
+    pub id: String,
+    pub name: String,
     #[serde(default)]
-    title: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CardWorkflow {
+    pub version: i64,
+    pub id: String,
+    pub name: String,
     #[serde(default)]
-    kind: Option<String>,
+    pub description: Option<String>,
+    pub nodes: Vec<WorkflowNode>,
+    pub connections: Vec<WorkflowConnection>,
     #[serde(default)]
-    override_target: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct WorkflowNode {
+    pub id: String,
+    pub type_id: String,
+    pub position: WorkflowPosition,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub widget_values: Option<serde_json::Value>,
+    #[serde(default)]
+    pub runtime_state: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WorkflowPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct WorkflowConnection {
+    pub id: String,
+    pub source_node_id: String,
+    pub source_socket_key: String,
+    pub target_node_id: String,
+    pub target_socket_key: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -383,29 +427,33 @@ pub(crate) fn parse_rules(dir: &std::path::Path, rules_path: &str) -> Vec<RuleSu
     out
 }
 
-/// Build `CardSummary` list from a `schema/card.json` file on disk.
-pub(crate) fn parse_cards(dir: &std::path::Path, cards_path: &str) -> Vec<CardSummary> {
-    // Manifest-controlled path: reject absolute paths and `..` traversal
-    // before joining, so we never read outside the mod dir (skip if malicious).
-    if cards_path.contains("..") || std::path::Path::new(cards_path).is_absolute() {
-        return Vec::new();
+/// Build event/workflow summaries from the canonical v2 files on disk.
+pub(crate) fn parse_cards(dir: &std::path::Path) -> Result<Vec<CardSummary>, crate::mod_system::error::ModError> {
+    let data = std::fs::read_to_string(dir.join("schema/events.json"))?;
+    let index: EventPackIndex = serde_json::from_str(&data)?;
+    if index.version != 2 {
+        return Err(crate::mod_system::error::ModError::manifest_invalid(
+            "schema/events.json version 必须为 2",
+        ));
     }
-    let mut out = Vec::new();
-    let p = dir.join(cards_path);
-    if let Ok(data) = std::fs::read_to_string(&p) {
-        if let Ok(cf) = serde_json::from_str::<CardFile>(&data) {
-            for c in cf.cards {
-                out.push(CardSummary {
-                    id: c.id,
-                    title: c.title,
-                    file: cards_path.to_string(),
-                    kind: c.kind.unwrap_or_else(|| "add".to_string()),
-                    override_target: c.override_target,
-                });
-            }
+    let mut out = Vec::with_capacity(index.events.len());
+    for event in index.events {
+        let file = format!("schema/event-{}.json", event.id);
+        let workflow: CardWorkflow = serde_json::from_str(&std::fs::read_to_string(dir.join(&file))?)?;
+        if workflow.id != event.id || workflow.name != event.name {
+            return Err(crate::mod_system::error::ModError::manifest_invalid(format!(
+                "workflow 与索引不一致：{file}"
+            )));
         }
+        out.push(CardSummary {
+            id: event.id,
+            title: event.name,
+            file,
+            kind: "workflow".to_string(),
+            override_target: None,
+        });
     }
-    out
+    Ok(out)
 }
 
 /// Build `WorldbookEntrySummary` list from `schema/worldbook.json` (if present).
@@ -436,4 +484,37 @@ pub(crate) fn parse_runtime_state(dir: &std::path::Path) -> Option<ModRuntimeSta
         cooldown_remaining: sf.cooldown_remaining,
         last_tick: sf.last_tick,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn canonical_workflows_produce_event_summaries() {
+        let dir = std::env::temp_dir().join(format!(
+            "opt-event-summary-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir_all(dir.join("schema")).unwrap();
+        std::fs::write(dir.join("schema/events.json"), serde_json::to_vec(&json!({
+            "version": 2,
+            "events": [{ "id": "event-one", "name": "Event One" }]
+        })).unwrap()).unwrap();
+        std::fs::write(dir.join("schema/event-event-one.json"), serde_json::to_vec(&json!({
+            "version": 1,
+            "id": "event-one",
+            "name": "Event One",
+            "nodes": [],
+            "connections": []
+        })).unwrap()).unwrap();
+
+        let summaries = parse_cards(&dir).unwrap();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].id, "event-one");
+        assert_eq!(summaries[0].file, "schema/event-event-one.json");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
