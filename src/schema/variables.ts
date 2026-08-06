@@ -334,6 +334,8 @@ export interface GameState {
   memoryConfig?: Record<string, unknown>;
   /** 世界演化运行时状态（可选，由世界演化引擎管理） */
   simulationRuntime?: import('../modules/schema').SimulationRuntimeState;
+  /** 自定义玩法模块的运行时状态；与事件包/工作流完全分离。 */
+  customModules?: Record<string, import('../custom-modules/stateStore').CustomModuleRuntimeState>;
 }
 
 // 默认空状态

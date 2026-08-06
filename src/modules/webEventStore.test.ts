@@ -37,7 +37,7 @@ const manifest: Manifest = {
   author: 'tester',
   engine: 'opt-event',
   schemaVersion: 1,
-  minAppVersion: '2.7.0',
+  minAppVersion: '2.7.2',
   type: 'card',
   coverColor: '#3b82f6',
   icon: 'FileText',

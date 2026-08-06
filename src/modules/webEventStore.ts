@@ -44,7 +44,7 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.7.2';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;

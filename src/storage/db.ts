@@ -529,13 +529,13 @@ export async function getAllMessages(saveId: string): Promise<ChatMessage[]> {
 
 // ─── Global store（键值对，存元数据列表等） ─────────────
 
-async function getGlobal<T = any>(key: string): Promise<T | undefined> {
+export async function getGlobal<T = any>(key: string): Promise<T | undefined> {
   const db = await getDB();
   const record = await db.get(GLOBAL_STORE, key);
   return record?.value as T | undefined;
 }
 
-async function putGlobal(key: string, value: any): Promise<void> {
+export async function putGlobal(key: string, value: any): Promise<void> {
   const db = await getDB();
   await db.put(GLOBAL_STORE, { key, value });
 }

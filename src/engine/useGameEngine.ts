@@ -35,6 +35,7 @@ import { useSimulationStore } from '../stores/simulationStore';
 import { formatSnapshotForMainAI } from '../utils/npcHelpers';
 import type { MemoryPipelineContext } from '../memory/useMemorySystem';
 import { loadPresets, resolvePreset } from '../components/settings/apiPresetUtils';
+import { runCustomModulesForWorldAndCommit } from '../custom-modules/engineBridge';
 import {
   executeMemoryWrite,
   executeMemorySummary,
@@ -600,9 +601,21 @@ export function useGameEngine(
           current: gs.世界?.时间系统?.当前时间 ?? '',
         };
 
-        // 获取世界定义
-        const currentWorldDef = findWorldDef(selectedWorld);
+        // 获取发送时的当前世界；sendMessage 的回调不能捕获创建时的旧世界。
+        const activeWorldId = selectedWorldRef.current;
+        const currentWorldDef = findWorldDef(activeWorldId);
         const worldDesc = currentWorldDef?.description ?? currentWorldDef?.name ?? '未知世界';
+
+        // 自定义玩法模块是独立于事件包的确定性层：每次玩家回合结束时，
+        // 只读取当前世界已绑定且启用的模块，并写回自己的命名空间。
+        const customTurnResult = await runCustomModulesForWorldAndCommit(gs, activeWorldId, 'onTurnEnd', Date.now(), {
+          commit: (nextState) => varMgrRef.current.setState(nextState),
+          notify: () => eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED),
+          autoSave: () => onAutoSaveRef.current?.(),
+        });
+        if (customTurnResult.warnings.length > 0) {
+          console.warn('[CustomModules] onTurnEnd warnings:', customTurnResult.warnings);
+        }
 
         // 获取仿真规则（世界演化不再作为可选模块暴露，但 5 层后台必须始终运行；
         // 缺少 simulation 模块时回退到默认规则兜底，兼容仍含该模块的旧世界文件）
@@ -623,8 +636,17 @@ export function useGameEngine(
           const recentConversation = recentConvParts.join('\n\n');
 
           // 后台执行，不 await — 世界演化结果在下一轮对话生效
-          simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null, recentConversation, resourceEvolution)
-            .then((result) => {
+        simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules ?? null, recentConversation, resourceEvolution)
+            .then(async (result) => {
+              const tickState = varMgrRef.current.getState();
+              const customTickResult = await runCustomModulesForWorldAndCommit(tickState, activeWorldId, 'onTick', Date.now(), {
+                commit: (nextState) => varMgrRef.current.setState(nextState),
+                notify: () => eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED),
+                autoSave: () => onAutoSaveRef.current?.(),
+              });
+              if (customTickResult.warnings.length > 0) {
+                console.warn('[CustomModules] onTick warnings:', customTickResult.warnings);
+              }
               // 直接应用机械层效果（确定性，不经 AI）
               if (result?.mechanicalEffects && Object.keys(result.mechanicalEffects).length > 0) {
                 const enabledModules = (currentWorldDef?.modules ?? [])

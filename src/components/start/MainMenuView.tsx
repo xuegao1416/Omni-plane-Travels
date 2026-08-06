@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, FolderOpen, Settings, Boxes, Cloud } from 'lucide-react';
+import { Play, FolderOpen, Settings, Boxes, Cloud, Sparkles } from 'lucide-react';
 import type { SaveMeta } from '../../storage/db';
 import { useAuthStore } from '../../stores/authStore';
 import BackgroundMusic from '../BackgroundMusic';
@@ -10,6 +10,7 @@ interface MainMenuViewProps {
   onViewSaves: () => void;
   onSettings: () => void;
   onOpenEvents: () => void;
+  onOpenCustomModules: () => void;
   onOpenUserCenter: () => void;
   title: string;
   subtitle: string;
@@ -26,7 +27,7 @@ interface MenuItem {
 }
 
 export default function MainMenuView({
-  allSaves, onStartWizard, onViewSaves, onSettings, onOpenEvents, onOpenUserCenter,
+  allSaves, onStartWizard, onViewSaves, onSettings, onOpenEvents, onOpenCustomModules, onOpenUserCenter,
   title, subtitle, beginLabel, settingsLabel,
 }: MainMenuViewProps) {
   const { user, isAuthenticated } = useAuthStore();
@@ -46,6 +47,7 @@ export default function MainMenuView({
     { label: '读取存档', icon: FolderOpen, onClick: onViewSaves, badge: allSaves.length > 0 ? String(allSaves.length) : undefined },
     { label: settingsLabel, icon: Settings, onClick: onSettings },
     { label: '事件中心', icon: Boxes, onClick: onOpenEvents, badge: 'Beta测试' },
+    { label: '自定义模块 Agent', icon: Sparkles, onClick: onOpenCustomModules },
   ];
 
   return (
@@ -175,7 +177,7 @@ export default function MainMenuView({
         transition: 'opacity 1s ease 1.2s',
         letterSpacing: '0.05em',
       }}>
-        v2.7.1
+        v2.7.2
       </div>
       <BackgroundMusic />
     </div>

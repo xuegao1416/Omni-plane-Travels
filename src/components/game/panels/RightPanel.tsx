@@ -5,6 +5,7 @@ import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlemen
 import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard } from './modules';
 import { findWorldDef } from '../../../data/worldLoader';
 import { normalizeAssetStatus } from './businessOverlay/utils';
+import { CustomModulePanel } from './CustomModulePanel';
 
 interface Props {
   gameState: GameState;
@@ -151,6 +152,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
       overflowY: 'auto',
       height: '100%',
     }}>
+      <CustomModulePanel gameState={gameState} worldId={worldId} />
       {/* 世界状态 */}
       <div className="surface-card" style={{ padding: '1rem' }}>
         <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>

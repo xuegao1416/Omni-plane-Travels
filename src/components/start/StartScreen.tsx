@@ -2,9 +2,12 @@ import { useStartScreen } from './useStartScreen';
 import MainMenuView from './MainMenuView';
 import SavesView from './SavesView';
 import WizardShell from './WizardShell';
+import CustomModuleAgentWorkspace from './CustomModuleAgentWorkspace';
+import { useState } from 'react';
 
 export default function StartScreen() {
   const h = useStartScreen();
+  const [customModuleOpen, setCustomModuleOpen] = useState(false);
 
   const content = (() => {
     if (h.view === 'main') {
@@ -15,6 +18,7 @@ export default function StartScreen() {
           onViewSaves={() => h.setView('saves')}
           onSettings={() => h.navigate('settings')}
           onOpenEvents={() => h.navigate('events')}
+          onOpenCustomModules={() => setCustomModuleOpen(true)}
           onOpenUserCenter={() => h.navigate('user-center')}
           title={h.t('start.title')}
           subtitle={h.t('start.subtitle')}
@@ -70,6 +74,7 @@ export default function StartScreen() {
   return (
     <>
       {content}
+      {customModuleOpen && <CustomModuleAgentWorkspace onClose={() => setCustomModuleOpen(false)} />}
       {h.DialogUI}
     </>
   );
