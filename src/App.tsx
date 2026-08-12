@@ -8,15 +8,27 @@ import GameScreen from './components/game/GameScreen';
 import EventsScreen from './components/event/EventsScreen';
 import UserCenterPage from './components/UserCenterPage';
 import { useAuthStore } from './stores/authStore';
+import { useAdaptiveTheme } from './theme/useAdaptiveTheme';
 
 function AppContent() {
   const { state } = useGame();
   const checkAuth = useAuthStore(s => s.checkAuth);
 
+  useAdaptiveTheme();
+
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
+  if (state.currentScreen === 'settings') {
+    const previousScreen = state.screenHistory[state.screenHistory.length - 1];
+    return (
+      <div className="settings-route">
+        {previousScreen === 'game' ? <GameScreen /> : <StartScreen />}
+        <SettingsScreen />
+      </div>
+    );
+  }
+
   switch (state.currentScreen) {
-    case 'settings': return <SettingsScreen />;
     case 'events': return <EventsScreen />;
     case 'game': return <GameScreen />;
     case 'user-center': return <UserCenterPage />;

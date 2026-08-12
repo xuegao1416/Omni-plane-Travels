@@ -58,16 +58,15 @@ export function DeedsModal({ npcId, npcName, chronicles: initialChronicles, onCl
   };
 
   return (
-    <div style={{
+    <div className="game-journey__nested-overlay" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1100, animation: 'fadeIn 0.15s ease',
     }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)',
+      <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
+        borderRadius: 'var(--radius-lg)',
         width: '90%', maxWidth: '520px', maxHeight: '75vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: 'var(--shadow-lg)',
       }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ fontWeight: '600', fontSize: 'var(--font-size-lg)', display: 'flex', alignItems: 'center', gap: '8px' }}>

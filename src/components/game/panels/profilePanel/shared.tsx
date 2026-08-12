@@ -7,23 +7,22 @@ export function DetailModal({ title, quality, onClose, children, icon }: {
   const qColor = quality ? getQualityColor(quality) : 'var(--accent)';
   return (
     <div
+      className="game-journey__nested-overlay"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
       <div
+        className="game-journey__nested-panel"
         onClick={e => e.stopPropagation()}
         style={{
-          background: 'var(--bg-secondary)',
           border: `1px solid ${qColor}30`,
           borderRadius: '16px',
           maxWidth: '340px',
           width: '92%',
           overflow: 'hidden',
-          boxShadow: `0 8px 32px rgba(0,0,0,0.2), 0 0 0 1px ${qColor}15`,
         }}
       >
         {/* 头部 */}

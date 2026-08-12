@@ -55,13 +55,12 @@ export function FieldDetailModal({ name, fields, onClose }: {
   name: string; fields: [string, string][]; onClose: () => void;
 }) {
   return (
-    <div onClick={onClose} style={{
+    <div className="game-journey__nested-overlay" onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.5)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+      <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
+        border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)', padding: '20px', maxWidth: '360px', width: '90%',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>

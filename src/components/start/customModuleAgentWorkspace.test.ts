@@ -15,7 +15,7 @@ describe('custom module Agent external workspace', () => {
   test('keeps the install action behind a validated draft confirmation', () => {
     expect(workspaceSource).toContain('saveCustomGameplayModule');
     expect(workspaceSource).toContain('bindCustomGameplayModule');
-    expect(workspaceSource).toContain('确认安装到当前世界');
+    expect(workspaceSource).toContain('保存并绑定');
     expect(workspaceSource).toContain('draft?.ok');
   });
 

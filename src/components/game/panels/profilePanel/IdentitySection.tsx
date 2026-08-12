@@ -1,7 +1,11 @@
+import { useState, useEffect } from 'react';
 import { User, DollarSign } from 'lucide-react';
 import { Collapsible } from '../../../shared/Collapsible';
 import { ExcelRow } from '../../../shared/ExcelRow';
+import { getDefaultPortraitSource } from '../../../start/PortraitEditor';
+import { useSaveStore } from '../../../../stores/saveStore';
 import type { GameState } from './types';
+import type { PlayerProfile } from '../../../../storage/db';
 
 interface Props {
   player: GameState['玩家'];
@@ -9,8 +13,60 @@ interface Props {
 }
 
 export function IdentitySection({ player, hasBusinessModule }: Props) {
+  const [portraitUrl, setPortraitUrl] = useState<string>('');
+  const currentSaveId = useSaveStore(s => s.currentSaveId);
+
+  useEffect(() => {
+    let cancelled = false;
+    // 从默认性别剪影开始
+    const defaultSrc = getDefaultPortraitSource(player.性别 || '');
+    setPortraitUrl(defaultSrc);
+
+    // 异步查找自定义头像
+    if (currentSaveId) {
+      (async () => {
+        try {
+          const { loadSave } = useSaveStore.getState();
+          const save = await loadSave(currentSaveId);
+          if (cancelled || !save?.personalInfo?.portrait) return;
+          const { getPortraitSource } = await import('../../../start/PortraitEditor');
+          const customUrl = getPortraitSource(save.personalInfo as PlayerProfile);
+          if (customUrl && customUrl !== defaultSrc) {
+            setPortraitUrl(customUrl);
+          }
+        } catch {
+          // 使用默认剪影
+        }
+      })();
+    }
+
+    return () => { cancelled = true; };
+  }, [player.性别, currentSaveId]);
+
   return (
     <>
+      {/* 玩家头像 */}
+      {portraitUrl && (
+        <div style={{
+          display: 'flex', justifyContent: 'center', padding: '0 0 12px',
+        }}>
+          <div style={{
+            width: '80px', height: '107px', borderRadius: '50% 50% 44% 44%',
+            overflow: 'hidden', border: '2px solid var(--accent)',
+            boxShadow: '0 0 0 4px var(--bg-secondary), 0 4px 16px rgba(0,0,0,0.12)',
+          }}>
+            <img
+              src={portraitUrl}
+              alt={player.姓名 || '玩家'}
+              style={{
+                width: '100%', height: '100%',
+                objectFit: 'cover', objectPosition: 'center',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 角色基本信息 */}
       <Collapsible icon={<User size={15} />} title="基本信息">
         <div style={{ display: 'flex', flexDirection: 'column' }}>

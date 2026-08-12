@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { ensureCacheListener } from '../../modules/eventApi';
+import { isTauri } from '../../utils/nativeFetch';
 import type { EventRegistryEntry, EventPackType } from '../../modules/schema';
 import { createRule, createEmptyPack } from '../../modules/webEventStore';
 import { useEvents } from './useEvents';
-import { useIsPhone } from '../../hooks/useIsMobile';
-import EventCenter from './EventCenter';
 import EventLibrary from './EventLibrary';
+import EventArchiveWorkspace from './EventArchiveWorkspace';
 import CardEditor from './CardEditor';
 import EventErrorBoundary from './EventErrorBoundary';
 import WorkflowEditor from '../workflow/WorkflowEditor';
@@ -17,28 +16,32 @@ import './event.css';
 
 type SubView = 'center' | 'library' | 'card' | 'rule' | 'wizard' | 'ai-generator';
 
-/** 按事件包类型决定跳转的子视图 */
 function subViewForType(type: EventPackType): SubView {
   if (type === 'rule') return 'rule';
-  return 'card'; // card / bundle 落入统一事件包编辑器
+  return 'card';
 }
+
 export default function EventsScreen() {
   const { navigate } = useGame();
   const eventApi = useEvents();
   const [subView, setSubView] = useState<SubView>('center');
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
-  const isPhone = useIsPhone();
-  // 监听 packs:changed 自动失效缓存（非 Tauri 环境静默忽略）
+
   useEffect(() => {
     void ensureCacheListener();
   }, []);
+
+  useEffect(() => {
+    if (subView === 'center' && !selectedPackId && eventApi.packs.length > 0) {
+      setSelectedPackId(eventApi.packs[0].meta.id);
+    }
+  }, [eventApi.packs, selectedPackId, subView]);
 
   const handleOpenPack = (entry: EventRegistryEntry) => {
     setSelectedPackId(entry.meta.id);
     setSubView(subViewForType(entry.meta.type));
   };
 
-  // 新建事件包：立即创建一个空白且已落盘的事件包，随后打开编辑器往里加事件
   const handleNewPack = async () => {
     const packId = await createEmptyPack('我的卡片事件包');
     void eventApi.refresh();
@@ -46,108 +49,63 @@ export default function EventsScreen() {
     setSubView('card');
   };
 
-  // 新建规则 → 落库后直接打开工作流编辑器
   const handleNewRule = async () => {
     try {
       const id = await createRule();
       setSelectedPackId(id);
       setSubView('rule');
-    } catch (e) {
-      console.error('[EventsScreen] 新建规则失败：', e);
+    } catch (error) {
+      console.error('[EventsScreen] 创建工作流失败:', error);
     }
   };
 
-  // AI 生成完成后：刷新列表并打开编辑器
   const handleAiSaved = (packId: string, type: 'card' | 'rule') => {
     void eventApi.refresh();
     setSelectedPackId(packId);
     setSubView(type === 'rule' ? 'rule' : 'card');
   };
 
+  const handleImport = () => {
+    if (isTauri()) {
+      void eventApi.importPack();
+    } else {
+      setSubView('wizard');
+    }
+  };
+
   const goCenter = () => setSubView('center');
 
-  const isShell = subView === 'center' || subView === 'library';
-  const title = subView === 'library' ? '事件库' : '事件中心';
+  if (subView === 'center' || subView === 'library') {
+    return (
+      <EventArchiveWorkspace
+        eventApi={eventApi}
+        tab={subView}
+        selectedPackId={selectedPackId}
+        onSelectPack={setSelectedPackId}
+        onChangeTab={setSubView}
+        onBack={() => navigate('start')}
+        onImport={handleImport}
+        onNewPack={() => void handleNewPack()}
+        onNewRule={() => void handleNewRule()}
+        onAiGenerate={() => setSubView('ai-generator')}
+        onOpenPack={handleOpenPack}
+        libraryContent={<EventLibrary eventApi={eventApi} onOpenPack={handleOpenPack} />}
+      />
+    );
+  }
 
   return (
-    <div
-      className="full-height"
-      style={{
-        background: 'var(--bg-primary)',
-        color: 'var(--text-primary)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      {/* 外壳头部（仅仪表盘视图显示；编辑器自带头部与返回） */}
-      {isShell && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: isPhone ? 'var(--space-2)' : 'var(--space-3)',
-            padding: isPhone ? '8px 12px' : '12px 16px',
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--bg-secondary)',
-            flexShrink: 0,
-          }}
-        >
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => navigate('start')}
-            style={{ minHeight: 'var(--touch-min)', minWidth: isPhone ? 44 : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <ArrowLeft size={16} />{!isPhone && ' 返回'}
-          </button>
-          <h1 style={{ fontSize: isPhone ? 'var(--font-size-lg)' : 'var(--font-size-xl)', fontWeight: 600, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap' }}>
-            {title}
-          </h1>
-          <div style={{ display: 'flex', gap: isPhone ? 'var(--space-2)' : 'var(--space-3)', marginLeft: 'auto', alignItems: 'center' }}>
-            <TabButton active={subView === 'center'} onClick={() => setSubView('center')}>
-              事件中心
-            </TabButton>
-            <TabButton active={subView === 'library'} onClick={() => setSubView('library')}>
-              事件库
-            </TabButton>
-          </div>
-        </div>
-      )}
-
-      {/* 内容 */}
-      <div style={{ flex: 1, position: 'relative', overflow: isShell ? 'auto' : 'hidden' }}>
-        {subView === 'center' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              <EventCenter
-                eventApi={eventApi}
-                onOpenPack={handleOpenPack}
-                onNewPack={handleNewPack}
-                onNewRule={handleNewRule}
-                onGoImport={() => setSubView('wizard')}
-                onAiGenerate={() => setSubView('ai-generator')}
-              />
-            </div>
-          </div>
-        )}
-        {subView === 'library' && <EventLibrary eventApi={eventApi} onOpenPack={handleOpenPack} />}
-
-        {/* 全屏编辑器 / 抽屉 / 向导（自带头部与返回，覆盖外壳头部）
-            每个路由包一层本地错误边界（P0-3）：任一面板渲染失败仅隔离自身，
-            不拖垮整个事件中心，并给出错误文案 + 返回入口。 */}
+    <div className="full-height" style={{ position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
         {subView === 'card' && selectedPackId && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-            <EventErrorBoundary onBack={goCenter}>
-              <CardEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
-            </EventErrorBoundary>
-          </div>
+          <EventErrorBoundary onBack={goCenter}>
+            <CardEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
+          </EventErrorBoundary>
         )}
         {subView === 'rule' && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-            <EventErrorBoundary onBack={goCenter}>
-              <WorkflowEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
-            </EventErrorBoundary>
-          </div>
+          <EventErrorBoundary onBack={goCenter}>
+            <WorkflowEditor eventPackId={selectedPackId} onBack={goCenter} onSaved={() => void eventApi.refresh()} />
+          </EventErrorBoundary>
         )}
         {subView === 'wizard' && (
           <EventErrorBoundary onBack={goCenter}>
@@ -155,47 +113,11 @@ export default function EventsScreen() {
           </EventErrorBoundary>
         )}
         {subView === 'ai-generator' && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-            <EventErrorBoundary onBack={goCenter}>
-              <AiEventGenerator onBack={goCenter} onSaved={handleAiSaved} />
-            </EventErrorBoundary>
-          </div>
+          <EventErrorBoundary onBack={goCenter}>
+            <AiEventGenerator onBack={goCenter} onSaved={handleAiSaved} />
+          </EventErrorBoundary>
         )}
       </div>
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: 'none',
-        border: 'none',
-        cursor: 'pointer',
-        fontSize: 'var(--font-size-md)',
-        fontWeight: 600,
-        color: active ? 'var(--accent)' : 'var(--text-secondary)',
-        padding: 'var(--space-1) var(--space-2)',
-        minHeight: 44,
-        display: 'inline-flex',
-        alignItems: 'center',
-        borderRadius: 'var(--radius-md)',
-        borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
-        transition: 'color var(--duration-fast) var(--ease-out)',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {children}
-    </button>
   );
 }

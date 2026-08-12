@@ -64,26 +64,10 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
   });
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-    }}>
+    <div className={`game-journey__message-row${isUser ? ' is-user' : ' is-assistant'}`}>
       <div
         ref={bubbleRef}
-        style={{
-          width: isUser ? undefined : (isMobile ? '92%' : '75%'),
-          maxWidth: isUser ? (isMobile ? '95%' : '80%') : undefined,
-          padding: isMobile ? '0.625rem 0.875rem' : '0.75rem 1rem',
-          borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-          background: isUser ? 'var(--accent)' : 'var(--bg-secondary)',
-          color: isUser ? 'var(--color-on-accent)' : 'var(--text-primary)',
-          border: isUser ? 'none' : '1px solid var(--border)',
-          position: 'relative',
-          wordBreak: 'break-word',
-          lineHeight: 'var(--body-line-height, 1.8)',
-          fontSize: 'var(--body-font-size)',
-          fontFamily: 'var(--font-family)',
-        }}
+        className={`game-journey__message-bubble${isUser ? ' is-user' : ' is-assistant'}${isMobile ? ' is-mobile' : ''}`}
       >
         {editing ? (
           <EditMode

@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Plus, FileJson, Users, User, BookOpen } from 'lucide-react';
 import { useDialog } from './Dialog';
+import OverlayPortal from './OverlayPortal';
 import type { TemplatePickerProps } from './templatePicker/types';
 import type { NpcTemplate, PlayerPreset, HistoryPreset } from '../../storage/templateStore';
 import { getNpcTemplates, importNpcFromTemplate, parseNpcTemplateJSON, getPlayerPresets, parsePlayerPresetJSON, applyPresetToProfile, deleteNpcTemplate, deletePlayerPreset, getHistoryPresets, parseHistoryPresetJSON, deleteHistoryPreset } from '../../storage/templateStore';
@@ -69,7 +70,7 @@ export default function TemplatePickerDialog(props: TemplatePickerProps) {
   const tplLabel = mode === 'npc' ? 'NPC模板' : mode === 'history' ? '经历预设' : '预设';
 
   return (
-    <div className={s.overlay} onClick={onClose}>
+    <OverlayPortal className={s.overlay} ariaLabel={view === 'main' ? title : listTitle} onClose={onClose}>
       <div className={s.dialog} onClick={e => e.stopPropagation()}>
         <div className={s.dialogHeader}>
           <h3 className={s.dialogTitle}>{view === 'main' ? title : listTitle}</h3>
@@ -97,6 +98,6 @@ export default function TemplatePickerDialog(props: TemplatePickerProps) {
         <input ref={fileInputRef} type="file" accept=".json" className={s.hiddenInput} onChange={handleFileImport} />
         {DialogUI}
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

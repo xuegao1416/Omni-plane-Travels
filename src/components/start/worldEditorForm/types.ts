@@ -1,4 +1,4 @@
-import type { WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
+import type { WorldArtwork, WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
 import {
   createDefaultStatModule, createDefaultProgressionModule, createDefaultSurvivalModule,
   createDefaultBusinessModule, createDefaultDiceModule, createDefaultTalentModule,
@@ -8,6 +8,7 @@ import { generateWorldBookEntries } from '../../../modules/buildPipeline';
 
 export type FormState = {
   name: string; description: string; icon: string; coverColor: string; tags: string; difficulty: string;
+  artwork?: WorldArtwork;
   overview: string; timePeriod: string; location: string; atmosphere: string;
   powerSystem: string; socialStructure: string; specialRules: string;
   currencyName: string; currencySymbol: string; currencyDesc: string; priceLevel: string;
@@ -22,6 +23,7 @@ export type FormState = {
 
 export const defaultForm: FormState = {
   name: '', description: '', icon: '', coverColor: '#3b82f6', tags: '', difficulty: 'medium',
+  artwork: undefined,
   overview: '', timePeriod: '', location: '', atmosphere: '',
   powerSystem: '', socialStructure: '', specialRules: '',
   currencyName: '', currencySymbol: '', currencyDesc: '', priceLevel: '',
@@ -65,6 +67,7 @@ export function worldToForm(w: WorldDef): FormState {
 
   return {
     name: w.name || '', description: w.description || '', icon: w.icon || '', coverColor: w.coverColor || '#3b82f6',
+    artwork: w.artwork,
     tags: w.tags?.join(', ') || '', difficulty: w.difficulty || 'medium',
     overview: entries?.find(e => e.entryType === 'setting')?.content || '',
     timePeriod: settingMeta?.timePeriod || '', location: settingMeta?.location || '', atmosphere: settingMeta?.atmosphere || '',
@@ -88,6 +91,7 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
       id: initialWorld?.id || `custom_${Date.now()}`,
       name: form.name.trim(), description: form.description.trim(), entryId: null,
       icon: form.icon || undefined, coverColor: form.coverColor || undefined,
+      artwork: form.artwork ?? initialWorld?.artwork,
       tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
       difficulty: (form.difficulty as any) || undefined, worldBookEntries: refinedEntries, modules: form.modules,
       author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),
@@ -125,6 +129,7 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
   return {
     id: initialWorld?.id || `custom_${Date.now()}`, name: form.name.trim(), description: form.description.trim(), entryId: null,
     icon: form.icon || undefined, coverColor: form.coverColor || undefined,
+    artwork: form.artwork ?? initialWorld?.artwork,
     tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
     difficulty: (form.difficulty as any) || undefined, worldBookEntries: [...entries, ...existingEntries], modules: form.modules,
     author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),

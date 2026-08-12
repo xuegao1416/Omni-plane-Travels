@@ -6,8 +6,12 @@
    responsive 最后加载，确保移动端断点覆盖可生效
    ═══════════════════════════════════════════════ */
 @import './styles/tokens.css';
+@import './styles/adaptive-theme.css';
 @import './styles/base.css';
 @import './styles/layout-wizard.css';
 @import './styles/layout-settings.css';
 @import './styles/layout-game.css';
 @import './styles/responsive.css';
+@import './styles/entry-crystal.css';
+@import './styles/creation-ritual.css';
+@import './styles/game-journey.css';

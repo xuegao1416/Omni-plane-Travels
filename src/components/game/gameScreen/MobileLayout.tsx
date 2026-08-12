@@ -2,6 +2,7 @@ import { Menu, Maximize2, Minimize2, PanelRightOpen } from 'lucide-react';
 import MobileOverlay from '../MobileOverlay';
 import type { OverlayPanel } from './types';
 import type { MobileNavItem } from './navConfig';
+import { getNavLabel } from './navConfig';
 
 interface MobileLayoutProps {
   // Header
@@ -23,6 +24,7 @@ interface MobileLayoutProps {
   mobileActivePanel: OverlayPanel;
   onMobileActivePanelChange: (panel: OverlayPanel) => void;
   panelTitle: string;
+  panelEmblemSrc?: string;
   panelContent: React.ReactNode;
 
   // Right panel
@@ -45,23 +47,17 @@ export default function MobileLayout({
   mobileActivePanel,
   onMobileActivePanelChange,
   panelTitle,
+  panelEmblemSrc,
   panelContent,
   rightPanel,
   children,
 }: MobileLayoutProps) {
   return (
     <div
-      className="full-height"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg-primary)',
-        color: 'var(--text-primary)',
-        overflow: 'hidden',
-      }}
+      className="full-height game-journey game-journey--mobile"
     >
       {/* 移动端头部 */}
-      <div className="mobile-header">
+      <header className="mobile-header game-journey__mobile-header">
         <button
           className="mobile-header-btn"
           onClick={() => onShowLeftOverlay(true)}
@@ -74,7 +70,7 @@ export default function MobileLayout({
           {worldName || '世界漫游指南'}
         </div>
 
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div className="game-journey__mobile-actions">
           <button
             className="mobile-header-btn"
             onClick={onToggleFullscreen}
@@ -90,12 +86,16 @@ export default function MobileLayout({
             <PanelRightOpen size={22} />
           </button>
         </div>
-      </div>
+      </header>
 
       {/* 中间主区域 */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        {children}
-      </div>
+      <main className="game-journey__mobile-main">
+        <div className="game-journey__reading-surface game-journey__reading-surface--main">
+          <div className="game-journey__frame-content">
+            {children}
+          </div>
+        </div>
+      </main>
 
       {/* 左侧导航覆盖层 */}
       <MobileOverlay
@@ -131,8 +131,8 @@ export default function MobileLayout({
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-dim)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
-                <Icon size={20} strokeWidth={1.5} />
-                <span>{t(item.labelKey)}</span>
+                {item.emblemSrc ? <img src={item.emblemSrc} alt="" aria-hidden="true" style={{ width: 20, height: 20, objectFit: 'contain', flex: '0 0 20px' }} /> : <Icon size={20} strokeWidth={1.5} />}
+                <span>{getNavLabel(item.id)}</span>
               </button>
             );
           })}
@@ -145,6 +145,7 @@ export default function MobileLayout({
           open={true}
           onClose={() => onMobileActivePanelChange(null)}
           title={panelTitle}
+          emblemSrc={panelEmblemSrc}
           side="left"
           width={300}
         >

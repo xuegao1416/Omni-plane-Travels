@@ -11,7 +11,7 @@
 //! - `registry` — in-memory `ModRegistry` (persisted to `registry.json`)
 //! - `package`  — `.opt-event` zip pack/unpack, zip-bomb + checksum guards
 //! - `validator`— manifest structure / version / dependency / permission checks
-//! - `commands` — the 10 Tauri commands
+//! - `commands` — the 11 Tauri commands
 
 pub mod commands;
 pub mod error;

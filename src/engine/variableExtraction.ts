@@ -107,6 +107,12 @@ export async function runVariableExtraction(params: {
 }): Promise<void> {
   const { varMgr, parsed, round, userText, mainApiConfig, worldBook, delayMs, maxRetries } = params;
 
+  if (!parsed.content.trim()) {
+    const error = new Error('正文内容为空，无法执行变量提取');
+    eventBus.emit(EVENTS.VARIABLE_EXTRACTION_FAILED, error.message);
+    throw error;
+  }
+
   // 选择 API 配置：优先变量提取专用预设 > 主API
   let effectiveConfig: ApiConfig = mainApiConfig;
   try {
@@ -129,18 +135,14 @@ export async function runVariableExtraction(params: {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      let updateText: string | null = null;
-
       // 始终通过独立 API 调用提取变量（正文和变量完全分离）
-      if (parsed.content) {
-        updateText = await callAuxiliaryApiForEngine(
-          effectiveConfig,
-          worldBook,
-          varMgr.createSafeSnapshotForPrompt(),
-          userText,
-          parsed.content,
-        );
-      }
+      const updateText = await callAuxiliaryApiForEngine(
+        effectiveConfig,
+        worldBook,
+        varMgr.createSafeSnapshotForPrompt(),
+        userText,
+        parsed.content,
+      );
 
       if (updateText) {
         // callAuxiliaryApi 已负责从 <UpdateVariable> 标签或裸 JSON 中提取内容
@@ -153,10 +155,10 @@ export async function runVariableExtraction(params: {
 
         const applied = varMgr.applyUpdateVariable(jsonContent);
         if (!applied) {
-          console.warn('[变量提取] applyUpdateVariable 返回 false，JSON 解析失败。内容前200字:', jsonContent.slice(0, 200));
+          throw new Error(`变量更新内容无法应用：${jsonContent.slice(0, 120)}`);
         }
-      } else if (parsed.content) {
-        console.warn('[变量提取] 辅助 API 未返回有效的变量更新内容');
+      } else {
+        throw new Error('辅助 API 未返回有效的变量更新内容');
       }
 
       eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
@@ -170,6 +172,10 @@ export async function runVariableExtraction(params: {
     }
   }
 
-  console.warn('[变量提取] 全部重试失败:', (lastError as Error)?.message || lastError);
-  eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+  const finalError = lastError instanceof Error
+    ? lastError
+    : new Error('变量提取全部重试失败');
+  console.warn('[变量提取] 全部重试失败:', finalError.message);
+  eventBus.emit(EVENTS.VARIABLE_EXTRACTION_FAILED, finalError.message);
+  throw finalError;
 }

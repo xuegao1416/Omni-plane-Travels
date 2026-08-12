@@ -7,6 +7,14 @@ import { cloneDeep, get, set, merge, unset } from 'lodash-es';
 
 /** 原型污染防护 — 过滤危险路径段 */
 const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+const CORE_OBJECT_PATHS = new Set([
+  '世界', '世界.时间系统', '世界.空间定位',
+  '玩家', '玩家.生存状态', '玩家.身份信息', '玩家.技能系统', '玩家.货币资源', '玩家.物品栏',
+  '人物档案',
+]);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 function isSafePath(path: string): boolean {
   return !path.split('.').some(seg => DANGEROUS_PATH_SEGMENTS.has(seg));
 }
@@ -90,6 +98,7 @@ export class VariableManager {
 
   // 规范化状态：确保NPC分类、事迹、结构默认值 + 纪事迁移 + 任务系统迁移 + 模块数值校验
   private normalizeState(): void {
+    this.repairCoreStateShape();
     ensureNpcCategoryDefaults(this.state);
     ensureNpcChronicleDefaults(this.state);
     ensureNpcStructureDefaults(this.state);
@@ -98,6 +107,26 @@ export class VariableManager {
     this.migrateNotebookToTaskSystem();
     this.normalizeTaskSystem();
     this.validateAndClampModuleValues();
+  }
+
+  /** 修复旧存档或历史坏补丁留下的无效核心容器，避免后续轮次在构建快照时永久失败。 */
+  private repairCoreStateShape(): void {
+    const defaults = createDefaultGameState();
+    const state = this.state as unknown as Record<string, unknown>;
+
+    if (!isRecord(state.世界)) state.世界 = cloneDeep(defaults.世界);
+    const world = state.世界 as Record<string, unknown>;
+    if (!isRecord(world.时间系统)) world.时间系统 = cloneDeep(defaults.世界.时间系统);
+    if (!isRecord(world.空间定位)) world.空间定位 = cloneDeep(defaults.世界.空间定位);
+
+    if (!isRecord(state.玩家)) state.玩家 = cloneDeep(defaults.玩家);
+    const player = state.玩家 as Record<string, unknown>;
+    const defaultPlayer = defaults.玩家 as unknown as Record<string, unknown>;
+    for (const key of ['生存状态', '身份信息', '技能系统', '货币资源', '物品栏']) {
+      if (!isRecord(player[key])) player[key] = cloneDeep(defaultPlayer[key]);
+    }
+
+    if (!isRecord(state.人物档案)) state.人物档案 = {};
   }
 
   /**
@@ -195,6 +224,7 @@ export class VariableManager {
 
     const CHRONICLE_CAP = 30;
     const entries = Object.entries(chronicleSystem.纪事)
+      .filter(([, v]) => v !== null && v !== undefined)
       .sort(([,a], [,b]) => (a.$time ?? 0) - (b.$time ?? 0));
 
     if (entries.length > CHRONICLE_CAP) {
@@ -253,7 +283,9 @@ export class VariableManager {
     for (const [section, cap] of Object.entries(CAPS) as [keyof typeof CAPS, number][]) {
       const entries = taskSystem[section];
       if (!entries || typeof entries !== 'object') continue;
-      const sorted = Object.entries(entries).sort(([,a], [,b]) => ((a as any).$time ?? 0) - ((b as any).$time ?? 0));
+      const sorted = Object.entries(entries)
+        .filter(([, v]) => v !== null && v !== undefined)
+        .sort(([,a], [,b]) => ((a as any).$time ?? 0) - ((b as any).$time ?? 0));
       if (sorted.length > cap) {
         const toRemove = sorted.slice(0, sorted.length - cap);
         for (const [key] of toRemove) {
@@ -292,6 +324,11 @@ export class VariableManager {
 
       const resolvedPath = pathParts.join('.');
       if (!isSafePath(resolvedPath)) continue;
+      if (CORE_OBJECT_PATHS.has(resolvedPath)) {
+        if (patch.op === 'remove' || !isRecord(patch.value)) {
+          throw new Error(`拒绝破坏核心状态容器的变量补丁: ${resolvedPath}`);
+        }
+      }
       switch (patch.op) {
         case 'replace':
         case 'add': {
@@ -342,38 +379,78 @@ export class VariableManager {
 
   // 从AI响应中的UpdateVariable标签解析并应用更新
   applyUpdateVariable(updateText: string): boolean {
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(updateText);
+      parsed = JSON.parse(updateText);
+    } catch {
+      return this.applyLegacyKeyValueUpdate(updateText);
+    }
 
+    const previousState = cloneDeep(this.state);
+    try {
       // 数组 → RFC 6902 补丁
       if (Array.isArray(parsed)) {
         this.applyPatches(parsed);
+        if (!this.hasValidCoreStateShape()) throw new Error('变量补丁破坏了核心状态结构');
         return true;
       }
 
       // 对象 → 深度合并（NPC 感知）
       if (typeof parsed === 'object' && parsed !== null) {
-        this.applyMergeUpdate(parsed);
+        this.applyMergeUpdate(parsed as Record<string, unknown>);
+        if (!this.hasValidCoreStateShape()) throw new Error('变量更新破坏了核心状态结构');
         return true;
       }
       return false;
     } catch {
-      // 尝试解析为键值对格式
-      try {
-        const lines = updateText.split('\n').filter(l => l.includes('='));
-        for (const line of lines) {
-          const [path, ...rest] = line.split('=');
-          const value = rest.join('=').trim();
-          if (path && value) {
-            this.setVar(path.trim(), value);
-          }
-        }
-        this.normalizeState();
-        return true;
-      } catch {
-        return false;
-      }
+      this.state = previousState;
+      return false;
     }
+  }
+
+  /** 兼容旧版 path=value 输出；同样以整批事务方式应用。 */
+  private applyLegacyKeyValueUpdate(updateText: string): boolean {
+    const lines = updateText.split('\n').filter(l => l.includes('='));
+    if (lines.length === 0) return false;
+
+    const previousState = cloneDeep(this.state);
+    try {
+      let appliedCount = 0;
+      for (const line of lines) {
+        const [path, ...rest] = line.split('=');
+        const value = rest.join('=').trim();
+        if (path && value) {
+          this.setVar(path.trim(), value);
+          appliedCount++;
+        }
+      }
+      if (appliedCount === 0) return false;
+      this.normalizeState();
+      if (!this.hasValidCoreStateShape()) throw new Error('旧版变量更新破坏了核心状态结构');
+      return true;
+    } catch {
+      this.state = previousState;
+      return false;
+    }
+  }
+
+  /** 防止一次坏补丁把存档写成后续轮次无法读取的半损坏状态。 */
+  private hasValidCoreStateShape(): boolean {
+    const state = this.state as unknown as Record<string, unknown>;
+    const world = state.世界 as Record<string, unknown> | undefined;
+    const player = state.玩家 as Record<string, unknown> | undefined;
+
+    return isRecord(state)
+      && isRecord(world)
+      && isRecord(world.时间系统)
+      && isRecord(world.空间定位)
+      && isRecord(player)
+      && isRecord(player.生存状态)
+      && isRecord(player.身份信息)
+      && isRecord(player.技能系统)
+      && isRecord(player.货币资源)
+      && isRecord(player.物品栏)
+      && isRecord(state.人物档案);
   }
 
   // NPC 感知的合并更新

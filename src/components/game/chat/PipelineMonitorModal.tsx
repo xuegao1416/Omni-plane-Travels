@@ -33,8 +33,8 @@ export default function PipelineMonitorModal({ status, onClose, onRetrySingleSta
   const runningStage = stages.find(s => s.stage.status === 'running');
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+    <div className="game-journey__nested-overlay" style={styles.overlay} onClick={onClose}>
+      <div className="game-journey__nested-panel" style={styles.modal} onClick={e => e.stopPropagation()}>
         {/* 头部 */}
         <div style={styles.header}>
           <div>
@@ -184,15 +184,11 @@ const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'fixed', inset: 0, zIndex: 9980,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(6,6,14,0.5)',
-    backdropFilter: 'blur(8px)',
   },
   modal: {
     width: 'min(700px, 92vw)',
     borderRadius: 'var(--radius-xl)',
     border: '1px solid var(--border)',
-    background: 'var(--bg-secondary)',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
     overflow: 'hidden',
   },
   header: {

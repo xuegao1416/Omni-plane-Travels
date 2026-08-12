@@ -42,17 +42,18 @@ export default function BusinessOverlay({
     <>
       {/* 背景遮罩 */}
       <div
+        className="game-journey__nested-overlay game-journey__nested-overlay--contained"
         onClick={onClose}
         style={{
           position: 'absolute', inset: 0,
-          background: 'rgba(0,0,0,0.4)', zIndex: 99,
+          zIndex: 99,
           opacity: animating ? 1 : 0, transition: 'opacity 0.25s ease',
         }}
       />
       {/* 面板 */}
       <div
         ref={panelRef}
-        className="business-drawer"
+        className="business-drawer game-journey__nested-panel game-journey__nested-panel--side"
         style={{
           zIndex: 100,
           transform: animating ? 'translateX(0)' : 'translateX(100%)',

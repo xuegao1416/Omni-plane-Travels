@@ -275,6 +275,23 @@ export interface WorldDef {
   /** 世界自带的事件包；加载世界时自动写入 IndexedDB（builtin=true），在事件中心展示为「内置」。
    *  存档导出时这些包会随存档一起打包，导入时排重写入。 */
   eventPacks?: EmbeddedEventPack[];
+
+  /** Optional presentation metadata for adaptive visual themes. */
+  /** Optional custom world artwork; older worlds simply omit this field. */
+  artwork?: WorldArtwork;
+
+  presentation?: {
+    skin?: string;
+    coverImage?: string;
+  };
+}
+
+export interface WorldArtwork {
+  source: 'preset' | 'upload';
+  presetId?: string;
+  dataUrl?: string;
+  focalX?: number;
+  focalY?: number;
 }
 
 /**

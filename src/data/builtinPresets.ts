@@ -75,7 +75,7 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
     scriptName: '行动选项-选项',
     // 兼容带引号和不带引号的 key 格式：{t:"..."} 或 {"t":"..."} 或 {t: "..."}
     findRegex: '\\[OPTION\\]\\s*\\{["\']?t["\']?\\s*:\\s*"([^"]*)"\\s*,\\s*["\']?d["\']?\\s*:\\s*"([^"]*)"\\s*\\}',
-    replaceString: '<div class="action-option-card" data-option-text="$1：$2"><div class="action-option-card-title">$1</div><div class="action-option-card-desc">$2</div></div>',
+    replaceString: '<button type="button" class="action-option-card" aria-pressed="false" data-option-text="$1：$2"><div class="action-option-card-title">$1</div><div class="action-option-card-desc">$2</div></button>',
     placement: [2],
     disabled: false,
     markdownOnly: true,
@@ -181,6 +181,17 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
     id: 'builtin_display_dialogue_avatar',
     scriptName: '对话头像卡片',
     findRegex: '\\[SPEAK\\]\\s*\\{(?=[\\s\\S]*?"img"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"who"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"sub"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"msg"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"act"\\s*:\\s*"([^"]*)")[\\s\\S]*?\\}',
+    replaceString: '<div class="dialogue-avatar-placeholder" data-avatar="$1" data-name="$2" data-title="$3" data-text="$4" data-action="$5"></div>',
+    placement: [2],
+    disabled: false,
+    markdownOnly: true,
+    promptOnly: false,
+  },
+  // --- 对话预测卡片（ui:DL 格式） ---
+  {
+    id: 'builtin_display_uidl_dialogue',
+    scriptName: '对话预测卡片',
+    findRegex: '/ui:DL\\s*\\{(?=[\\s\\S]*?"av"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"nm"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"tt"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"tx"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"ac"\\s*:\\s*"([^"]*)")[\\s\\S]*?\\}/i',
     replaceString: '<div class="dialogue-avatar-placeholder" data-avatar="$1" data-name="$2" data-title="$3" data-text="$4" data-action="$5"></div>',
     placement: [2],
     disabled: false,

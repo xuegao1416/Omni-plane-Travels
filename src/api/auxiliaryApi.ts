@@ -1,7 +1,8 @@
 // 变量提取 API 客户端 - 从 AI 回复中提取变量更新
 
 import type { ApiConfig } from './types';
-import { buildEndpoint } from './client';
+import { buildEndpoint, prepareFetchRequest } from './client';
+import { nativeFetch } from '../utils/nativeFetch';
 
 /**
  * 尝试从 AI 回复内容中提取变量更新 JSON
@@ -69,12 +70,10 @@ export async function callAuxiliaryApi(
     stream: false,
   };
 
-  const resp = await fetch(url, {
+  const { url: fetchUrl, headers } = prepareFetchRequest(url, apiKey);
+  const resp = await nativeFetch(fetchUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify(body),
     signal,
   });

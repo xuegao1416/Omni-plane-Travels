@@ -8,14 +8,12 @@ interface Props {
 
 export function RollbackConfirm({ layer, onConfirm, onCancel }: Props) {
   return (
-    <div style={{
+    <div className="game-journey__nested-overlay game-journey__nested-overlay--contained" style={{
       position: 'absolute', inset: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.6)',
       zIndex: 10,
     }}>
-      <div style={{
-        background: 'var(--bg-secondary)',
+      <div className="game-journey__nested-panel" style={{
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         padding: '24px',

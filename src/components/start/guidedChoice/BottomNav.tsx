@@ -1,7 +1,5 @@
 import { ChevronLeft, ChevronRight, SkipForward } from 'lucide-react';
-import {
-  bottomBarStyle, navBtnStyle, primaryBtnStyle, skipBtnStyle,
-} from './styles';
+import { EntrySlicedButton } from '../EntrySurface';
 
 interface BottomNavProps {
   currentDimIndex: number;
@@ -14,41 +12,15 @@ interface BottomNavProps {
   onSkip: () => void;
 }
 
-export function BottomNav({
-  currentDimIndex, totalDims, canProceed, isLastDimension, dimRequired,
-  onPrev, onNext, onSkip,
-}: BottomNavProps) {
+export function BottomNav({ currentDimIndex, totalDims, canProceed, isLastDimension, dimRequired, onPrev, onNext, onSkip }: BottomNavProps) {
   return (
-    <div style={bottomBarStyle}>
-      <button
-        onClick={onPrev}
-        disabled={currentDimIndex === 0}
-        style={{ ...navBtnStyle, opacity: currentDimIndex === 0 ? 0.5 : 1, cursor: currentDimIndex === 0 ? 'not-allowed' : 'pointer' }}
-      >
-        <ChevronLeft size={16} />
-        上一步
-      </button>
-
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-        {currentDimIndex + 1} / {totalDims}
-      </span>
-
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        {!dimRequired && (
-          <button onClick={onSkip} style={skipBtnStyle}>
-            <SkipForward size={14} />
-            跳过
-          </button>
-        )}
-        <button
-          onClick={onNext}
-          disabled={!canProceed}
-          style={{ ...primaryBtnStyle, opacity: canProceed ? 1 : 0.5, cursor: canProceed ? 'pointer' : 'not-allowed' }}
-        >
-          {isLastDimension ? '完成选择' : '下一步'}
-          {!isLastDimension && <ChevronRight size={16} />}
-        </button>
+    <footer className="guided-choice-bottom-nav">
+      <EntrySlicedButton className="guided-choice-nav-button" icon={ChevronLeft} tone="quiet" onClick={onPrev} disabled={currentDimIndex === 0}>上一步</EntrySlicedButton>
+      <span className="guided-choice-bottom-nav__count">{currentDimIndex + 1} / {totalDims}</span>
+      <div className="guided-choice-bottom-nav__actions">
+        {!dimRequired && <EntrySlicedButton className="guided-choice-nav-button guided-choice-nav-button--quiet" icon={SkipForward} tone="quiet" onClick={onSkip}>跳过</EntrySlicedButton>}
+        <EntrySlicedButton className="guided-choice-primary" icon={isLastDimension ? undefined : ChevronRight} tone="primary" onClick={onNext} disabled={!canProceed}>{isLastDimension ? '完成推演' : '下一步'}</EntrySlicedButton>
       </div>
-    </div>
+    </footer>
   );
 }

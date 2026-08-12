@@ -144,7 +144,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
   } : undefined;
 
   return (
-    <div style={{
+    <div className="game-journey__status-panel" style={{
       display: 'flex',
       flexDirection: 'column',
       gap: '1rem',
@@ -154,7 +154,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
     }}>
       <CustomModulePanel gameState={gameState} worldId={worldId} />
       {/* 世界状态 */}
-      <div className="surface-card" style={{ padding: '1rem' }}>
+      <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
         <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           世界状态
         </h4>
@@ -175,7 +175,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
 
       {/* 当前目标 */}
       {player.当前目标 && (
-        <div className="surface-card" style={{ padding: '1rem' }}>
+        <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
           <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             当前目标
           </h4>
@@ -187,7 +187,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
 
       {/* 生存状态（无数值属性模块时显示默认血量/体力） */}
       {!hasStatModule && (
-        <div className="surface-card" style={{ padding: '1rem' }}>
+        <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
           <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             生存状态
           </h4>

@@ -10,7 +10,7 @@ interface Props {
 export default function AdvancedSettings({ config, set }: Props) {
   return (
     <>
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-muted)' }}>
+      <div className="settings-api-section-title">
         高级参数
       </div>
 

@@ -82,6 +82,8 @@ pub struct ModManifest {
     pub cover_color: String,
     pub icon: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled_by_default: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_order: Option<i64>,
@@ -272,6 +274,14 @@ pub struct ModDetail {
     pub conflict_status: Vec<ConflictStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_state: Option<ModRuntimeState>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModRuntimePack {
+    pub id: String,
+    pub manifest: ModManifest,
+    pub files: HashMap<String, String>,
 }
 
 // ---------------- Internal parsing helpers (schema/*.json) ----------------

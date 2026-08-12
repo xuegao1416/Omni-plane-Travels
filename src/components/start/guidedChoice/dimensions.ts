@@ -8,6 +8,7 @@ export interface GuidedDimConfig {
   label: string;
   description: string;
   icon: LucideIcon;
+  emblem: string;
   required: boolean;
   color: string;
   multiSelect?: boolean;
@@ -15,14 +16,14 @@ export interface GuidedDimConfig {
 }
 
 export const GUIDED_DIMENSIONS: GuidedDimConfig[] = [
-  { key: 'worldType', label: '世界类型', description: '选择一个世界类型，决定整体框架', icon: Globe, required: true, color: '#6366f1' },
-  { key: 'tone',      label: '叙事基调', description: '基调决定了 AI 叙述故事时的风格和氛围', icon: ScrollText, required: true, color: '#f59e0b' },
-  { key: 'conflict',  label: '核心冲突', description: '核心冲突是驱动故事前进的引擎', icon: Swords, required: true, color: '#ef4444' },
-  { key: 'geography', label: '地理格局', description: '世界的地理分布和区域特征', icon: Map, required: true, color: '#10b981', multiSelect: true, maxSelect: 3 },
-  { key: 'factions',  label: '势力结构', description: '各方势力的关系和格局', icon: Flag, required: true, color: '#8b5cf6', multiSelect: true, maxSelect: 3 },
-  { key: 'npcs',      label: '关键人物', description: '这个世界中的重要角色', icon: User, required: false, color: '#ec4899', multiSelect: true, maxSelect: 3 },
-  { key: 'culture',   label: '文化风俗', description: '信仰、习俗、日常生活', icon: BookMarked, required: false, color: '#14b8a6', multiSelect: true, maxSelect: 2 },
-  { key: 'rules',     label: '世界规则', description: '力量体系、社会结构、特殊规则', icon: ScrollText, required: true, color: '#f97316' },
+  { key: 'worldType', label: '世界类型', description: '选择一个世界类型，决定整体框架', icon: Globe, emblem: '/art/theme/emblems/emblem-31-v2.png', required: true, color: '#6366f1' },
+  { key: 'tone',      label: '叙事基调', description: '基调决定了 AI 叙述故事时的风格和氛围', icon: ScrollText, emblem: '/art/theme/emblems/emblem-32-v2.png', required: true, color: '#f59e0b' },
+  { key: 'conflict',  label: '核心冲突', description: '核心冲突是驱动故事前进的引擎', icon: Swords, emblem: '/art/theme/emblems/emblem-33-v2.png', required: true, color: '#ef4444' },
+  { key: 'geography', label: '地理格局', description: '世界的地理分布和区域特征', icon: Map, emblem: '/art/theme/emblems/emblem-34-v2.png', required: true, color: '#10b981', multiSelect: true, maxSelect: 3 },
+  { key: 'factions',  label: '势力结构', description: '各方势力的关系和格局', icon: Flag, emblem: '/art/theme/emblems/emblem-35-v2.png', required: true, color: '#8b5cf6', multiSelect: true, maxSelect: 3 },
+  { key: 'npcs',      label: '关键人物', description: '这个世界中的重要角色', icon: User, emblem: '/art/theme/emblems/emblem-36-v2.png', required: false, color: '#ec4899', multiSelect: true, maxSelect: 3 },
+  { key: 'culture',   label: '文化风俗', description: '信仰、习俗、日常生活', icon: BookMarked, emblem: '/art/theme/emblems/emblem-37-v2.png', required: false, color: '#14b8a6', multiSelect: true, maxSelect: 2 },
+  { key: 'rules',     label: '世界规则', description: '力量体系、社会结构、特殊规则', icon: ScrollText, emblem: '/art/theme/emblems/emblem-38-v2.png', required: true, color: '#f97316' },
 ];
 
 export const DIMENSION_HINTS: Record<string, string> = {

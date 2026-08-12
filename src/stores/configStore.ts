@@ -88,7 +88,7 @@ const translations: Record<Language, Record<string, string>> = {
     'saves.saved': '已保存', 'saves.imported': '导入成功',
     'start.title': '世界漫游指南', 'start.subtitle': '探索未知世界，书写你的故事',
     'start.world': '选择世界', 'start.world.dev': '开发中', 'start.world.default': '默认世界（自由模式）',
-    'start.begin': '开始游戏', 'start.continue': '继续游戏', 'start.settings': '设置',
+    'start.begin': '点击任意处开始', 'start.continue': '继续游戏', 'start.settings': '设置',
   },
   'en': {
     'settings.title': 'Settings', 'settings.back': '← Back', 'settings.save': 'Save & Return',
@@ -126,7 +126,7 @@ const translations: Record<Language, Record<string, string>> = {
     'saves.saved': 'Saved', 'saves.imported': 'Imported',
     'start.title': 'Multi-Realm Traversal Simulator', 'start.subtitle': 'Realms converge, your destiny awaits',
     'start.world': 'Select World', 'start.world.dev': 'In Development', 'start.world.default': 'Default World (Free Mode)',
-    'start.begin': 'Start Game', 'start.continue': 'Continue Game', 'start.settings': 'Settings',
+    'start.begin': 'Click anywhere to begin', 'start.continue': 'Continue Game', 'start.settings': 'Settings',
   },
 };
 

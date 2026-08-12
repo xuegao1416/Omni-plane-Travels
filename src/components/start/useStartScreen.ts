@@ -7,7 +7,7 @@ import { useConfigStore } from '../../stores/configStore';
 import { useWizard } from '../../hooks/useWizard';
 import { useAiFill } from '../../hooks/useAiFill';
 import { useCharacterHistory, clearSegmentsCache } from '../../hooks/useCharacterHistory';
-import type { GameSave, PlayerProfile } from '../../storage/db';
+import { loadSaveWithMigration, type GameSave, type PlayerProfile } from '../../storage/db';
 import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
@@ -314,6 +314,27 @@ export function useStartScreen() {
     await renameSaveFromStore(id, newName);
   };
 
+  const handleDeleteWorld = async (worldId: string) => {
+    if (!wizard.createdWorlds.some(world => world.id === worldId)) {
+      await showAlert('内置世界不能删除；只有自建世界定义可以删除。', { title: '无法删除世界', danger: true });
+      return { ok: false as const, reason: 'not-found' as const };
+    }
+    if (!await confirm('删除世界定义后将无法再进入该世界；关联存档不会被删除。确定继续？', { danger: true, confirmText: '删除世界定义' })) {
+      return { ok: false as const, reason: 'cancelled' as const };
+    }
+
+    const referencedSaveIds: string[] = [];
+    for (const meta of savesMeta) {
+      const save = await loadSaveWithMigration(meta.id);
+      if (save?.worldId === worldId) referencedSaveIds.push(meta.id);
+    }
+    if (referencedSaveIds.length > 0) {
+      await showAlert('无法删除世界定义：已有存档引用它。请先处理关联存档；存档不会被自动删除。', { title: '存在关联存档', danger: true });
+      return { ok: false as const, reason: 'referenced' as const };
+    }
+    return wizard.handleDeleteWorld(worldId);
+  };
+
   const handleImportSave = async (file: File) => {
     try {
       const text = await file.text();
@@ -358,8 +379,9 @@ export function useStartScreen() {
     allWorlds: wizard.allWorlds, createdWorlds: wizard.createdWorlds,
     worldEditorOpen: wizard.worldEditorOpen, setWorldEditorOpen: wizard.setWorldEditorOpen,
     editingWorld: wizard.editingWorld, setEditingWorld: wizard.setEditingWorld,
+    worldEditorInitialStep: wizard.worldEditorInitialStep, setWorldEditorInitialStep: wizard.setWorldEditorInitialStep,
     handleSaveWorld: wizard.handleSaveWorld,
-    handleDeleteWorld: wizard.handleDeleteWorld,
+    handleDeleteWorld,
     handleCancelWorldEditor: wizard.handleCancelWorldEditor,
     handleImportWorld: wizard.handleImportWorld,
     // ai fill

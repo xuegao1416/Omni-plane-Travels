@@ -4,8 +4,6 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: stretch;
   justify-content: stretch;
@@ -17,11 +15,9 @@
   margin: 20px auto;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .header {

@@ -23,9 +23,9 @@ export default function ImageGenSettingsTab() {
   const setConfig = useImageStore((s) => s.setConfig);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="settings-tab-panel settings-tab-panel--image">
       {/* ─── 正文生图 ─── */}
-      <Section icon={<ImageIcon size={16} />} title="正文生图">
+      <Section variant="paper" icon={<ImageIcon size={16} />} title="正文生图">
         <SettingRow label="启用正文生图" desc="开启后，正文中的 image###提示词### 标签将变为「点击生图」按钮">
           <Toggle value={config.inlineImageEnabled} onChange={(v) => updateConfig('inlineImageEnabled', v)} />
         </SettingRow>
@@ -61,7 +61,7 @@ export default function ImageGenSettingsTab() {
       </Section>
 
       {/* ─── 角色画像 ─── */}
-      <Section icon={<Users size={16} />} title="角色画像生成">
+      <Section variant="paper" icon={<Users size={16} />} title="角色画像生成">
         <SettingRow label="启用自动画像生成" desc="新增 NPC 时自动调用 API 分析角色特征，生成画像">
           <Toggle value={config.characterPortraitEnabled} onChange={(v) => updateConfig('characterPortraitEnabled', v)} />
         </SettingRow>
@@ -88,7 +88,7 @@ export default function ImageGenSettingsTab() {
       </Section>
 
       {/* ─── 连接设置（引擎选择 + 引擎专属配置） ─── */}
-      <Section icon={<Cpu size={16} />} title="连接设置">
+      <Section variant="paper" icon={<Cpu size={16} />} title="连接设置">
         <EngineSelector engine={config.engine} onEngineChange={(v) => updateConfig('engine', v)} />
         {config.engine === 'nai' && <NAIConfig config={config} updateConfig={updateConfig} />}
         {config.engine === 'comfyui' && <ComfyConfig config={config} updateConfig={updateConfig} />}
@@ -97,7 +97,7 @@ export default function ImageGenSettingsTab() {
       </Section>
 
       {/* ─── 全局提示词 ─── */}
-      <Section icon={<Wand2 size={16} />} title="全局提示词">
+      <Section variant="paper" icon={<Wand2 size={16} />} title="全局提示词">
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
           <Field label="正向提示词" hint="会自动与每次请求的提示词合并去重">
             <TextArea

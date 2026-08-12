@@ -22,6 +22,9 @@ export interface StepPersonalInfoProps {
   worldEntry?: WorldBookEntry | null;
   onNext: () => void;
   onPrev: () => void;
+  onModalStateChange?: (open: boolean) => void;
+  phase?: 'identity' | 'loadout';
+  showNavigation?: boolean;
 }
 
 export type RightTab = 'identity' | 'stats' | 'skills' | 'items' | 'npcs';

@@ -1,4 +1,4 @@
-//! The 10 event-system Tauri commands.
+//! The 11 event-system Tauri commands.
 //!
 //! Command names match `docs/api-mod-system.md` exactly. Each returns
 //! `Result<T, ModError>`; `ModError` is serialized into `error.message` so the
@@ -8,7 +8,8 @@
 //! frontend: these commands only store/validate/register Mods and flip
 //! enabled flags. They never evaluate rules or execute player code.
 
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
 use tauri::{AppHandle, State};
@@ -20,6 +21,38 @@ use crate::mod_system::registry::ModRegistry;
 use crate::mod_system::types::*;
 use crate::mod_system::validator;
 use crate::mod_system::{emit_mods_changed, mod_dir, mods_root, now_iso, dir_size};
+
+fn collect_runtime_json_files(root: &Path) -> Result<HashMap<String, String>, ModError> {
+    let mut files = HashMap::new();
+    collect_runtime_json_files_inner(root, root, &mut files)?;
+    Ok(files)
+}
+
+fn collect_runtime_json_files_inner(
+    root: &Path,
+    current: &Path,
+    files: &mut HashMap<String, String>,
+) -> Result<(), ModError> {
+    for entry in std::fs::read_dir(current)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            collect_runtime_json_files_inner(root, &path, files)?;
+            continue;
+        }
+        if !file_type.is_file() || path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+
+        let relative = path
+            .strip_prefix(root)
+            .map_err(|error| ModError::io_error(error.to_string(), None))?;
+        let relative = relative.to_string_lossy().replace('\\', "/");
+        files.insert(relative, std::fs::read_to_string(path)?);
+    }
+    Ok(())
+}
 
 // ===========================================================================
 // 1. discover_mods
@@ -374,7 +407,25 @@ pub fn export_event(
 }
 
 // ===========================================================================
-// 10. get_mod_detail
+// 10. get_event_runtime
+// ===========================================================================
+#[tauri::command]
+pub fn get_event_runtime(
+    id: String,
+    app: AppHandle,
+    state: State<'_, ModRegistry>,
+) -> Result<ModRuntimePack, ModError> {
+    state.get(&id).ok_or_else(|| ModError::not_found(&id))?;
+    let dir = mod_dir(&app, &id)?;
+    let manifest_path = dir.join("manifest.json");
+    let manifest: ModManifest = serde_json::from_str(&std::fs::read_to_string(manifest_path)?)?;
+    let files = collect_runtime_json_files(&dir)?;
+
+    Ok(ModRuntimePack { id, manifest, files })
+}
+
+// ===========================================================================
+// 11. get_mod_detail
 // ===========================================================================
 #[tauri::command]
 pub fn get_event_detail(
@@ -446,6 +497,41 @@ pub fn get_event_detail(
         conflict_status,
         runtime_state,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_runtime_json_files as collect_files;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn collect_runtime_json_files() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("omni-runtime-{suffix}"));
+        let schema = root.join("schema");
+        fs::create_dir_all(&schema).expect("create fixture directory");
+        fs::write(root.join("manifest.json"), "{\"id\":\"demo\"}")
+            .expect("write manifest fixture");
+        fs::write(schema.join("rules.json"), "{\"version\":1}")
+            .expect("write rules fixture");
+        fs::write(schema.join("event-card-1.json"), "{\"nodes\":[]}")
+            .expect("write card fixture");
+        fs::write(root.join("cover.png"), [0_u8, 1_u8, 2_u8])
+            .expect("write binary fixture");
+
+        let files = collect_files(&root).expect("collect runtime files");
+
+        assert_eq!(files.get("manifest.json"), Some(&"{\"id\":\"demo\"}".to_string()));
+        assert_eq!(files.get("schema/rules.json"), Some(&"{\"version\":1}".to_string()));
+        assert_eq!(files.get("schema/event-card-1.json"), Some(&"{\"nodes\":[]}".to_string()));
+        assert!(!files.contains_key("cover.png"));
+
+        fs::remove_dir_all(root).expect("remove fixture directory");
+    }
 }
 
 // ===========================================================================

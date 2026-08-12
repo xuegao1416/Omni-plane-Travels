@@ -84,9 +84,9 @@ export default function NotebookPanel({ gameState }: Props) {
   const [filter, setFilter] = useState<ChronicleType | '全部'>('全部');
   const chronicleSystem = gameState.玩家.纪事系统;
 
-  // 读取纪事数据
+  // 读取纪事数据（过滤 null 值避免崩溃）
   const allEntries = chronicleSystem?.纪事
-    ? Object.values(chronicleSystem.纪事).sort((a, b) => (b.$time ?? 0) - (a.$time ?? 0))
+    ? Object.values(chronicleSystem.纪事).filter(Boolean).sort((a, b) => (b.$time ?? 0) - (a.$time ?? 0))
     : [];
 
   // 过滤

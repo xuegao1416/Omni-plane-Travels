@@ -1,10 +1,6 @@
 import { X, RefreshCw, Undo2 } from 'lucide-react';
 import type { WorldDef } from '../../data/worlds-schema';
 import { GUIDED_DIMENSIONS, getDimensionQuestion } from './guidedChoice/dimensions';
-import {
-  overlayStyle, headerBarStyle, closeBtnStyle, titleStyle, subtitleStyle,
-  cardGridStyle, primaryBtnStyle,
-} from './guidedChoice/styles';
 import { useGuidedSelection } from './guidedChoice/useGuidedSelection';
 import { LoadingView } from './guidedChoice/LoadingView';
 import { StepIndicator } from './guidedChoice/StepIndicator';
@@ -29,128 +25,66 @@ export default function GuidedChoiceOverlay({
   if (!visible) return null;
 
   if (s.phase === 'loading') {
-    return (
-      <LoadingView
-        title="AI 正在分析你的世界..."
-        subtitle={userDesc}
-        spinnerMessage="正在为你生成世界选项..."
-        onClose={s.handleClose}
-      />
-    );
+    return <LoadingView title="AI 正在分析你的世界..." subtitle={userDesc} spinnerMessage="正在为你生成世界选项..." onClose={s.handleClose} />;
   }
 
   if (s.phase === 'generating') {
-    return (
-      <LoadingView
-        title="正在生成你的世界..."
-        subtitle={`已选择 ${s.selections.length} 个维度，AI 正在根据你的选择构建完整世界`}
-        spinnerMessage="正在生成世界名称、设定、势力、NPC..."
-        onClose={s.handleClose}
-      />
-    );
+    return <LoadingView title="正在生成你的世界..." subtitle={`已选择 ${s.selections.length} 个维度，AI 正在根据你的选择构建完整世界`} spinnerMessage="正在生成世界名称、设定、势力、NPC..." onClose={s.handleClose} />;
   }
 
   const { currentDim, currentGeneration, currentSelection } = s;
 
   return (
-    <div style={overlayStyle}>
-      <div style={headerBarStyle}>
-        <button onClick={s.handleClose} style={closeBtnStyle}><X size={16} /></button>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={titleStyle}>选择你的世界</h1>
-          <p style={subtitleStyle}>{userDesc}</p>
+    <section className="guided-choice-panel" aria-label="世界织构推演">
+      <div className="guided-choice-header">
+        <button className="guided-choice-close" onClick={s.handleClose} aria-label="关闭世界织构推演"><X size={16} /></button>
+        <div className="guided-choice-heading">
+          <span className="world-weave-kicker">STEP 02 · WORLD WEAVE</span>
+          <h2>世界织构推演</h2>
+          <p>{userDesc}</p>
         </div>
       </div>
 
-      <StepIndicator
-        currentDimIndex={s.currentDimIndex}
-        selections={s.selections}
-        onJump={s.setCurrentDimIndex}
-      />
+      <StepIndicator currentDimIndex={s.currentDimIndex} selections={s.selections} onJump={s.setCurrentDimIndex} />
 
-      <main style={{ flex: 1, overflow: 'auto', padding: '1.5rem 1.5rem 0' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '1rem' }}>
+      <main className="guided-choice-body">
+        <div className="guided-choice-body__inner">
           {s.error && (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <p style={{ color: 'var(--danger)', marginBottom: '1rem' }}>{s.error}</p>
-              <button onClick={s.handleRetry} style={primaryBtnStyle}>重试</button>
+            <div className="guided-choice-error">
+              <p>{s.error}</p>
+              <button className="guided-choice-primary" onClick={s.handleRetry}>重试</button>
             </div>
           )}
 
-          {!s.error && currentGeneration?.narrative && (
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: '600px', margin: '0 auto 1.5rem', animation: 'slideUp 0.3s ease' }}>
-              {currentGeneration.narrative}
-            </p>
-          )}
+          {!s.error && currentGeneration?.narrative && <p className="guided-choice-narrative">{currentGeneration.narrative}</p>}
 
           {!s.error && currentDim && (
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem', animation: 'slideUp 0.3s ease' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)', margin: 0 }}>
-                {getDimensionQuestion(currentDim.key)}
-              </h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: '0.4rem' }}>
+            <div className="guided-choice-question">
+              <span className="guided-choice-question__eyebrow">{currentDim.label}</span>
+              <h3>{getDimensionQuestion(currentDim.key)}</h3>
+              <p>
                 {currentDim.description}
-                {currentDim.multiSelect && (
-                  <span style={{ marginLeft: '8px', color: 'var(--accent)' }}>
-                    （可多选，最多{currentDim.maxSelect || 3}个）
-                  </span>
-                )}
+                {currentDim.multiSelect && <span className="guided-choice-question__limit">（可多选，最多 {currentDim.maxSelect || 3} 个）</span>}
               </p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
-                <button
-                  onClick={s.handleRegenerate}
-                  disabled={s.isRegenerating}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.3rem',
-                    padding: '0.35rem 0.75rem', borderRadius: '8px',
-                    border: '1px solid var(--border)', background: 'var(--bg-secondary)',
-                    color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer',
-                    opacity: s.isRegenerating ? 0.6 : 1,
-                    transition: 'all 0.2s ease',
-                  }}
-                  title="重新生成本维度的选项"
-                >
-                  <RefreshCw size={13} style={{ animation: s.isRegenerating ? 'spin 0.8s linear infinite' : 'none' }} />
+              <div className="guided-choice-question__actions">
+                <button onClick={s.handleRegenerate} disabled={s.isRegenerating} className="guided-choice-tool" title="重新生成本维度的选项">
+                  <RefreshCw size={13} className={s.isRegenerating ? 'is-spinning' : undefined} />
                   {s.isRegenerating ? '生成中...' : '换一批'}
                 </button>
-                {s.hasHistory && (
-                  <button
-                    onClick={s.handleUndoRegenerate}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.3rem',
-                      padding: '0.35rem 0.75rem', borderRadius: '8px',
-                      border: '1px solid var(--border)', background: 'var(--bg-secondary)',
-                      color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
-                    title="恢复上一批选项"
-                  >
-                    <Undo2 size={13} />
-                    上一批
-                  </button>
-                )}
+                {s.hasHistory && <button onClick={s.handleUndoRegenerate} className="guided-choice-tool" title="恢复上一批选项"><Undo2 size={13} /> 上一批</button>}
               </div>
             </div>
           )}
 
           {!s.error && currentGeneration && currentDim && (
             <>
-              <div style={cardGridStyle}>
-                {(currentGeneration.choices ?? []).map((choice) => {
+              <div className="guided-choice-options">
+                {(currentGeneration.choices ?? []).map(choice => {
                   const isSelected = !!(currentDim.multiSelect
                     ? currentSelection?.choices?.some(c => c.id === choice.id)
                     : currentSelection?.choiceId === choice.id);
-                  return (
-                    <ChoiceCard
-                      key={choice.id}
-                      choice={choice}
-                      dimColor={currentDim.color}
-                      isSelected={isSelected}
-                      onSelect={() => s.handleSelect(choice.id)}
-                    />
-                  );
+                  return <ChoiceCard key={choice.id} choice={choice} dimColor={currentDim.color} isSelected={isSelected} onSelect={() => s.handleSelect(choice.id)} />;
                 })}
-
                 <CustomCard
                   dimColor={currentDim.color}
                   dimLabel={currentDim.label}
@@ -161,7 +95,6 @@ export default function GuidedChoiceOverlay({
                   onSelect={() => s.handleSelect('E')}
                 />
               </div>
-
               {s.isEditingCustom && (
                 <CustomEditArea
                   dimLabel={currentDim.label}
@@ -192,12 +125,6 @@ export default function GuidedChoiceOverlay({
         onNext={s.handleNext}
         onSkip={() => s.isLastDimension ? s.handleComplete() : s.setCurrentDimIndex(prev => prev + 1)}
       />
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @media (max-width: 640px) { .guide-step-label { display: none; } }
-      `}</style>
-    </div>
+    </section>
   );
 }

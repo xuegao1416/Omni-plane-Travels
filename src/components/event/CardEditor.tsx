@@ -22,7 +22,7 @@ import type { WorldDef } from '../../data/worlds-schema';
 import CardWorkflowEditor from '../card-workflow/CardWorkflowEditor';
 import CardNodePalette from '../card-workflow/CardNodePalette';
 
-const APP_VERSION = '2.7.2';
+const APP_VERSION = '2.7.3';
 
 function newEventId(): string {
   return `evt-${Math.random().toString(36).slice(2, 8)}`;

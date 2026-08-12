@@ -6,8 +6,8 @@ export default function GeneralSettingsTab() {
   const { settings: ui, update, t } = useUISettings();
 
   return (
-    <div style={{ maxWidth: '560px' }}>
-      <Section icon={<Globe size={15} />} title={t('settings.language')}>
+    <div className="settings-tab-panel settings-tab-panel--general">
+      <Section variant="paper" icon={<Globe size={15} />} title={t('settings.language')}>
         <SettingRow label={t('settings.language')}>
           <SegmentedControl
             options={[{ label: '简体中文', value: 'zh-CN' }, { label: 'English', value: 'en' }]}
@@ -17,7 +17,7 @@ export default function GeneralSettingsTab() {
         </SettingRow>
       </Section>
 
-      <Section icon={<Palette size={15} />} title={t('settings.theme')}>
+      <Section variant="paper" icon={<Palette size={15} />} title={t('settings.theme')}>
         <SettingRow label={t('settings.theme')}>
           <SegmentedControl
             options={[
@@ -32,7 +32,7 @@ export default function GeneralSettingsTab() {
         </SettingRow>
       </Section>
 
-      <Section icon={<Type size={15} />} title="排版">
+      <Section variant="paper" icon={<Type size={15} />} title="排版">
         <SettingRow label={t('settings.font')}>
           <Select
             options={[

@@ -174,7 +174,7 @@ function buildBaseCustomModuleAgentSystemPrompt(): string {
 state 只能使用 number、string、boolean、enum、array、object。logic 只能使用 onGameStart、onTurnEnd、onTick、onChoice，以及 set、add、subtract、toggle、append、remove、log 动作。所有 action 和 view 的 path 只能指向本模块自己的 state。
 权限必须是 read 数组加 write: "own-state-only"。可视模块才提供 view，slot 只能是 right-panel 或 left-panel，组件只能是 section、text、number、progress、badge、list、table、divider、conditional、button。后台模块可以省略 view。
 
-安全边界：禁止生成 code、script、eval、component、import；禁止 JavaScript、TypeScript、React、Vue、JSX、HTML、网络请求、文件访问、Tauri 调用、API key 或任意外部状态写入。禁止读取或修改 世界、玩家、人物档案、memoryRuntime、simulationRuntime 等核心状态。不能实现的要求要在 JSON 的 description 中说明限制。
+安全边界（硬限制，违规一律拒绝）：禁止生成 code、script、eval、component、import；禁止 JavaScript、TypeScript、React、Vue、JSX、HTML、网络请求、文件访问、Tauri 调用、API key 或任意外部写入。所有状态读写必须通过 logic 中的规则（onGameStart/onTurnEnd/onTick/onChoice）和 permissions 字段声明的范围进行，游戏内部状态操作是安全的。
 只输出一个 JSON 对象，不要 Markdown，不要解释文字。对象必须符合：{"message":"给玩家的回复或追问","status":"needs_input 或 draft_ready","module":null 或完整模块 JSON}。需要澄清时使用 needs_input；信息足够且模块通过你自己的检查时使用 draft_ready。JSON 生成后仍会经过严格校验，不能绕过校验。`;
 }
 

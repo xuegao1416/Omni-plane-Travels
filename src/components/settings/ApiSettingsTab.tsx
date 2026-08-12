@@ -58,7 +58,7 @@ const ApiSettingsTab = forwardRef<ApiSettingsRef, ApiSettingsTabProps>(
     }, []);
 
     return (
-      <div style={{ maxWidth: '560px' }}>
+      <div className="settings-tab-panel settings-tab-panel--api">
         <div style={{ marginBottom: '18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <span style={{ fontWeight: '600', fontSize: 'var(--font-size-md)' }}>参数配置</span>
@@ -74,7 +74,7 @@ const ApiSettingsTab = forwardRef<ApiSettingsRef, ApiSettingsTabProps>(
               {PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
-          <ProviderForm
+      <ProviderForm
             config={config} set={set}
             models={models} setModels={setModels}
             loadingModels={loadingModels} onFetchModels={handleFetchModels}

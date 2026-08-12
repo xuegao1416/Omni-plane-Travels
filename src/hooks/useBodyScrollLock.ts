@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { acquireBodyScrollLock } from './bodyScrollLockManager';
 
 /**
  * 当条件为 true 时锁定 body 滚动，防止弹窗后面的页面跟着滚动。
@@ -6,11 +7,7 @@ import { useEffect } from 'react';
  */
 export function useBodyScrollLock(locked: boolean) {
   useEffect(() => {
-    if (!locked) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    if (!locked) return undefined;
+    return acquireBodyScrollLock(document.body);
   }, [locked]);
 }

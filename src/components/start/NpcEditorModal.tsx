@@ -9,6 +9,9 @@ import { v4 as uuid } from 'uuid';
 import { useConfigStore } from '../../stores/configStore';
 import { useNpcFill } from '../../hooks/useNpcFill';
 import { exportNpcTemplateJSON, downloadJSON } from '../../storage/templateStore';
+import { useDialog } from '../shared/Dialog';
+import OverlayPortal from '../shared/OverlayPortal';
+import { isNpcDraftDirty } from './npcModalState';
 
 const QUALITY_OPTIONS = ['普通', '精良', '稀有', '史诗', '传说'] as const;
 
@@ -83,6 +86,21 @@ export default function NpcEditorModal({
   const t = useConfigStore(s => s.t);
   const [npc, setNpc] = useState<CustomNpc>(() => initial || emptyNpc());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const { DialogUI, confirm: dlgConfirm } = useDialog();
+
+  const requestClose = async () => {
+    if (!isNpcDraftDirty(npc, initial ?? null)) {
+      onCancel();
+      return;
+    }
+    const discard = await dlgConfirm('当前 NPC 还有未保存内容，确定放弃编辑吗？', {
+      title: '放弃 NPC 编辑',
+      confirmText: '放弃编辑',
+      cancelText: '继续编辑',
+      danger: true,
+    });
+    if (discard) onCancel();
+  };
 
   const toggleSection = (key: string) => {
     setExpandedSections(prev => {
@@ -156,7 +174,7 @@ export default function NpcEditorModal({
   });
 
   return (
-    <div className="world-editor-overlay" onClick={onCancel}>
+    <OverlayPortal className="world-editor-overlay" ariaLabel={initial ? '编辑 NPC' : '创建 NPC'} onClose={() => { void requestClose(); }}>
       <div className="world-editor-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: '720px' }}>
         <div className="world-editor-header">
           <span style={{ fontWeight: '600', fontSize: '1rem' }}>
@@ -190,7 +208,7 @@ export default function NpcEditorModal({
                 {isFilling ? <><Loader size={12} className="animate-spin" /> 生成中{fillElapsed > 0 ? ` ${fillElapsed}s` : ''}</> : <><Wand2 size={12} /> AI 补全</>}
               </button>
             )}
-            <button onClick={onCancel} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 'var(--space-1)' }}>
+            <button onClick={() => { void requestClose(); }} aria-label="关闭 NPC 编辑" style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 'var(--space-1)' }}>
               <X size={18} />
             </button>
           </div>
@@ -427,12 +445,13 @@ export default function NpcEditorModal({
         </div>
 
         <div className="world-editor-footer">
-          <button className="btn-secondary" onClick={onCancel} style={{ padding: 'var(--space-2) var(--space-5)' }}>{t('common.cancel')}</button>
+          <button className="btn-secondary" onClick={() => { void requestClose(); }} style={{ padding: 'var(--space-2) var(--space-5)' }}>{t('common.cancel')}</button>
           <button className="btn-primary" onClick={() => onSave(npc)} disabled={!canSave} style={{ padding: 'var(--space-2) var(--space-6)' }}>
             {initial ? t('npcEditor.saveChanges') : t('npcEditor.createNpc')}
           </button>
         </div>
       </div>
-    </div>
+      {DialogUI}
+    </OverlayPortal>
   );
 }

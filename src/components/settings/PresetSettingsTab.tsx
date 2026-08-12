@@ -53,7 +53,7 @@ export default function PresetSettingsTab() {
 
   if (!editingPreset) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="settings-tab-panel settings-tab-panel--preset">
         {DialogUI}
         <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>

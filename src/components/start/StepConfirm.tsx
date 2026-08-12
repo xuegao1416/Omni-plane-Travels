@@ -10,12 +10,16 @@ interface StepConfirmProps {
   segmentDefs: SegmentDef[];
   segments: Record<string, string>;
   buildInitialState: () => GameState;
+  selectedWorldName?: string;
+  worldSummary?: string;
+  portraitSource?: string;
   onStartGame: () => void;
   onPrev: () => void;
+  showNavigation?: boolean;
 }
 
 export default function StepConfirm({
-  personalInfo, segmentDefs, segments, buildInitialState, onStartGame, onPrev,
+  personalInfo, segmentDefs, segments, buildInitialState, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true,
 }: StepConfirmProps) {
   const npcCount = personalInfo.customNpcs.length;
   const skillCount = Object.keys(personalInfo.initialSkills).length;
@@ -24,6 +28,15 @@ export default function StepConfirm({
 
   return (
     <div className="confirm-layout">
+      <div className="confirm-journey-strip">
+        {portraitSource && <img src={portraitSource} alt="人物形象" className="confirm-portrait" />}
+        <div className="confirm-journey-strip__copy">
+          <span className="confirm-eyebrow">启程契约</span>
+          <strong>{personalInfo.name || '未命名旅者'}</strong>
+          <span>{selectedWorldName || '尚未选择世界'}</span>
+          {worldSummary && <small>{worldSummary}</small>}
+        </div>
+      </div>
       {/* 左栏：角色 + NPC */}
       <div className="confirm-left">
         <div className="confirm-card">
@@ -98,12 +111,14 @@ export default function StepConfirm({
       </div>
 
       {/* 导航 */}
-      <div className="confirm-nav">
-        <button className="btn-secondary" onClick={onPrev} style={{ padding: '10px 24px' }}>← 上一步</button>
-        <button className="btn-primary" onClick={onStartGame} style={{ padding: '10px 32px', fontSize: 'var(--font-size-lg)' }}>
-          开始冒险 →
-        </button>
-      </div>
+      {showNavigation && (
+        <div className="confirm-nav">
+          <button className="btn-secondary" onClick={onPrev} style={{ padding: '10px 24px' }}>← 上一步</button>
+          <button className="btn-primary" onClick={onStartGame} style={{ padding: '10px 32px', fontSize: 'var(--font-size-lg)' }}>
+            开始冒险 →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

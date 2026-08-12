@@ -5,6 +5,7 @@ import type { WorldBookEntry } from '../worldbook/index';
 import { loadWorldBook } from '../engine/worldPersonality';
 import { STORAGE_KEYS } from '@/config/storageKeys';
 import { normalizeModules } from '../modules/normalizeModule';
+import { deleteCustomWorldFromList, type CustomWorldDeleteResult } from '../data/customWorldLifecycle';
 
 const CREATED_WORLDS_KEY = STORAGE_KEYS.CUSTOM_WORLDS;
 
@@ -78,6 +79,7 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
   // ─── 世界编辑器 ───
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [editingWorld, setEditingWorld] = useState<WorldDef | null>(null);
+  const [worldEditorInitialStep, setWorldEditorInitialStep] = useState<number | undefined>(undefined);
   const aiWorldAbortRef = useRef<AbortController | null>(null);
 
   // 加载世界书（进入向导时触发，不再绑定特定步骤号）
@@ -129,16 +131,21 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
     setSelectedWorld(world.id);
     setWorldEditorOpen(false);
     setEditingWorld(null);
+    setWorldEditorInitialStep(undefined);
   };
 
-  const handleDeleteWorld = (worldId: string) => {
-    setCreatedWorlds(prev => prev.filter(w => w.id !== worldId));
+  const handleDeleteWorld = (worldId: string, referencedWorldIds: ReadonlySet<string> = new Set()): CustomWorldDeleteResult => {
+    const result = deleteCustomWorldFromList(createdWorlds, worldId, new Set(WORLDS.map(world => world.id)), referencedWorldIds);
+    if (!result.ok) return result;
+    setCreatedWorlds(result.worlds);
     if (selectedWorld === worldId) setSelectedWorld('default');
+    return result;
   };
 
   const handleCancelWorldEditor = () => {
     setWorldEditorOpen(false);
     setEditingWorld(null);
+    setWorldEditorInitialStep(undefined);
   };
 
   const handleImportWorld = (world: WorldDef) => {
@@ -164,6 +171,7 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
     // 编辑器
     worldEditorOpen, setWorldEditorOpen,
     editingWorld, setEditingWorld,
+    worldEditorInitialStep, setWorldEditorInitialStep,
     handleSaveWorld,
     handleDeleteWorld,
     handleCancelWorldEditor,

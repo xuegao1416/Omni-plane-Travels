@@ -1,18 +1,26 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { WorldDef } from '../../data/worldLoader';
+import { resolveWorldArtwork } from '../../data/worldArtwork';
 import type { WorldBookEntry } from '../../worldbook/index';
 import type { PlayerProfile } from '../../storage/db';
 import type { GameState } from '../../schema/variables';
 import type { HistoryPreset } from '../../storage/templateStore';
 import { Check, Sunrise } from 'lucide-react';
 import { getAgeStages } from '../../utils/ageStages';
-import WorldEditorForm from './WorldEditorForm';
-import StepWorldBrowser from './StepWorldBrowser';
+import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
+import AmbientParticleLayer from '../shared/dawn/AmbientParticleLayer';
 import StepPersonalInfo from './StepPersonalInfo';
 import StepCharacterHistory, { buildSegmentDefs } from './StepCharacterHistory';
 import StepConfirm from './StepConfirm';
+import { EntrySlicedButton } from './EntrySurface';
+import PortraitEditor, { getPortraitSource } from './PortraitEditor';
 
-const STEP_LABELS = ['选择世界', '角色创建', '人物经历', '总确认'];
+const STEP_LABELS = ['降临身份', '天赋与行囊', '前尘编年', '启程契约'];
+const RITUAL_ANCHORS: Record<number, string> = {
+  1: '/art/theme/ui-kit/dawn-v4/ritual/identity-mirror-v1.png',
+  2: '/art/theme/ui-kit/dawn-v4/ritual/talent-astrolabe-v1.png',
+  4: '/art/theme/ui-kit/dawn-v4/ritual/departure-gate-v1.png',
+};
 
 interface WizardShellProps {
   step: number;
@@ -23,9 +31,10 @@ interface WizardShellProps {
   t: (key: string) => string;
   // step props
   selectedWorld: string;
-  setSelectedWorld: (id: string) => void;
+  /** Legacy preview compatibility; world selection is now owned by the hall. */
+  setSelectedWorld?: (id: string) => void;
   allWorlds: WorldDef[];
-  createdWorlds: WorldDef[];
+  createdWorlds?: WorldDef[];
   worldEntry: WorldBookEntry | null;
   personalInfo: PlayerProfile;
   setPersonalInfo: (info: PlayerProfile) => void;
@@ -48,28 +57,26 @@ interface WizardShellProps {
   buildInitialState: () => GameState;
   onStartGame: () => void;
   // world editor
-  worldEditorOpen: boolean;
-  editingWorld: WorldDef | null;
-  onSaveWorld: (world: WorldDef) => void;
-  onDeleteWorld: (worldId: string) => void;
-  onCancelWorldEditor: () => void;
-  onOpenEditor: (world: WorldDef | null) => void;
-  onImportWorld: (world: WorldDef) => void;
+  worldEditorOpen?: boolean;
+  editingWorld?: WorldDef | null;
+  onSaveWorld?: (world: WorldDef) => void;
+  onDeleteWorld?: (worldId: string) => void;
+  onCancelWorldEditor?: () => void;
+  onOpenEditor?: (world: WorldDef | null) => void;
+  onImportWorld?: (world: WorldDef) => void;
   apiConfig: any;
   settings: any;
 }
 
 export default function WizardShell({
   step, setStep, onBackToMenu, title, subtitle, t,
-  selectedWorld, setSelectedWorld,
-  allWorlds, createdWorlds, worldEntry,
+  selectedWorld,
+  allWorlds, worldEntry,
   personalInfo, setPersonalInfo, isFilling, fillElapsed, onAiFill, onCancelFill,
   segments, setSegments, isGenerating, regeneratingId,
   includeAgeStages, setIncludeAgeStages,
   hasApiConfig,
   onGenerateAll, onRegenerateSegment, onLoadPreset, buildInitialState, onStartGame,
-  worldEditorOpen, editingWorld, onSaveWorld, onDeleteWorld, onCancelWorldEditor, onOpenEditor,
-  onImportWorld,
   apiConfig, settings,
 }: WizardShellProps) {
   // 动态计算年龄阶段（根据开关决定是否包含）
@@ -80,115 +87,195 @@ export default function WizardShell({
     [personalInfo.age, includeAgeStages],
   );
 
-  return (
-    <div
-      className="full-height"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg-primary)',
-        overflow: 'hidden',
-      }}
-    >
-      {/* ── 顶部标题栏（精简） ── */}
-      <div className="wizard-topbar" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '1rem 2rem', borderBottom: '1px solid var(--border)', animation: 'slideUp 0.3s ease' }}>
-        <button
-          onClick={() => { onBackToMenu(); }}
-          style={{ position: 'absolute', left: '1.5rem', border: 'none', background: 'var(--bg-secondary)', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >←</button>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--accent)', letterSpacing: '0.05em', margin: 0 }}>{title}</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginTop: '0.2rem', margin: 0 }}>{subtitle}</p>
-        </div>
-      </div>
+  const currentStep = Math.min(Math.max(step, 1), STEP_LABELS.length);
+  const [modalOpen, setModalOpen] = useState(false);
+  const selectedWorldName = allWorlds.find(world => world.id === selectedWorld)?.name || selectedWorld || '未选择世界';
+  const selectedWorldDef = allWorlds.find(world => world.id === selectedWorld);
+  const selectedWorldScene = selectedWorldDef ? resolveWorldArtwork(selectedWorldDef).src : undefined;
+  // World selection/editor actions are owned by the hall. Kept as inert shims for the disabled legacy block.
+  const setSelectedWorld = (_id: string) => undefined;
+  const onOpenEditor = (_world: WorldDef | null) => undefined;
+  const identityReady = Boolean(personalInfo.name.trim() && personalInfo.gender && personalInfo.age.trim());
+  const historyReady = segmentDefs.every(def => segments[def.id]?.trim().length > 0);
+  const canAdvance = currentStep === 1 ? identityReady : currentStep === 3 ? historyReady : true;
 
-      {/* ── 主区域：左侧步骤栏 + 右侧内容 ── */}
-      <div className="wizard-main" style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        {/* 左侧步骤栏 */}
-        <aside className="wizard-sidebar">
-          {STEP_LABELS.map((label, i) => {
-            const stepNum = i + 1;
-            const isActive = step === stepNum;
-            const isCompleted = step > stepNum;
+  const handleBack = () => {
+    if (modalOpen) return;
+    if (currentStep === 1) {
+      onBackToMenu();
+      return;
+    }
+    setStep(currentStep - 1);
+  };
+
+  const handleNext = () => {
+    if (modalOpen) return;
+    if (!canAdvance) return;
+    if (currentStep === 4) {
+      onStartGame();
+      return;
+    }
+    setStep(currentStep + 1);
+  };
+
+  return (
+    <div className="creation-ritual-shell" aria-label="世界降临仪式">
+      <header className="creation-ritual-shell__header">
+        <div>
+          <div>{selectedWorldName}</div>
+          <h1>世界降临仪式</h1>
+          <p>{subtitle || title}</p>
+        </div>
+      </header>
+
+      <div className="creation-ritual-shell__body">
+        <aside className="creation-ritual-shell__steps" aria-label="创建步骤">
+          {STEP_LABELS.map((label, index) => {
+            const stepNum = index + 1;
+            const isActive = currentStep === stepNum;
+            const isCompleted = currentStep > stepNum;
             return (
-              <div key={stepNum} className={`wizard-sidebar-step${isActive ? ' active' : ''}${isCompleted ? ' completed' : ''}`}>
-                {/* 竖线连接器 */}
-                <div className="wizard-sidebar-line-wrap">
-                  <div className="wizard-sidebar-dot">
-                    {isCompleted ? <Check size={14} /> : stepNum}
-                  </div>
-                  {i < STEP_LABELS.length - 1 && <div className={`wizard-sidebar-line${isCompleted ? ' completed' : ''}`} />}
-                </div>
-                <span className="wizard-sidebar-label">{label}</span>
+              <div key={label} className={`creation-ritual-step${isActive ? ' is-active' : ''}${isCompleted ? ' is-completed' : ''}`} aria-current={isActive ? 'step' : undefined}>
+                <span className="creation-ritual-step__index">
+                  {isCompleted ? <Check size={14} /> : stepNum}
+                </span>
+                <span className="creation-ritual-step__label">{label}</span>
               </div>
             );
           })}
         </aside>
 
-        {/* 右侧内容区域 */}
-        <main className="wizard-content">
-          <div style={{ width: '100%', maxWidth: '1200px', animation: 'slideUp 0.3s ease' }}>
-            {step === 1 && (
-              <StepWorldBrowser
-                selectedWorld={selectedWorld} setSelectedWorld={setSelectedWorld}
-                createdWorlds={createdWorlds} allWorlds={allWorlds}
-                worldEntry={worldEntry}
-                onNext={() => setStep(2)}
-                onEditWorld={(w) => onOpenEditor(w)}
-                onDeleteWorld={onDeleteWorld}
-                onCreateWorld={() => onOpenEditor(null)}
-                onImportWorld={onImportWorld}
-                onSaveWorld={onSaveWorld}
-              />
+        <section className="creation-ritual-shell__paper">
+          <DawnFrameV4 mode="panel" className="creation-ritual-shell__paper-frame" ariaLabel="世界降临仪式主纸面">
+            <AmbientParticleLayer />
+            <section className={`creation-ritual-shell__stage is-step-${currentStep}`}>
+          <div className="creation-ritual-shell__anchor">
+            {currentStep === 1 ? null : currentStep === 3 ? null : currentStep === 4 ? (
+              <div className="departure-gate-preview">
+                <div className="departure-gate-preview__scene" style={selectedWorldScene ? { backgroundImage: `url("${selectedWorldScene}")` } : undefined} aria-hidden="true" />
+                <img src={RITUAL_ANCHORS[4]} alt="启程门" draggable={false} />
+                <span>{selectedWorldName}</span>
+              </div>
+            ) : (
+              <>
+                <img className={currentStep === 2 ? 'is-astrolabe' : undefined} src={RITUAL_ANCHORS[currentStep]} alt="" draggable={false} />
+                <span>{selectedWorldName}</span>
+              </>
             )}
-            {step === 2 && (
-              <StepPersonalInfo
+          </div>
+
+          <main key={currentStep} className="creation-ritual-shell__scroll">
+            {currentStep === 1 && (
+              <div className="ritual-identity-layout">
+                <aside className="ritual-identity-portrait" aria-label="人物身份摘要">
+                  <div className="creation-ritual-portrait-slot">
+                    <PortraitEditor personalInfo={personalInfo} onChange={portrait => setPersonalInfo({ ...personalInfo, portrait })} />
+                  </div>
+                  <div className="ritual-identity-summary">
+                    <span className="ritual-section-kicker">身份卷 · 当前旅者</span>
+                    <strong>{personalInfo.name || '未命名旅者'}</strong>
+                    <span>{[personalInfo.age && `${personalInfo.age}岁`, personalInfo.gender, personalInfo.career].filter(Boolean).join(' · ') || '填写右侧资料后生成摘要'}</span>
+                    <small>{personalInfo.perspective || '选择叙事视角'}</small>
+                    <small className="ritual-world-context">世界 · {selectedWorldName}</small>
+                  </div>
+                </aside>
+                <div className="ritual-identity-form">
+                {/* World selection moved to the hall; the legacy block remains disabled for compatibility. */}
+                {false && <div className="creation-ritual-world-choice">
+                  <div>
+                    <span className="creation-ritual-world-choice__eyebrow">第一步 · 选择旅庭</span>
+                    <strong>{selectedWorldDef?.name || '请选择一个世界'}</strong>
+                    <small>{selectedWorldDef?.description || '也可以创建或导入自己的世界。'}</small>
+                  </div>
+                  <select aria-label="选择世界" value={selectedWorld} onChange={event => setSelectedWorld(event.target.value)}>
+                    <option value="">请选择世界</option>
+                    {allWorlds.map(world => <option key={world.id} value={world.id}>{world.name}</option>)}
+                  </select>
+                  <div className="creation-ritual-world-choice__actions">
+                    <button type="button" onClick={() => onOpenEditor(selectedWorldDef || null)}>编辑世界</button>
+                    <button type="button" onClick={() => onOpenEditor(null)}>创建世界</button>
+                  </div>
+                </div>}
+                <StepPersonalInfo
+                phase="identity"
+                showNavigation={false}
                 personalInfo={personalInfo} setPersonalInfo={setPersonalInfo}
                 isFilling={isFilling} fillElapsed={fillElapsed} onAiFill={onAiFill} onCancelFill={onCancelFill}
                 hasApiConfig={hasApiConfig}
-                worldModules={allWorlds.find(w => w.id === selectedWorld)?.modules}
+                worldModules={allWorlds.find(world => world.id === selectedWorld)?.modules}
                 apiConfig={apiConfig}
                 selectedWorld={selectedWorld}
                 allWorlds={allWorlds}
                 worldEntry={worldEntry}
+                onModalStateChange={setModalOpen}
+                onNext={() => setStep(2)} onPrev={() => setStep(1)}
+                />
+                </div>
+              </div>
+            )}
+            {currentStep === 2 && (
+              <StepPersonalInfo
+                phase="loadout"
+                showNavigation={false}
+                personalInfo={personalInfo} setPersonalInfo={setPersonalInfo}
+                isFilling={isFilling} fillElapsed={fillElapsed} onAiFill={onAiFill} onCancelFill={onCancelFill}
+                hasApiConfig={hasApiConfig}
+                worldModules={allWorlds.find(world => world.id === selectedWorld)?.modules}
+                apiConfig={apiConfig}
+                selectedWorld={selectedWorld}
+                allWorlds={allWorlds}
+                worldEntry={worldEntry}
+                onModalStateChange={setModalOpen}
                 onNext={() => setStep(3)} onPrev={() => setStep(1)}
               />
             )}
-            {step === 3 && (
+            {currentStep === 3 && (
               <StepCharacterHistory
+                showNavigation={false}
                 segmentDefs={segmentDefs} segments={segments} setSegments={setSegments}
                 isGenerating={isGenerating} regeneratingId={regeneratingId}
                 includeAgeStages={includeAgeStages} setIncludeAgeStages={setIncludeAgeStages}
                 hasApiConfig={hasApiConfig}
                 onGenerateAll={onGenerateAll} onRegenerateSegment={onRegenerateSegment}
                 onLoadPreset={onLoadPreset}
+                onModalStateChange={setModalOpen}
                 onStartGame={() => setStep(4)}
                 onPrev={() => setStep(2)}
               />
             )}
-            {step === 4 && (
+            {currentStep === 4 && (
               <StepConfirm
+                showNavigation={false}
                 personalInfo={personalInfo}
                 segmentDefs={segmentDefs} segments={segments}
                 buildInitialState={buildInitialState}
+                selectedWorldName={selectedWorldName}
+                worldSummary={selectedWorldDef?.description}
+                portraitSource={getPortraitSource(personalInfo)}
                 onStartGame={onStartGame}
                 onPrev={() => setStep(3)}
               />
             )}
-          </div>
-        </main>
+          </main>
+        </section>
+          </DawnFrameV4>
+
+          <footer className={`creation-ritual-shell__footer${currentStep === 3 ? ' is-step-3' : ''}${modalOpen ? ' is-modal-blocked' : ''}`} aria-disabled={modalOpen}>
+            <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-secondary" onClick={handleBack} disabled={modalOpen}>
+              {currentStep === 1 ? '返回大厅' : '← 上一步'}
+            </EntrySlicedButton>
+            <div>
+              <span>{currentStep} / {STEP_LABELS.length}</span>
+              {currentStep === 3 && !historyReady && <span className="creation-ritual-shell__next-reason" role="status">请完成当前/全部编年阶段后继续</span>}
+              <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-primary" onClick={handleNext} disabled={modalOpen || !canAdvance}>
+                {currentStep === 4 ? '开始冒险' : '下一步'} →
+              </EntrySlicedButton>
+            </div>
+          </footer>
+        </section>
       </div>
 
       {/* 世界编辑器覆盖层 */}
-      {worldEditorOpen && (
-        <WorldEditorForm
-          initialWorld={editingWorld}
-          onSave={onSaveWorld}
-          onCancel={onCancelWorldEditor}
-          apiConfig={apiConfig}
-          settings={settings}
-        />
-      )}
     </div>
   );
 }

@@ -121,6 +121,8 @@
   position: fixed;
   inset: 0;
   z-index: 1600;
+  box-sizing: border-box;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(6px);
   display: flex;
@@ -136,7 +138,7 @@
   border: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  max-height: 80vh;
+  max-height: calc(100dvh - max(20px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
   display: flex;
   flex-direction: column;
 }

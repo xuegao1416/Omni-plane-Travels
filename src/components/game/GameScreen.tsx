@@ -20,8 +20,9 @@ import { eventBus, EVENTS } from '../../engine/eventBus';
 import type { WorldSystemData, DiceRoll, BusinessModuleSchema, WorldDynamicsConfig, PeriodicRule, ModuleEffects, EventRule, RuleFile } from '../../modules/schema';
 import { useSaveStore } from '../../stores/saveStore';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
-import { getWebEvent, allWebEvents } from '../../modules/eventDb';
-import { installWorldEventPacks, getWebEnabledEventIds } from '../../modules/webEventStore';
+import { installWorldEventPacks } from '../../modules/webEventStore';
+import { getRuntimePack, listPacks, type EventRuntimePack } from '../../modules/eventApi';
+import { selectRuntimePacksForWorld } from '../../modules/eventRuntime';
 import { installWorldCardWorkflows } from '../../modules/cardWorldBindings';
 import CardOverlay from '../event/CardOverlay';
 import EventConfigPanel from '../event/EventConfigPanel';
@@ -34,11 +35,15 @@ import { useSurvivalCraft } from './gameScreen/hooks/useSurvivalCraft';
 import { useSurvivalSettlement } from './gameScreen/hooks/useSurvivalSettlement';
 import { useBusinessSettlement } from './gameScreen/hooks/useBusinessSettlement';
 import { normalizeAssetStatus } from './panels/businessOverlay/utils';
+import JourneyDossierContent from './shared/JourneyDossierContent';
+import { DOSSIER_META, normalizeDossierPanel } from './shared/journeyDossierMeta';
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
   const { t } = useUISettings();
-  const isMobile = useMediaQuery('(max-width: 900px)');
+  // Keep tablet/near-square viewports on the compact desktop composition; reserve
+  // the mobile shell for genuinely narrow portrait widths.
+  const isMobile = useMediaQuery('(max-width: 640px)');
 
   // ── State ──
   const [overlay, setOverlay] = useState<OverlayPanel>(null);
@@ -148,21 +153,13 @@ export default function GameScreen() {
         enabledIds = sessionActivePacks;
       } else {
         try {
-          enabledIds = await getWebEnabledEventIds();
+          const entries = await listPacks(true);
+          enabledIds = entries.filter((entry) => entry.enabled).map((entry) => entry.meta.id);
         } catch {
           enabledIds = [];
         }
       }
       // 所有包必须绑定当前世界才加载（防止跨世界污染）
-      if (worldDef) {
-        const allRecs = await allWebEvents().catch(() => []);
-        const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId ?? r.manifest.worldId]));
-        enabledIds = enabledIds.filter(id => {
-          const wId = worldIdMap.get(id);
-          if (!wId) return true; // 无 worldId 的全局包正常加载
-          return wId === worldDef.id; // 有 worldId 的包必须匹配当前世界
-        });
-      }
       if (cancelled) return;
 
       // 防残留：先清空再按当前绑定注册
@@ -194,11 +191,20 @@ export default function GameScreen() {
         }
       }
 
+      const runtimePacks: EventRuntimePack[] = [];
       for (const id of enabledIds) {
         if (cancelled) break;
         try {
-          const rec = await getWebEvent(id).catch(() => undefined);
-          if (!rec) continue;
+          runtimePacks.push(await getRuntimePack(id));
+        } catch (e) {
+          console.warn(`[event pack] runtime read failed: ${id}`, e);
+        }
+      }
+
+      for (const rec of selectRuntimePacksForWorld(runtimePacks, worldDef?.id)) {
+        if (cancelled) break;
+        const id = rec.id;
+        try {
           const rules: EventRule[] = [];
           const periodicRules: PeriodicRule[] = [];
           let workflow: import('../../modules/workflowSchema').WorkflowDefinition | undefined;
@@ -225,7 +231,7 @@ export default function GameScreen() {
               workflow,
               permissions: rec.manifest.permissions ?? [],
               runtime: savedRuntime ?? { onceFired: {}, cooldownRemaining: {} },
-              source: rec.builtin ? 'world' : 'user',
+              source: 'user',
             });
           }
         } catch (e) {
@@ -281,23 +287,27 @@ export default function GameScreen() {
   }, [worldDef, bumpVersion]);
   // ── Panel rendering (shared between desktop and mobile) ──
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
-    switch (panel) {
-      case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} />;
-      case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
-      case 'tasks': return <TaskPanel gameState={gameState} />;
-      case 'notebook': return <NotebookPanel gameState={gameState} />;
-      case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
-      case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
-      case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => {}} mode="inline" />;
-      case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
-      case 'modules': return <EventConfigPanel onClose={onClose} worldDef={worldDef} />;
-      default: return null;
-    }
+    const content = (() => {
+      switch (panel) {
+        case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} />;
+        case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
+        case 'tasks': return <TaskPanel gameState={gameState} />;
+        case 'notebook': return <NotebookPanel gameState={gameState} />;
+        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
+        case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
+        case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => {}} mode="inline" />;
+        case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
+        case 'modules': return <EventConfigPanel onClose={onClose} worldDef={worldDef} />;
+        default: return null;
+      }
+    })();
+    return panel && content ? <JourneyDossierContent panel={normalizeDossierPanel(panel)}>{content}</JourneyDossierContent> : content;
   };
   const getPanelTitle = (panel: OverlayPanel): string => {
-    const btn = navButtons.find(b => b.id === panel);
-    return btn ? t(btn.labelKey) : '';
+    if (!panel) return '';
+    return DOSSIER_META[normalizeDossierPanel(panel)].title;
   };
+  const getPanelEmblem = (panel: OverlayPanel): string | undefined => panel ? DOSSIER_META[normalizeDossierPanel(panel)].emblemSrc : undefined;
   const mobileNavItems = useMemo(() => buildMobileNavItems({
     navigate, setShowLeftOverlay, setMobileActivePanel,
   }), [navigate]);
@@ -354,6 +364,8 @@ export default function GameScreen() {
   const chatPanelEl = (
     <ChatPanel
       messages={engine.messages} isGenerating={engine.isGenerating}
+      worldName={worldDef?.name || '世界漫游指南'}
+      worldSceneUrl={worldDef ? `/art/theme/worlds/${worldDef.id}-scene.png` : undefined}
       onSend={engine.sendMessage} onCancel={engine.cancel}
       onDelete={engine.deleteSingleMessage} onEdit={engine.editMessage}
       onResend={engine.resendFromMessage} onResendFromHere={engine.resendFromAssistantMessage}
@@ -377,6 +389,7 @@ export default function GameScreen() {
           showRightOverlay={showRightOverlay} onShowRightOverlay={setShowRightOverlay}
           mobileActivePanel={mobileActivePanel} onMobileActivePanelChange={setMobileActivePanel}
           panelTitle={getPanelTitle(mobileActivePanel)}
+          panelEmblemSrc={getPanelEmblem(mobileActivePanel)}
           panelContent={renderPanelContent(mobileActivePanel, () => setMobileActivePanel(null))}
           rightPanel={rightPanelEl}
         >{chatPanelEl}</MobileLayout>
@@ -386,9 +399,11 @@ export default function GameScreen() {
           onNavigate={navigate} t={t}
           isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen}
           drawerTitle={getPanelTitle(overlay)}
+          drawerEmblemSrc={getPanelEmblem(overlay)}
           drawerContent={renderPanelContent(overlay, () => setOverlay(null))}
           rightCollapsed={rightCollapsed} onToggleRightPanel={() => setRightCollapsed(c => !c)}
           rightPanel={rightPanelEl}
+          worldName={worldDef?.name || '世界漫游指南'}
         >{chatPanelEl}</DesktopLayout>
       )}
       {bizData && <BusinessOverlay open={businessOverlayOpen} data={bizData} onClose={() => setBusinessOverlayOpen(false)} />}

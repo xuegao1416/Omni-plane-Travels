@@ -1,0 +1,294 @@
+/*
+ * Adaptive Crystal Voyage presentation layer.
+ *
+ * The registry supplies --theme-* values and data-world-skin. These styles
+ * provide a CSS-only material fallback, so missing artwork never blocks an
+ * interactive surface.
+ */
+
+:root,
+[data-world-skin] {
+  --crystal-accent: var(--theme-accent, var(--accent));
+  --crystal-surface: var(--theme-surface, var(--bg-secondary));
+  --crystal-border: var(--theme-border, var(--border));
+  --crystal-glow: var(--theme-glow, var(--accent-glow));
+  --crystal-card-frame: var(--theme-card-frame, none);
+  --crystal-surface-fallback:
+    linear-gradient(135deg, color-mix(in srgb, var(--crystal-surface) 94%, white 6%), var(--crystal-surface));
+  --crystal-surface-muted: color-mix(in srgb, var(--crystal-surface) 86%, var(--crystal-border) 14%);
+  --crystal-surface-glass: color-mix(in srgb, var(--crystal-surface) 78%, transparent);
+  --crystal-glow-soft: color-mix(in srgb, var(--crystal-glow) 42%, transparent);
+}
+
+/* Optional card-frame artwork is intentionally disabled until the five theme
+ * variants are generated. The shared CSS material below remains the visible
+ * fallback and keeps the bundle independent from missing PNGs. */
+[data-world-skin="crystal-neutral"] {
+  --theme-card-frame: none;
+}
+
+[data-world-skin="crystal-cyber"] {
+  --theme-card-frame: none;
+}
+
+[data-world-skin="crystal-forest"] {
+  --theme-card-frame: none;
+}
+
+[data-world-skin="crystal-ruins"] {
+  --theme-card-frame: none;
+}
+
+[data-world-skin="crystal-sakura"] {
+  --theme-card-frame: none;
+}
+
+/* Shared crystal frame. Keep content in the DOM; artwork is a replaceable
+ * background layer rather than a prerequisite for layout or interaction. */
+.crystal-frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--crystal-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--crystal-surface);
+  background-image: var(--crystal-card-frame), var(--crystal-surface-fallback);
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 16px 42px var(--crystal-glow-soft), inset 0 1px 0 color-mix(in srgb, white 42%, transparent);
+  transition:
+    transform var(--motion-enter) var(--motion-ease),
+    background-color var(--duration-normal) var(--motion-ease),
+    border-color var(--duration-fast) var(--motion-ease),
+    box-shadow var(--duration-normal) var(--motion-ease);
+}
+
+.crystal-frame::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--crystal-accent) 14%, transparent), transparent 48%);
+  opacity: 0.72;
+  transition: opacity var(--duration-normal) var(--motion-ease);
+}
+
+.crystal-frame[data-state="enter"] {
+  animation: crystal-frame-enter var(--motion-enter) var(--motion-ease) both;
+}
+
+.crystal-frame[data-state="confirmed"] {
+  animation: crystal-frame-confirmed var(--motion-settle) var(--motion-ease) both;
+}
+
+.crystal-frame[data-state="disabled"],
+.crystal-frame[aria-disabled="true"] {
+  filter: saturate(0.72);
+  opacity: 0.62;
+}
+
+.crystal-frame[data-state="disabled"]::before,
+.crystal-frame[aria-disabled="true"]::before {
+  opacity: 0.24;
+}
+
+/* Choice cards share the same state vocabulary as CrystalFrame. */
+.crystal-choice {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: var(--touch-min);
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--crystal-border);
+  border-radius: var(--radius-lg);
+  background: var(--crystal-surface-glass);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform var(--motion-enter) var(--motion-ease),
+    opacity var(--duration-fast) var(--motion-ease),
+    background-color var(--duration-fast) var(--motion-ease),
+    border-color var(--duration-fast) var(--motion-ease),
+    box-shadow var(--duration-fast) var(--motion-ease);
+}
+
+.crystal-choice::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow var(--duration-fast) var(--motion-ease);
+}
+
+.crystal-choice:not([aria-disabled="true"]):not([data-state="disabled"]):hover {
+  transform: translateY(calc(var(--motion-lift) * -1));
+  border-color: var(--crystal-accent);
+  box-shadow: 0 10px 24px var(--crystal-glow-soft);
+}
+
+.crystal-choice:focus-visible,
+.crystal-action-button:focus-visible {
+  outline: 2px solid var(--crystal-accent);
+  outline-offset: 3px;
+}
+
+.crystal-choice[data-state="selected"] {
+  border-color: var(--crystal-accent);
+  background: var(--crystal-surface-muted);
+  box-shadow: 0 0 0 1px var(--crystal-accent), 0 10px 28px var(--crystal-glow-soft);
+}
+
+.crystal-choice[data-state="selected"]::after {
+  box-shadow: inset 0 0 18px var(--crystal-glow-soft);
+}
+
+.crystal-choice[data-state="dimmed"] {
+  opacity: 0.5;
+}
+
+.crystal-choice[data-state="confirmed"] {
+  animation: crystal-choice-confirmed var(--motion-settle) var(--motion-ease) both;
+}
+
+.crystal-choice[data-state="pressed"] {
+  transform: scale(0.98);
+  transition-duration: var(--motion-press);
+}
+
+.crystal-choice[data-state="disabled"],
+.crystal-choice[aria-disabled="true"] {
+  cursor: not-allowed;
+  filter: saturate(0.64);
+  opacity: 0.52;
+}
+
+/* Shared action button states. The selector intentionally stays component
+ * scoped so existing buttons keep their current theme behavior. */
+.crystal-action-button {
+  display: inline-flex;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--crystal-border);
+  border-radius: var(--radius-md);
+  background: var(--crystal-surface-muted);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform var(--motion-enter) var(--motion-ease),
+    color var(--duration-fast) var(--motion-ease),
+    background-color var(--duration-fast) var(--motion-ease),
+    border-color var(--duration-fast) var(--motion-ease),
+    box-shadow var(--duration-fast) var(--motion-ease),
+    opacity var(--duration-fast) var(--motion-ease);
+}
+
+.crystal-action-button:not(:disabled):not([aria-disabled="true"]):not([data-state="disabled"]):hover {
+  transform: translateY(calc(var(--motion-lift) * -1));
+  border-color: var(--crystal-accent);
+  box-shadow: 0 8px 20px var(--crystal-glow-soft);
+}
+
+.crystal-action-button[data-state="pressed"] {
+  transform: scale(0.98);
+  transition-duration: var(--motion-press);
+}
+
+.crystal-action-button[data-state="confirmed"] {
+  border-color: var(--crystal-accent);
+  animation: crystal-button-confirmed var(--motion-settle) var(--motion-ease) both;
+}
+
+.crystal-action-button[data-state="disabled"],
+.crystal-action-button:disabled,
+.crystal-action-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@keyframes crystal-frame-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes crystal-frame-confirmed {
+  0%,
+  100% {
+    box-shadow: 0 16px 42px var(--crystal-glow-soft), inset 0 1px 0 color-mix(in srgb, white 42%, transparent);
+  }
+
+  45% {
+    box-shadow: 0 0 0 6px var(--crystal-glow-soft), 0 16px 42px var(--crystal-glow-soft);
+  }
+}
+
+@keyframes crystal-choice-confirmed {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  45% {
+    transform: translateY(-2px) scale(1.01);
+  }
+}
+
+@keyframes crystal-button-confirmed {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--crystal-glow-soft);
+  }
+
+  45% {
+    box-shadow: 0 0 0 6px var(--crystal-glow-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  [data-world-skin] {
+    --motion-enter: 0ms;
+    --motion-settle: 0ms;
+    --motion-press: 0ms;
+    --motion-lift: 0px;
+    --motion-ease: linear;
+  }
+
+  .crystal-frame,
+  .crystal-choice,
+  .crystal-action-button {
+    animation: none !important;
+    transform: none;
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+  }
+
+  .crystal-frame:hover,
+  .crystal-choice:hover,
+  .crystal-action-button:hover,
+  .crystal-choice[data-state="pressed"],
+  .crystal-action-button[data-state="pressed"] {
+    transform: none;
+  }
+
+  .crystal-frame::before,
+  .crystal-choice::after {
+    transition: none;
+  }
+}

@@ -131,7 +131,10 @@ Bun.serve({
     }
 
     // 静态文件（禁止缓存）。index.html 需要注入 CSS Module link
-    const file = Bun.file(`.${pathname}`);
+    let file = Bun.file(`.${pathname}`);
+    if (!(await file.exists())) {
+      file = Bun.file(`./public${pathname}`);
+    }
     if (await file.exists()) {
       if (pathname === '/index.html') {
         let html = await file.text();

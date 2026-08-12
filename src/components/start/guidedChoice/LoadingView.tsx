@@ -1,8 +1,4 @@
 import { X } from 'lucide-react';
-import {
-  overlayStyle, headerBarStyle, closeBtnStyle, titleStyle, subtitleStyle,
-  centerContentStyle, spinnerStyle,
-} from './styles';
 
 interface LoadingViewProps {
   title: string;
@@ -13,20 +9,20 @@ interface LoadingViewProps {
 
 export function LoadingView({ title, subtitle, spinnerMessage, onClose }: LoadingViewProps) {
   return (
-    <div style={overlayStyle}>
-      <div style={headerBarStyle}>
-        <button onClick={onClose} style={closeBtnStyle}><X size={16} /></button>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={titleStyle}>{title}</h1>
-          <p style={subtitleStyle}>{subtitle}</p>
+    <section className="guided-choice-panel guided-choice-panel--loading" aria-label={title}>
+      <div className="guided-choice-header">
+        <button className="guided-choice-close" onClick={onClose} aria-label="关闭世界织构推演"><X size={16} /></button>
+        <div className="guided-choice-heading">
+          <span className="world-weave-kicker">STEP 02 · WORLD WEAVE</span>
+          <h2>世界织构推演</h2>
+          <p>{subtitle}</p>
         </div>
       </div>
-      <div style={centerContentStyle}>
-        <div style={spinnerStyle} />
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '1rem' }}>
-          {spinnerMessage}
-        </p>
+      <div className="guided-choice-loading">
+        <img src="/art/theme/ui-kit/dawn-v4/ritual/talent-astrolabe-v1.png" alt="" aria-hidden="true" />
+        <strong>{title}</strong>
+        <span>{spinnerMessage}</span>
       </div>
-    </div>
+    </section>
   );
 }

@@ -94,8 +94,8 @@ export default function InGameWorldBookEditor({ engine, worldId, onClose }: Prop
   };
 
   return (
-    <div className={s.overlay}>
-      <div className={s.panel}>
+    <div className={`${s.overlay} game-journey__nested-overlay`}>
+      <div className={`${s.panel} game-journey__nested-panel`}>
         <Toolbar
           worldId={worldId} entries={entries} importMsg={importMsg} saveMsg={saveMsg}
           onClose={onClose} onImport={importEntries} onExport={exportEntries} onAdd={addEntry} onSave={handleSave}

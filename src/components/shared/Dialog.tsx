@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { AlertTriangle, Info, HelpCircle, X, Loader2 } from 'lucide-react';
 import { useConfigStore } from '../../stores/configStore';
-import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import OverlayPortal from './OverlayPortal';
 import s from './Dialog.module.css';
 
 interface DialogOptions {
@@ -24,7 +24,6 @@ interface DialogState extends DialogOptions {
 export function useDialog() {
   const t = useConfigStore(s => s.t);
   const [dialog, setDialog] = useState<DialogState | null>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
 
   const confirm = useCallback((message: string, options?: Partial<Omit<DialogOptions, 'type' | 'message'>>): Promise<boolean> => {
     return new Promise(resolve => {
@@ -71,14 +70,6 @@ export function useDialog() {
   }, []);
 
   // ESC 关闭
-  useEffect(() => {
-    if (!dialog?.open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dialog.type !== 'loading') close(false);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [dialog?.open, dialog?.type, close]);
 
   const iconMap = {
     confirm: HelpCircle,
@@ -88,10 +79,14 @@ export function useDialog() {
     loading: Loader2,
   };
 
-  useBodyScrollLock(!!dialog?.open);
-
   const DialogUI = dialog?.open ? (
-    <div ref={dialogRef} className={s.overlay} onClick={() => { if (dialog.type !== 'loading') close(false); }}>
+    <OverlayPortal
+      className={s.overlay}
+      ariaLabel={dialog.title || t(`dialog.${dialog.type}`)}
+      onClose={dialog.type === 'loading' ? undefined : () => close(false)}
+      closeOnBackdrop={dialog.type !== 'loading'}
+      closeOnEscape={dialog.type !== 'loading'}
+    >
       <div className={s.dialog} onClick={e => e.stopPropagation()}>
         {/* 头部 */}
         <div className={s.header}>
@@ -147,8 +142,8 @@ export function useDialog() {
           </div>
         )}
       </div>
-    </div>
+    </OverlayPortal>
   ) : null;
 
-  return { DialogUI, confirm, alert, prompt, loading, close: () => close(false) };
+  return { DialogUI, confirm, alert, prompt, loading, close: () => close(false), isOpen: Boolean(dialog?.open) };
 }

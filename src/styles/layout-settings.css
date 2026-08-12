@@ -141,3 +141,267 @@
   font-family: var(--font-mono, 'Consolas', monospace);
 }
 
+/* Dawn V4 settings surface: the page owns scrolling, while the frame remains
+   a decorative shell and never becomes a second fixed viewport. */
+.settings-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  padding: 16px;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--creation-bg, var(--bg-primary)) 28%, transparent);
+  -webkit-backdrop-filter: blur(7px) saturate(1.06);
+  backdrop-filter: blur(7px) saturate(1.06);
+  isolation: isolate;
+}
+.settings-screen__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 42px 12px 46px;
+  border-bottom: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 74%, transparent);
+  background: transparent;
+}
+.settings-screen__header .settings-screen__back {
+  flex: 0 0 var(--touch-min);
+  width: var(--touch-min);
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  margin-left: 4px;
+  padding: 0;
+  background: transparent;
+  color: var(--creation-text, var(--text-primary));
+  transform: translateX(-10px);
+}
+.settings-screen__header .settings-screen__back:hover,
+.settings-screen__header .settings-screen__back:focus-visible {
+  background: color-mix(in srgb, var(--creation-selected, var(--accent-dim)) 58%, transparent);
+  color: var(--creation-accent, var(--accent));
+}
+.settings-screen__header .settings-screen__back img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.settings-screen__header h1 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+.settings-screen__body {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.settings-screen__sidebar {
+  display: flex;
+  width: 130px;
+  flex: 0 0 130px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 8px;
+  border-right: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 74%, transparent);
+  background: transparent;
+}
+.settings-screen__scroll {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 18px 16px;
+  scrollbar-gutter: stable;
+}
+.settings-screen__frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(1280px, 100%);
+  height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  min-width: 0;
+  min-height: 0;
+  margin: auto;
+  box-shadow: 0 18px 54px color-mix(in srgb, var(--creation-glow, var(--accent-glow)) 58%, transparent);
+}
+.settings-screen__frame > .dawn-frame-v4__fill {
+  border: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 76%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--creation-surface, var(--bg-secondary)) 72%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 48%, transparent), inset 0 0 34px color-mix(in srgb, var(--creation-glow, var(--accent-glow)) 32%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.08);
+  backdrop-filter: blur(14px) saturate(1.08);
+}
+.settings-screen__frame > .dawn-frame-v4__content {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 26px 14px;
+}
+.settings-screen__content {
+  width: 100%;
+  max-width: 1120px;
+  min-width: 0;
+  margin: 0 auto;
+}
+.settings-screen__footer {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 24px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 74%, transparent);
+  background: transparent;
+}
+.settings-screen__footer button {
+  min-height: var(--touch-min);
+}
+.settings-screen__footer .btn-primary {
+  padding-inline: 28px;
+}
+
+@media (max-width: 640px) {
+  .settings-screen {
+    padding: 8px;
+  }
+  .settings-screen__header {
+    padding: 4px 8px 10px 34px;
+  }
+  .settings-screen__header .settings-screen__back {
+    transform: translateX(-4px);
+  }
+  .settings-screen__body {
+    display: block;
+    overflow: hidden;
+  }
+  .settings-screen__scroll {
+    height: 100%;
+    padding: 10px 0 12px;
+  }
+  .settings-screen__frame {
+    width: 100%;
+    height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
+  }
+  .settings-screen .settings-screen__frame > .dawn-frame-v4__fill {
+    inset: 12px !important;
+  }
+  .settings-screen__frame > .dawn-frame-v4__content {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    padding: 14px 14px 10px;
+  }
+  .settings-mobile-tabs {
+    padding: 4px 0 8px;
+    background: transparent;
+  }
+  .settings-screen__footer {
+    padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+.settings-tab-panel {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 960px;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 18px;
+}
+.settings-tab-panel--general,
+.settings-tab-panel--api,
+.settings-tab-panel--image,
+.settings-tab-panel--preset {
+  width: 100%;
+}
+.settings-section--paper > .settings-section__body {
+  background: transparent !important;
+  border-color: color-mix(in srgb, var(--creation-border, var(--border)) 82%, transparent);
+  border-radius: 8px;
+  overflow: visible;
+}
+.settings-screen .settings-mobile-tabs {
+  background: color-mix(in srgb, var(--creation-surface-muted, var(--bg-tertiary)) 34%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--creation-border, var(--border)) 72%, transparent);
+}
+.settings-screen .settings-tab-btn.active,
+.settings-screen .settings-mobile-tab.active {
+  background: color-mix(in srgb, var(--creation-selected, var(--accent-dim)) 74%, transparent);
+  color: var(--creation-accent, var(--accent));
+}
+.settings-screen .segmented-control {
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 64%, transparent);
+  background: color-mix(in srgb, var(--creation-surface-muted, var(--bg-tertiary)) 34%, transparent);
+}
+.settings-screen .segmented-control-btn.active {
+  background: var(--creation-input, var(--bg-secondary));
+  color: var(--creation-accent, var(--accent));
+  box-shadow: 0 1px 5px color-mix(in srgb, var(--creation-glow, var(--accent-glow)) 52%, transparent);
+}
+.settings-row {
+  min-width: 0;
+}
+.settings-api-form {
+  width: 100%;
+  min-width: 0;
+  background: color-mix(in srgb, var(--creation-surface-muted, var(--bg-tertiary)) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 68%, transparent);
+  border-radius: 10px;
+  overflow: visible;
+}
+.settings-api-section-title {
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 82%, transparent);
+  background: color-mix(in srgb, var(--creation-surface-muted, transparent) 38%, transparent);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.settings-preset-card {
+  background: color-mix(in srgb, var(--creation-surface-muted, transparent) 34%, transparent) !important;
+}
+.settings-screen .input-field,
+.settings-screen .settings-textarea,
+.settings-screen select {
+  background: var(--creation-input, var(--bg-secondary)) !important;
+  border-color: color-mix(in srgb, var(--creation-border, var(--border)) 82%, transparent);
+}
+
+@media (max-width: 640px) {
+  .settings-tab-panel {
+    max-width: none;
+    gap: 14px;
+  }
+  .settings-screen__content {
+    max-width: none;
+  }
+  .settings-screen__footer {
+    justify-content: stretch;
+  }
+  .settings-screen__footer button {
+    flex: 1 1 0;
+  }
+  .settings-api-form > div {
+    min-width: 0;
+  }
+  .settings-api-form .input-field {
+    max-width: 100% !important;
+  }
+  .settings-row--stacked {
+    align-items: stretch;
+  }
+}
+

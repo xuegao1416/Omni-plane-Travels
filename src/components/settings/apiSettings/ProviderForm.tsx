@@ -22,7 +22,7 @@ export default function ProviderForm({
   presets, setPresets, onLoadPreset,
 }: Props) {
   return (
-    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+    <div className="settings-api-form">
 
       <PresetManager config={config} presets={presets} setPresets={setPresets} onLoadPreset={onLoadPreset} />
 
@@ -59,7 +59,7 @@ export default function ProviderForm({
       <ProxySettings />
 
       {/* 模型设置 */}
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)', fontWeight: '600', color: 'var(--text-muted)' }}>
+      <div className="settings-api-section-title">
         模型设置
       </div>
 

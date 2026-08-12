@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import { Search, Globe, ChevronRight, Upload, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Search, Globe, ChevronRight, Upload, ArrowLeft, ExternalLink, Download } from 'lucide-react';
 import type { WorldDef, WorldModule } from '../../data/worlds-schema';
+import { exportWorld } from '../../utils/worldIO';
 import type { WorldBookEntry } from '../../worldbook/index';
 import WorldCard, { CreateWorldCard, getWorldIcon } from './WorldCard';
 import WorldBookEditor from './WorldBookEditor';
@@ -93,11 +94,19 @@ export default function StepWorldBrowser({
     return (
       <div className="world-detail-header" style={{ '--cover-color': w.coverColor ?? 'var(--accent)' } as React.CSSProperties}>
         <DetailIcon size={32} strokeWidth={1.5} />
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 className="world-detail-title">{w.name}</h2>
           <p className="world-detail-desc">{w.description}</p>
           {w.tags && <div className="world-detail-meta">{w.tags.map(tag => <span key={tag} className="world-card-tag">{tag}</span>)}</div>}
         </div>
+        <button
+          type="button"
+          className="world-detail-export"
+          onClick={() => exportWorld(w)}
+          title="导出世界为 JSON 文件（下载后可微调，再用左侧「导入世界」重新载入）"
+        >
+          <Download size={14} /><span>导出</span>
+        </button>
       </div>
     );
   };

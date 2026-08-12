@@ -18,7 +18,7 @@ const invokeImpl = async (cmd: string, args?: Record<string, unknown>): Promise<
             coverColor: '#3b82f6',
             icon: 'swords',
             schemaVersion: 1,
-            minAppVersion: '2.7.2',
+            minAppVersion: '2.7.3',
             loadOrder: 100,
             enabledByDefault: false,
           },
@@ -47,6 +47,14 @@ const invokeImpl = async (cmd: string, args?: Record<string, unknown>): Promise<
         cardsSummary: [],
         dependencyStatus: [],
         conflictStatus: [],
+      };
+    case 'get_event_runtime':
+      return {
+        id: 'demo-rule',
+        manifest: { id: 'demo-rule', type: 'rule', permissions: ['add_card', 'modify_world_state'] },
+        files: {
+          'schema/rules.json': JSON.stringify({ version: 1, rules: [] }),
+        },
       };
     default:
       return null;
@@ -202,7 +210,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.7.2',
+      minAppVersion: '2.7.3',
       type: 'rule',
       coverColor: '#3b82f6',
       icon: 'swords',
@@ -219,7 +227,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.7.2',
+      minAppVersion: '2.7.3',
       type: 'rule',
       coverColor: '#3b82f6',
       icon: 'swords',
@@ -237,7 +245,7 @@ describe('manifestSchema — 安全红线', () => {
       author: '赖工',
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.7.2',
+      minAppVersion: '2.7.3',
       type: 'rule',
       coverColor: 'linear-gradient(#7C3AED,#A855F7)',
       icon: 'swords',

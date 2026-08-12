@@ -24,9 +24,12 @@ interface Props {
   onDiceRoll?: (roll: DiceRoll) => void;
   /** 单步重试回调 */
   onRetrySingleStage?: (taskId: PipelineTaskId) => void;
+  worldName?: string;
+  worldSceneUrl?: string;
+  mobileSummary?: React.ReactNode;
 }
 
-export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage }: Props) {
+export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, worldName, worldSceneUrl, mobileSummary }: Props) {
   const [showMonitor, setShowMonitor] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -66,47 +69,24 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
   }, []);
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      background: 'var(--bg-primary)',
-      overflow: 'hidden',
-    }}>
+    <div className="game-journey__chat-panel">
+      <div className="game-journey__narrative-banner">
+        {worldSceneUrl && <span className="game-journey__narrative-banner-scene" style={{ backgroundImage: `url("${worldSceneUrl}")` }} aria-hidden="true" />}
+        <span className="game-journey__narrative-banner-glass" aria-hidden="true" />
+        <span className="game-journey__narrative-banner-kicker">当前旅程</span>
+        <strong>{worldName || '世界漫游指南'}</strong>
+      </div>
+      {mobileSummary && <div className="game-journey__mobile-summary">{mobileSummary}</div>}
       {/* 消息列表 */}
-      <div ref={scrollRef} style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '1rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-        fontSize: 'var(--body-font-size)',
-        lineHeight: 'var(--body-line-height)',
-        fontFamily: 'var(--font-family)',
-      }}>
+      <div ref={scrollRef} className="game-journey__message-list">
         {messages.length === 0 && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted)',
-            fontSize: 'var(--font-size-md)',
-          }}>
+          <div className="game-journey__empty-state">
             {t('chat.empty')}
           </div>
         )}
         {messages.map(msg => (
           <ErrorBoundary key={msg.id} fallback={
-            <div style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--danger)',
-              color: 'var(--text-muted)',
-              fontSize: 'var(--font-size-sm)',
-            }}>
+            <div className="game-journey__message-error">
               ⚠ 消息渲染失败 (ID: {msg.id.slice(0, 8)}…)
             </div>
           }>

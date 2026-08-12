@@ -60,7 +60,7 @@ export default function EventCenter({ eventApi, onOpenPack, onNewPack, onNewRule
           <FilePlus size={14} /> {isPhone ? '事件包' : '新建事件包'}
         </button>
         <button className="btn-secondary" onClick={onNewRule} style={{ minHeight: isPhone ? 36 : undefined, fontSize: isPhone ? 'var(--font-size-xs)' : undefined, padding: isPhone ? '4px 8px' : undefined }}>
-          <FilePlus size={14} /> {isPhone ? '规则' : '新建规则'}
+          <FilePlus size={14} /> {isPhone ? '工作流' : '新建工作流'}
         </button>
         <button
           className="btn-secondary"

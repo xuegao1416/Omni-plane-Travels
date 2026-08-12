@@ -48,94 +48,45 @@ export default function InputArea({ onSend, onCancel, isGenerating, pipelineStat
 
 
   return (
-    <div style={{
-      borderTop: '1px solid var(--border)',
-      background: 'var(--bg-secondary)',
-    }}>
+    <div className="game-journey__input-area">
       {/* 输入区 */}
-      <div style={{
-        padding: isMobile ? '8px 12px' : '12px 16px',
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'flex-end',
-      }}>
+      <div className="game-journey__input-inner">
         <textarea
           ref={inputRef}
-          className="input-field"
+          className="input-field game-journey__input"
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('input.placeholder')}
           disabled={isGenerating}
+          aria-label={isGenerating ? '生成中，输入已暂停' : '旅程输入'}
           rows={isMobile ? 2 : 3}
-          style={{
-            flex: 1,
-            resize: 'none',
-            fontFamily: 'inherit',
-            minHeight: 'var(--touch-min)',
-          }}
         />
         {/* 管线监控按钮 */}
         <button
           onClick={onOpenMonitor}
           title="查看管线监控"
-          style={{
-            padding: '8px',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            background: pipelineStatus && !isAllDone(pipelineStatus) ? 'var(--accent-dim)' : 'transparent',
-            color: pipelineStatus && !isAllDone(pipelineStatus) ? 'var(--accent)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            minWidth: 'var(--touch-min)',
-            minHeight: 'var(--touch-min)',
-          }}
+          className={`game-journey__monitor-button${pipelineStatus && !isAllDone(pipelineStatus) ? ' is-running' : ''}`}
         >
           <Activity size={16} />
           {pipelineStatus && !isAllDone(pipelineStatus) && (
-            <span style={{
-              position: 'absolute', top: '2px', right: '2px',
-              width: '6px', height: '6px', borderRadius: 'var(--radius-md)',
-              background: 'var(--accent)',
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }} />
+            <span className="game-journey__monitor-dot" />
           )}
         </button>
         {isGenerating ? (
           <button
-            className="btn-ghost"
+            className="btn-ghost game-journey__cancel-button"
             onClick={onCancel}
-            style={{
-              padding: '8px 16px',
-              color: 'var(--danger)',
-              minWidth: 'var(--touch-min)',
-              minHeight: 'var(--touch-min)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-            }}
           >
             <StopCircle size={16} />
             {t('input.stop')}
           </button>
         ) : (
           <button
-            className="btn-primary"
+            className="btn-primary game-journey__send-button"
             onClick={handleSend}
             disabled={!text.trim()}
-            style={{
-              padding: '8px 16px',
-              minWidth: 'var(--touch-min)',
-              minHeight: 'var(--touch-min)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-            }}
+            title={!text.trim() ? '请输入内容后发送' : '发送'}
           >
             <Send size={16} />
             {t('input.send')}

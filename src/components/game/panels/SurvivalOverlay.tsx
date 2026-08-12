@@ -92,19 +92,20 @@ export default function SurvivalOverlay({
     <>
       {/* 背景遮罩 */}
       <div
+        className="game-journey__nested-overlay game-journey__nested-overlay--contained"
         onClick={onClose}
         style={{
           position: 'absolute', inset: 0,
-          background: 'rgba(0,0,0,0.4)', zIndex: 99,
+          zIndex: 99,
           opacity: animating ? 1 : 0, transition: 'opacity 0.25s ease',
         }}
       />
       {/* 面板 */}
       <div
+        className="game-journey__nested-panel game-journey__nested-panel--side"
         style={{
           position: 'absolute', top: 0, right: 0, bottom: 0,
           width: '380px', maxWidth: '100vw',
-          background: 'var(--bg-primary)',
           zIndex: 100, display: 'flex', flexDirection: 'column',
           transform: animating ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',

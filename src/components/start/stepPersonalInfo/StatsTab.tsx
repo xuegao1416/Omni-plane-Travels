@@ -55,14 +55,14 @@ function ModuleInitEditor({ worldModules, initData, onChange }: {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minWidth: 0 }}>
       {statData && (
         <div>
           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, marginBottom: 8, color: 'var(--accent)', letterSpacing: '0.03em' }}>
             {statMod!.name}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, minWidth: 0 }}>
               {[{ key: 'attrA', fallback: 80, tag: '生命' }, { key: 'attrB', fallback: 60, tag: '能量' }].map(({ key, fallback, tag }) => {
                 const attr = statData[key];
                 if (!attr) return null;
@@ -77,7 +77,7 @@ function ModuleInitEditor({ worldModules, initData, onChange }: {
               })}
             </div>
             {['dim1','dim2','dim3','dim4','dim5','dim6'].filter(k => statData[k]).length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, minWidth: 0 }}>
                 {(['dim1','dim2','dim3','dim4','dim5','dim6'] as const).map(key => {
                   const dim = statData[key];
                   if (!dim) return null;
@@ -95,7 +95,7 @@ function ModuleInitEditor({ worldModules, initData, onChange }: {
             {statData.special?.length > 0 && (
               <div>
                 <span style={{ ..._labelStyle, marginBottom: 4, display: 'block' }}>属性</span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, minWidth: 0 }}>
                   {statData.special.map((sp: any) => (
                     <div key={sp.id}>
                       <span style={_labelStyle}>{sp.name}</span>
@@ -116,14 +116,14 @@ function ModuleInitEditor({ worldModules, initData, onChange }: {
           <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, marginBottom: 8, color: 'var(--accent)', letterSpacing: '0.03em' }}>
             {progMod!.name}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             {progData.tiers.map((tier: any, i: number) => (
               <label key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px',
                 borderRadius: 6, cursor: 'pointer', fontSize: 'var(--font-size-sm)',
                 background: (get('成长体系.currentTierIndex', 0) === i) ? 'var(--accent-dim)' : 'transparent',
                 border: `1px solid ${(get('成长体系.currentTierIndex', 0) === i) ? 'var(--accent)' : 'var(--border)'}`,
-                transition: 'all 0.12s',
+                transition: 'all 0.12s', width: '100%', minWidth: 0, boxSizing: 'border-box',
               }}>
                 <input type="radio" name="initTier"
                   checked={(get('成长体系.currentTierIndex', 0) === i)}
@@ -135,7 +135,7 @@ function ModuleInitEditor({ worldModules, initData, onChange }: {
                 <span style={{ fontWeight: 600, color: (get('成长体系.currentTierIndex', 0) === i) ? 'var(--accent)' : 'var(--text-primary)' }}>
                   {tier.name}
                 </span>
-                {tier.description && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tier.description}</span>}
+                {tier.description && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1 1 0', minWidth: 0 }}>{tier.description}</span>}
               </label>
             ))}
           </div>
@@ -144,7 +144,7 @@ function ModuleInitEditor({ worldModules, initData, onChange }: {
 
       {!statData && !progData && (
         <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-          此世界的模块没有可配置的初始数据
+          此世界没有额外行囊限制
         </div>
       )}
     </div>

@@ -47,6 +47,16 @@ interface CustomNpc {
   tierIndex?: number;
 }
 
+export interface PortraitSettings {
+  /** Optional portrait state; absent in legacy saves means use the gender default. */
+  source: 'default' | 'custom';
+  customDataUrl?: string;
+  zoom: number;
+  positionX: number;
+  positionY: number;
+  fileName?: string;
+}
+
 interface PlayerProfile {
   // 基础信息
   name: string;
@@ -82,6 +92,8 @@ interface PlayerProfile {
 
   // 自建NPC → GameState.人物档案
   customNpcs: CustomNpc[];
+  /** Optional, backwards-compatible visual identity shared by creation and game profile. */
+  portrait?: PortraitSettings;
 
   // 模块初始数据（角色创建时玩家设定的初始属性值）
   moduleInitData?: Record<string, unknown>;

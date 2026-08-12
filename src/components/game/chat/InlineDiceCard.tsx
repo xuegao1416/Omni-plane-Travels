@@ -1,8 +1,9 @@
 // 内联骰子检定卡片 — 渲染在消息正文中的可交互骰子卡片
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Dice6 } from 'lucide-react';
+import { CheckCircle2, Dices, Sparkles, XCircle } from 'lucide-react';
 import type { DiceRoll, StatModuleSchema } from '../../../modules/schema';
 import { rollDice, getCheckableAttributes, calcModifier } from '../../../modules/xpAlgorithm';
+import JourneyCardShell from '../shared/JourneyCardShell';
 
 interface InlineDiceCardProps {
   /** AI 指定的属性名（如 "力量"、"敏捷"） */
@@ -74,15 +75,20 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
     : undefined;
 
   return (
-    <div className="inline-dice-card">
+    <JourneyCardShell className="game-journey-card--dice" label="骰子检定">
+      <div className="inline-dice-card">
       {/* 头部 */}
       <div className="inline-dice-header">
-        <Dice6 size={14} />
+        <Dices size={14} aria-hidden="true" />
         <span>骰子检定</span>
         <span className="inline-dice-dc">DC {dc}</span>
       </div>
 
       {/* 操作区 */}
+      <div className="inline-dice-body">
+      <div className="inline-dice-core" aria-hidden="true">
+        <Dices size={30} strokeWidth={1.25} />
+      </div>
       <div className="inline-dice-controls">
         {checkableAttrs.length > 0 ? (
           <select
@@ -108,9 +114,13 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
           className="inline-dice-roll-btn"
           onClick={handleRoll}
           disabled={!selectedAttrData || animating}
+          aria-label={animating ? '骰子检定进行中' : '掷骰'}
+          title={animating ? '骰子检定进行中' : '掷骰'}
         >
-          {animating ? '🎲...' : '🎲 掷骰'}
+          <Dices size={16} aria-hidden="true" />
+          <span>{animating ? '检定中…' : '掷骰'}</span>
         </button>
+      </div>
       </div>
 
       {/* 结果展示 */}
@@ -119,7 +129,7 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
           <div className="inline-dice-result-header">
             <span className="inline-dice-result-attr">{result.attributeName}检定</span>
             <span className="inline-dice-result-status" style={{ color: resultColor }}>
-              {result.isNatural20 ? '🎉 大成功！' : result.isNatural1 ? '💀 大失败！' : result.success ? '成功 ✓' : '失败 ✗'}
+              {result.isNatural20 ? <><Sparkles size={13} aria-hidden="true" /> 大成功</> : result.isNatural1 ? <><XCircle size={13} aria-hidden="true" /> 大失败</> : result.success ? <><CheckCircle2 size={13} aria-hidden="true" /> 成功</> : <><XCircle size={13} aria-hidden="true" /> 失败</>}
             </span>
           </div>
           <div className="inline-dice-result-formula">
@@ -128,6 +138,7 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </JourneyCardShell>
   );
 }

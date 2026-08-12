@@ -1,14 +1,19 @@
-export function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+export function Section({ icon, title, children, variant = 'default' }: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  variant?: 'default' | 'paper';
+}) {
   return (
-    <div style={{ marginBottom: '18px' }}>
+    <div className={`settings-section${variant === 'paper' ? ' settings-section--paper' : ''}`} style={{ marginBottom: '18px' }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: '8px',
         marginBottom: '10px', fontWeight: '600', fontSize: 'var(--font-size-md)',
       }}>
         <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>{icon}</span>{title}
       </div>
-      <div style={{
-        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+      <div className="settings-section__body" style={{
+        background: variant === 'paper' ? 'transparent' : 'var(--bg-secondary)', border: '1px solid var(--border)',
         borderRadius: 'var(--radius-md)', overflow: 'hidden',
       }}>
         {children}
@@ -21,7 +26,7 @@ export function SettingRow({ label, desc, children, stacked }: { label: string; 
   // 纵向堆叠模式 — 用于窄容器（如侧边栏），label 在上、control 在下占满宽度
   if (stacked) {
     return (
-      <div style={{
+      <div className="settings-row settings-row--stacked" style={{
         padding: '10px 14px', borderBottom: '1px solid var(--border)',
       }}>
         <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '600', marginBottom: desc ? '2px' : '0', color: 'var(--text-primary)' }}>{label}</div>
@@ -32,7 +37,7 @@ export function SettingRow({ label, desc, children, stacked }: { label: string; 
   }
   // 默认横向布局 — label 左、control 右
   return (
-    <div style={{
+    <div className="settings-row" style={{
       display: 'flex', alignItems: 'center', padding: '10px 16px',
       borderBottom: '1px solid var(--border)', minHeight: '44px',
     }}>

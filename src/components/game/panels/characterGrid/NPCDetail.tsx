@@ -118,16 +118,15 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
   const pi = npc.个人信息 ?? { 外貌: '', 表性格: '', 里性格: '', 当前想法: '', 当前穿着: '', 当前位置: '', 当前状态: '', 备注: '' };
 
   return (
-    <div style={{
+    <div className="game-journey__nested-overlay" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1000, animation: 'fadeIn 0.15s ease',
     }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)',
+      <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
+        borderRadius: 'var(--radius-lg)',
         width: '92%', maxWidth: '640px', height: '82vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: 'var(--shadow-lg)',
       }}>
         <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} />
 

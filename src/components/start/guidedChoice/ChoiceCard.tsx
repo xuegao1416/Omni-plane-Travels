@@ -1,5 +1,5 @@
-import type { DimensionChoice, DimensionSelection } from '../../../worldgen/choice';
-import { cardStyle } from './styles';
+import { Check } from 'lucide-react';
+import type { DimensionChoice } from '../../../worldgen/choice';
 
 interface ChoiceCardProps {
   choice: DimensionChoice;
@@ -8,41 +8,15 @@ interface ChoiceCardProps {
   onSelect: () => void;
 }
 
-/** 普通选项卡片（A/B/C/D） */
-export function ChoiceCard({ choice, dimColor, isSelected, onSelect }: ChoiceCardProps) {
+export function ChoiceCard({ choice, dimColor: _dimColor, isSelected, onSelect }: ChoiceCardProps) {
   return (
-    <button
-      onClick={onSelect}
-      style={{
-        ...cardStyle,
-        border: `2px solid ${isSelected ? dimColor : 'var(--border)'}`,
-        background: isSelected ? `${dimColor}15` : 'var(--bg-secondary)',
-      }}
-      onMouseEnter={e => {
-        if (!isSelected) {
-          e.currentTarget.style.borderColor = `${dimColor}80`;
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = `0 4px 12px ${dimColor}20`;
-        }
-      }}
-      onMouseLeave={e => {
-        if (!isSelected) {
-          e.currentTarget.style.borderColor = 'var(--border)';
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = 'none';
-        }
-      }}
-    >
-      <CardBadge id={choice.id} dimColor={dimColor} isSelected={isSelected} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-          {choice.title}
-        </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.4 }}>
-          {choice.subtitle}
-        </div>
-      </div>
-      {isSelected && <CheckMark dimColor={dimColor} />}
+    <button type="button" onClick={onSelect} className={`guided-choice-option${isSelected ? ' is-selected' : ''}`} aria-pressed={isSelected}>
+      <span className="guided-choice-option__badge">{choice.id}</span>
+      <span className="guided-choice-option__copy">
+        <strong>{choice.title}</strong>
+        <small>{choice.subtitle}</small>
+      </span>
+      {isSelected && <Check className="guided-choice-option__check" size={16} />}
     </button>
   );
 }
@@ -57,89 +31,18 @@ interface CustomCardProps {
   onSelect: () => void;
 }
 
-/** 自定义选项卡片（E） */
 export function CustomCard({
-  dimColor, isCustomSelected, isEditingCustom,
+  dimColor: _dimColor, dimLabel, isCustomSelected, isEditingCustom,
   displayTitle, displaySubtitle, onSelect,
 }: CustomCardProps) {
   return (
-    <button
-      onClick={onSelect}
-      style={{
-        ...cardStyle,
-        border: `2px solid ${isCustomSelected ? dimColor : isEditingCustom ? `${dimColor}80` : 'var(--border)'}`,
-        background: isCustomSelected ? `${dimColor}15` : isEditingCustom ? `${dimColor}08` : 'var(--bg-secondary)',
-      }}
-      onMouseEnter={e => {
-        if (!isCustomSelected) {
-          e.currentTarget.style.borderColor = `${dimColor}80`;
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = `0 4px 12px ${dimColor}20`;
-        }
-      }}
-      onMouseLeave={e => {
-        if (!isCustomSelected) {
-          e.currentTarget.style.borderColor = isEditingCustom ? `${dimColor}80` : 'var(--border)';
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = 'none';
-        }
-      }}
-    >
-      <CardBadge id="E" dimColor={dimColor} isSelected={isCustomSelected} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-          {displayTitle}
-        </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.4 }}>
-          {displaySubtitle}
-        </div>
-      </div>
-      {isCustomSelected && <CheckMark dimColor={dimColor} />}
+    <button type="button" onClick={onSelect} className={`guided-choice-option guided-choice-option--custom${isCustomSelected ? ' is-selected' : ''}${isEditingCustom ? ' is-editing' : ''}`} aria-pressed={isCustomSelected}>
+      <span className="guided-choice-option__badge">E</span>
+      <span className="guided-choice-option__copy">
+        <strong>{displayTitle}</strong>
+        <small>{displaySubtitle || `为${dimLabel}添加自己的设定`}</small>
+      </span>
+      {isCustomSelected && <Check className="guided-choice-option__check" size={16} />}
     </button>
-  );
-}
-
-/** 选项标识徽章 */
-function CardBadge({ id, dimColor, isSelected }: { id: string; dimColor: string; isSelected: boolean }) {
-  return (
-    <div
-      style={{
-        width: '32px',
-        height: '32px',
-        borderRadius: '8px',
-        background: isSelected ? dimColor : `${dimColor}20`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: isSelected ? '#fff' : dimColor,
-        fontWeight: 700,
-        fontSize: '0.85rem',
-        flexShrink: 0,
-      }}
-    >
-      {id}
-    </div>
-  );
-}
-
-/** 选中标记圆点 */
-function CheckMark({ dimColor }: { dimColor: string }) {
-  return (
-    <div
-      style={{
-        width: '22px',
-        height: '22px',
-        borderRadius: 'var(--radius-md)',
-        background: dimColor,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#fff',
-        fontSize: '0.7rem',
-        flexShrink: 0,
-      }}
-    >
-      {'\u2713'}
-    </div>
   );
 }

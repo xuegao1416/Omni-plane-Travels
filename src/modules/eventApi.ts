@@ -1,5 +1,5 @@
 // ============================================================
-//  Mod API 桥接 — 封装 10 个 Tauri 命令的 invoke 调用
+//  Mod API 桥接 — 封装 11 个 Tauri 命令的 invoke 调用
 //  内存注册表缓存 + 监听 mods:changed 事件刷新缓存。
 //  写命令失败时统一 unwrap 为 EventApiError（含 EventErrorCode）。
 //  注：Rust 后端实现 src-tauri/src/mod_system；本文件仅封装调用。
@@ -25,6 +25,12 @@ import * as web from './webEventStore';
 import { isTauri } from '../utils/nativeFetch';
 
 // EventApiError is shared from eventErrors.ts so Web imports do not form a runtime cycle.
+/** Platform-neutral event package payload consumed by the game runtime. */
+export interface EventRuntimePack {
+  id: string;
+  manifest: Manifest;
+  files: Record<string, string>;
+}
 
 /** Tauri reject 的对象 message 即 EventError 的 JSON 字符串，解析回 EventError */
 export function unwrapEventError(err: unknown): EventApiError {
@@ -89,7 +95,7 @@ export function disposeCacheListener(): void {
   initPromise = null;
 }
 
-// ─── 10 个操作：桌面走 Tauri invoke，Web 走 IndexedDB 实现 ───
+// ─── 11 个操作：桌面走 Tauri invoke，Web 走 IndexedDB 实现 ───
 
 export async function discoverPacks(): Promise<EventMeta[]> {
   if (!isTauri()) return web.webDiscoverPacks();
@@ -189,6 +195,12 @@ export async function getEventDetail(id: string): Promise<EventDetail> {
 }
 
 /** 便捷：取单个包的元数据（带缓存） */
+/** Read runtime schema files from the active platform's event-pack store. */
+export async function getRuntimePack(id: string): Promise<EventRuntimePack> {
+  if (!isTauri()) return web.webGetRuntimePack(id);
+  return call<EventRuntimePack>('get_event_runtime', { id });
+}
+
 export async function getEventMeta(id: string): Promise<EventMeta | null> {
   if (metaCache.has(id)) return metaCache.get(id)!;
   try {

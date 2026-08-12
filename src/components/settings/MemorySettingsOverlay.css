@@ -380,3 +380,23 @@
     box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
   }
 }
+
+/* Memory settings lives inside the themed journey overlay. Keep its groups
+   visually subordinate to the overlay while preserving a stronger editor. */
+.game-journey__overlay-panel .ms-card,
+.game-journey__overlay-panel .ms-main,
+.game-journey__overlay-panel .ms-header,
+.game-journey__overlay-panel .ms-section-header,
+.game-journey__overlay-panel .ms-action-bar,
+.game-journey__overlay-panel .ms-editor-card,
+.game-journey__overlay-panel .ms-editor-header {
+  background: color-mix(in srgb, var(--journey-surface-muted) 32%, transparent) !important;
+  box-shadow: none !important;
+}
+.game-journey__overlay-panel .ms-textarea {
+  background: color-mix(in srgb, var(--journey-input) 48%, transparent) !important;
+  box-shadow: none;
+}
+.game-journey__overlay-panel .ms-textarea:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--journey-focus) 22%, transparent) !important;
+}

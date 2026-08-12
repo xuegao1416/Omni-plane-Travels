@@ -1,7 +1,53 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'bun:test';
-import { planV2ToV3Migration, SAVE_SCHEMA_VERSION } from '../storage/db';
+import {
+  deleteSave,
+  loadGame,
+  planV2ToV3Migration,
+  saveGameIncremental,
+  SAVE_SCHEMA_VERSION,
+} from '../storage/db';
 import type { GameSave } from '../storage/db';
+import { getDefaultPortraitSource, getPortraitSource } from '../components/start/PortraitEditor';
+
+describe('portrait persistence round-trip', () => {
+  it('preserves a custom data URL through the compact save head and restores default gender assets', async () => {
+    const saveId = `portrait-round-trip-${Date.now()}`;
+    const customDataUrl = 'data:image/webp;base64,portrait-round-trip';
+    const portrait = {
+      source: 'custom' as const,
+      customDataUrl,
+      zoom: 1.24,
+      positionX: 7,
+      positionY: -4,
+      fileName: '旅者.webp',
+    };
+
+    try {
+      await saveGameIncremental(saveId, {
+        id: saveId,
+        name: '头像持久化测试',
+        timestamp: Date.now(),
+        schemaVersion: SAVE_SCHEMA_VERSION,
+        round: 0,
+        gameState: {} as any,
+        worldId: 'default',
+        personalInfo: { gender: '女', portrait },
+      } as any, []);
+
+      const loaded = await loadGame(saveId);
+      expect(loaded?.personalInfo?.portrait).toEqual(portrait);
+      expect(getPortraitSource(loaded!.personalInfo!)).toBe(customDataUrl);
+    } finally {
+      await deleteSave(saveId);
+    }
+
+    expect(getDefaultPortraitSource('男')).toBe('/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-male-v1.png');
+    expect(getDefaultPortraitSource('女')).toBe('/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-female-v1.png');
+    expect(getDefaultPortraitSource('其他')).toBe('/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-neutral-v1.png');
+    expect(getPortraitSource({ gender: '男' } as any)).toBe(getDefaultPortraitSource('男'));
+  });
+});
 
 function makeOldSave(): GameSave {
   return {

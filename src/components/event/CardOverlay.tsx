@@ -6,12 +6,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { X, FileText, ScrollText, MessageCircle, Image, ListChecks, Sparkles, Filter, Dice5 } from 'lucide-react';
 import { eventBus, EVENTS } from '../../engine/eventBus';
 import { getWebEvent } from '../../modules/eventDb';
-import type { CardNodeExecutionResult, CardExecutionContext } from '../../modules/schema';
+import { getRuntimePack } from '../../modules/eventApi';
+import type { CardWorkflowDefinition, CardNodeExecutionResult, CardExecutionContext } from '../../modules/schema';
 import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 import { executeCardWorkflow, type CardWorkflowExecutionResult } from '../../modules/cardWorkflowEngine';
 import { useSaveStore } from '../../stores/saveStore';
 import { selectChoice, applyEffectTarget } from '../../modules/eventChoiceState';
 import type { GameState } from '../../schema/variables';
+import JourneyCardShell from '../game/shared/JourneyCardShell';
 
 interface CardEvent {
   cardId: string;
@@ -37,7 +39,7 @@ export default function CardOverlay({ gameState }: Props) {
 
   const openCard = useCallback(async (evt: CardEvent) => {
     try {
-      const rec = await getWebEvent(evt.eventPackId).catch(() => undefined);
+      const rec = await getRuntimePack(evt.eventPackId).catch(() => undefined);
       if (!rec) return;
 
       const worldName = rec.manifest?.name ?? '事件';
@@ -131,15 +133,15 @@ export default function CardOverlay({ gameState }: Props) {
         padding: 'var(--space-6)',
       }}
     >
-      <div
-        className="event-fade-in"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 'min(460px, 92vw)', maxHeight: '82vh', overflow: 'auto',
-          background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)', padding: 'var(--space-5)', color: 'var(--text-primary)',
-        }}
-      >
+      <JourneyCardShell mode="panel" className="game-journey-card--event" label="浜嬩欢鍗?">
+        <div
+          className="event-fade-in game-journey-card__event-content"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: 'min(460px, 92vw)', maxHeight: '82vh', overflow: 'auto',
+            padding: 'var(--space-5)', color: 'var(--text-primary)',
+          }}
+        >
         {/* 标题栏 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
           <span style={{ flex: 1, fontWeight: 600, fontFamily: 'var(--font-display)' }}>{title}</span>
@@ -193,7 +195,8 @@ export default function CardOverlay({ gameState }: Props) {
             {result.warnings.join(', ')}
           </div>
         )}
-      </div>
+        </div>
+      </JourneyCardShell>
     </div>
   );
 }

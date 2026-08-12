@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
-import { LogIn, LogOut, User, Loader, Mail, ArrowRight, KeyRound } from 'lucide-react';
+import { LogIn, LogOut, User, Loader, Mail, ArrowRight, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 type AuthView = 'login' | 'register' | 'forgot';
 
@@ -12,6 +12,9 @@ export default function AuthSettingsTab() {
   const { user, isLoading, isAuthenticated, logout, sendCode, login, register, resetPassword } = useAuthStore();
   const { DialogUI, alert: showAlert } = useDialog();
 
+  const effectiveLoading = isLoading;
+  const effectiveAuthenticated = isAuthenticated;
+  const effectiveUser = user;
   const [view, setView] = useState<AuthView>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +24,7 @@ export default function AuthSettingsTab() {
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [codeSent, setCodeSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function AuthSettingsTab() {
   }, [codeSent, view]);
 
   const resetForm = useCallback(() => {
-    setEmail(''); setPassword(''); setCode(''); setError(''); setCodeSent(false); setCountdown(0);
+    setEmail(''); setPassword(''); setCode(''); setError(''); setCodeSent(false); setCountdown(0); setShowPassword(false);
   }, []);
 
   const handleSendCode = useCallback(async () => {
@@ -95,7 +99,7 @@ export default function AuthSettingsTab() {
     }
   }, [email, code, password, resetPassword]);
 
-  if (isLoading) {
+  if (effectiveLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', color: 'var(--text-muted)' }}>
         <Loader size={20} className="animate-spin" style={{ marginRight: 8 }} />
@@ -104,9 +108,9 @@ export default function AuthSettingsTab() {
     );
   }
 
-  if (isAuthenticated) {
+  if (effectiveAuthenticated) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
+      <div className="traveler-registry-auth" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
         {DialogUI}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '16px',
@@ -119,8 +123,8 @@ export default function AuthSettingsTab() {
             <User size={24} color="var(--accent)" />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600' }}>{user?.username}</div>
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>{user?.email}</div>
+            <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600' }}>{effectiveUser?.username || '晨雾旅者'}</div>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>{effectiveUser?.email || 'traveler@example.com'}</div>
           </div>
         </div>
 
@@ -156,7 +160,7 @@ export default function AuthSettingsTab() {
 
   // 未登录
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '40px 20px', maxWidth: '400px', margin: '0 auto' }}>
+    <div className="traveler-registry-auth" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '40px 20px', maxWidth: '400px', margin: '0 auto' }}>
       {DialogUI}
 
       <div style={{
@@ -177,44 +181,65 @@ export default function AuthSettingsTab() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
         {/* 邮箱 */}
-        <input
-          className="input-field"
-          type="email"
-          value={email}
-          onChange={e => { setEmail(e.target.value); setError(''); }}
-          placeholder="邮箱地址"
-          disabled={submitting}
-          style={{ padding: '10px 12px' }}
-        />
+        <label className="traveler-auth-field">
+          <span>邮箱地址</span>
+          <input
+            className="input-field"
+            type="email"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setError(''); }}
+            placeholder="name@example.com"
+            autoComplete="email"
+            aria-label="邮箱地址"
+            disabled={submitting}
+            style={{ padding: '10px 12px' }}
+          />
+        </label>
 
         {/* 密码（登录/注册/重置都显示） */}
-        <input
-          className="input-field"
-          type="password"
-          value={password}
-          onChange={e => { setPassword(e.target.value); setError(''); }}
-          placeholder={view === 'login' ? '密码' : '设置密码（至少 6 位）'}
-          disabled={submitting}
-          onKeyDown={e => e.key === 'Enter' && (view === 'login' ? handleLogin() : codeSent ? (view === 'register' ? handleRegister() : handleResetPassword()) : handleSendCode())}
-          style={{ padding: '10px 12px' }}
-        />
+        <label className="traveler-auth-field traveler-auth-password-field">
+          <span>密码</span>
+          <div className="traveler-auth-password-input">
+            <input
+              className="input-field"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+              placeholder={view === 'login' ? '请输入密码' : '至少 6 位字符'}
+              autoComplete={view === 'login' ? 'current-password' : 'new-password'}
+              aria-label="密码"
+              disabled={submitting}
+              onKeyDown={e => e.key === 'Enter' && (view === 'login' ? handleLogin() : codeSent ? (view === 'register' ? handleRegister() : handleResetPassword()) : handleSendCode())}
+              style={{ padding: '10px 42px 10px 12px' }}
+            />
+            <button type="button" className="traveler-auth-password-toggle" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? '隐藏密码' : '显示密码'} aria-pressed={showPassword}>
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </label>
 
         {/* 验证码（注册/重置模式，发码后显示） */}
         {view !== 'login' && codeSent && (
-          <input
-            ref={codeRef}
-            className="input-field"
-            type="text"
-            value={code}
-            onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
-            placeholder="输入 6 位验证码"
-            maxLength={6}
-            disabled={submitting}
-            style={{ padding: '10px 12px', letterSpacing: '6px', fontSize: 'var(--font-size-lg)', textAlign: 'center' }}
-          />
+          <label className="traveler-auth-field">
+            <span>邮箱验证码</span>
+            <input
+              ref={codeRef}
+              className="input-field"
+              type="text"
+              inputMode="numeric"
+              value={code}
+              onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+              placeholder="输入 6 位验证码"
+              autoComplete="one-time-code"
+              aria-label="邮箱验证码"
+              maxLength={6}
+              disabled={submitting}
+              style={{ padding: '10px 12px', letterSpacing: '6px', fontSize: 'var(--font-size-lg)', textAlign: 'center' }}
+            />
+          </label>
         )}
 
-        {error && <p style={{ color: 'var(--danger)', fontSize: 'var(--font-size-sm)', margin: 0 }}>{error}</p>}
+        {error && <p className="traveler-auth-error" role="alert">{error}</p>}
 
         {/* 主按钮 */}
         {view === 'login' ? (

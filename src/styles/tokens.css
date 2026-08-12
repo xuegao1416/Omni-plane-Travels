@@ -78,6 +78,13 @@
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
+  /* Shared motion contract for adaptive Crystal surfaces. */
+  --motion-enter: 420ms;
+  --motion-settle: 560ms;
+  --motion-press: 120ms;
+  --motion-lift: 4px;
+  --motion-ease: var(--ease-out);
+
   /* ─── 布局尺寸 ─── */
   --right-panel-width: 340px;
 
@@ -204,4 +211,86 @@
   --danger: #dc3545;
   --warning: #c2860a;
   --success: #28a76a;
+}
+
+/* Dawn V4 journey surfaces: one semantic contract, four visual themes. */
+:root,
+[data-theme="light"] {
+  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-v1.png');
+  --creation-bg: #edf5f0;
+  --creation-surface: rgba(255, 255, 248, .74);
+  --creation-surface-muted: rgba(229, 242, 235, .76);
+  --creation-elevated: rgba(255, 255, 248, .88);
+  --creation-text: #294b45;
+  --creation-muted: #648078;
+  --creation-border: rgba(122, 166, 153, .42);
+  --creation-accent: #b39453;
+  --creation-glow: rgba(193, 220, 210, .48);
+  --creation-input: rgba(255, 255, 248, .82);
+  --creation-selected: rgba(229, 242, 235, .76);
+  --creation-disabled: rgba(100, 128, 120, .45);
+  --creation-focus: #b39453;
+  --creation-danger: #a85151;
+  --creation-overlay: rgba(20, 35, 44, .42);
+  --creation-button: #b39453;
+}
+
+[data-theme="dark"] {
+  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-nocturne-v1.png');
+  --creation-bg: #182035;
+  --creation-surface: rgba(27, 36, 58, .78);
+  --creation-surface-muted: rgba(77, 103, 130, .5);
+  --creation-elevated: rgba(35, 49, 79, .9);
+  --creation-text: #e8eee8;
+  --creation-muted: #b5c0c7;
+  --creation-border: rgba(166, 190, 203, .42);
+  --creation-accent: #d5b879;
+  --creation-glow: rgba(123, 168, 193, .36);
+  --creation-input: rgba(17, 25, 45, .7);
+  --creation-selected: rgba(77, 103, 130, .5);
+  --creation-disabled: rgba(181, 192, 199, .42);
+  --creation-focus: #f0cf88;
+  --creation-danger: #ef9b93;
+  --creation-overlay: rgba(8, 15, 32, .58);
+  --creation-button: #d5b879;
+}
+
+[data-theme="metal"] {
+  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-silver-v1.png');
+  --creation-bg: #e9edf2;
+  --creation-surface: rgba(248, 250, 252, .76);
+  --creation-surface-muted: rgba(222, 234, 242, .8);
+  --creation-elevated: rgba(248, 250, 252, .9);
+  --creation-text: #303b4d;
+  --creation-muted: #68788d;
+  --creation-border: rgba(126, 150, 173, .44);
+  --creation-accent: #a88750;
+  --creation-glow: rgba(172, 205, 229, .45);
+  --creation-input: rgba(255, 255, 255, .8);
+  --creation-selected: rgba(222, 234, 242, .8);
+  --creation-disabled: rgba(104, 120, 141, .42);
+  --creation-focus: #9e793e;
+  --creation-danger: #ad5b5b;
+  --creation-overlay: rgba(24, 38, 48, .4);
+  --creation-button: #a88750;
+}
+
+[data-theme="green"] {
+  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-forest-v1.png');
+  --creation-bg: #e8f2eb;
+  --creation-surface: rgba(246, 252, 246, .74);
+  --creation-surface-muted: rgba(216, 239, 223, .8);
+  --creation-elevated: rgba(246, 252, 246, .88);
+  --creation-text: #264b39;
+  --creation-muted: #5f806d;
+  --creation-border: rgba(105, 153, 126, .44);
+  --creation-accent: #b39453;
+  --creation-glow: rgba(149, 199, 166, .42);
+  --creation-input: rgba(249, 255, 250, .8);
+  --creation-selected: rgba(216, 239, 223, .8);
+  --creation-disabled: rgba(95, 128, 109, .42);
+  --creation-focus: #8e6d36;
+  --creation-danger: #a55151;
+  --creation-overlay: rgba(18, 42, 33, .4);
+  --creation-button: #b39453;
 }

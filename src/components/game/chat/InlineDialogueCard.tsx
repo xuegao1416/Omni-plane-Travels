@@ -12,7 +12,7 @@ interface Props {
 
 /**
  * 内联对话头像卡片 — 渲染 [SPEAK] 格式的对话
- * 气泡式布局：头像嵌入名称标签，对话内容在下方
+ * 简洁版：仅头像 + 名称 + 对话气泡，无装饰外框
  */
 export default function InlineDialogueCard({ avatarUrl: initialUrl, name, npcId, title, text, action }: Props) {
   const [imgError, setImgError] = useState(false);
@@ -26,7 +26,7 @@ export default function InlineDialogueCard({ avatarUrl: initialUrl, name, npcId,
   const initial = name ? name.charAt(0) : '?';
 
   return (
-    <div style={{
+    <div className="inline-dialogue-card" style={{
       margin: '20px 0',
       fontFamily: 'var(--font-family)',
     }}>

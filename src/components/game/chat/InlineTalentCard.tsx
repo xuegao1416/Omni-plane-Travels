@@ -1,6 +1,7 @@
 // 天赋觉醒内联卡片 — 渲染在消息正文中的天赋觉醒展示
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
+import JourneyCardShell from '../shared/JourneyCardShell';
 
 interface InlineTalentCardProps {
   /** 天赋 ID */
@@ -39,7 +40,8 @@ export default function InlineTalentCard({ id, name, rarity, description, effect
   const rarityBg = RARITY_BG_COLORS[rarity] || 'rgba(156, 163, 175, 0.1)';
 
   return (
-    <div
+    <JourneyCardShell className="game-journey-card--talent" label="天赋觉醒">
+      <div
       className="inline-talent-card"
       style={{
         border: `1px solid ${rarityColor}40`,
@@ -143,6 +145,7 @@ export default function InlineTalentCard({ id, name, rarity, description, effect
       }}>
         {expanded ? '点击收起' : '点击查看详情'}
       </div>
-    </div>
+      </div>
+    </JourneyCardShell>
   );
 }

@@ -2,6 +2,8 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
+  box-sizing: border-box;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17,6 +19,9 @@
   padding: var(--space-6);
   width: 90%;
   max-width: 380px;
+  max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  overflow-y: auto;
+  box-sizing: border-box;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   animation: dialogSlideIn 0.2s ease;
 }

@@ -10,6 +10,8 @@ import {
   X, ScrollText, Swords, DollarSign, Flag, User, Sparkles, BarChart3, Map, BookMarked, Loader,
 } from 'lucide-react';
 
+export type ManualEditSection = 'seed' | 'geography' | 'history' | 'characters' | 'narrative' | 'modules';
+
 interface ManualEditFormProps {
   form: FormState;
   update: (patch: Partial<FormState>) => void;
@@ -30,17 +32,21 @@ interface ManualEditFormProps {
   addLocation: () => void;
   removeLocation: (i: number) => void;
   updateLocation: (i: number, patch: Partial<FormState['locations'][0]>) => void;
+  sections?: ManualEditSection[];
 }
 
 export function ManualEditForm({
   form, update, selectedModules, onToggleModule, disabledByConflict,
   updateModuleData, onTalentAiGenerate, isGeneratingTalent, onModuleAiFill, generatingModule,
   addFaction, removeFaction, updateFaction, addNPC, removeNPC, updateNPC, addLocation, removeLocation, updateLocation,
+  sections,
 }: ManualEditFormProps) {
+  const sectionEnabled = (section: ManualEditSection) => !sections || sections.includes(section);
+
   return (
     <>
       {/* 基本信息 */}
-      <div className="world-form-section"><h4><BarChart3 size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 基本信息</h4>
+      {sectionEnabled('seed') && <div className="world-form-section"><h4><BarChart3 size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 基本信息</h4>
         <div className="world-form-group"><label>世界名称 *</label><input type="text" value={form.name} onChange={e => update({ name: e.target.value })} placeholder="给你的世界起个名字..." /></div>
         <div className="world-form-group"><label>简介</label><textarea value={form.description} onChange={e => update({ description: e.target.value })} placeholder="一句话描述这个世界（展示在卡片上）" rows={2} /></div>
         <div className="world-form-row">
@@ -55,20 +61,20 @@ export function ManualEditForm({
           <div className="world-form-group"><label>难度</label><select value={form.difficulty} onChange={e => update({ difficulty: e.target.value })} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px', color: 'var(--text-primary)' }}><option value="easy">● 简单</option><option value="medium">● 中等</option><option value="hard">● 困难</option></select></div>
         </div>
         <div className="world-form-group"><label>标签 (逗号分隔)</label><input type="text" value={form.tags} onChange={e => update({ tags: e.target.value })} placeholder="科幻, 冒险, 开放世界" /></div>
-      </div>
+      </div>}
 
       {/* 世界设定 */}
-      <div className="world-form-section"><h4><ScrollText size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 世界设定</h4>
+      {sectionEnabled('geography') && <div className="world-form-section"><h4><ScrollText size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 世界设定</h4>
         <div className="world-form-group"><label>世界观概述</label><textarea value={form.overview} onChange={e => update({ overview: e.target.value })} placeholder="2-3段沉浸式世界观描述..." rows={5} /></div>
         <div className="world-form-row three">
           <div className="world-form-group"><label>时间背景</label><input type="text" value={form.timePeriod} onChange={e => update({ timePeriod: e.target.value })} placeholder="1990年春" /></div>
           <div className="world-form-group"><label>地理位置</label><input type="text" value={form.location} onChange={e => update({ location: e.target.value })} placeholder="东北工业城市" /></div>
           <div className="world-form-group"><label>氛围</label><input type="text" value={form.atmosphere} onChange={e => update({ atmosphere: e.target.value })} placeholder="温暖怀旧" /></div>
         </div>
-      </div>
+      </div>}
 
       {/* 地理区域 */}
-      <div className="world-form-section"><h4><Map size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 地理区域</h4>
+      {sectionEnabled('geography') && <div className="world-form-section"><h4><Map size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 地理区域</h4>
         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: 8 }}>定义世界中的关键区域/地点（对应世界书的 lore 条目）</p>
         <div className="world-dynamic-list">
           {form.locations.map((loc, i) => (
@@ -82,24 +88,24 @@ export function ManualEditForm({
           ))}
         </div>
         <button className="btn-ghost" onClick={addLocation} style={{ marginTop: 8, fontSize: 'var(--font-size-base)' }}>+ 添加区域</button>
-      </div>
+      </div>}
 
       {/* 文化风俗 */}
-      <div className="world-form-section"><h4><BookMarked size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 文化风俗</h4>
+      {sectionEnabled('geography') && <div className="world-form-section"><h4><BookMarked size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 文化风俗</h4>
         <div className="world-form-group"><label>文化描述</label><textarea value={form.culture} onChange={e => update({ culture: e.target.value })} placeholder="描述这个世界的信仰、习俗、禁忌、语言特色..." rows={3} /></div>
-      </div>
+      </div>}
 
       {/* 世界规则 */}
-      <div className="world-form-section"><h4><Swords size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 世界规则</h4>
+      {sectionEnabled('geography') && <div className="world-form-section"><h4><Swords size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 世界规则</h4>
         <div className="world-form-row">
           <div className="world-form-group"><label>力量体系</label><textarea value={form.powerSystem} onChange={e => update({ powerSystem: e.target.value })} placeholder="魔法/科技/武道..." rows={2} /></div>
           <div className="world-form-group"><label>社会结构</label><textarea value={form.socialStructure} onChange={e => update({ socialStructure: e.target.value })} placeholder="封建王国/星际联邦..." rows={2} /></div>
         </div>
         <div className="world-form-group"><label>特殊规则 (每行一条)</label><textarea value={form.specialRules} onChange={e => update({ specialRules: e.target.value })} placeholder="角色可能死亡&#10;无魔法系统" rows={2} /></div>
-      </div>
+      </div>}
 
       {/* 经济 & 时间 */}
-      <div className="world-form-section"><h4><DollarSign size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 经济 & 时间</h4>
+      {sectionEnabled('history') && <div className="world-form-section"><h4><DollarSign size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 经济 & 时间</h4>
         <div className="world-form-row three">
           <div className="world-form-group"><label>货币名称</label><input type="text" value={form.currencyName} onChange={e => update({ currencyName: e.target.value })} placeholder="人民币" /></div>
           <div className="world-form-group"><label>货币符号</label><input type="text" value={form.currencySymbol} onChange={e => update({ currencySymbol: e.target.value })} placeholder="¥" /></div>
@@ -111,10 +117,10 @@ export function ManualEditForm({
           <div className="world-form-group"><label>开始时间</label><input type="text" value={form.startTime} onChange={e => update({ startTime: e.target.value })} placeholder="1990年3月15日" /></div>
           <div className="world-form-group"><label>时间流速</label><input type="text" value={form.timeSpeed} onChange={e => update({ timeSpeed: e.target.value })} placeholder="与现实同步" /></div>
         </div>
-      </div>
+      </div>}
 
       {/* 势力 */}
-      <div className="world-form-section"><h4><Flag size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 势力</h4>
+      {sectionEnabled('history') && <div className="world-form-section"><h4><Flag size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 势力</h4>
         <div className="world-dynamic-list">
           {form.factions.map((f, i) => (
             <div key={i} className="world-dynamic-item">
@@ -128,10 +134,10 @@ export function ManualEditForm({
           ))}
         </div>
         <button className="btn-ghost" onClick={addFaction} style={{ marginTop: 8, fontSize: 'var(--font-size-base)' }}>+ 添加势力</button>
-      </div>
+      </div>}
 
       {/* 预设NPC */}
-      <div className="world-form-section"><h4><User size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 预设NPC</h4>
+      {sectionEnabled('characters') && <div className="world-form-section"><h4><User size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 预设NPC</h4>
         <div className="world-dynamic-list">
           {form.presetNPCs.map((n, i) => (
             <div key={i} className="world-dynamic-item">
@@ -148,20 +154,20 @@ export function ManualEditForm({
           ))}
         </div>
         <button className="btn-ghost" onClick={addNPC} style={{ marginTop: 8, fontSize: 'var(--font-size-base)' }}>+ 添加NPC</button>
-      </div>
+      </div>}
 
       {/* 核心特色 */}
-      <div className="world-form-section"><h4><Sparkles size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 核心特色</h4>
+      {sectionEnabled('narrative') && <div className="world-form-section"><h4><Sparkles size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 核心特色</h4>
         <div className="world-form-group"><label>特色 (逗号分隔)</label><input type="text" value={form.highlights} onChange={e => update({ highlights: e.target.value })} placeholder="日常生活, 温情互动, 怀旧氛围" /></div>
-      </div>
+      </div>}
 
       {/* 系统模块 */}
-      <div className="world-form-section"><h4><BarChart3 size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 系统模块</h4>
+      {sectionEnabled('seed') && <div className="world-form-section"><h4><BarChart3 size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 系统模块</h4>
         <ModuleSelector selected={selectedModules} onToggle={onToggleModule} disabledByConflict={disabledByConflict} />
-      </div>
+      </div>}
 
       {/* 模块数据编辑 */}
-      {form.modules && form.modules.length > 0 && (
+      {sectionEnabled('modules') && form.modules && form.modules.length > 0 && (
         <div className="world-form-section"><h4><BarChart3 size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 模块数据</h4>
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: 10 }}>编辑各模块的初始数据（AI已生成，可手动调整）</p>
           {form.modules.map((mod, modIdx) => {

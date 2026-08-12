@@ -50,20 +50,28 @@ interface StepCharacterHistoryProps {
   onLoadPreset: (preset: HistoryPreset) => void;
   onStartGame: () => void;
   onPrev: () => void;
+  onModalStateChange?: (open: boolean) => void;
+  showNavigation?: boolean;
 }
 
 export default function StepCharacterHistory({
   segmentDefs, segments, setSegments, isGenerating, regeneratingId,
   includeAgeStages, setIncludeAgeStages,
   hasApiConfig, onGenerateAll, onRegenerateSegment, onLoadPreset,
-  onStartGame, onPrev,
+  onStartGame, onPrev, onModalStateChange, showNavigation = true,
 }: StepCharacterHistoryProps) {
   const [activeId, setActiveId] = useState(segmentDefs[0]?.id ?? '');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const presetMenuRef = useRef<HTMLDivElement>(null);
-  const { DialogUI, prompt: dlgPrompt, alert: dlgAlert } = useDialog();
+  const activeRailRef = useRef<HTMLButtonElement>(null);
+  const { DialogUI, prompt: dlgPrompt, alert: dlgAlert, isOpen: dialogOpen } = useDialog();
+
+  useEffect(() => {
+    onModalStateChange?.(pickerOpen || dialogOpen);
+    return () => onModalStateChange?.(false);
+  }, [dialogOpen, onModalStateChange, pickerOpen]);
 
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -103,6 +111,10 @@ export default function StepCharacterHistory({
   const isActiveRegenerating = regeneratingId === activeId;
   const isActiveEmpty = !activeContent.trim();
 
+  useEffect(() => {
+    activeRailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [activeId]);
+
   // 切换年龄阶段开关时，同步更新 activeId
   const handleToggleAgeStages = (next: boolean) => {
     setIncludeAgeStages(next);
@@ -113,9 +125,9 @@ export default function StepCharacterHistory({
   };
 
   return (
-    <div className="history-layout">
+    <div className="history-layout history-ritual-surface">
       {/* ── 顶部操作栏 ── */}
-      <div className="history-topbar">
+      <div className="history-topbar history-ritual-surface__controls">
         <label className="history-toggle" title="是否包含0岁到当前年龄的成长经历">
           <input
             type="checkbox"
@@ -159,30 +171,8 @@ export default function StepCharacterHistory({
         </div>
       </div>
 
-      {/* ── Tab 栏：阶段选择 ── */}
-      <div className="history-tabs">
-        {segmentDefs.map((def) => {
-          const content = segments[def.id] || '';
-          const hasText = content.trim().length > 0;
-          const isRegen = regeneratingId === def.id;
-          return (
-            <button
-              key={def.id}
-              className={`history-tab${activeId === def.id ? ' active' : ''}`}
-              onClick={() => setActiveId(def.id)}
-            >
-              <span className="history-tab-icon">{def.icon}</span>
-              <span className="history-tab-title">{def.title}</span>
-              <span className="history-tab-status">
-                {isRegen ? <Loader size={10} className="animate-spin" /> : hasText ? '✓' : ''}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
       {/* ── 内容编辑区 ── */}
-      <div className="history-content">
+      <div className="history-content history-ritual-surface__editor">
         {activeDef && (
           <>
             <div className="history-content-header">
@@ -243,19 +233,45 @@ export default function StepCharacterHistory({
         )}
       </div>
 
-      {/* ── 底部导航 ── */}
-      <div className="history-nav">
-        <button className="btn-secondary" onClick={onPrev} style={{ padding: '10px 24px' }}>← 上一步</button>
-        <button
-          className="btn-primary"
-          onClick={onStartGame}
-          style={{ padding: '10px 32px', fontSize: 'var(--font-size-lg)', display: 'flex', alignItems: 'center', gap: '6px' }}
-          disabled={!allSegmentsFilled}
-          title={!allSegmentsFilled ? '请填写所有人生阶段的内容' : ''}
-        >
-          <Play size={16} /> 下一步
-        </button>
+      <div className="history-progress-rail history-ritual-surface__rail" aria-label="前尘编年进度">
+        <div className="history-progress-rail__art" aria-hidden="true" />
+        <div className="history-progress-rail__nodes">
+          {segmentDefs.map((def, index) => {
+            const complete = Boolean(segments[def.id]?.trim());
+            const current = activeId === def.id;
+            return (
+              <button
+                key={def.id}
+                ref={current ? activeRailRef : undefined}
+                type="button"
+                className={`history-progress-node${complete ? ' is-complete' : ''}${current ? ' is-current' : ''}`}
+                onClick={() => setActiveId(def.id)}
+                aria-current={current ? 'step' : undefined}
+              >
+                <span className="history-progress-node__icon">{def.icon}</span>
+                <span>{def.title}</span>
+                <small>{complete ? '已完成' : current ? '当前阶段' : '待填写'}</small>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ── 底部导航 ── */}
+      {showNavigation && (
+        <div className="history-nav history-ritual-surface__nav">
+          <button className="btn-secondary" onClick={onPrev} style={{ padding: '10px 24px' }}>← 上一步</button>
+          <button
+            className="btn-primary"
+            onClick={onStartGame}
+            style={{ padding: '10px 32px', fontSize: 'var(--font-size-lg)', display: 'flex', alignItems: 'center', gap: '6px' }}
+            disabled={!allSegmentsFilled}
+            title={!allSegmentsFilled ? '请填写所有人生阶段的内容' : ''}
+          >
+            <Play size={16} /> 下一步
+          </button>
+        </div>
+      )}
 
       {/* 弹窗 */}
       {pickerOpen && (

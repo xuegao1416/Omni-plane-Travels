@@ -2,6 +2,7 @@
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { copyDirectoryContents } from './scripts/copyStaticAssets';
 
 const DIST = './dist';
 
@@ -10,6 +11,12 @@ console.log('🔨 开始生产构建...');
 // 1. 确保 dist 目录存在
 if (!existsSync(DIST)) {
   mkdirSync(DIST, { recursive: true });
+}
+
+// Copy public assets before the root-level PWA assets below. This preserves
+// nested URLs such as /art/theme/anchor/*.png in Pages and Tauri builds.
+if (existsSync('./public')) {
+  copyDirectoryContents('./public', DIST);
 }
 
 // 2. 打包 JS（Bun 会把 JS 中 import 的 .css 抽取为独立 asset 输出）
@@ -22,7 +29,10 @@ const jsResult = await Bun.build({
   // （Linux 产出 130+ chunk 且部分损坏，Windows 只有 5 个），待 Bun 修复后重新开启。
   splitting: false,
   minify: true,
-  define: { 'process.env.NODE_ENV': '"production"' },
+  define: {
+    'process.env.NODE_ENV': '"production"',
+    __RITUAL_PREVIEW_DEV__: 'false',
+  },
 });
 
 if (!jsResult.success) {
@@ -65,6 +75,8 @@ const cssResult = await Bun.build({
   entrypoints: ['./src/index.css'],
   target: 'browser',
   minify: true,
+  // Keep public artwork URLs root-relative; the asset tree is copied to dist/ above.
+  external: ['/art/*'],
 });
 
 if (!cssResult.success) {
@@ -110,18 +122,6 @@ if (existsSync('./scarborough-fair.mp3')) {
   copyFileSync('./scarborough-fair.mp3', join(DIST, 'scarborough-fair.mp3'));
   console.log('   ✅ scarborough-fair.mp3');
 }
-if (existsSync('./bg-main.png')) {
-  copyFileSync('./bg-main.png', join(DIST, 'bg-main.png'));
-  console.log('   ✅ bg-main.png');
-}
-if (existsSync('./bg-main-phone.png')) {
-  copyFileSync('./bg-main-phone.png', join(DIST, 'bg-main-phone.png'));
-  console.log('   ✅ bg-main-phone.png');
-}
-if (existsSync('./title-main.png')) {
-  copyFileSync('./title-main.png', join(DIST, 'title-main.png'));
-  console.log('   ✅ title-main.png');
-}
 
 // 6. 复制代理教程图片
 console.log('📷 复制代理教程图片...');
@@ -148,7 +148,4 @@ console.log('   ├── main.js');
 console.log('   ├── main.css');
 console.log('   ├── manifest.json (PWA 配置)');
 console.log('   ├── icon.png (应用图标)');
-console.log('   ├── bg-main.png (主页背景-桌面)');
-console.log('   ├── bg-main-phone.png (主页背景-移动)');
-console.log('   ├── title-main.png (主页标题)');
 console.log('   └── proxy-tutorial-images/ (代理教程图片 9 张)');

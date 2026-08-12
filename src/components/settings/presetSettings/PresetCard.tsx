@@ -4,7 +4,7 @@ import { iconBtnStyle } from './constants';
 
 export function PresetCard({ name, desc, promptCount, regexCount, active, builtin, onSelect, onExport, onDelete, onEdit }: PresetCardProps) {
   return (
-    <div style={{
+    <div className="settings-preset-card" style={{
       display: 'flex', alignItems: 'center', gap: '10px',
       padding: '12px 14px', borderRadius: '10px',
       border: active ? '2px solid var(--accent)' : '1px solid var(--border)',

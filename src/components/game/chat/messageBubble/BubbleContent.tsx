@@ -90,6 +90,16 @@ export default function BubbleContent({
             if (optionEl && onOptionClick) {
               const optionText = optionEl.getAttribute('data-option-text');
               if (optionText) {
+                // 反选同组其他选项（单选行为）
+                const grid = optionEl.closest('.action-options-grid');
+                if (grid) {
+                  grid.querySelectorAll('.action-option-card').forEach(card => {
+                    card.classList.remove('selected');
+                    card.setAttribute('aria-pressed', 'false');
+                  });
+                }
+                optionEl.classList.add('selected');
+                optionEl.setAttribute('aria-pressed', 'true');
                 onOptionClick(optionText);
               }
             }

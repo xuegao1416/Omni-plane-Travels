@@ -10,7 +10,6 @@ interface UISettingsContextType {
 }
 
 const UISettingsContext = createContext<UISettingsContextType | null>(null);
-
 export function UISettingsProvider({ children }: { children: ReactNode }) {
   const settings = useConfigStore(s => s.settings);
   const updateSettings = useConfigStore(s => s.updateSettings);

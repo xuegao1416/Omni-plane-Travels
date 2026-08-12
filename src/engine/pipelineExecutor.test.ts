@@ -11,10 +11,10 @@ const apiConfig: ApiConfig = {
   stream: false,
 };
 
-test('a successful narrative round completes when variable extraction returns no update', async () => {
+test('variable extraction does not report success for an unusable update', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => new Response(JSON.stringify({
-    choices: [{ message: { content: 'No structured variable update.' } }],
+    choices: [{ message: { content: '<UpdateVariable>not valid JSON</UpdateVariable>' } }],
   }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
 
   try {
@@ -40,7 +40,8 @@ test('a successful narrative round completes when variable extraction returns no
 
     expect(result.mainResult?.text).toBe('A complete narrative.');
     expect(result.status.stages.main.status).toBe('success');
-    expect(result.status.stages.variable.status).toBe('success');
+    expect(result.status.stages.variable.status).toBe('error');
+    expect(result.status.stages.variable.error).toContain('无法应用');
     expect(result.status.endTime).toBeGreaterThan(0);
   } finally {
     globalThis.fetch = originalFetch;

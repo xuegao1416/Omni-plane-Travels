@@ -89,3 +89,22 @@ describe('VariableManager.addResources 元数据', () => {
     expect(vm.getState().玩家.生存资源!['gold'].name).toBe('金币');
   });
 });
+
+describe('VariableManager.applyUpdateVariable atomicity', () => {
+  it('prevents cross-round poisoning and repairs the same damage in old saves', () => {
+    const vm = freshVM();
+    const before = vm.createSafeSnapshotForPrompt().人物档案;
+
+    const applied = vm.applyUpdateVariable(JSON.stringify([
+      { op: 'replace', path: '/人物档案', value: null },
+    ]));
+
+    expect(applied).toBe(false);
+    expect(vm.createSafeSnapshotForPrompt().人物档案).toEqual(before);
+
+    const damagedSave = createDefaultGameState();
+    (damagedSave as any).人物档案 = null;
+    const recoveredVm = new VariableManager(damagedSave);
+    expect(recoveredVm.createSafeSnapshotForPrompt().人物档案).toEqual({});
+  });
+});

@@ -39,6 +39,7 @@ pub fn run() {
             mod_system::commands::disable_event,
             mod_system::commands::import_event,
             mod_system::commands::export_event,
+            mod_system::commands::get_event_runtime,
             mod_system::commands::get_event_detail,
         ])
         .run(tauri::generate_context!())

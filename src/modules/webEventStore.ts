@@ -44,7 +44,7 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.7.2';
+const APP_VERSION = '2.7.3';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
@@ -472,6 +472,24 @@ export async function webGetEventDetail(id: string): Promise<EventDetail> {
 // ─── canonical v2 pack 内事件读写辅助 ───
 
 /** 写入 canonical v2 事件元数据、对应工作流，以及可选的包级周期规则。 */
+
+/** Return the text files needed by the game runtime for one event pack. */
+export async function webGetRuntimePack(id: string): Promise<{
+  id: string;
+  manifest: Manifest;
+  files: Record<string, string>;
+}> {
+  const rec = await getWebEvent(id);
+  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${id}`);
+
+  const files: Record<string, string> = {};
+  for (const [path, value] of Object.entries(rec.files)) {
+    if (typeof value === 'string') files[path] = value;
+  }
+
+  return { id: rec.id, manifest: rec.manifest, files };
+}
+
 export async function saveEventToPack(
   packId: string,
   entry: EventIndexEntry,

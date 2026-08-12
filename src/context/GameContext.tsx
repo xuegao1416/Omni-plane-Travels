@@ -19,6 +19,7 @@ function withProfileDefaults(raw: Partial<PlayerProfile> | null | undefined): Pl
     career: raw.career ?? '', socialClass: raw.socialClass ?? '', organization: raw.organization ?? '',
     specialIdentity: raw.specialIdentity ?? '', perspective: raw.perspective ?? '第三人称',
     initialSkills: raw.initialSkills ?? {}, initialItems: raw.initialItems ?? {}, customNpcs: raw.customNpcs ?? [],
+    portrait: raw.portrait ? { ...raw.portrait } : undefined,
   };
 }
 
