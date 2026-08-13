@@ -41,6 +41,51 @@ const baseModule = {
 };
 
 describe('custom gameplay module validation', () => {
+  test('rejects undeclared host inputs and every V2 write outside own state', () => {
+    const result = validateCustomGameplayModule({
+      ...baseModule,
+      schemaVersion: 2,
+      inputs: { health: 'player.stats.attrA', secret: 'player.secret' },
+      permissions: { read: ['player.stats.attrA'], write: 'own-state-only' },
+      logic: {
+        onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [],
+        onButton: [{ actions: [{ type: 'set', path: '玩家.生存状态.血量', value: 1 }] }],
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.map((item) => item.code)).toEqual(expect.arrayContaining(['unknown-host-input', 'forbidden-state-path']));
+  });
+
+  test('requires every V2 host input in permissions.read', () => {
+    const result = validateCustomGameplayModule({
+      ...baseModule,
+      schemaVersion: 2,
+      inputs: { health: 'player.stats.attrA' },
+      logic: { ...baseModule.logic, onButton: [] },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.map((item) => item.code)).toContain('undeclared-read-permission');
+  });
+
+  test('rejects a string reference assigned to number state and unknown event subpaths', () => {
+    const result = validateCustomGameplayModule({
+      ...baseModule,
+      schemaVersion: 2,
+      inputs: { time: 'game.time' },
+      permissions: { read: ['game.time'], write: 'own-state-only' },
+      logic: {
+        onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [],
+        onButton: [{ actions: [
+          { type: 'set', path: 'score', value: { source: 'input', path: 'time' } },
+          { type: 'set', path: 'title', value: { source: 'event', path: 'button.payload.secret' } },
+        ] }],
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.map((item) => item.code)).toEqual(expect.arrayContaining(['type-mismatch', 'unknown-event-path']));
+  });
   test('normalizes omitted optional sections and metadata without changing the module contract', () => {
     const result = normalizeCustomGameplayModule({
       ...baseModule,

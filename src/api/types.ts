@@ -38,6 +38,8 @@ export interface StreamOptions extends RequestOptions {
 export interface CompletionResult {
   text: string;
   reasoning?: string;
+  /** Provider-reported stop reason, e.g. stop / length / content_filter. */
+  finishReason?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;

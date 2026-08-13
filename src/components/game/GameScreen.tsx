@@ -37,6 +37,8 @@ import { useBusinessSettlement } from './gameScreen/hooks/useBusinessSettlement'
 import { normalizeAssetStatus } from './panels/businessOverlay/utils';
 import JourneyDossierContent from './shared/JourneyDossierContent';
 import { DOSSIER_META, normalizeDossierPanel } from './shared/journeyDossierMeta';
+import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
+import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
@@ -56,7 +58,6 @@ export default function GameScreen() {
   const [mobileActivePanel, setMobileActivePanel] = useState<OverlayPanel>(null);
   const [stateVersion, setStateVersion] = useState(0);
   const [notification, setNotification] = useState<string | null>(null);
-  const [lastDiceRoll, setLastDiceRoll] = useState<DiceRoll | null>(null);
   // ── Fullscreen ──
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -96,13 +97,56 @@ export default function GameScreen() {
     for (const mod of worldDef.modules) {
       if (!mod.enabled) continue;
       const key = keyMap[mod.moduleId];
-      if (key && (mod.moduleConfig || mod.data)) (result as any)[key] = (mod.moduleConfig || mod.data);
+      if (!key || !(mod.moduleConfig || mod.data)) continue;
+      const config = (mod.moduleConfig || mod.data) as Record<string, any>;
+      if (mod.moduleId === 'stat') {
+        const live = gameState.玩家?.生存状态 ?? {};
+        const statConfig: Record<string, any> = { ...config };
+        if (config.attrA) statConfig.attrA = { ...config.attrA, current: live.血量 ?? config.attrA.current };
+        if (config.attrB) statConfig.attrB = { ...config.attrB, current: live.体力值 ?? config.attrB.current };
+        for (let i = 1; i <= 6; i++) {
+          const id = `dim${i}`;
+          if (config[id]) statConfig[id] = { ...config[id], value: live[id] ?? config[id].value };
+        }
+        if (Array.isArray(config.special)) {
+          statConfig.special = config.special.map((item: any) => ({
+            ...item,
+            value: live[item.id] ?? item.value,
+          }));
+        }
+        (result as any)[key] = statConfig;
+      } else {
+        (result as any)[key] = config;
+      }
     }
     return result;
-  }, [worldDef]);
+  }, [worldDef, gameState, stateVersion]);
   // ── Extracted hooks ──
   const bumpVersion = useCallback(() => setStateVersion(v => v + 1), []);
   const { isSimulating, handleManualTick } = useSimulation(engine, worldDef, apiConfig);
+
+  const handleCustomModuleChoice = useCallback(async (event: CustomModuleChoiceEvent) => {
+    const result = await runCustomModulesForWorldAndCommit(engine.variableManager.getState(), state.selectedWorld, 'onChoice', {
+      event,
+    }, {
+      commit: (nextState) => engine.variableManager.setState(nextState),
+      notify: () => { bumpVersion(); eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED); },
+      autoSave: () => useSaveStore.getState().scheduleAutoSave(),
+    });
+    if (result.warnings.length > 0) console.warn('[CustomModules] onChoice warnings:', result.warnings);
+  }, [engine, state.selectedWorld, bumpVersion]);
+
+  const handleCustomModuleButton = useCallback((moduleId: string, event: string) => {
+    void runCustomModulesForWorldAndCommit(engine.variableManager.getState(), state.selectedWorld, 'onButton', {
+      event: { type: 'button', moduleId, event },
+    }, {
+      commit: (nextState) => engine.variableManager.setState(nextState),
+      notify: () => { bumpVersion(); eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED); },
+      autoSave: () => useSaveStore.getState().scheduleAutoSave(),
+    }).then((result) => {
+      if (result.warnings.length > 0) console.warn('[CustomModules] onButton warnings:', result.warnings);
+    }).catch((error) => console.warn('[CustomModules] onButton failed:', error));
+  }, [engine, state.selectedWorld, bumpVersion]);
 
   // ── 事件包注册（二级开关：sessionActivePacks 优先，否则用全局已启用列表） ──
   const sessionActivePacks = useSaveStore(s => s.sessionActivePacks);
@@ -259,7 +303,14 @@ export default function GameScreen() {
     return () => { eventBus.off(EVENTS.VARIABLE_UPDATE_ENDED, onUpdate); eventBus.off(EVENTS.VARIABLE_EXTRACTION_FAILED, onFail); };
   }, []);
   // ── Callbacks ──
-  const handleDiceRoll = useCallback((roll: DiceRoll) => setLastDiceRoll(roll), []);
+  const handleDiceRoll = useCallback((roll: DiceRoll) => {
+    const current = engine.variableManager.getState();
+    const history = [...(current.dice?.history ?? []), roll].slice(-10);
+    current.dice = { lastRoll: roll, history };
+    engine.variableManager.setState(current);
+    bumpVersion();
+    useSaveStore.getState().scheduleAutoSave();
+  }, [engine, bumpVersion]);
   const handleUpdateChronicles = useCallback((npcId: string, chronicles: string[]) => {
     const s = engine.variableManager.getState();
     const npc = s.人物档案?.[npcId];
@@ -277,13 +328,22 @@ export default function GameScreen() {
   // ── Simulation rules change handler ──
   const handleSimulationRulesChange = useCallback((rules: WorldDynamicsConfig) => {
     if (!worldDef) return;
-    // 更新世界定义中的 simulation 模块配置
-    const simModIndex = worldDef.modules?.findIndex(m => m.moduleId === 'simulation' && m.enabled);
-    if (simModIndex !== undefined && simModIndex >= 0 && worldDef.modules) {
-      worldDef.modules[simModIndex].moduleConfig = rules as unknown as Record<string, unknown>;
-      // 触发重新渲染
-      bumpVersion();
+    // 新世界默认不再显式携带 simulation 模块；首次编辑时再物化一份覆盖配置。
+    const modules = worldDef.modules ?? (worldDef.modules = []);
+    const simMod = modules.find(m => m.moduleId === 'simulation');
+    if (simMod) {
+      simMod.enabled = true;
+      simMod.moduleConfig = rules as unknown as Record<string, unknown>;
+    } else {
+      modules.push({
+        moduleId: 'simulation',
+        name: '世界动态',
+        description: '当前世界的世界动态规则覆盖',
+        enabled: true,
+        moduleConfig: rules as unknown as Record<string, unknown>,
+      });
     }
+    bumpVersion();
   }, [worldDef, bumpVersion]);
   // ── Panel rendering (shared between desktop and mobile) ──
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
@@ -293,7 +353,7 @@ export default function GameScreen() {
         case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
         case 'tasks': return <TaskPanel gameState={gameState} />;
         case 'notebook': return <NotebookPanel gameState={gameState} />;
-        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
+        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onRollbackToSnapshot={(msgIndex) => { engine.rollbackToSnapshot(msgIndex); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
         case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
         case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => {}} mode="inline" />;
         case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
@@ -358,6 +418,7 @@ export default function GameScreen() {
       onOpenSurvivalOverlay={() => setSurvivalOverlayOpen(true)}
       survivalChangeLog={getSurvivalChangeLog()}
       businessData={bizData}
+      onCustomModuleButton={handleCustomModuleButton}
     />
   );
 
@@ -413,7 +474,7 @@ export default function GameScreen() {
         changeLog={getSurvivalChangeLog()}
         onClose={() => setSurvivalOverlayOpen(false)}
       />}
-      <CardOverlay gameState={gameState} />
+      <CardOverlay gameState={gameState} onChoice={handleCustomModuleChoice} />
       {notification && (
         <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 200, animation: 'fadeIn 0.2s ease' }}>
           {notification}

@@ -27,7 +27,7 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
   const initialAttr = useMemo(() => {
     if (!attr) return checkableAttrs[0]?.id || '';
     const found = checkableAttrs.find(a => a.name === attr || a.id === attr);
-    return found?.id || checkableAttrs[0]?.id || '';
+    return found?.id || '';
   }, [attr, checkableAttrs]);
 
   const [selectedAttr, setSelectedAttr] = useState(initialAttr);
@@ -86,8 +86,9 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
 
       {/* 操作区 */}
       <div className="inline-dice-body">
-      <div className="inline-dice-core" aria-hidden="true">
-        <Dices size={30} strokeWidth={1.25} />
+      <div className={`inline-dice-core${animating ? ' is-rolling' : ''}`} aria-hidden="true">
+        <span className="inline-dice-core__value">{result?.d20 ?? 'D20'}</span>
+        <Dices size={18} strokeWidth={1.4} />
       </div>
       <div className="inline-dice-controls">
         {checkableAttrs.length > 0 ? (
@@ -96,6 +97,7 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
             value={selectedAttr}
             onChange={e => setSelectedAttr(e.target.value)}
           >
+            {!selectedAttr && <option value="">选择检定属性</option>}
             {checkableAttrs.map(a => (
               <option key={a.id} value={a.id}>{a.name} ({a.value})</option>
             ))}
@@ -108,6 +110,9 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
           <span className="inline-dice-modifier">
             修正 {modifier >= 0 ? '+' : ''}{modifier}
           </span>
+        )}
+        {!selectedAttrData && checkableAttrs.length > 0 && attr && (
+          <span className="inline-dice-no-attr">未找到“{attr}”，请选择实际属性</span>
         )}
 
         <button

@@ -1,4 +1,5 @@
 import type { FormState } from './types';
+import { inferWorldClockConfig, type WorldClockConfig, type WorldClockDate } from '../../../time/worldClock';
 import { ALL_WORLD_ICONS } from '@/components/shared/worldIcons';
 import ModuleSelector from '../ModuleSelector';
 import { StatModuleEditor } from '../moduleEditors/StatModuleEditor';
@@ -7,7 +8,7 @@ import { SurvivalModuleEditor } from '../moduleEditors/SurvivalModuleEditor';
 import { BusinessModuleEditor } from '../moduleEditors/BusinessModuleEditor';
 import { TalentModuleEditor } from '../moduleEditors/TalentModuleEditor';
 import {
-  X, ScrollText, Swords, DollarSign, Flag, User, Sparkles, BarChart3, Map, BookMarked, Loader,
+  X, ScrollText, Swords, DollarSign, Flag, User, Sparkles, BarChart3, Map, BookMarked, Loader, CalendarDays,
 } from 'lucide-react';
 
 export type ManualEditSection = 'seed' | 'geography' | 'history' | 'characters' | 'narrative' | 'modules';
@@ -42,6 +43,35 @@ export function ManualEditForm({
   sections,
 }: ManualEditFormProps) {
   const sectionEnabled = (section: ManualEditSection) => !sections || sections.includes(section);
+  const timeSystem = inferWorldClockConfig({
+    calendar: form.calendar,
+    startTime: form.startTime,
+    timeSpeed: form.timeSpeed,
+    timePeriod: form.timePeriod,
+    timeSystem: form.timeSystem,
+  });
+  const updateTimeSystem = (patch: Partial<WorldClockConfig>) => update({ timeSystem: { ...timeSystem, ...patch } });
+  const updateStart = (patch: Partial<WorldClockDate>) => updateTimeSystem({ start: { ...timeSystem.start, ...patch } });
+  const updateLegacyCalendar = (calendar: string) => {
+    const inferred = inferWorldClockConfig({ calendar, startTime: form.startTime, timeSpeed: form.timeSpeed, timePeriod: form.timePeriod });
+    update({ calendar, timeSystem: { ...timeSystem, mode: inferred.mode, calendarName: inferred.calendarName, eraName: inferred.eraName } });
+  };
+  const updateLegacyStartTime = (startTime: string) => {
+    const inferred = inferWorldClockConfig({ calendar: form.calendar, startTime, timeSpeed: form.timeSpeed, timePeriod: form.timePeriod });
+    update({ startTime, timeSystem: { ...timeSystem, start: inferred.start } });
+  };
+  const updateLegacyTimeSpeed = (timeSpeed: string) => {
+    const inferred = inferWorldClockConfig({ timeSpeed });
+    update({ timeSpeed, timeSystem: { ...timeSystem, defaultTurnMinutes: inferred.defaultTurnMinutes } });
+  };
+  const monthText = Array.isArray(timeSystem.months)
+    ? timeSystem.months.map(month => `${month.name}:${month.days}`).join(', ')
+    : '';
+  const parseMonths = (value: string) => value.split(/[,，\n]/).map((item, index) => {
+    const [name, days] = item.split(/[:：]/);
+    const parsedDays = Number(days);
+    return { name: (name || `第${index + 1}月`).trim(), days: Number.isFinite(parsedDays) && parsedDays > 0 ? Math.trunc(parsedDays) : 30 };
+  }).filter(month => month.name);
 
   return (
     <>
@@ -113,10 +143,31 @@ export function ManualEditForm({
         </div>
         <div className="world-form-group"><label>货币说明</label><input type="text" value={form.currencyDesc} onChange={e => update({ currencyDesc: e.target.value })} placeholder="简要说明" /></div>
         <div className="world-form-row three">
-          <div className="world-form-group"><label>纪年方式</label><input type="text" value={form.calendar} onChange={e => update({ calendar: e.target.value })} placeholder="公历" /></div>
-          <div className="world-form-group"><label>开始时间</label><input type="text" value={form.startTime} onChange={e => update({ startTime: e.target.value })} placeholder="1990年3月15日" /></div>
-          <div className="world-form-group"><label>时间流速</label><input type="text" value={form.timeSpeed} onChange={e => update({ timeSpeed: e.target.value })} placeholder="与现实同步" /></div>
+          <div className="world-form-group"><label>纪年方式</label><input type="text" value={form.calendar} onChange={e => updateLegacyCalendar(e.target.value)} placeholder="公历" /></div>
+          <div className="world-form-group"><label>开始时间</label><input type="text" value={form.startTime} onChange={e => updateLegacyStartTime(e.target.value)} placeholder="1990年3月15日" /></div>
+          <div className="world-form-group"><label>时间流速</label><input type="text" value={form.timeSpeed} onChange={e => updateLegacyTimeSpeed(e.target.value)} placeholder="与现实同步" /></div>
         </div>
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}><CalendarDays size={14} /> 高级历法（普通玩家无需设置）</summary>
+          <div style={{ marginTop: 10, padding: 10, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div className="world-form-row three">
+              <div className="world-form-group"><label>历法类型</label><select value={timeSystem.mode || 'gregorian'} onChange={e => updateTimeSystem({ mode: e.target.value as WorldClockConfig['mode'] })}><option value="gregorian">公历</option><option value="custom">自定义</option><option value="relative">相对/旅历</option></select></div>
+              <div className="world-form-group"><label>历法名称</label><input value={timeSystem.calendarName || ''} onChange={e => updateTimeSystem({ calendarName: e.target.value })} placeholder="旅历 / 江湖历" /></div>
+              <div className="world-form-group"><label>纪元名称</label><input value={timeSystem.eraName || ''} onChange={e => updateTimeSystem({ eraName: e.target.value })} placeholder="第七纪元" /></div>
+            </div>
+            <div className="world-form-row three">
+              <div className="world-form-group"><label>起始年份</label><input type="number" min={1} value={timeSystem.start.year} onChange={e => updateStart({ year: Number(e.target.value) })} /></div>
+              <div className="world-form-group"><label>起始月份</label><input type="number" min={1} max={timeSystem.months.length || 12} value={timeSystem.start.month} onChange={e => updateStart({ month: Number(e.target.value) })} /></div>
+              <div className="world-form-group"><label>起始日期</label><input type="number" min={1} max={400} value={timeSystem.start.day} onChange={e => updateStart({ day: Number(e.target.value) })} /></div>
+            </div>
+            <div className="world-form-row three">
+              <div className="world-form-group"><label>起始时刻</label><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input aria-label="起始小时" type="number" min={0} max={23} value={timeSystem.start.hour} onChange={e => updateStart({ hour: Number(e.target.value) })} /><span>:</span><input aria-label="起始分钟" type="number" min={0} max={59} value={timeSystem.start.minute} onChange={e => updateStart({ minute: Number(e.target.value) })} /></div></div>
+              <div className="world-form-group"><label>默认回合分钟</label><input type="number" min={1} max={1440} value={timeSystem.defaultTurnMinutes ?? 30} onChange={e => updateTimeSystem({ defaultTurnMinutes: Number(e.target.value) })} /></div>
+              <div className="world-form-group"><label>星期名称（逗号分隔）</label><input value={Array.isArray(timeSystem.weekdays) ? timeSystem.weekdays.join(', ') : ''} onChange={e => updateTimeSystem({ weekdays: e.target.value.split(/[,，]/).map(item => item.trim()).filter(Boolean) })} placeholder="星期日, 星期一, ..." /></div>
+            </div>
+            <div className="world-form-group"><label>月份与天数（名称:天数，逗号分隔）</label><input value={monthText} onChange={e => updateTimeSystem({ months: parseMonths(e.target.value) })} placeholder="春月:30, 夏月:30, 秋月:30, 冬月:30" /></div>
+          </div>
+        </details>
       </div>}
 
       {/* 势力 */}

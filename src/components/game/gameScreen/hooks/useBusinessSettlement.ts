@@ -4,6 +4,7 @@ import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { BusinessModuleSchema } from '../../../../modules/schema';
 import { normalizeAssetStatus } from '../../panels/businessOverlay/utils';
+import { getBusinessSettlementPeriodKey } from '../../../../time/businessPeriod';
 
 type AssetStatus = 'active' | 'idle' | 'damaged' | 'destroyed';
 type TxType = 'income' | 'expense' | 'purchase' | 'sale' | 'upgrade' | 'event';
@@ -25,6 +26,7 @@ interface RuntimeBusiness {
   资金: number;
   资产列表: RuntimeAsset[];
   交易日志?: Array<{ 类型: TxType; 描述: string; 金额: number }>;
+  上次结算周期?: string;
 }
 
 /** 计算单个资产的净收益（含等级加成） */
@@ -33,8 +35,10 @@ function assetNetIncome(asset: RuntimeAsset): number {
   return (asset.基础收益 ?? 0) + levelBonus - (asset.维护费 ?? 0);
 }
 
+export { getBusinessSettlementPeriodKey as settlementPeriodKey };
+
 /**
- * 经营资产：自动结算（每轮变量更新后，纯机械计算）
+ * 经营资产：自动结算（每个完整游戏回合结束后，纯机械计算）
  * 从 GameState.玩家.经营资产 读取运行时数据，结算后写回
  *
  * 修复记录：
@@ -49,7 +53,7 @@ export function useBusinessSettlement(
   bumpVersion: () => void,
 ) {
   useEffect(() => {
-    const handler = () => {
+    const handler = (turnId?: string) => {
       const biz = worldDef?.modules?.find(m => m.moduleId === 'business' && m.enabled)?.moduleConfig as BusinessModuleSchema | undefined;
       if (!biz) return;
 
@@ -105,6 +109,18 @@ export function useBusinessSettlement(
 
       // ── 有运行时数据时，执行机械结算 ──
 
+      const cycleName = biz.cycleName || '天';
+      const worldTime = state.世界?.时间系统?.当前时间 || '';
+      const periodKey = getBusinessSettlementPeriodKey(cycleName, worldTime, turnId, state.世界?.时间系统?.时钟);
+      if (!periodKey || runtimeBiz.上次结算周期 === periodKey) return;
+
+      // 天/周/月以首次观察到的时间作为基线，不在读档或开局首轮凭空发放收益。
+      if (!runtimeBiz.上次结算周期 && !/回合|轮/.test(cycleName)) {
+        runtimeBiz.上次结算周期 = periodKey;
+        engine.variableManager.setState(state);
+        return;
+      }
+
       let totalIncome = 0;
       let totalMaintenance = 0;
 
@@ -155,6 +171,7 @@ export function useBusinessSettlement(
       }
 
       runtimeBiz.资金 = newFunds;
+      runtimeBiz.上次结算周期 = periodKey;
 
       // 交易日志：仅在资金实际变化时记录
       if (!runtimeBiz.交易日志) runtimeBiz.交易日志 = [];
@@ -176,7 +193,7 @@ export function useBusinessSettlement(
       bumpVersion();
     };
 
-    eventBus.on(EVENTS.VARIABLE_UPDATE_ENDED, handler);
-    return () => { eventBus.off(EVENTS.VARIABLE_UPDATE_ENDED, handler); };
+    eventBus.on(EVENTS.GENERATION_ENDED, handler);
+    return () => { eventBus.off(EVENTS.GENERATION_ENDED, handler); };
   }, [engine, worldDef, bumpVersion]);
 }

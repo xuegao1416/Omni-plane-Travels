@@ -12,6 +12,7 @@ import { loadPresets } from '../../../settings/apiPresetUtils';
 import { SIM_API_PRESET_KEY } from './constants';
 import type { WorldDynamicsConfig } from '../../../../modules/schema';
 import type { WorldDef } from '../../../../data/worlds-schema';
+import { createDefaultWorldDynamics } from '../../../../modules/defaults';
 import SimulationRuleEditor from './SimulationRuleEditor';
 
 interface SimSettingsProps {
@@ -27,7 +28,8 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
 
   // 从世界定义获取当前的世界动态配置
   const simMod = worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled);
-  const currentRules = (simMod?.moduleConfig as unknown as WorldDynamicsConfig) ?? null;
+  const currentRules = (simMod?.moduleConfig as unknown as WorldDynamicsConfig) ?? createDefaultWorldDynamics();
+  const usesDefaultRules = !simMod?.moduleConfig;
 
   const handleRulesChange = (rules: WorldDynamicsConfig) => {
     if (onRulesChange) {
@@ -192,21 +194,19 @@ export function SimSettings({ worldDef, onRulesChange }: SimSettingsProps) {
 
         {showRules && currentRules && (
           <div style={{ marginTop: '8px' }}>
+            {usesDefaultRules && (
+              <div style={{
+                marginBottom: '8px', padding: '8px 10px',
+                background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
+              }}>
+                当前世界使用系统默认动态规则；世界推演仍会正常运行。
+              </div>
+            )}
             <SimulationRuleEditor
               rules={currentRules}
               onChange={handleRulesChange}
             />
-          </div>
-        )}
-
-        {showRules && !currentRules && (
-          <div style={{
-            marginTop: '8px', padding: '12px',
-            background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
-            fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
-            textAlign: 'center',
-          }}>
-            当前世界未启用世界动态模块
           </div>
         )}
       </div>

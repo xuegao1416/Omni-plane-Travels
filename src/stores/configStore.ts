@@ -18,6 +18,7 @@ export interface UISettings {
   uiFontSize: FontSize;
   bodyFontSize: FontSize;
   lineHeight: LineHeight;
+  centeredNarrative: boolean;
   autoScroll: boolean;
 }
 
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: UISettings = {
   uiFontSize: '中',
   bodyFontSize: '中',
   lineHeight: '舒适',
+  centeredNarrative: false,
   autoScroll: true,
 };
 
@@ -58,7 +60,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.language': '语言', 'settings.theme': '主题', 'settings.font': '字体',
     'settings.uiFontSize': '界面字体', 'settings.uiFontSize.desc': 'UI 元素的字体大小',
     'settings.bodyFontSize': '正文字体', 'settings.bodyFontSize.desc': '聊天消息的字体大小',
-    'settings.lineHeight': '正文行距', 'settings.autoScroll': '正文自动滚动',
+    'settings.lineHeight': '正文行距', 'settings.centeredNarrative': '居中行文',
+    'settings.centeredNarrative.desc': '将对话收拢到屏幕中央，减少宽屏阅读时的视线偏移', 'settings.autoScroll': '正文自动滚动',
     'theme.light': '拂晓', 'theme.dark': '玄夜', 'theme.metal': '银灰', 'theme.green': '翠林',
     'font.yahei': '雅黑', 'font.source': '思源黑体', 'font.menglong': '朦胧黑体',
     'font.hanchan': '寒蝉半圆', 'font.shanggu': '尚古圆体',
@@ -96,7 +99,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.language': 'Language', 'settings.theme': 'Theme', 'settings.font': 'Font',
     'settings.uiFontSize': 'UI Font Size', 'settings.uiFontSize.desc': 'Font size for UI elements',
     'settings.bodyFontSize': 'Body Font Size', 'settings.bodyFontSize.desc': 'Font size for chat messages',
-    'settings.lineHeight': 'Line Height', 'settings.autoScroll': 'Auto Scroll',
+    'settings.lineHeight': 'Line Height', 'settings.centeredNarrative': 'Centered Reading',
+    'settings.centeredNarrative.desc': 'Center the conversation in a comfortable reading column on wide screens', 'settings.autoScroll': 'Auto Scroll',
     'theme.light': 'Dawn', 'theme.dark': 'Nocturne', 'theme.metal': 'Silver', 'theme.green': 'Forest',
     'font.yahei': 'YaHei', 'font.source': 'Source Han', 'font.menglong': 'Menglong',
     'font.hanchan': 'Hanchan', 'font.shanggu': 'Shanggu',

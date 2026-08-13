@@ -13,8 +13,17 @@ import {
 import type { GameState, Task, TaskType, TaskStage, TaskReward } from '../../../schema/variables';
 import { Collapsible } from '../../shared/Collapsible';
 import EmptyState from '../../shared/EmptyState';
+import { toDisplayText } from '../../../utils/displayText';
 
 interface Props { gameState: GameState; }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function safeArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value.filter(isRecord) as T[] : [];
+}
 
 // ── 任务类型图标和颜色 ──
 const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Target; color: string; label: string }> = {
@@ -52,9 +61,10 @@ function ProgressBar({ value, color }: { value: number; color?: string }) {
 
 // ── 阶段进度指示器 ──
 function StageIndicator({ stages }: { stages: TaskStage[] }) {
+  const safeStages = safeArray<TaskStage>(stages);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flexWrap: 'wrap', margin: '6px 0' }}>
-      {stages.map((stage, i) => {
+      {safeStages.map((stage, i) => {
         const done = stage.状态 === '已完成';
         const active = stage.状态 === '进行中';
         return (
@@ -67,7 +77,7 @@ function StageIndicator({ stages }: { stages: TaskStage[] }) {
               color: done || active ? '#fff' : 'var(--text-muted)',
               opacity: done ? 0.7 : 1,
             }}>
-              {done ? '✓' : active ? '⏳' : '·'} {stage.名称}
+              {done ? '✓' : active ? '⏳' : '·'} {toDisplayText(stage.名称, `阶段 ${i + 1}`)}
             </span>
           </span>
         );
@@ -82,7 +92,7 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
 
   // 物品需求
   if (task.物品需求) {
-    for (const req of task.物品需求) {
+    for (const req of safeArray<NonNullable<Task['物品需求']>[number]>(task.物品需求)) {
       const owned = gameState.玩家.物品栏?.[req.物品名]?.数量 ?? 0;
       items.push({
         icon: Package,
@@ -94,7 +104,7 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
 
   // 属性需求
   if (task.属性需求) {
-    for (const req of task.属性需求) {
+    for (const req of safeArray<NonNullable<Task['属性需求']>[number]>(task.属性需求)) {
       const val = (gameState.玩家.生存状态 as any)?.[req.属性名] ?? 0;
       items.push({
         icon: Dumbbell,
@@ -106,7 +116,7 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
 
   // 资源需求
   if (task.资源需求) {
-    for (const req of task.资源需求) {
+    for (const req of safeArray<NonNullable<Task['资源需求']>[number]>(task.资源需求)) {
       const res = gameState.玩家.生存资源?.[req.资源名];
       const amount = res?.数量 ?? 0;
       items.push({
@@ -119,7 +129,7 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
 
   // 技能需求
   if (task.技能需求) {
-    for (const req of task.技能需求) {
+    for (const req of safeArray<NonNullable<Task['技能需求']>[number]>(task.技能需求)) {
       const skill = gameState.玩家.技能系统?.[req.技能名];
       const has = !!skill;
       items.push({
@@ -132,7 +142,7 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
 
   // NPC需求
   if (task.NPC需求) {
-    for (const req of task.NPC需求) {
+    for (const req of safeArray<NonNullable<Task['NPC需求']>[number]>(task.NPC需求)) {
       const npc = Object.values(gameState.人物档案).find(n => n.姓名 === req.NPC名);
       const favor = npc?.关系数据?.好感度 ?? 0;
       const met = !req.最低好感度 || favor >= req.最低好感度;
@@ -187,9 +197,12 @@ function RewardDisplay({ reward }: { reward: TaskReward }) {
   const items: string[] = [];
   if (reward.经验值) items.push(`⭐ ${reward.经验值}XP`);
   if (reward.金币) items.push(`💰 ${reward.金币}`);
-  if (reward.物品?.length) items.push(`📦 ${reward.物品.map(i => i.物品名).join('、')}`);
-  if (reward.技能?.length) items.push(`⚔️ ${reward.技能.map(s => s.技能名).join('、')}`);
-  if (reward.天赋?.length) items.push(`✨ ${reward.天赋.map(t => t.天赋名).join('、')}`);
+  const rewardItems = safeArray<NonNullable<TaskReward['物品']>[number]>(reward.物品);
+  const rewardSkills = safeArray<NonNullable<TaskReward['技能']>[number]>(reward.技能);
+  const rewardTalents = safeArray<NonNullable<TaskReward['天赋']>[number]>(reward.天赋);
+  if (rewardItems.length) items.push(`📦 ${rewardItems.map(i => i.物品名).join('、')}`);
+  if (rewardSkills.length) items.push(`⚔️ ${rewardSkills.map(s => s.技能名).join('、')}`);
+  if (rewardTalents.length) items.push(`✨ ${rewardTalents.map(t => t.天赋名).join('、')}`);
   if (reward.属性提升) {
     for (const [stat, val] of Object.entries(reward.属性提升)) {
       items.push(`📈 ${stat}+${val}`);
@@ -231,8 +244,9 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
   const failed = task.状态 === '已失败';
 
   // 计算阶段进度
-  const stageProgress = task.阶段
-    ? { done: task.阶段.filter(s => s.状态 === '已完成').length, total: task.阶段.length }
+  const stages = safeArray<TaskStage>(task.阶段);
+  const stageProgress = stages.length > 0
+    ? { done: stages.filter(s => s.状态 === '已完成').length, total: stages.length }
     : null;
 
   return (
@@ -258,7 +272,7 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
             textDecoration: done ? 'line-through' : 'none',
             flex: 1,
           }}>
-            {task.任务名}
+            {toDisplayText(task.任务名, '未命名任务')}
           </span>
           <span style={{
             fontSize: 'var(--font-size-xs)', padding: '1px 6px',
@@ -275,7 +289,7 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
 
         {/* 第二行：来源 + 类型 + 进度 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-          {task.来源 && <span>来源: {task.来源}</span>}
+          {task.来源 && <span>来源: {toDisplayText(task.来源)}</span>}
           <span>{typeConfig.label}</span>
           {task.进度 != null && !stageProgress && (
             <span style={{ flex: 1, textAlign: 'right' }}>{task.进度}%</span>
@@ -291,7 +305,7 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
         )}
 
         {/* 阶段进度 */}
-        {task.阶段 && <StageIndicator stages={task.阶段} />}
+        {stages.length > 0 && <StageIndicator stages={stages} />}
       </div>
 
       {/* 展开详情 */}
@@ -299,20 +313,20 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
         <div style={{ padding: '0 10px 10px', borderTop: '1px solid var(--border)' }}>
           {/* 描述 */}
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', margin: '8px 0' }}>
-            {task.描述}
+            {toDisplayText(task.描述)}
           </div>
 
           {/* 当前目标 */}
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)', margin: '4px 0' }}>
             <Target size={12} style={{ display: 'inline', marginRight: 'var(--space-1)', verticalAlign: 'middle' }} />
-            目标: {task.目标}
+            目标: {toDisplayText(task.目标, toDisplayText(task.描述))}
           </div>
 
           {/* 截止时间 */}
           {task.截止时间 && (
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', margin: '4px 0' }}>
               <Clock size={11} style={{ display: 'inline', marginRight: 'var(--space-1)', verticalAlign: 'middle' }} />
-              截止: {task.截止时间}
+              截止: {toDisplayText(task.截止时间)}
             </div>
           )}
 
@@ -320,7 +334,7 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
           <RequirementList task={task} gameState={gameState} />
 
           {/* 阶段详情 */}
-          {task.阶段?.map((stage, i) => (
+          {stages.map((stage, i) => (
             <div key={i} style={{
               margin: '6px 0', padding: '6px 8px',
               background: stage.状态 === '进行中' ? 'var(--bg-tertiary)' : 'transparent',
@@ -328,9 +342,9 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
               borderLeft: `2px solid ${stage.状态 === '已完成' ? 'var(--success)' : stage.状态 === '进行中' ? 'var(--primary)' : 'var(--border)'}`,
             }}>
               <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>
-                {stage.状态 === '已完成' ? '✓' : stage.状态 === '进行中' ? '⏳' : '·'} {stage.名称}
+                {stage.状态 === '已完成' ? '✓' : stage.状态 === '进行中' ? '⏳' : '·'} {toDisplayText(stage.名称, `阶段 ${i + 1}`)}
               </div>
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{stage.描述}</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{toDisplayText(stage.描述)}</div>
             </div>
           ))}
 
@@ -351,9 +365,12 @@ export default function TaskPanel({ gameState }: Props) {
     return <EmptyState icon={Target} message="暂无任务" />;
   }
 
-  const activeTasks = Object.values(taskSystem.活跃任务);
-  const completedTasks = Object.values(taskSystem.已完成任务);
-  const failedTasks = Object.values(taskSystem.已失败任务);
+  const taskValues = (value: unknown): Task[] => isRecord(value)
+    ? Object.values(value).filter(isRecord) as unknown as Task[]
+    : [];
+  const activeTasks = taskValues(taskSystem.活跃任务);
+  const completedTasks = taskValues(taskSystem.已完成任务);
+  const failedTasks = taskValues(taskSystem.已失败任务);
 
   // 过滤
   const filteredActive = filter === '全部'

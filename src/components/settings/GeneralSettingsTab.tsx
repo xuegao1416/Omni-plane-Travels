@@ -66,6 +66,9 @@ export default function GeneralSettingsTab() {
             onChange={v => update('lineHeight', v as LineHeight)}
           />
         </SettingRow>
+        <SettingRow label={t('settings.centeredNarrative')} desc={t('settings.centeredNarrative.desc')}>
+          <Toggle value={ui.centeredNarrative} onChange={v => update('centeredNarrative', v)} />
+        </SettingRow>
         <SettingRow label={t('settings.autoScroll')}>
           <Toggle value={ui.autoScroll} onChange={v => update('autoScroll', v)} />
         </SettingRow>

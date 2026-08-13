@@ -365,16 +365,16 @@ function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progre
       const maxLevel = p.levelData.maxLevel;
       rules.push(`   【成长体系更新规则】
    - 模式：等级制（0~${maxLevel}级）
-   - 获得经验时：{"玩家":{"当前经验值":新值}}
-   - 升级时：{"玩家":{"当前段位索引":新等级,"当前经验值":0}}
+   - 战斗、训练、探索产生的经验由本地机械系统自动结算，禁止更新当前经验值或当前段位索引
+   - 只有任务奖励、事件奖励等正文明确给出具体经验数值的来源，才可更新：{"玩家":{"当前经验值":新值}}
    - 当前经验值不能为负，当前段位索引不能超过${maxLevel}`);
     } else if (p.tiers?.length) {
       const tierList = p.tiers.map((t: any, i: number) => `${i + 1}.${t.name}`).join('、');
       rules.push(`   【成长体系更新规则】
    - 模式：段位制
    - 阶段列表：${tierList}
-   - 获得经验时：{"玩家":{"当前经验值":新值}}
-   - 升段时：{"玩家":{"当前段位索引":新索引,"当前经验值":0}}
+   - 战斗、训练、探索产生的经验由本地机械系统自动结算，禁止更新当前经验值或当前段位索引
+   - 只有任务奖励、事件奖励等正文明确给出具体经验数值的来源，才可更新：{"玩家":{"当前经验值":新值}}
    - 当前经验值不能为负，当前段位索引不能超过${p.tiers.length - 1}`);
     }
   }
@@ -430,6 +430,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
   const moduleData = worldSystem ? extractWorldSystemData(worldSystem) : {};
   const hasStatModule = !!moduleData.数值属性;
   const statModule = hasStatModule ? moduleData.数值属性 as any : undefined;
+  const hasBusinessModule = !!moduleData.经营资产;
   const hasProgression = !!(
     progressionConfig && (
       (Array.isArray((progressionConfig as any).tiers) && (progressionConfig as any).tiers.length > 0) ||
@@ -567,19 +568,22 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
 【其他变量规则】
 
 1. 玩家变量
-   {"玩家":{"当前目标":"...","物品栏":{"物品名":{"数量":1}},"当前位置":"...","外貌":"...","货币资源":{"主货币":{"名称":"金币","数量":新值}}}}
+   {"玩家":{"当前目标":"...","物品栏":{"物品名":{"数量":1}},"当前位置":"...","外貌":"..."${hasBusinessModule ? '' : ',"货币资源":{"主货币":{"名称":"金币","数量":新值}}'}}}
    - 外貌：仅在玩家外貌发生永久性变化时更新（如受伤留疤、获得纹身、年龄增长等），不要写入当前动作或临时状态
-   - 货币资源：玩家获得/花费货币时更新数量，名称仅在首次或变化时设置
+   ${hasBusinessModule
+    ? '- ★ 当前世界启用了经营资产模块，所有金钱变化只写入 玩家.经营资产.资金；禁止更新 玩家.货币资源，禁止同时写两套资金。'
+    : '- 货币资源：玩家获得/花费货币时更新数量，名称仅在首次或变化时设置'}
 
 2. 玩家生存状态
 ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过 玩家.生存状态 更新（见下方模块规则）。` : `   无数值属性模块时，更新生存状态：
    {"玩家":{"生存状态":{"血量":新值,"体力值":新值}}}
    血量范围0~100，体力值范围0~100`}
 
-3. 世界变量（★ 首轮必须设置，后续有变化时更新 ★）
-   - 首轮必须输出 时间系统.当前时间 和 空间定位.当前位置，否则界面无法显示世界状态
-   - 后续轮次：时间流逝、地点变化、天气变化时更新
-   {"世界":{"时间系统":{"当前时间":"傍晚","当前天气":"晴朗"},"空间定位":{"当前位置":"城门"}}}
+3. 世界变量（★ 首轮设置位置，后续有变化时更新 ★）
+   - 时间系统.时钟 是系统维护的权威时间；禁止创建、修改、删除 时间系统.时钟 或 时间系统.当前时间
+   - 首轮必须输出 空间定位.当前位置；天气明确时可同时输出 当前天气
+   - 后续轮次只在地点或天气变化时更新，时间流逝由系统自动处理
+   {"世界":{"时间系统":{"当前天气":"晴朗"},"空间定位":{"当前位置":"城门"}}}
 
 4. 纪事系统（统一情报板 — 记录玩家已知的所有重要信息）
    - 游戏开始时纪事为空，由 AI 根据剧情动态创建

@@ -13,6 +13,8 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const editingRef = useRef(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
   editingRef.current = editing;
   const isUser = message.role === 'user';
   const isMobile = useMediaQuery('(max-width: 640px)');
@@ -37,8 +39,34 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
       setContextMenu({ x: e.clientX, y: e.clientY });
     };
     el.addEventListener('contextmenu', handler);
-    return () => el.removeEventListener('contextmenu', handler);
+    return () => {
+      el.removeEventListener('contextmenu', handler);
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    };
   }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+    longPressStartRef.current = null;
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'touch' || editingRef.current) return;
+    cancelLongPress();
+    const point = { x: e.clientX, y: e.clientY };
+    longPressStartRef.current = point;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      setContextMenu(point);
+    }, 520);
+  }, [cancelLongPress]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const start = longPressStartRef.current;
+    if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) <= 10) return;
+    cancelLongPress();
+  }, [cancelLongPress]);
 
   // 编辑操作
   const handleEdit = useCallback(() => {
@@ -68,6 +96,11 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
       <div
         ref={bubbleRef}
         className={`game-journey__message-bubble${isUser ? ' is-user' : ' is-assistant'}${isMobile ? ' is-mobile' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={cancelLongPress}
+        onPointerCancel={cancelLongPress}
+        style={isMobile ? ({ WebkitTouchCallout: 'none', userSelect: 'none', touchAction: 'pan-y' } as React.CSSProperties) : undefined}
       >
         {editing ? (
           <EditMode

@@ -7,11 +7,15 @@ import {
   deleteCustomGameplayModule,
   disableCustomGameplayModuleForWorld,
   getCustomGameplayModulesForWorld,
+  clearCustomModuleAgentSession,
+  loadCustomModuleAgentSession,
   listCustomGameplayModules,
+  saveCustomModuleAgentSession,
   saveCustomGameplayModule,
 } from './storage';
 import { createInitialCustomModuleState, installCustomModuleState } from './stateStore';
 import type { CustomGameplayModule } from './schema';
+import { createCustomModuleAgentSession } from './agentSession';
 
 const moduleDefinition = {
   kind: 'custom-gameplay-module',
@@ -38,9 +42,23 @@ const moduleDefinition = {
 
 afterEach(async () => {
   await clearCustomGameplayModules();
+  await clearCustomModuleAgentSession();
 });
 
 describe('custom gameplay module storage', () => {
+  test('persists draft sessions separately from installed module records', async () => {
+    const session = createCustomModuleAgentSession({ id: 'world-a', name: 'World A' });
+    session.brief.goal = '记录目标';
+    await saveCustomModuleAgentSession(session);
+    expect((await loadCustomModuleAgentSession())?.brief.goal).toBe('记录目标');
+    expect(await listCustomGameplayModules()).toEqual([]);
+  });
+
+  test('ignores a corrupted agent session snapshot', async () => {
+    await saveCustomModuleAgentSession({ sessionVersion: 99, world: null } as never);
+    expect(await loadCustomModuleAgentSession()).toBeUndefined();
+  });
+
   test('creates, updates, lists and deletes module definitions', async () => {
     const saved = await saveCustomGameplayModule(moduleDefinition);
     expect(saved.module.id).toBe('mood-system');

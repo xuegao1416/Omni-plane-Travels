@@ -1,6 +1,6 @@
 import type { ApiConfig } from '../../../api/types';
 import { Toggle } from '../SettingsUIComponents';
-import { rowStyle, REASONING_OPTIONS } from './types';
+import { rowStyle, REASONING_OPTIONS, warningStyle } from './types';
 
 interface Props {
   config: ApiConfig;
@@ -14,7 +14,12 @@ export default function AdvancedSettings({ config, set }: Props) {
         高级参数
       </div>
 
-      {/* 流式响应 */}
+      {/* 流式响应 - 强烈建议关闭（开启会导致各种奇怪显示问题）*/}
+      <div style={warningStyle}>
+        <strong>强烈建议关闭流式响应。</strong>
+        开启会导致行动选项错位、正文截断、思考块残留、变量刷新异常等显示问题。
+        如果遇到正文末尾被截断、行动选项出不来等异常，请先检查此项是否已关闭。
+      </div>
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>流式响应</div>

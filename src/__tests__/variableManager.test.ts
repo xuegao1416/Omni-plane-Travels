@@ -107,4 +107,47 @@ describe('VariableManager.applyUpdateVariable atomicity', () => {
     const recoveredVm = new VariableManager(damagedSave);
     expect(recoveredVm.createSafeSnapshotForPrompt().人物档案).toEqual({});
   });
+
+  it('migrates legacy object-shaped task goals instead of passing objects to React', () => {
+    const damagedSave = createDefaultGameState();
+    (damagedSave.玩家.任务系统!.活跃任务 as any).旧任务 = {
+      任务名: '旧任务',
+      任务类型: '支线',
+      描述: '调查线索',
+      状态: '进行中',
+      优先级: '中',
+      目标: {
+        描述: '抵达钟楼',
+        阶段: [{ 名称: '上楼', 描述: '找到楼梯', 状态: '进行中' }],
+      },
+      $time: 1,
+    };
+
+    const recovered = new VariableManager(damagedSave).getState().玩家.任务系统!.活跃任务.旧任务;
+    expect(recovered.目标).toBe('抵达钟楼');
+    expect(recovered.阶段).toEqual([{ 名称: '上楼', 描述: '找到楼梯', 状态: '进行中' }]);
+  });
+
+  it('repairs an object-shaped current goal before the status panel renders it', () => {
+    const damagedSave = createDefaultGameState();
+    (damagedSave.玩家 as any).当前目标 = {
+      描述: '抵达钟楼',
+      阶段: [{ 名称: '上楼' }],
+    };
+
+    expect(new VariableManager(damagedSave).getState().玩家.当前目标).toBe('抵达钟楼');
+  });
+
+  it('restores NPC records from a snapshot together with player variables', () => {
+    const before = createDefaultGameState();
+    const vm = new VariableManager(before);
+    const snapshot = vm.createSnapshot();
+    const after = vm.getState();
+    (after.人物档案 as any).NPC_旧档 = { 姓名: '旧档角色', 人物分类: '在场', 人物事迹: ['已建立档案'] };
+    vm.setState(after);
+
+    vm.restoreSnapshot(snapshot);
+
+    expect(vm.getState().人物档案).toEqual({});
+  });
 });

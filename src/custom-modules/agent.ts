@@ -1,17 +1,24 @@
 import { requestStreamWithRetry } from '../api/client';
 import type { ApiConfig, CompletionResult, Message, StreamOptions } from '../api/types';
-import type { CustomGameplayModule, ModuleValidationIssue } from './schema';
+import {
+  applyCustomModuleAgentTurn,
+  createCustomModuleAgentSession,
+  createEmptyCustomModuleDesignBrief,
+  type CustomModuleAgentEnvelope,
+  type CustomModuleAgentPhase,
+  type CustomModuleAgentSession,
+  type CustomModuleAgentWorldContext,
+} from './agentSession';
+import { buildCustomModuleCapabilityCatalog } from './capabilities';
+import type { CustomGameplayModuleDefinition, ModuleValidationIssue } from './schema';
 import { validateCustomGameplayModule } from './validator';
 
-export interface CustomModuleAgentWorldContext {
-  id: string;
-  name: string;
-  description?: string;
-}
+export type { CustomModuleAgentWorldContext } from './agentSession';
+export type { CustomModuleAgentEnvelope, CustomModuleAgentPhase, CustomModuleAgentSession } from './agentSession';
 
 export type CustomModuleDraftResult = {
   ok: true;
-  module: CustomGameplayModule;
+  module: CustomGameplayModuleDefinition;
   raw: string;
 } | {
   ok: false;
@@ -22,38 +29,24 @@ export type CustomModuleDraftResult = {
 export type CustomModuleAgentTurnResult = {
   ok: true;
   message: string;
+  phase: CustomModuleAgentPhase;
+  /** V1 compatibility status retained for existing consumers. */
   status: 'needs_input' | 'draft_ready';
-  module?: CustomGameplayModule;
+  brief: ReturnType<typeof createEmptyCustomModuleDesignBrief>;
+  question?: CustomModuleAgentEnvelope['question'];
+  module?: CustomGameplayModuleDefinition;
   raw: string;
+  session?: CustomModuleAgentSession;
 } | {
   ok: false;
   errors: ModuleValidationIssue[];
   raw: string;
+  session?: CustomModuleAgentSession;
 };
 
 export interface CustomModuleConversationMessage {
   role: 'user' | 'assistant';
   content: string;
-}
-
-export type CustomModuleRequestField = 'purpose' | 'presentation';
-
-const MODULE_PURPOSE_HINT_RE = /(记录|追踪|管理|统计|显示|计算|控制|累计|提醒|跟踪|进度|record|track|manage|monitor|count|calculate|control|remind|progress)/i;
-const MODULE_PRESENTATION_HINT_RE = /(前端|前台|卡片|面板|界面|可见|有前端|后台|后端|无前端|隐形|frontend|card|panel|ui|visible|backend|background|headless)/i;
-
-/** Keeps the first turn conversational when the request has no usable design target. */
-export function getMissingCustomModuleRequestFields(
-  conversation: CustomModuleConversationMessage[],
-): CustomModuleRequestField[] {
-  const userText = conversation
-    .filter((message) => message.role === 'user')
-    .map((message) => message.content)
-    .join('\n')
-    .trim();
-  const missing: CustomModuleRequestField[] = [];
-  if (!MODULE_PURPOSE_HINT_RE.test(userText)) missing.push('purpose');
-  if (!MODULE_PRESENTATION_HINT_RE.test(userText)) missing.push('presentation');
-  return missing;
 }
 
 function errorIssue(message: string, code = 'invalid-agent-output'): ModuleValidationIssue {
@@ -64,13 +57,12 @@ function errorIssue(message: string, code = 'invalid-agent-output'): ModuleValid
 export function extractCustomModuleJson(text: string): unknown {
   const trimmed = text.trim();
   try { return JSON.parse(trimmed); } catch { /* continue with fenced/prose output */ }
-
-  for (let start = 0; start < trimmed.length; start++) {
+  for (let start = 0; start < trimmed.length; start += 1) {
     if (trimmed[start] !== '{') continue;
     let depth = 0;
     let inString = false;
     let escaped = false;
-    for (let index = start; index < trimmed.length; index++) {
+    for (let index = start; index < trimmed.length; index += 1) {
       const char = trimmed[index];
       if (inString) {
         if (escaped) escaped = false;
@@ -79,11 +71,10 @@ export function extractCustomModuleJson(text: string): unknown {
         continue;
       }
       if (char === '"') { inString = true; continue; }
-      if (char === '{') depth++;
-      if (char === '}') depth--;
+      if (char === '{') depth += 1;
+      if (char === '}') depth -= 1;
       if (depth === 0) {
-        const candidate = trimmed.slice(start, index + 1);
-        try { return JSON.parse(candidate); } catch { break; }
+        try { return JSON.parse(trimmed.slice(start, index + 1)); } catch { break; }
       }
     }
   }
@@ -92,128 +83,115 @@ export function extractCustomModuleJson(text: string): unknown {
 
 export function parseCustomModuleDraft(raw: string): CustomModuleDraftResult {
   try {
-    const parsed = extractCustomModuleJson(raw);
-    const result = validateCustomGameplayModule(parsed);
-    if (!result.valid || !result.normalized) {
-      return { ok: false, errors: result.errors, raw };
-    }
+    const result = validateCustomGameplayModule(extractCustomModuleJson(raw));
+    if (!result.valid || !result.normalized) return { ok: false, errors: result.errors, raw };
     return { ok: true, module: result.normalized, raw };
   } catch (error) {
     return { ok: false, errors: [errorIssue(error instanceof Error ? error.message : String(error), 'invalid-json')], raw };
   }
 }
 
+function phaseFromRaw(value: Record<string, unknown>): CustomModuleAgentPhase | undefined {
+  if (typeof value.phase === 'string' && ['discovery', 'designing', 'draft_ready', 'revising'].includes(value.phase)) return value.phase as CustomModuleAgentPhase;
+  if (value.status === 'needs_input') return 'designing';
+  if (value.status === 'draft_ready') return 'draft_ready';
+  return undefined;
+}
+
+function asBrief(value: unknown) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const strings = (key: string): string[] => Array.isArray(source[key]) ? source[key].filter((item): item is string => typeof item === 'string') : [];
+  return {
+    goal: typeof source.goal === 'string' ? source.goal : '',
+    presentation: typeof source.presentation === 'string' ? source.presentation : '',
+    triggers: strings('triggers'), inputs: strings('inputs'), state: strings('state'),
+    behavior: strings('behavior'), outputs: strings('outputs'), assumptions: strings('assumptions'), unresolved: strings('unresolved'),
+  };
+}
+
 export function parseCustomModuleAgentTurn(raw: string): CustomModuleAgentTurnResult {
   try {
     const parsed = extractCustomModuleJson(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { ok: false, errors: [errorIssue('Agent 输出必须是 JSON 对象')], raw };
-    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, errors: [errorIssue('Agent 输出必须是 JSON 对象')], raw };
     const value = parsed as Record<string, unknown>;
 
-    // 兼容旧版“直接输出模块 JSON”，让历史提示词仍能被工作台预览。
+    // Accept old direct module JSON during the migration window, but new calls use the envelope below.
     if (value.kind === 'custom-gameplay-module') {
       const draft = parseCustomModuleDraft(raw);
-      return draft.ok
-        ? { ok: true, message: '我已经整理好了模块草案。', status: 'draft_ready', module: draft.module, raw }
-        : draft;
+      if (!draft.ok) return draft;
+      return {
+        ok: true, message: '我已经整理好了模块草案。', phase: 'draft_ready', status: 'draft_ready',
+        brief: createEmptyCustomModuleDesignBrief(), module: draft.module, raw,
+      };
     }
 
-    if (typeof value.message !== 'string' || value.message.trim().length === 0 || value.message.length > 2000) {
+    if (typeof value.message !== 'string' || !value.message.trim() || value.message.length > 2000) {
       return { ok: false, errors: [errorIssue('Agent envelope 缺少有效的 message', 'invalid-agent-envelope')], raw };
     }
-    if (value.status !== 'needs_input' && value.status !== 'draft_ready') {
-      return { ok: false, errors: [errorIssue('Agent envelope 的 status 必须是 needs_input 或 draft_ready', 'invalid-agent-envelope')], raw };
-    }
-
-    if (value.status === 'needs_input') {
-      if (value.module !== null && value.module !== undefined) {
-        return { ok: false, errors: [errorIssue('needs_input 阶段不应携带 module', 'invalid-agent-envelope')], raw };
+    const phase = phaseFromRaw(value);
+    if (!phase) return { ok: false, errors: [errorIssue('Agent envelope 的 phase 必须是 discovery、designing、draft_ready 或 revising', 'invalid-agent-envelope')], raw };
+    const brief = asBrief(value.brief);
+    let question: CustomModuleAgentEnvelope['question'];
+    if (value.question !== undefined) {
+      if (!value.question || typeof value.question !== 'object' || Array.isArray(value.question)) {
+        return { ok: false, errors: [errorIssue('question 必须是包含 id 和 text 的对象', 'invalid-agent-envelope')], raw };
       }
-      return { ok: true, message: value.message.trim(), status: 'needs_input', raw };
+      const rawQuestion = value.question as Record<string, unknown>;
+      if (typeof rawQuestion.id !== 'string' || !rawQuestion.id.trim()
+        || typeof rawQuestion.text !== 'string' || !rawQuestion.text.trim()
+        || (rawQuestion.choices !== undefined
+          && (!Array.isArray(rawQuestion.choices) || !rawQuestion.choices.every((choice) => typeof choice === 'string')))) {
+        return { ok: false, errors: [errorIssue('question 必须包含有效 id、text 和可选字符串 choices', 'invalid-agent-envelope')], raw };
+      }
+      question = {
+        id: rawQuestion.id.trim(),
+        text: rawQuestion.text.trim(),
+        ...(Array.isArray(rawQuestion.choices)
+          ? { choices: [...new Set(rawQuestion.choices.map((choice) => choice.trim()).filter(Boolean))] }
+          : {}),
+      };
     }
-
-    if (value.module === null || value.module === undefined) {
-      return { ok: false, errors: [errorIssue('draft_ready 阶段必须携带 module', 'invalid-agent-envelope')], raw };
+    const moduleValue = value.module;
+    if (moduleValue === null || moduleValue === undefined) {
+      return { ok: true, message: value.message.trim(), phase, status: 'needs_input', brief, question, raw };
     }
-    const draft = validateCustomGameplayModule(value.module);
+    const draft = validateCustomGameplayModule(moduleValue);
     if (!draft.valid || !draft.normalized) return { ok: false, errors: draft.errors, raw };
-    return { ok: true, message: value.message.trim(), status: 'draft_ready', module: draft.normalized, raw };
+    return { ok: true, message: value.message.trim(), phase, status: 'draft_ready', brief, question, module: draft.normalized, raw };
   } catch (error) {
     return { ok: false, errors: [errorIssue(error instanceof Error ? error.message : String(error), 'invalid-json')], raw };
   }
 }
 
-const CUSTOM_MODULE_AGENT_PROTOCOL_EXAMPLES = `
-Exact protocol examples (copy the structure, then adapt values):
-logic: {
-  "onGameStart": [{ "actions": [{ "type": "set", "path": "count", "value": 0 }] }],
-  "onTurnEnd": [{ "actions": [{ "type": "add", "path": "count", "value": 1 }] }],
-  "onTick": [],
-  "onChoice": []
-}
-Do not output legacy rule fields such as {"action":"add","path":"count","value":1}; every rule must use an actions array.
-Minimal legal view components:
-{"type":"section","title":"Stats","children":[{"type":"number","label":"Count","path":"count"}]}
-{"type":"text","text":"Static text"} or {"type":"text","label":"Count","path":"count"}
-{"type":"number","label":"Count","path":"count"}
-{"type":"progress","label":"Progress","path":"count","min":0,"max":100}
-{"type":"badge","label":"Status","path":"status"}
-{"type":"list","label":"Items","path":"items"}
-{"type":"table","label":"Rows","path":"rows","columns":[{"key":"name","label":"Name"}]}
-{"type":"divider"}
-{"type":"conditional","when":{"type":"compare","path":"count","operator":"gt","value":0},"children":[{"type":"text","text":"Active"}]}
-{"type":"button","label":"Refresh","event":"refresh"}
-The view must be an object with slot and components; components must be an array of the legal component objects above. Only use button when an interactive choice is explicitly requested.
-Only return needs_input when the conversation still lacks the module purpose or whether it is a visible frontend module or a background module. A selected world is already supplied by the workspace. If those details are clear, return draft_ready.`;
-
-function buildBaseCustomModuleAgentSystemPrompt(): string {
-  return `你是 Omni Plane Travels 的“自定义玩法模块 Agent”。你的任务是把玩家描述转换为一个可审查的 JSON 草案。
-
-协议必须满足：kind 固定为 "custom-gameplay-module"；schemaVersion 固定为 1；scope 固定为 "world"；必须包含 id、name、version、author、state、logic、permissions。
-state 只能使用 number、string、boolean、enum、array、object。logic 只能使用 onGameStart、onTurnEnd、onTick、onChoice，以及 set、add、subtract、toggle、append、remove、log 动作。所有 action 和 view 的 path 只能指向本模块自己的 state。
-权限必须是 read 数组加 write: "own-state-only"。可视模块才提供 view，slot 只能是 right-panel 或 left-panel，组件只能是 section、text、number、progress、badge、list、table、divider、conditional、button。后台模块可以省略 view。
-
-安全边界（硬限制，违规一律拒绝）：禁止生成 code、script、eval、component、import；禁止 JavaScript、TypeScript、React、Vue、JSX、HTML、网络请求、文件访问、Tauri 调用、API key 或任意外部写入。所有状态读写必须通过 logic 中的规则（onGameStart/onTurnEnd/onTick/onChoice）和 permissions 字段声明的范围进行，游戏内部状态操作是安全的。
-只输出一个 JSON 对象，不要 Markdown，不要解释文字。对象必须符合：{"message":"给玩家的回复或追问","status":"needs_input 或 draft_ready","module":null 或完整模块 JSON}。需要澄清时使用 needs_input；信息足够且模块通过你自己的检查时使用 draft_ready。JSON 生成后仍会经过严格校验，不能绕过校验。`;
-}
-
-export function buildCustomModuleAgentSystemPrompt(): string {
-  return `${buildBaseCustomModuleAgentSystemPrompt()}\n${CUSTOM_MODULE_AGENT_PROTOCOL_EXAMPLES}`;
-}
-
-export type CustomModuleAgentRequest = (
-  config: ApiConfig,
-  messages: Message[],
-  options: StreamOptions,
-) => Promise<CompletionResult>;
-
-export function buildCustomModuleAgentRepairPrompt(
-  raw: string,
-  errors: ModuleValidationIssue[],
+function buildBaseCustomModuleAgentSystemPrompt(
+  world?: CustomModuleAgentWorldContext,
 ): string {
-  const issueText = errors
-    .slice(0, 24)
-    .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-    .join('\n');
-  return `The previous JSON response failed validation. Repair it once and return only one complete JSON object using the exact protocol examples above. Do not explain the repair and do not use legacy rule fields such as action/path/value at rule level.
-Validator errors:
-${issueText || '(invalid agent envelope)'}
-Previous output:
-${raw.slice(0, 12000)}`;
+  const catalog = world ? buildCustomModuleCapabilityCatalog(world) : buildCustomModuleCapabilityCatalog({ id: 'unknown', name: '当前世界' });
+  return `你是 Omni Plane Travels 的自定义玩法模块共创 Agent。你必须先理解需求，再生成可审查的声明式模块。\n
+本轮只输出一个 JSON envelope：message、phase、brief、可选 question、module。phase 只能是 discovery、designing、draft_ready、revising；每轮最多一个 question。需求未闭合时 module 必须为 null；需求足够时直接返回完整模块。修订必须返回完整新模块，未提及部分保持原样。玩家说“你看着办”时，把明确选择写入 brief.assumptions。\n
+下面是运行时导出的能力目录，禁止生成目录之外的输入、生命周期、动作、状态类型或视图组件：\n${JSON.stringify(catalog)}\n
+V2 模块必须 schemaVersion=2、inputs 只绑定能力目录中的安全路径、logic 包含 onGameStart/onTurnEnd/onTick/onChoice/onButton；permissions.read 必须精确列出 inputs 使用的每一条宿主路径，不要声明未使用路径；条件可读 state/input/event，动作值可用字面量或安全引用，写入只能指向自身 state。禁止 code、script、eval、import、网络、文件、Tauri 或任意代码执行。V1 仅用于兼容历史模块，不作为新生成默认。\n
+模块 kind 固定为 "custom-gameplay-module"，scope 固定为 "world"，permissions.write 固定为 "own-state-only"；可视模块使用 right-panel 或 left-panel。规则动作使用完整的 actions 数组，例如 "onTurnEnd":[{"actions":[{"type":"add","path":"count","value":1}]}]。示例结构："actions": [{ "type": "add", "path": "count", "value": 1 }]。Do not output legacy rule fields。不要输出旧式 action/path/value 规则。合法视图例子：{"type":"progress","path":"count"}、{"type":"table","path":"rows","columns":[{"key":"name","label":"名称"}]}。\n
+brief 字段必须完整返回：goal、presentation、triggers、inputs、state、behavior、outputs、assumptions、unresolved。当前世界：${world?.name ?? '当前世界'}（${world?.id ?? 'unknown'}）。`;
 }
 
-export function buildCustomModuleAgentUserPrompt(
-  request: string,
-  world: CustomModuleAgentWorldContext,
-): string {
-  return `当前世界：${world.name}（${world.id}）
-世界简介：${world.description || '暂无'}
+export function buildCustomModuleAgentSystemPrompt(world?: CustomModuleAgentWorldContext): string {
+  return buildBaseCustomModuleAgentSystemPrompt(world);
+}
 
-玩家需求：
-${request.trim()}
+export type CustomModuleAgentRequest = (config: ApiConfig, messages: Message[], options: StreamOptions) => Promise<CompletionResult>;
 
-请设计一个第一版可运行的自定义玩法模块。优先保持状态字段少、规则确定、可解释；如果玩家要求的是可见卡片，请提供 right-panel view；如果玩家要求后台运行，请省略 view。`;
+export function buildCustomModuleAgentRepairPrompt(raw: string, errors: ModuleValidationIssue[], session?: CustomModuleAgentSession): string {
+  const issueText = errors.slice(0, 24).map((entry) => `${entry.path.join('.') || '(root)'}: ${entry.message}`).join('\n');
+  return `上一轮输出未通过本地校验。只修复这些错误并只返回一个完整 JSON envelope；不要删掉当前有效草案中未涉及的部分。校验错误：\n${issueText || '(invalid envelope)'}\n当前会话快照：\n${session ? JSON.stringify(session) : '(无)'}\n上一轮输出：\n${raw.slice(0, 16000)}`;
+}
+
+export function buildCustomModuleAgentUserPrompt(request: string, world: CustomModuleAgentWorldContext): string {
+  return `当前世界：${world.name}（${world.id}）\n世界简介：${world.description || '暂无'}\n\n玩家最新消息：\n${request.trim()}\n\n只追问一个真正影响实现的问题；如果信息足够，直接进入 draft_ready 并生成 V2 完整模块。`;
+}
+
+function sessionPrompt(session: CustomModuleAgentSession, newestMessage: string, recentConversation: CustomModuleConversationMessage[]): string {
+  return `当前结构化会话：\n${JSON.stringify(session)}\n\n玩家最新消息：\n${newestMessage.trim()}\n\n仅保留这些最近对话用于语气参考：\n${JSON.stringify(recentConversation.slice(-8))}`;
 }
 
 export async function generateCustomModuleDraft(
@@ -222,50 +200,68 @@ export async function generateCustomModuleDraft(
   world: CustomModuleAgentWorldContext,
   options: { signal?: AbortSignal; onText?: (text: string) => void } = {},
 ): Promise<CustomModuleDraftResult> {
-  const response = await requestStreamWithRetry(
-    apiConfig,
-    [
-      { role: 'system', content: buildCustomModuleAgentSystemPrompt() },
-      { role: 'user', content: buildCustomModuleAgentUserPrompt(request, world) },
-    ],
-    {
-      signal: options.signal,
-      maxTokens: 12000,
-      responseFormat: 'json',
-      onDelta: (_delta, accumulated) => options.onText?.(accumulated),
-    },
-  );
+  const response = await requestStreamWithRetry(apiConfig, [
+    { role: 'system', content: buildCustomModuleAgentSystemPrompt(world) },
+    { role: 'user', content: buildCustomModuleAgentUserPrompt(request, world) },
+  ], {
+    signal: options.signal, maxTokens: 12000, responseFormat: 'json',
+    onDelta: () => options.onText?.('正在整理模块设计……'),
+  });
   return parseCustomModuleDraft(response.text);
 }
 
+type AgentRunOptions = {
+  signal?: AbortSignal;
+  onText?: (text: string) => void;
+  onStatus?: (status: string) => void;
+  request?: CustomModuleAgentRequest;
+  conversation?: CustomModuleConversationMessage[];
+};
+
 export async function runCustomModuleAgentTurn(
   apiConfig: ApiConfig,
-  world: CustomModuleAgentWorldContext,
-  conversation: CustomModuleConversationMessage[],
-  options: { signal?: AbortSignal; onText?: (text: string) => void; request?: CustomModuleAgentRequest } = {},
+  sessionOrWorld: CustomModuleAgentSession | CustomModuleAgentWorldContext,
+  newestMessageOrConversation: string | CustomModuleConversationMessage[],
+  options: AgentRunOptions = {},
 ): Promise<CustomModuleAgentTurnResult> {
-  const worldContext = `当前创作目标世界：${world.name}（${world.id}）\n世界简介：${world.description || '暂无'}\n所有模块最终绑定到这个世界。`;
+  const isSession = 'sessionVersion' in sessionOrWorld;
+  const session = isSession
+    ? sessionOrWorld as CustomModuleAgentSession
+    : createCustomModuleAgentSession(sessionOrWorld as CustomModuleAgentWorldContext);
+  const conversation = Array.isArray(newestMessageOrConversation)
+    ? newestMessageOrConversation
+    : options.conversation ?? [];
+  const newestMessage = typeof newestMessageOrConversation === 'string'
+    ? newestMessageOrConversation
+    : conversation.filter((item) => item.role === 'user').at(-1)?.content ?? '';
   const request = options.request ?? requestStreamWithRetry;
   let messages: Message[] = [
-    { role: 'system', content: `${buildCustomModuleAgentSystemPrompt()}\n${worldContext}` },
-    ...conversation,
+    { role: 'system', content: buildCustomModuleAgentSystemPrompt(session.world) },
+    { role: 'user', content: isSession ? sessionPrompt(session, newestMessage, conversation) : buildCustomModuleAgentUserPrompt(newestMessage, session.world) },
   ];
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    options.onStatus?.(attempt === 0 ? '正在分析需求……' : '正在按校验结果修复草案……');
     const response = await request(apiConfig, messages, {
-      signal: options.signal,
-      maxTokens: 12000,
-      responseFormat: 'json',
-      onDelta: (_delta, accumulated) => options.onText?.(accumulated),
+      signal: options.signal, maxTokens: 12000, responseFormat: 'json',
+      // Never expose the partial JSON stream to the player.
+      onDelta: () => options.onText?.(attempt === 0 ? '正在整理设计蓝图……' : '正在修复设计蓝图……'),
     });
     const parsed = parseCustomModuleAgentTurn(response.text);
-    if (parsed.ok || attempt === 1) return parsed;
-
-    options.onText?.('');
+    if (parsed.ok) {
+      const envelope: CustomModuleAgentEnvelope = {
+        message: parsed.message, phase: parsed.phase, brief: parsed.brief,
+        question: parsed.question, module: parsed.module ?? null,
+      };
+      const applied = applyCustomModuleAgentTurn(session, envelope);
+      return { ...parsed, session: applied.session };
+    }
+    if (attempt === 1) return { ...parsed, session };
     messages = [
       ...messages,
       { role: 'assistant', content: response.text },
-      { role: 'user', content: buildCustomModuleAgentRepairPrompt(response.text, parsed.errors) },
+      { role: 'user', content: buildCustomModuleAgentRepairPrompt(response.text, parsed.errors, session) },
     ];
   }
-  throw new Error('custom module agent retry exhausted');
+  return { ok: false, errors: [errorIssue('custom module agent retry exhausted')], raw: '', session };
 }

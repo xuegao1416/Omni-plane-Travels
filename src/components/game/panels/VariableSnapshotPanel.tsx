@@ -9,7 +9,7 @@ import { RollbackConfirm } from './variableSnapshot/RollbackConfirm';
 import { STORAGE_KEYS } from '../../../config/storageKeys';
 
 export default function VariableSnapshotPanel({
-  messages, varMgr, onRestoreSnapshot, onSave,
+  messages, varMgr, onRestoreSnapshot, onRollbackToSnapshot, onSave,
 }: VariableSnapshotPanelProps) {
   const { DialogUI, alert: dlgAlert } = useDialog();
   const [layerEditTexts, setLayerEditTexts] = useState<Record<string, string>>({});
@@ -74,11 +74,15 @@ export default function VariableSnapshotPanel({
 
   const handleRollback = useCallback(() => {
     if (!confirmRollback) return;
-    varMgr.restoreSnapshot(confirmRollback.snapshot);
-    onRestoreSnapshot?.(confirmRollback.snapshot);
-    onSave?.();
+    if (onRollbackToSnapshot && confirmRollback.msgIndex >= 0) {
+      onRollbackToSnapshot(confirmRollback.msgIndex);
+    } else {
+      varMgr.restoreSnapshot(confirmRollback.snapshot);
+      onRestoreSnapshot?.(confirmRollback.snapshot);
+      onSave?.();
+    }
     setConfirmRollback(null);
-  }, [varMgr, onRestoreSnapshot, onSave, confirmRollback]);
+  }, [varMgr, onRestoreSnapshot, onRollbackToSnapshot, onSave, confirmRollback]);
 
   // ─── 导出 / 导入 ───
   const handleExport = useCallback(() => {

@@ -9,6 +9,7 @@ export interface VariableSnapshotPanelProps {
   messages: ChatMessage[];
   varMgr: VariableManager;
   onRestoreSnapshot?: (snapshot: GameState) => void;
+  onRollbackToSnapshot?: (msgIndex: number) => void;
   onSave?: () => void;
 }
 

@@ -2,8 +2,11 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'bun:test';
 import {
   deleteSave,
+  getAllSaveMeta,
+  importSaveFromData,
   loadGame,
   planV2ToV3Migration,
+  saveAllSaveMeta,
   saveGameIncremental,
   SAVE_SCHEMA_VERSION,
 } from '../storage/db';
@@ -93,5 +96,33 @@ describe('db 迁移 planV2ToV3Migration', () => {
     expect(plan).not.toBeNull();
     expect(plan!.head.messageCount).toBe(0);
     expect(plan!.messageRecords.length).toBe(0);
+  });
+});
+
+describe('imported save metadata', () => {
+  it('records the imported message count and repairs older metadata that omitted it', async () => {
+    const rawData = {
+      save: {
+        id: `import-message-count-${Date.now()}`,
+        name: '导入消息计数测试',
+        timestamp: Date.now(),
+        worldId: 'default',
+        gameState: {},
+        messages: makeOldSave().messages,
+      },
+    };
+    const meta = await importSaveFromData(rawData);
+
+    try {
+      expect(meta.messageCount).toBe(3);
+
+      const { messageCount: _, ...legacyMeta } = meta;
+      await saveAllSaveMeta([legacyMeta]);
+      const repaired = await getAllSaveMeta();
+      expect(repaired[0]?.messageCount).toBe(3);
+    } finally {
+      await deleteSave(meta.id);
+      await saveAllSaveMeta((await getAllSaveMeta()).filter(item => item.id !== meta.id));
+    }
   });
 });

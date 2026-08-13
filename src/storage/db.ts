@@ -556,19 +556,39 @@ export async function putGlobal(key: string, value: any): Promise<void> {
 
 let cachedSaveMeta: SaveMeta[] | null = null;
 
+/** Repair metadata created by older import/rename paths without loading message shards. */
+async function repairMissingMessageCounts(metas: SaveMeta[]): Promise<SaveMeta[]> {
+  if (!metas.some(meta => meta.messageCount === undefined)) return metas;
+
+  const db = await getDB();
+  let changed = false;
+  const repaired = await Promise.all(metas.map(async meta => {
+    if (meta.messageCount !== undefined) return meta;
+    const record = await db.get(SAVES_STORE, meta.id) as CompactSaveRecord | GameSave | undefined;
+    if (!record) return meta;
+    const count = typeof (record as CompactSaveRecord).messageCount === 'number'
+      ? (record as CompactSaveRecord).messageCount
+      : Array.isArray((record as GameSave).messages) ? (record as GameSave).messages.length : undefined;
+    if (count === undefined) return meta;
+    changed = true;
+    return { ...meta, messageCount: count };
+  }));
+
+  if (changed) {
+    cachedSaveMeta = repaired;
+    await putGlobal('saves', repaired);
+  }
+  return repaired;
+}
+
 /** 读取所有存档元数据（轻量，不加载完整存档） */
 export async function getAllSaveMeta(): Promise<SaveMeta[]> {
-  if (cachedSaveMeta) {
-    // 重新计算预览文本（修复世界 ID 显示问题）
-    return cachedSaveMeta.map(meta => ({
-      ...meta,
-      preview: rebuildPreview(meta),
-    }));
+  if (!cachedSaveMeta) {
+    cachedSaveMeta = await getGlobal<SaveMeta[]>('saves') || [];
   }
-  const metas = await getGlobal<SaveMeta[]>('saves');
-  cachedSaveMeta = metas || [];
+  const metas = await repairMissingMessageCounts(cachedSaveMeta);
   // 重新计算预览文本
-  return cachedSaveMeta.map(meta => ({
+  return metas.map(meta => ({
     ...meta,
     preview: rebuildPreview(meta),
   }));
@@ -1158,6 +1178,8 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     name: finalName,
     timestamp: finalTimestamp,
     preview: buildPreview(saveData),
+    estBytes: messages.length * 500,
+    messageCount: messages.length,
   };
 
   const updated = [...metas, meta];

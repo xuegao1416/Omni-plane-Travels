@@ -5,8 +5,11 @@
  * 从原始响应中提取纯正文（剥掉所有标签）
  * 用途：发给 AI API、变量提取、记忆系统
  */
+import { stripTimeAdvanceTags } from '../time/worldClock';
+
 export function extractContentForPrompt(rawText: string): string {
   if (!rawText) return '';
+  rawText = stripTimeAdvanceTags(rawText);
 
   // 优先提取 <contenttext> 标签内的内容
   const contentMatch = rawText.match(/<contenttext>([\s\S]*?)<\/contenttext>/i);
@@ -23,6 +26,7 @@ export function extractContentForPrompt(rawText: string): string {
 /** 剥掉 contenttext 内部的子标签 */
 function stripInnerTags(text: string): string {
   return text
+    .replace(/<TimeAdvance\s*>[\s\S]*?<\/TimeAdvance>/gi, '')
     .replace(/<details>[\s\S]*?<\/details>/gi, '')
     .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
     .replace(/<Auto>[\s\S]*?<\/Auto>/gi, '')
@@ -38,6 +42,7 @@ function stripInnerTags(text: string): string {
 /** 剥掉所有已知标签（兜底用） */
 function stripAllTags(text: string): string {
   return text
+    .replace(/<TimeAdvance\s*>[\s\S]*?<\/TimeAdvance>/gi, '')
     .replace(/<contenttext>[\s\S]*?<\/contenttext>/gi, '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .replace(/<(?:action_)?options>[\s\S]*?<\/(?:action_)?options>/gi, '')

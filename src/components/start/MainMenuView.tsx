@@ -48,7 +48,7 @@ export default function MainMenuView({ onStartWizard, title, subtitle }: MainMen
       </section>
 
       <div className="entry-home-footer" aria-label="版本">
-        <span>v2.7.3</span>
+        <span>v2.7.4</span>
       </div>
     </main>
   );

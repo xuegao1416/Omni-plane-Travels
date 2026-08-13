@@ -7,6 +7,7 @@ import EntryTransition from './EntryTransition';
 import WorldHallView from './WorldHallView';
 import WorldEditorForm from './WorldEditorForm';
 import { useState, useEffect, useRef } from 'react';
+import { reportDepth } from '../../modules/playTracker';
 import { Volume2, VolumeX } from 'lucide-react';
 
 /** 大厅背景音乐 — 仅在 WorldHallView 可见时播放，首页/过场/向导/游戏过程不播放 */
@@ -73,6 +74,13 @@ export default function StartScreen() {
     if (returnedFromHall) sessionStorage.removeItem('omni.start.returnTarget');
     return returnedFromHall || h.state.selectedWorld !== 'default' ? 'hall' : 'home';
   });
+
+  // 记录大厅与创建角色流程的匿名到达深度。
+  useEffect(() => {
+    if (entryPhase === 'hall' && h.view === 'main') reportDepth('lobby');
+    else if (h.view === 'wizard') reportDepth('wizard');
+    // 存档页与首页不提高深度。
+  }, [entryPhase, h.view]);
 
   const enterHall = () => setEntryPhase('transition');
   const enterCharacterCreation = () => {

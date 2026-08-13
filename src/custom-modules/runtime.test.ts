@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { createInitialCustomModuleState } from './stateStore';
 import { executeCustomModuleLifecycle } from './runtime';
-import type { CustomGameplayModule } from './schema';
+import { executeCustomModuleActions } from './actionExecutor';
+import type { CustomGameplayModule, CustomGameplayModuleDefinition } from './schema';
 
 const moduleDefinition = {
   kind: 'custom-gameplay-module',
@@ -43,6 +44,50 @@ const moduleDefinition = {
 } satisfies CustomGameplayModule;
 
 describe('custom gameplay module runtime', () => {
+  test('runs V2 input conditions and reference-valued actions while keeping writes in module state', () => {
+    const v2 = {
+      ...moduleDefinition,
+      schemaVersion: 2 as const,
+      inputs: { health: 'player.stats.attrA', currency: 'player.currency.primary' },
+      permissions: { read: ['player.stats.attrA', 'player.currency.primary'], write: 'own-state-only' as const },
+      logic: {
+        onGameStart: [], onTurnEnd: [], onTick: [],
+        onChoice: [],
+        onButton: [{
+          when: { type: 'compare' as const, source: 'input' as const, path: 'health', operator: 'gt' as const, value: 50 },
+          actions: [{ type: 'set' as const, path: 'score', value: { source: 'input' as const, path: 'currency' } }],
+        }],
+      },
+    } as unknown as CustomGameplayModuleDefinition;
+    const initial = createInitialCustomModuleState(v2);
+    const result = executeCustomModuleLifecycle(v2, initial, 'onButton', {
+      now: 300,
+      context: {
+        game: { round: 1, time: 'day 1' },
+        player: { stats: { attrA: 80 }, currency: { primary: 12 }, survival: {} },
+        event: { button: { type: 'button', moduleId: 'focus-system', event: 'refresh' } },
+      },
+    });
+    expect(result.nextState.values.score).toBe(12);
+    expect(result.nextState.values.enabled).toBe(false);
+  });
+
+  test('keeps the runtime state type-safe if a damaged record bypasses installation validation', () => {
+    const initial = createInitialCustomModuleState(moduleDefinition);
+    const result = executeCustomModuleActions(
+      moduleDefinition,
+      initial,
+      [{ type: 'set', path: 'score', value: { source: 'input', path: 'label' } }],
+      'onButton',
+      1,
+      10,
+      { input: { label: 'not-a-number' }, event: {} },
+    );
+
+    expect(result.nextState.values.score).toBe(0);
+    expect(result.applied).toBe(0);
+    expect(result.warnings).toHaveLength(1);
+  });
   test('runs a lifecycle deterministically, clamps numbers, and writes only the module namespace', () => {
     const initial = createInitialCustomModuleState(moduleDefinition);
     const first = executeCustomModuleLifecycle(moduleDefinition, initial, 'onTurnEnd', { now: 100 });

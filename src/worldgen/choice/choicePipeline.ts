@@ -8,6 +8,7 @@ import { executeBuildPipeline } from '../../modules/buildPipeline';
 import { createBuildContext } from '../../modules/buildContext';
 import type { CallAI } from '../types';
 import type { DimensionGeneration, DimensionSelection } from './types';
+import { inferWorldClockConfig } from '../../time/worldClock';
 
 // ── JSON 提取工具 ──
 function extractJSON(text: string): string {
@@ -78,7 +79,19 @@ ${selectionSummary}
     "currencyName": "货币名",
     "currencySymbol": "货币符号",
     "currencyDesc": "货币描述（30-50字，包含货币来源、流通范围、价值特点）",
-    "priceLevel": "物价水平描述（30-50字，包含不同阶层的消费水平、稀缺物资价格）"
+    "priceLevel": "物价水平描述（30-50字，包含不同阶层的消费水平、稀缺物资价格）",
+    "calendar": "纪年方式",
+    "startTime": "开局日期时间",
+    "timeSpeed": "叙事时间流速说明",
+    "timeSystem": {
+      "mode": "gregorian/custom/relative",
+      "calendarName": "历法名称",
+      "eraName": "纪元名，可为空",
+      "start": { "year": 1, "month": 1, "day": 1, "hour": 8, "minute": 0 },
+      "months": [{ "name": "一月", "days": 31 }],
+      "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+      "defaultTurnMinutes": 30
+    }
   },
   "rules": {
     "powerSystem": "力量/权力体系名称",
@@ -88,7 +101,7 @@ ${selectionSummary}
   "highlights": ["核心特色1（20-30字）", "核心特色2（20-30字）", "核心特色3（20-30字）"]
 }`;
 
-  const raw = await callAI([{ role: 'user', content: prompt }]);
+  const raw = await callAI([{ role: 'user', content: `${prompt}\n\n必须输出完整 economy.timeSystem。公历月份必须按真实月份天数；自定义历法需列出全部月份。若无法确定，输出 mode=relative、calendarName=旅历和安全默认值。` }]);
   const data = JSON.parse(extractJSON(raw));
 
   // 组装 WorldDef
@@ -156,8 +169,8 @@ ${selectionSummary}
   }
 
   // 5. economy entry
-  if (data.economy) {
-    const eco = data.economy;
+  {
+    const eco = data.economy || {};
     entries.push({
       uid: uid++, key: ['货币', '经济', '消费'], constant: false,
       comment: '经济系统',
@@ -166,6 +179,16 @@ ${selectionSummary}
       meta: {
         currency: { name: eco.currencyName, symbol: eco.currencySymbol, description: eco.currencyDesc },
         priceLevel: eco.priceLevel,
+        calendar: eco.calendar,
+        startTime: eco.startTime,
+        timeSpeed: eco.timeSpeed,
+        timeSystem: inferWorldClockConfig({
+          calendar: eco.calendar,
+          startTime: eco.startTime,
+          timeSpeed: eco.timeSpeed,
+          timePeriod: data.timePeriod,
+          timeSystem: eco.timeSystem,
+        }),
       },
     });
   }

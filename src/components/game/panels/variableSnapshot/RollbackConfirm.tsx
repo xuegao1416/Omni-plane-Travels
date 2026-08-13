@@ -31,7 +31,7 @@ export function RollbackConfirm({ layer, onConfirm, onCancel }: Props) {
             </span>
           )}
           <span style={{ display: 'block', marginTop: 8, color: 'var(--warning)', fontSize: 'var(--font-size-sm)' }}>
-            ⚠️ 此操作将覆盖当前变量状态
+            ⚠️ 此操作会恢复该快照记录的玩家变量、人物档案、记忆和世界演化，并删除该层之后的消息
           </span>
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type {
   Condition,
   CustomGameplayModule,
+  CustomGameplayModuleDefinition,
   JsonValue,
   StateFieldDefinition,
 } from './schema';
@@ -337,7 +338,7 @@ const permissionsSchema = z
   .strict()
   .default({ read: [], write: 'own-state-only' });
 
-export const customGameplayModuleSchema = z
+export const customGameplayModuleV1Schema = z
   .object({
     kind: z.literal('custom-gameplay-module'),
     schemaVersion: z.literal(1),
@@ -356,12 +357,91 @@ export const customGameplayModuleSchema = z
   })
   .strict();
 
+const customModuleReferenceSchema = z
+  .object({
+    type: z.literal('ref').optional(),
+    source: z.enum(['state', 'input', 'event']),
+    path: boundedPathSchema,
+  })
+  .strict();
+
+const customModuleValueSchema = z.union([jsonValueSchema, customModuleReferenceSchema]);
+
+const v2ConditionSchema: z.ZodType<unknown> = z.lazy(() => z.union([
+  z.union([
+    z.object({
+      type: z.literal('compare'),
+      source: z.enum(['state', 'input', 'event']),
+      path: boundedPathSchema,
+      operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']),
+      value: customModuleValueSchema,
+    }).strict(),
+    z.object({
+      type: z.literal('compare'),
+      left: customModuleReferenceSchema,
+      operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'contains']),
+      right: customModuleValueSchema,
+    }).strict(),
+  ]),
+  z.object({ type: z.literal('all'), conditions: z.array(v2ConditionSchema).min(1).max(16) }).strict(),
+  z.object({ type: z.literal('any'), conditions: z.array(v2ConditionSchema).min(1).max(16) }).strict(),
+  z.object({ type: z.literal('not'), condition: v2ConditionSchema }).strict(),
+]));
+
+const v2SetActionSchema = z.object({ type: z.literal('set'), path: boundedPathSchema, value: customModuleValueSchema }).strict();
+const v2NumericActionSchema = z.object({
+  type: z.enum(['add', 'subtract']), path: boundedPathSchema,
+  value: z.union([z.number().refine(Number.isFinite, '必须是有限数字'), customModuleReferenceSchema]),
+}).strict();
+const v2CollectionActionSchema = z.object({ type: z.enum(['append', 'remove']), path: boundedPathSchema, value: customModuleValueSchema }).strict();
+const v2ActionSchema = z.union([
+  v2SetActionSchema,
+  v2NumericActionSchema,
+  toggleActionSchema,
+  v2CollectionActionSchema,
+  logActionSchema,
+]);
+const v2LifecycleRuleSchema = z.object({
+  when: v2ConditionSchema.optional(),
+  actions: z.array(v2ActionSchema).min(1).max(32),
+}).strict();
+const v2LogicSchema = z.object({
+  onGameStart: z.array(v2LifecycleRuleSchema).max(64).default([]),
+  onTurnEnd: z.array(v2LifecycleRuleSchema).max(64).default([]),
+  onTick: z.array(v2LifecycleRuleSchema).max(64).default([]),
+  onChoice: z.array(v2LifecycleRuleSchema).max(64).default([]),
+  onButton: z.array(v2LifecycleRuleSchema).max(64).default([]),
+}).strict().default({ onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [] });
+
+const customGameplayModuleV2Schema = z.object({
+  kind: z.literal('custom-gameplay-module'),
+  schemaVersion: z.literal(2),
+  id: z.string().regex(ID_RE, 'id 必须匹配 ^[a-z0-9][a-z0-9_:-]{2,63}$'),
+  name: z.string().min(1).max(120),
+  version: z.string().regex(SEMVER_RE, 'version 必须是 x.y.z'),
+  author: z.string().min(1).max(80),
+  description: z.string().max(500).optional(),
+  scope: z.literal('world'),
+  state: z.record(stateFieldNameSchema, stateFieldSchema).refine((value) => Object.keys(value).length <= 64, {
+    message: '模块最多定义 64 个状态字段',
+  }),
+  inputs: z.record(stateFieldNameSchema, z.union([boundedPathSchema, z.object({ path: boundedPathSchema }).strict()])).refine(
+    (value) => Object.keys(value).length <= 32,
+    { message: '模块最多定义 32 个输入别名' },
+  ),
+  logic: v2LogicSchema,
+  view: viewSchema.optional(),
+  permissions: permissionsSchema,
+}).strict();
+
+export const customGameplayModuleSchema = z.union([customGameplayModuleV1Schema, customGameplayModuleV2Schema]);
+
 export type CustomGameplayModuleInput = z.input<typeof customGameplayModuleSchema>;
 export type CustomGameplayModuleOutput = z.output<typeof customGameplayModuleSchema>;
 
 export function parseCustomGameplayModule(input: unknown): {
   ok: true;
-  data: CustomGameplayModule;
+  data: CustomGameplayModuleDefinition;
   issues: [];
 } | {
   ok: false;
@@ -370,7 +450,7 @@ export function parseCustomGameplayModule(input: unknown): {
 } {
   const result = customGameplayModuleSchema.safeParse(input);
   if (result.success) {
-    return { ok: true, data: result.data as CustomGameplayModule, issues: [] };
+      return { ok: true, data: result.data as CustomGameplayModuleDefinition, issues: [] };
   }
   return {
     ok: false,

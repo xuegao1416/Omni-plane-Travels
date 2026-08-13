@@ -49,7 +49,7 @@ export interface BuiltinPreset extends PresetPack {
 // --- 显示用正则脚本（markdownOnly: true）---
 // 用于 MessageBubble 渲染时清理 AI 元数据
 
-const DISPLAY_SCRIPTS: RegexScript[] = [
+const CORE_DISPLAY_SCRIPTS: RegexScript[] = [
   {
     id: 'builtin_display_extract_contenttext',
     scriptName: '提取正文内容',
@@ -105,7 +105,7 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
     id: 'builtin_display_strip_meta',
     scriptName: '去除AI元数据标签',
     // 匹配所有已知闭合标签及其内容（thinking 已由折叠脚本处理，不再剥除）
-    findRegex: '<details>(?!\\s*<summary>💭)[\\s\\S]*?</details>|<integrity>[\\s\\S]*?</integrity>|<analysis_block>[\\s\\S]*?</analysis_block>|<image_think>[\\s\\S]*?</image_think>|<image[^>]*>[\\s\\S]*?</image>|<imgthink>[\\s\\S]*?</imgthink>|<UpdateVariable>[\\s\\S]*?</UpdateVariable>|<(?:action_)?options>[\\s\\S]*?</(?:action_)?options>|<integrity>[\\s\\S]*|This content is produced for educational[\\s\\S]*?creative exploration\\.|(?:^|\\n).*(?:时间|地点|人物|摘要).*(?:\\n|$)|<br\\s*/?>\\s*(?:###|时间|地点|人物|摘要|This content)|<br\\s*/?>\\s*(?:时间|地点|人物|摘要)|<StatusPlaceHolderImpl/>|<antArtifact>[\\s\\S]*?</antArtifact>',
+    findRegex: '<details>(?!\\s*<summary>💭)[\\s\\S]*?</details>|<integrity>[\\s\\S]*?</integrity>|<analysis_block>[\\s\\S]*?</analysis_block>|<image_think>[\\s\\S]*?</image_think>|<image[^>]*>[\\s\\S]*?</image>|<imgthink>[\\s\\S]*?</imgthink>|<UpdateVariable>[\\s\\S]*?</UpdateVariable>|<(?:action_)?options>[\\s\\S]*?</(?:action_)?options>|<integrity>[\\s\\S]*|This content is produced for educational[\\s\\S]*?creative exploration\\.|<StatusPlaceHolderImpl/>|<antArtifact>[\\s\\S]*?</antArtifact>',
     replaceString: '',
     placement: [2],
     disabled: false,
@@ -136,8 +136,18 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
   {
     id: 'builtin_display_dice_roll_start',
     scriptName: '骰子检定-开始',
-    findRegex: '\\[DICE_ROLL\\]\\s*\\{["\']?attr["\']?\\s*:\\s*"([^"]*)"\\s*,\\s*["\']?dc["\']?\\s*:\\s*([0-9]+)\\s*\\}\\s*(\\[/DICE_ROLL\\])?',
+    findRegex: '\\[DICE_ROLL\\]\\s*\\{\\s*["\']?attr["\']?\\s*[:：]\\s*["\']([^"\']+)["\']\\s*[,，]\\s*["\']?dc["\']?\\s*[:：]\\s*([0-9]+)\\s*\\}\\s*(?:\\[/DICE_ROLL\\])?',
     replaceString: '<div class="dice-roll-placeholder" data-attr="$1" data-dc="$2"></div>',
+    placement: [2],
+    disabled: false,
+    markdownOnly: true,
+    promptOnly: false,
+  },
+  {
+    id: 'builtin_display_dice_roll_dc_first',
+    scriptName: '骰子检定-兼容字段倒序',
+    findRegex: '\\[DICE_ROLL\\]\\s*\\{\\s*["\']?dc["\']?\\s*[:：]\\s*([0-9]+)\\s*[,，]\\s*["\']?attr["\']?\\s*[:：]\\s*["\']([^"\']+)["\']\\s*\\}\\s*(?:\\[/DICE_ROLL\\])?',
+    replaceString: '<div class="dice-roll-placeholder" data-attr="$2" data-dc="$1"></div>',
     placement: [2],
     disabled: false,
     markdownOnly: true,
@@ -171,28 +181,6 @@ const DISPLAY_SCRIPTS: RegexScript[] = [
     scriptName: '天赋觉醒',
     findRegex: '\\[TALENT_GAIN\\]\\s*\\{([^}]+)\\}\\s*\\[/TALENT_GAIN\\]',
     replaceString: '<div class="talent-gain-placeholder" data-talent=\'{$1}\'></div>',
-    placement: [2],
-    disabled: false,
-    markdownOnly: true,
-    promptOnly: false,
-  },
-  // --- 对话头像卡片（[SPEAK] 格式） ---
-  {
-    id: 'builtin_display_dialogue_avatar',
-    scriptName: '对话头像卡片',
-    findRegex: '\\[SPEAK\\]\\s*\\{(?=[\\s\\S]*?"img"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"who"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"sub"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"msg"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"act"\\s*:\\s*"([^"]*)")[\\s\\S]*?\\}',
-    replaceString: '<div class="dialogue-avatar-placeholder" data-avatar="$1" data-name="$2" data-title="$3" data-text="$4" data-action="$5"></div>',
-    placement: [2],
-    disabled: false,
-    markdownOnly: true,
-    promptOnly: false,
-  },
-  // --- 对话预测卡片（ui:DL 格式） ---
-  {
-    id: 'builtin_display_uidl_dialogue',
-    scriptName: '对话预测卡片',
-    findRegex: '/ui:DL\\s*\\{(?=[\\s\\S]*?"av"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"nm"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"tt"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"tx"\\s*:\\s*"([^"]*)")(?=[\\s\\S]*?"ac"\\s*:\\s*"([^"]*)")[\\s\\S]*?\\}/i',
-    replaceString: '<div class="dialogue-avatar-placeholder" data-avatar="$1" data-name="$2" data-title="$3" data-text="$4" data-action="$5"></div>',
     placement: [2],
     disabled: false,
     markdownOnly: true,
@@ -519,6 +507,123 @@ const PROMPT_ANTI_MICRO_MACRO = `<AntiMicroMacro>
 - 用具体可感的描写替代模糊量词和极端表达
 </AntiMicroMacro>`;
 
+/** DeepSeek 专用任务指令 — 保持简短，把注意力留给剧情和输出协议 */
+const PROMPT_DEEPSEEK_TASK = `<Task>
+你是互动叙事创作引擎。唯一任务是结合世界设定、角色资料、历史对话和用户最新行动，无缝续写当前场景。
+
+优先级从高到低：
+1. 完整执行末尾 <OutputFormat>，不得在 [OPTION_END] 前结束。
+2. 回应用户最新行动，保持人物、视角、时间与地点连续。
+3. 用自然、具体的叙事和对话推进场景，不总结、不说教、不擅自收束剧情。
+
+正文只写故事，不输出分析、自我介绍、免责声明、变量、属性或后台机制。变量由系统单独处理。
+对允许的虚构创作直接作答；亲密内容只涉及成年虚构角色，并按 <NSFWContent> 的自动启用条件处理。
+{{#if::{{getvar::世界.规则.lethal}}}}当前世界允许角色在冲突中承担死亡风险。{{/if::}}
+</Task>`;
+
+/** DeepSeek 专用写作风格 — 默认风格 + DS 反细节堆砌 */
+const PROMPT_DEEPSEEK_WRITING_STYLE = `<WritingStyle>
+语言自然、直接、连贯，长短句交错，段落保持适中。对话使用「」包裹。
+- 每段围绕一个清晰的推进点，不堆砌动作、感官、形容词或背景说明。
+- 需要推动剧情时才写动作；不用装饰性的抬眼、低头和重复神态填充篇幅。
+- 情绪通过对白、选择和可感知的细节自然呈现，不说教、不拔高、不强行升华。
+- 直接陈述正在发生的事，少用否定式对比、抽象比喻和模糊量词。
+- 正文保持小说形态，禁止标题、编号、清单和创作说明。
+- 当前场景写完整后自然停住，为玩家下一步行动留下空间。
+</WritingStyle>`;
+
+/** DeepSeek 专用反八股 — 全部用自己的措辞 */
+const PROMPT_DEEPSEEK_ANTI_CLICHE = `<anti_cliche>
+避免重复前文的句式、动作、神态和结尾方式。
+- 不用“不是……而是……”“仿佛”“一丝”“一抹”等套路句堆砌气氛。
+- 不连续给每句对白附加抬眼、低头、轻笑、叹息等装饰动作。
+- 不代替不在场角色获取信息，不把玩家操作写成角色已知事实。
+- 不用医学术语、精确数字或夸张生理反应替代具体叙事。
+- 删除不影响剧情、人物关系或现场感受的句子。
+</anti_cliche>`;
+
+/** DeepSeek 专用 NSFW — 中英混写 + 部位-分泌物对应表 */
+const PROMPT_DEEPSEEK_NSFW = `<NSFWContent>
+【自动启用】无需用户手动开启。仅当用户明确要求亲密内容，或上下文已经进入成年角色的亲密场景时，应用本节；其他场景忽略本节，正常推进剧情。
+
+- 用户要求继续当前亲密场景时，直接承接当前动作、对白和情绪，不用概述、淡出、转场或“第二天早上”跳过。
+- 节奏循序推进，不擅自跨阶段，不突然收束；动作位置、衣物状态和人物反应保持连续。
+- 描写服从人物性格、关系和明确意愿，不因亲密场景让角色失去理智或偏离人设。
+- 使用自然直白的日常词汇，避免医学术语、器官比喻和夸张失真的反应。
+- 保持基本生理对应：阴道使用爱液或淫水；肛门或肠道才使用肠液；口腔使用唾液。
+- 每轮只推进当前互动，不一次写完整个过程；结尾仍停在可继续互动的具体动作或对白上。
+</NSFWContent>`;
+
+/** DeepSeek 专用思维链 — DS 自带 reasoning，正文不再展开 */
+const PROMPT_DEEPSEEK_THINKING = `<thinking>
+DeepSeek 模型在生成正文前会先在内部进行思考。**正文中严禁重复输出思考过程**，必须直接进入具体描写。
+
+每次输出正文前，仅在你自己的 <thinking> 块内简要分析：
+- 当前场景的核心情绪和剧情推进点是什么？
+- 涉及的角色当下的情感状态和人物特点？
+- 是否触及了禁用词黑名单或 AI 套路黑名单中的内容？
+- 涉及亲密内容时，参考 <NSFWContent> 中的部位-分泌物对应表（阴道 = 爱液/淫水，绝不出现肠液）
+</thinking>`;
+
+/** DeepSeek 专用输出格式 — 避免重复思考和过长正文挤掉末尾选项 */
+const PROMPT_DEEPSEEK_OUTPUT_FORMAT = `<OutputFormat>
+这是最后且最高优先级的输出协议。只输出正文和行动选项：
+
+<contenttext>600-1000 个中文字符的完整正文</contenttext>
+[OPTION_START]
+[OPTION]{t: "选项标题", d: "选项详细描述"}
+[OPTION]{t: "选项标题", d: "选项详细描述"}
+[OPTION]{t: "选项标题", d: "选项详细描述"}
+[OPTION_END]
+
+- 输出 3-5 个不同方向的可执行选项。
+- 只有输出 [OPTION_END] 后才算完成；禁止在正文中途、</contenttext> 后或选项列表中途结束。
+- 空间不足时立即缩短正文，优先闭合 </contenttext> 并完整输出选项。
+- [OPTION_END] 必须是回复的最后一行，其后不输出任何文字。
+</OutputFormat>`;
+
+/** 称呼一致性规则（共享条目，4 个 preset 都会启用） */
+const PROMPT_CALLING_CONSISTENCY = `<CallingConsistency>
+统一角色间的称呼规则，避免一段里"老夫老妻"另一段突然"您"或者角色名反复横跳：
+
+━━ 称呼应当遵循的常识 ━━
+
+- **按关系亲疏**：熟识用昵称/直呼其名，生疏用世界观的尊称（先生/女士/阁下/前辈/长官等）
+- **跟随关系发展**：故事里从初识到熟识，称呼要自然过渡（可以从"前辈"逐步变成"阿明"）
+- **按年龄判断**：年龄称呼要看清楚角色年龄差（"哥""姐""叔叔""阿姨"别随便乱喊，年纪比你小的人不叫"哥"）
+- **全篇统一**：同一段对话里同样两个人，称呼方式应该稳定，不要一会儿"你"一会儿"老公"一会儿"夫君"
+
+━━ 一句话原则 ━━
+
+内心想"这个人物此时此地会怎么称呼对方"，把结论落实成具体称呼词汇，别每次重复想。</CallingConsistency>`;
+
+/** 防全知（共享条目，强化 narrative_rules 的认知边界） */
+const PROMPT_ANTI_OMNISCIENCE = `<AntiOmniscience>
+防止 AI 角色越权获取信息（"全知全觉"是 AI 写作最常见的 bug）：
+
+━━ 严重违规，一次犯规整段重写 ━━
+
+A 角色知道 B 角色私下做了某事，但两人从未在场。
+独处角色获取了发生在别处的剧情细节（"他不知道，此时此刻另一边的她已经……"）。
+角色忽然掌握游戏开始后才建立、且他不在场的设定信息。
+用旁白口吻暴露玩家操作（"你刚才做的选择其实有深意"）。
+
+━━ 正确处理 ━━
+
+- 信息只能通过**在场感官**获得：亲眼看到、亲耳听到、亲口询问、亲自调查。
+- 离场角色的状态只能通过 NPC 在场提及、信件/物件、或者同步剧情里说"另一边的她已经……"也可以，但需要明确**信息渠道**。
+- 需要"制造悬念"用场景描写暗示，不要用上帝视角直接说出来。
+
+━━ 与 narrative_rules 的关系 ━━
+
+narrative_rules 里也有"严格区分创作者所知与角色可知信息"，本规则是它针对 DS 的强化版（DS 特别容易在长上下文里遗忘"谁在场谁不在场"）。</AntiOmniscience>`;
+
+
+
+
+
+
+
 /** NSFW 内容规范 */
 const PROMPT_NSFW_CONTENT = `<NSFWContent>
 进入亲密场景后，严格遵循以下规范：
@@ -768,6 +873,8 @@ const DEFAULT_PROMPTS: PresetPromptEntry[] = [
   // 第一组：基础规则（破限+叙事）
   { identifier: 'task',              name: '任务指令',      role: 'system', content: PROMPT_TASK,              enabled: true, order: 100, triggerMode: 'blue' },
   { identifier: 'narrative_rules',   name: '叙事规则与认知边界', role: 'system', content: PROMPT_NARRATIVE_RULES,  enabled: true, order: 200, triggerMode: 'blue' },
+  { identifier: 'anti_omniscience',  name: '防全知', role: 'system', content: PROMPT_ANTI_OMNISCIENCE, enabled: true, order: 205, triggerMode: 'blue' },
+
 
   // 第二组：人物与情感
   { identifier: 'emotional_balance', name: '情绪平衡与基调控制', role: 'system', content: PROMPT_EMOTIONAL_BALANCE, enabled: true, order: 300, triggerMode: 'blue' },
@@ -778,16 +885,19 @@ const DEFAULT_PROMPTS: PresetPromptEntry[] = [
   { identifier: 'writing_rules',     name: '写作规则',      role: 'system', content: PROMPT_WRITING_RULES,     enabled: true, order: 600, triggerMode: 'blue' },
   { identifier: 'writing_style',     name: '写作风格',      role: 'system', content: PROMPT_WRITING_STYLE,     enabled: true, order: 700, triggerMode: 'blue' },
   { identifier: 'perspective_boundary', name: '视角边界规范', role: 'system', content: PROMPT_PERSPECTIVE_BOUNDARY, enabled: true, order: 800, triggerMode: 'blue' },
+  { identifier: 'calling_consistency', name: '称呼一致性', role: 'system', content: PROMPT_CALLING_CONSISTENCY, enabled: true, order: 805, triggerMode: 'blue' },
+
   { identifier: 'dialogue_balance',  name: '对话互动规范',   role: 'system', content: PROMPT_DIALOGUE_BALANCE,  enabled: true, order: 900, triggerMode: 'blue' },
+
   { identifier: 'expression_rules',  name: '表达规范与禁用词', role: 'system', content: PROMPT_EXPRESSION_RULES, enabled: true, order: 1000, triggerMode: 'blue' },
   { identifier: 'anti_formula',      name: '防八股规范',    role: 'system', content: PROMPT_ANTI_FORMULA,      enabled: true, order: 1050, triggerMode: 'blue' },
   // 模块化反八股（可独立开关）
-  { identifier: 'anti_metaphor',     name: '杀比拟',       role: 'system', content: PROMPT_ANTI_METAPHOR,     enabled: false, order: 1051, triggerMode: 'blue' },
-  { identifier: 'anti_reveal',       name: '杀揭示',       role: 'system', content: PROMPT_ANTI_REVEAL,       enabled: false, order: 1052, triggerMode: 'blue' },
-  { identifier: 'anti_voice_desc',   name: '杀声述',       role: 'system', content: PROMPT_ANTI_VOICE_DESC,   enabled: false, order: 1053, triggerMode: 'blue' },
-  { identifier: 'anti_synesthesia',  name: '杀通感',       role: 'system', content: PROMPT_ANTI_SYNESTHESIA,  enabled: false, order: 1054, triggerMode: 'blue' },
-  { identifier: 'anti_shaguanlian',  name: '杀转折词',      role: 'system', content: PROMPT_ANTI_SHAGUANLIAN,  enabled: false, order: 1055, triggerMode: 'blue' },
-  { identifier: 'anti_micro_macro',  name: '杀极端感知',    role: 'system', content: PROMPT_ANTI_MICRO_MACRO,  enabled: false, order: 1056, triggerMode: 'blue' },
+  { identifier: 'anti_metaphor',     name: '杀比拟',       role: 'system', content: PROMPT_ANTI_METAPHOR,     enabled: true, order: 1051, triggerMode: 'blue' },
+  { identifier: 'anti_reveal',       name: '杀揭示',       role: 'system', content: PROMPT_ANTI_REVEAL,       enabled: true, order: 1052, triggerMode: 'blue' },
+  { identifier: 'anti_voice_desc',   name: '杀声述',       role: 'system', content: PROMPT_ANTI_VOICE_DESC,   enabled: true, order: 1053, triggerMode: 'blue' },
+  { identifier: 'anti_synesthesia',  name: '杀通感',       role: 'system', content: PROMPT_ANTI_SYNESTHESIA,  enabled: true, order: 1054, triggerMode: 'blue' },
+  { identifier: 'anti_shaguanlian',  name: '杀转折词',      role: 'system', content: PROMPT_ANTI_SHAGUANLIAN,  enabled: true, order: 1055, triggerMode: 'blue' },
+  { identifier: 'anti_micro_macro',  name: '杀极端感知',    role: 'system', content: PROMPT_ANTI_MICRO_MACRO,  enabled: true, order: 1056, triggerMode: 'blue' },
 
   // 第四组：特殊内容
   { identifier: 'nsfw_content',      name: 'NSFW内容规范',   role: 'system', content: PROMPT_NSFW_CONTENT,     enabled: true, order: 1100, triggerMode: 'blue' },
@@ -1063,21 +1173,26 @@ const PROMPT_DIALOGUE_OUTPUT_FORMAT = `<OutputFormat>
 - 即使剧情到了关键节点，也必须提供选项，不能省略
 
 【正文格式】
-正文内容直接输出，不需要任何标签包裹。叙事描写正常写，对话必须用 [SPEAK] 格式。
+正文内容直接输出，不需要任何标签包裹。叙事描写正常写；仅非玩家角色实际说出口的台词使用 [SPEAK] 格式。
 
 【对话格式】
-除了用户角色外，所有剧情人物的对话都必须按照以下格式输出：
+除玩家角色外，剧情人物实际说出口的台词必须按照以下格式输出：
 
 [SPEAK]{"img":"", "who":"角色名", "sub":"称号", "msg":"对话内容", "act":"动作描述"}
 
 参数说明：
-- img: 头像URL，可以为角色找合适的图像链接，或者留空
+- img: 固定留空为 ""，不要编造或搜索外部图片链接
 - who: 角色名称
 - sub: 称号、身份或神态（显示在名字旁边的小字标注）
-- msg: 对话正文内容
-- act: 动作神态或场景补充描述
+- msg: 仅填写角色说出口的话，不要再套一层引号
+- act: 仅填写与本句直接相关的一句简短动作或神态，不要复述叙事
 
-注意：如果有多段对话，请输出多个 [SPEAK] 格式，不要把所有对话放在一个格式中。
+协议约束：
+- 每个 [SPEAK] 必须是单行、合法 JSON，字段名和字段顺序固定，不得增加字段、Markdown 或 HTML
+- 字段值中的英文双引号必须写成 \\\"，不得用未转义双引号破坏 JSON
+- 旁白、环境、心理描写和系统信息不得放进 [SPEAK]；行动选项与 TimeAdvance 必须放在卡片之外
+- 同一角色连续表达同一层意思时合并为一张卡片；只在说话者改变或确实换了一轮发言时新开卡片，避免一句话拆成多张卡片
+- 不要另起“时间：”“地点：”“人物：”“摘要：”等状态行；精确时间由系统的权威世界时钟显示
 
 【行动选项格式】
 在正文末尾按以下格式输出行动选项：
@@ -1101,7 +1216,32 @@ const PROMPT_DIALOGUE_OUTPUT_FORMAT = `<OutputFormat>
 </OutputFormat>`;
 
 /** 对话头像预设的完整提示词 */
-const DIALOGUE_PRESET_PROMPTS: PresetPromptEntry[] = [
+
+
+/** DeepSeek 专用预设条目 — 替换 task / writing_style / anti_formula / nsfw_content / thinking */
+const DEEPSEEK_REDUNDANT_ANTI_PROMPTS = new Set([
+  'anti_metaphor',
+  'anti_reveal',
+  'anti_voice_desc',
+  'anti_synesthesia',
+  'anti_shaguanlian',
+  'anti_micro_macro',
+]);
+
+const DEEPSEEK_PROMPTS: PresetPromptEntry[] = [
+  ...DEFAULT_PROMPTS.map(p => {
+    if (p.identifier === 'task') return { ...p, content: PROMPT_DEEPSEEK_TASK };
+    if (p.identifier === 'writing_style') return { ...p, content: PROMPT_DEEPSEEK_WRITING_STYLE };
+    if (p.identifier === 'anti_formula') return { ...p, content: PROMPT_DEEPSEEK_ANTI_CLICHE };
+    if (p.identifier === 'nsfw_content') return { ...p, content: PROMPT_DEEPSEEK_NSFW };
+    if (p.identifier === 'thinking') return { ...p, content: PROMPT_DEEPSEEK_THINKING, enabled: false };
+    if (p.identifier === 'writing_process' || p.identifier === 'integrity_statement') return { ...p, enabled: false };
+    if (p.identifier === 'output_format') return { ...p, content: PROMPT_DEEPSEEK_OUTPUT_FORMAT };
+    if (DEEPSEEK_REDUNDANT_ANTI_PROMPTS.has(p.identifier)) return { ...p, enabled: false };
+    return p;
+  }),
+  ...ENHANCEMENT_PROMPT_ENTRIES,
+];const DIALOGUE_PRESET_PROMPTS: PresetPromptEntry[] = [
   // 变量上下文
   { identifier: 'var_snapshot',      name: '变量上下文',    role: 'system', content: PROMPT_VAR_SNAPSHOT,      enabled: true, order: 50,  triggerMode: 'blue' },
 
@@ -1118,7 +1258,7 @@ const DIALOGUE_PRESET_PROMPTS: PresetPromptEntry[] = [
   { identifier: 'writing_rules',     name: '写作规则',      role: 'system', content: PROMPT_WRITING_RULES,     enabled: true, order: 600, triggerMode: 'blue' },
   { identifier: 'writing_style',     name: '写作风格',      role: 'system', content: PROMPT_WRITING_STYLE,     enabled: true, order: 700, triggerMode: 'blue' },
   { identifier: 'perspective_boundary', name: '视角边界规范', role: 'system', content: PROMPT_PERSPECTIVE_BOUNDARY, enabled: true, order: 800, triggerMode: 'blue' },
-  { identifier: 'dialogue_balance',  name: '对话互动规范',   role: 'system', content: PROMPT_DIALOGUE_BALANCE,  enabled: true, order: 900, triggerMode: 'blue' },
+
   { identifier: 'expression_rules',  name: '表达规范与禁用词', role: 'system', content: PROMPT_EXPRESSION_RULES, enabled: true, order: 1000, triggerMode: 'blue' },
   { identifier: 'anti_formula',      name: '防八股规范',    role: 'system', content: PROMPT_ANTI_FORMULA,      enabled: true, order: 1050, triggerMode: 'blue' },
 
@@ -1139,7 +1279,7 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     description: '世界漫游指南默认预设 - 创作助手适配版',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     prompts: [...DEFAULT_PROMPTS, ...ENHANCEMENT_PROMPT_ENTRIES],
-    regexScripts: [...DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
+    regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
     version: '2.0.0',
   },
@@ -1149,9 +1289,19 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     description: '针对 Claude 模型安全机制优化，内置增色模块开关',
     systemPrompt: CLAUDE_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
     prompts: CLAUDE_PROMPTS,
-    regexScripts: [...DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
+    regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
     version: '2.0.0',
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek 专用预设',
+    description: '针对 DeepSeek 模型优化 — 精简推理与正文，优先保证完整回复和行动选项',
+    systemPrompt: DEEPSEEK_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
+    prompts: DEEPSEEK_PROMPTS,
+    regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
+    builtin: true,
+    version: '1.2.0',
   },
   {
     id: 'dialogue_avatar',
@@ -1159,7 +1309,7 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     description: '对话头像风格 - 所有对话都用 [SPEAK] 格式渲染带头像的对话卡片',
     systemPrompt: DIALOGUE_PRESET_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
     prompts: DIALOGUE_PRESET_PROMPTS,
-    regexScripts: [...DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
+    regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
     version: '1.0.0',
   },
@@ -1179,7 +1329,7 @@ export function getBuiltinPresets(): BuiltinPreset[] {
 
 /** 获取内置显示正则脚本（用于前端渲染） */
 export function getBuiltinDisplayScripts(): RegexScript[] {
-  return DISPLAY_SCRIPTS;
+  return CORE_DISPLAY_SCRIPTS;
 }
 
 /** 获取内置 API 上下文正则脚本 */

@@ -1,6 +1,6 @@
 import type { GameState } from '../schema/variables';
 import type {
-  CustomGameplayModule,
+  CustomGameplayModuleDefinition,
   JsonValue,
   StateFieldDefinition,
 } from './schema';
@@ -38,7 +38,7 @@ function defaultForField(field: StateFieldDefinition): JsonValue {
 }
 
 export function createInitialCustomModuleState(
-  module: CustomGameplayModule,
+  module: CustomGameplayModuleDefinition,
   enabled = true,
 ): CustomModuleRuntimeState {
   const values: Record<string, JsonValue> = {};
@@ -60,7 +60,7 @@ export function createInitialCustomModuleState(
  */
 export function installCustomModuleState(
   gameState: GameState,
-  module: CustomGameplayModule,
+  module: CustomGameplayModuleDefinition,
   enabled = true,
 ): CustomModuleRuntimeState {
   if (!gameState.customModules) gameState.customModules = {};

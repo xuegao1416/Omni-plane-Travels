@@ -7,6 +7,29 @@ import { useImageStore } from '../../../../stores/imageStore';
 import { usePortraitStore } from '../../../../stores/portraitStore';
 import { imageDb } from '../../../../storage/imageDb';
 
+function applyDialoguePortrait(card: HTMLElement, url: string) {
+  const avatar = card.querySelector<HTMLElement>('.inline-dialogue-card__avatar');
+  if (!avatar) return;
+  let image = avatar.querySelector<HTMLImageElement>('.inline-dialogue-card__avatar-image');
+  if (!url) {
+    image?.remove();
+    return;
+  }
+  if (!image) {
+    image = document.createElement('img');
+    image.className = 'inline-dialogue-card__avatar-image';
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    avatar.appendChild(image);
+  }
+  if (image.dataset.fallbackBound !== 'true') {
+    image.dataset.fallbackBound = 'true';
+    image.addEventListener('error', () => image?.remove(), { once: true });
+  }
+  if (image.src !== url) image.src = url;
+}
+
 /** 延迟卸载 React root，避免在 React commit 阶段同步 unmount 导致竞态警告 */
 function deferredUnmount(roots: Root[]) {
   // 微任务延迟：等当前 React 渲染/提交周期结束后再 unmount
@@ -18,8 +41,7 @@ function deferredUnmount(roots: Root[]) {
 }
 
 /**
- * 内联 Portal 挂载 Hook：骰子卡片、天赋卡片、生图按钮、对话头像卡片。
- * 管理 createRoot / unmount 生命周期。
+ * 内联内容挂载 Hook：管理交互卡片 Root，并为静态对话卡补入头像。
  */
 export function useInlinePortals(
   messageHtmlRef: React.RefObject<HTMLDivElement | null>,
@@ -32,7 +54,6 @@ export function useInlinePortals(
   const diceRootsRef = useRef<Root[]>([]);
   const talentRootsRef = useRef<Root[]>([]);
   const imageGenRootsRef = useRef<Root[]>([]);
-  const dialogueRootsRef = useRef<Root[]>([]);
 
   // ─── 骰子卡片 Portal ────────────────────────
   useEffect(() => {
@@ -151,59 +172,47 @@ export function useInlinePortals(
     };
   }, [renderedContent, inlineImageEnabled, isUser, message.streaming, message.id, messageHtmlRef]);
 
-  // ─── 对话头像卡片 Portal ────────────────────────
+  // ─── 对话头像补水 ──────────────────────────────
+  // 卡片正文已作为稳定 HTML 同步渲染；这里仅填入固定尺寸头像，不再创建成百上千个 React root。
   useEffect(() => {
-    deferredUnmount(dialogueRootsRef.current);
-    dialogueRootsRef.current = [];
-
+    let cancelled = false;
     if (!messageHtmlRef.current || isUser || message.streaming) return;
 
-    const placeholders = messageHtmlRef.current.querySelectorAll('.dialogue-avatar-placeholder');
-    if (placeholders.length === 0) return;
+    const cards = Array.from(messageHtmlRef.current.querySelectorAll<HTMLElement>('.inline-dialogue-card'));
+    if (cards.length === 0) return;
 
-    const mountDialogueCards = async () => {
-      const { default: InlineDialogueCardComponent } = await import('../InlineDialogueCard');
-      const setPortrait = usePortraitStore.getState().setPortrait;
-
-      for (const el of Array.from(placeholders)) {
-        let avatarUrl = el.getAttribute('data-avatar') || '';
-        const name = el.getAttribute('data-name') || '';
-        const npcId = el.getAttribute('data-npcid') || name; // 优先用 npcId，回退到 name
-        const title = el.getAttribute('data-title') || '';
-        const text = el.getAttribute('data-text') || '';
-        const action = el.getAttribute('data-action') || '';
-
-        // AI 未填充头像时，按 NPC 名字从 imageDb 查找
-        if (!avatarUrl && name) {
-          try {
-            avatarUrl = (await imageDb.findPortraitUrlByName(name)) || '';
-            // 写入 store，后续头像变化时自动更新
-            if (avatarUrl) setPortrait(npcId, avatarUrl);
-          } catch { /* ignore */ }
-        }
-
-        const container = document.createElement('div');
-        el.replaceWith(container);
-        const root = createRoot(container);
-        root.render(
-          <InlineDialogueCardComponent
-            avatarUrl={avatarUrl}
-            name={name}
-            npcId={npcId}
-            title={title}
-            text={text}
-            action={action}
-          />
-        );
-        dialogueRootsRef.current.push(root);
+    const applyFromStore = (portraits: Record<string, string>) => {
+      for (const card of cards) {
+        const npcId = card.dataset.npcid || card.dataset.name || '';
+        const fallback = card.dataset.avatar || '';
+        applyDialoguePortrait(card, portraits[npcId] || fallback);
       }
     };
 
-    mountDialogueCards();
+    applyFromStore(usePortraitStore.getState().portraits);
+    const unsubscribe = usePortraitStore.subscribe((state, previous) => {
+      if (state.portraits !== previous.portraits) applyFromStore(state.portraits);
+    });
+
+    const unresolved = new Map<string, string>();
+    const currentPortraits = usePortraitStore.getState().portraits;
+    for (const card of cards) {
+      const name = card.dataset.name || '';
+      const npcId = card.dataset.npcid || name;
+      if (name && !card.dataset.avatar && !currentPortraits[npcId]) unresolved.set(npcId, name);
+    }
+
+    for (const [npcId, name] of unresolved) {
+      imageDb.findPortraitUrlByName(name).then(url => {
+        if (cancelled || !url) return;
+        const store = usePortraitStore.getState();
+        if (store.portraits[npcId] !== url) store.setPortrait(npcId, url);
+      }).catch(() => { /* ignore */ });
+    }
 
     return () => {
-      deferredUnmount(dialogueRootsRef.current);
-      dialogueRootsRef.current = [];
+      cancelled = true;
+      unsubscribe();
     };
   }, [renderedContent, isUser, message.streaming, messageHtmlRef]);
 }

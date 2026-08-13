@@ -75,6 +75,26 @@ const validModule: CustomGameplayModule = {
 };
 
 describe('custom gameplay module schema', () => {
+  test('accepts a V2 module with declared safe inputs, references, and onButton', () => {
+    const v2 = {
+      ...validModule,
+      schemaVersion: 2,
+      inputs: { health: 'player.stats.attrA', primaryCurrency: 'player.currency.primary' },
+      logic: {
+        onGameStart: [], onTurnEnd: [], onTick: [],
+        onChoice: [{
+          when: { type: 'compare', source: 'input', path: 'health', operator: 'lt', value: 10 },
+          actions: [{ type: 'set', path: 'score', value: { source: 'input', path: 'primaryCurrency' } }],
+        }],
+        onButton: [{
+          when: { type: 'compare', source: 'event', path: 'button.event', operator: 'eq', value: 'refresh' },
+          actions: [{ type: 'add', path: 'score', value: { source: 'input', path: 'health' } }],
+        }],
+      },
+    };
+    expect(customGameplayModuleSchema.safeParse(v2).success).toBe(true);
+  });
+
   test('accepts the v1 world-scoped module contract and all supported field/component kinds', () => {
     const result = customGameplayModuleSchema.safeParse(validModule);
 

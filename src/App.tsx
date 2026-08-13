@@ -9,6 +9,8 @@ import EventsScreen from './components/event/EventsScreen';
 import UserCenterPage from './components/UserCenterPage';
 import { useAuthStore } from './stores/authStore';
 import { useAdaptiveTheme } from './theme/useAdaptiveTheme';
+import { reportDepth } from './modules/playTracker';
+import TelemetryConsentBanner from './components/TelemetryConsentBanner';
 
 function AppContent() {
   const { state } = useGame();
@@ -17,6 +19,13 @@ function AppContent() {
   useAdaptiveTheme();
 
   useEffect(() => { checkAuth(); }, [checkAuth]);
+
+  // 匿名游玩统计：报深度（home/lobby/wizard/game/events）
+  useEffect(() => {
+    if (state.currentScreen === 'game') reportDepth('game');
+    else if (state.currentScreen === 'events') reportDepth('events');
+    else reportDepth('home');
+  }, [state.currentScreen]);
 
   if (state.currentScreen === 'settings') {
     const previousScreen = state.screenHistory[state.screenHistory.length - 1];
@@ -43,6 +52,7 @@ export default function App() {
         <GameProvider>
           <AppContent />
         </GameProvider>
+        <TelemetryConsentBanner />
       </UISettingsProvider>
     </ErrorBoundary>
   );

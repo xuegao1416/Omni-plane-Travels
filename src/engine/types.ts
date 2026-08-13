@@ -39,6 +39,7 @@ export interface GameEngine {
   editMessage: (id: string, content: string) => void;
   resendFromMessage: (id: string) => Promise<void>;
   resendFromAssistantMessage: (id: string) => Promise<void>;
+  rollbackToSnapshot: (msgIndex: number) => void;
   loadSave: (save: GameSave) => void;
   reset: (worldDef?: WorldDef) => void;
   setPlayerProfile: (profile: PlayerProfile) => void;

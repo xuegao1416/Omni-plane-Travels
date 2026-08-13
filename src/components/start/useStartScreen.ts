@@ -12,6 +12,7 @@ import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
 import { resetSimulationEngine } from '../../simulation/SimulationApi';
+import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
 
 import { v4 as uuid } from 'uuid';
 
@@ -240,6 +241,17 @@ export function useStartScreen() {
 
     if (wizard.personalInfo.customNpcs.length > 0) {
       engine.setInitialNPCs(wizard.personalInfo.customNpcs);
+    }
+
+    // 自定义模块在初始 GameState 完整后启动；提交顺序与其它生命周期一致。
+    try {
+      await runCustomModulesForWorldAndCommit(engine.variableManager.getState(), wizard.selectedWorld, 'onGameStart', {
+        round: 0,
+      }, {
+        commit: (nextState) => engine.variableManager.setState(nextState),
+      });
+    } catch (error) {
+      console.warn('[custom-modules] onGameStart failed; continuing world creation', error);
     }
 
     // 构建初始消息列表（直接构造，不依赖 React 批量更新）

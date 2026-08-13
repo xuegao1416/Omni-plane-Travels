@@ -16,11 +16,23 @@ describe('custom module Agent external workspace', () => {
     expect(workspaceSource).toContain('saveCustomGameplayModule');
     expect(workspaceSource).toContain('bindCustomGameplayModule');
     expect(workspaceSource).toContain('保存并绑定');
-    expect(workspaceSource).toContain('draft?.ok');
+    expect(workspaceSource).toContain('session.lastValidDraft');
   });
 
-  test('asks for the minimum design details before calling the Agent', () => {
-    expect(workspaceSource).toContain('getMissingCustomModuleRequestFields');
-    expect(workspaceSource).toContain("status: 'needs_input'");
+  test('owns a structured session and preserves the last valid blueprint during revision', () => {
+    expect(workspaceSource).toContain('CustomModuleAgentSession');
+    expect(workspaceSource).toContain('applyCustomModuleAgentTurn');
+    expect(workspaceSource).toContain('session.brief');
+    expect(workspaceSource).toContain('本轮未应用');
+    expect(workspaceSource).not.toContain('setDraft(null)');
+  });
+
+  test('renders the current follow-up question and exposes its choices as input shortcuts', () => {
+    expect(workspaceSource).toContain('activeQuestion');
+    expect(workspaceSource).toContain('result.question');
+    expect(workspaceSource).toContain('activeQuestion.choices');
+    expect(workspaceSource).toContain('setInput(choice)');
+    expect(workspaceSource).toContain("result.phase === 'draft_ready' ? undefined");
+    expect(workspaceSource).toContain('sameText');
   });
 });

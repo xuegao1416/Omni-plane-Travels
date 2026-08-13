@@ -231,4 +231,9 @@ app.delete('/api/workshop/:itemId', requireAuth, async (c) => {
   return c.json(res.body, res.status as 200 | 403 | 404);
 });
 
+
+// ——— 匿名游玩统计（无需鉴权；数据完全匿名）———
+import { handlePostPlayStat } from './playStats';
+
+app.post('/api/stats/play', (c) => handlePostPlayStat(c));
 export default app;

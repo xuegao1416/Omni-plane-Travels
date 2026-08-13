@@ -1,6 +1,7 @@
 // 游戏变量类型定义 - 从世界漫游指南.json的Zod schema提取
 
-import type { SurvivalRecipe } from '../modules/schema';
+import type { DiceRoll, SurvivalRecipe } from '../modules/schema';
+import type { WorldClockState } from '../time/worldClock';
 
 export interface WorldModuleRuntime {
   moduleId: string;
@@ -10,7 +11,7 @@ export interface WorldModuleRuntime {
 }
 
 export interface WorldState {
-  时间系统: { 当前时间: string; 当前天气: string };
+  时间系统: { 当前时间: string; 当前天气: string; 时钟?: WorldClockState };
   空间定位: { 当前位置: string };
   /**
    * 泛化世界状态（由世界演化系统动态更新）
@@ -272,6 +273,8 @@ export interface PlayerState {
       描述: string;
       金额: number;
     }>;
+    /** 最近一次已结算的世界时间周期；防止同一轮多次变量通知重复入账。 */
+    上次结算周期?: string;
   };
 }
 
@@ -334,6 +337,11 @@ export interface GameState {
   memoryConfig?: Record<string, unknown>;
   /** 世界演化运行时状态（可选，由世界演化引擎管理） */
   simulationRuntime?: import('../modules/schema').SimulationRuntimeState;
+  /** 骰子检定运行态，随存档保存并供下一轮叙事与事件规则读取。 */
+  dice?: {
+    lastRoll?: DiceRoll;
+    history?: DiceRoll[];
+  };
   /** 自定义玩法模块的运行时状态；与事件包/工作流完全分离。 */
   customModules?: Record<string, import('../custom-modules/stateStore').CustomModuleRuntimeState>;
 }

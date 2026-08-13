@@ -6,6 +6,8 @@ import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard 
 import { findWorldDef } from '../../../data/worldLoader';
 import { normalizeAssetStatus } from './businessOverlay/utils';
 import { CustomModulePanel } from './CustomModulePanel';
+import { formatWorldClock } from '../../../time/worldClock';
+import { toDisplayText } from '../../../utils/displayText';
 
 interface Props {
   gameState: GameState;
@@ -28,14 +30,15 @@ interface Props {
   survivalChangeLog?: ResourceChangeLog[];
   /** 预计算的经营资产数据（来自 GameScreen，保证资金同步） */
   businessData?: BusinessModuleSchema;
+  onCustomModuleButton?: (moduleId: string, event: string) => void;
 }
 
 // 世界状态行 - Lucide 图标 + 文字
 function StatusRow({ icon, text, muted }: { icon: React.ReactNode; text: string; muted?: boolean }) {
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: muted ? 'var(--text-muted)' : undefined }}>
+    <span style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', minWidth: 0, color: muted ? 'var(--text-muted)' : undefined }}>
       <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{icon}</span>
-      {text}
+      <span style={{ minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{text}</span>
     </span>
   );
 }
@@ -58,9 +61,12 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
   );
 }
 
-export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData }: Props) {
+export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onCustomModuleButton }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
+  const displayWorldTime = world.时间系统.时钟
+    ? formatWorldClock(world.时间系统.时钟)
+    : world.时间系统.当前时间;
 
   // 判断是否有数值模块（生存状态中有 dim1 等字段说明启用了数值模块）
   const hasStatModule = 'dim1' in (player.生存状态 || {});
@@ -152,35 +158,35 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
       overflowY: 'auto',
       height: '100%',
     }}>
-      <CustomModulePanel gameState={gameState} worldId={worldId} />
+      <CustomModulePanel gameState={gameState} worldId={worldId} onButton={onCustomModuleButton} />
       {/* 世界状态 */}
       <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
         <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           世界状态
         </h4>
         <div style={{ fontSize: 'var(--font-size-sm)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {(!world.时间系统.当前时间 && !world.空间定位.当前位置) ? (
+          {(!displayWorldTime && !world.空间定位.当前位置) ? (
             <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: 'var(--font-size-sm)' }}>
               等待世界展开...
             </span>
           ) : (
             <>
-              {world.时间系统.当前时间 && <StatusRow icon={<Clock size={13} />} text={world.时间系统.当前时间} />}
-              {world.空间定位.当前位置 && <StatusRow icon={<MapPin size={13} />} text={world.空间定位.当前位置} />}
-              {world.时间系统.当前天气 && <StatusRow icon={<Cloud size={13} />} text={world.时间系统.当前天气} />}
+              {displayWorldTime && <StatusRow icon={<Clock size={13} />} text={displayWorldTime} />}
+              {toDisplayText(world.空间定位.当前位置) && <StatusRow icon={<MapPin size={13} />} text={toDisplayText(world.空间定位.当前位置)} />}
+              {toDisplayText(world.时间系统.当前天气) && <StatusRow icon={<Cloud size={13} />} text={toDisplayText(world.时间系统.当前天气)} />}
             </>
           )}
         </div>
       </div>
 
       {/* 当前目标 */}
-      {player.当前目标 && (
+      {toDisplayText(player.当前目标) && (
         <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
           <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             当前目标
           </h4>
           <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--accent)' }}>
-            {player.当前目标}
+            {toDisplayText(player.当前目标)}
           </div>
         </div>
       )}

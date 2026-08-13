@@ -85,6 +85,15 @@ export type StateFieldType = StateFieldDefinition['type'];
 export type StateDefinition = Record<string, StateFieldDefinition>;
 
 export type ConditionOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains';
+export type CustomModuleValueSource = 'state' | 'input' | 'event';
+
+export interface CustomModuleReference {
+  type?: 'ref';
+  source: CustomModuleValueSource;
+  path: string;
+}
+
+export type CustomModuleValue = JsonValue | CustomModuleReference;
 
 export interface CompareCondition {
   type: 'compare';
@@ -139,6 +148,58 @@ export interface LogAction {
   level?: 'debug' | 'info' | 'warn';
 }
 
+export interface V2CompareCondition {
+  type: 'compare';
+  source: CustomModuleValueSource;
+  path: string;
+  operator: ConditionOperator;
+  value: CustomModuleValue;
+}
+
+export interface V2ReferenceCompareCondition {
+  type: 'compare';
+  left: CustomModuleReference;
+  operator: ConditionOperator;
+  right: CustomModuleValue;
+}
+
+export interface V2AllCondition {
+  type: 'all';
+  conditions: V2Condition[];
+}
+
+export interface V2AnyCondition {
+  type: 'any';
+  conditions: V2Condition[];
+}
+
+export interface V2NotCondition {
+  type: 'not';
+  condition: V2Condition;
+}
+
+export type V2Condition = V2CompareCondition | V2ReferenceCompareCondition | V2AllCondition | V2AnyCondition | V2NotCondition;
+
+export interface V2SetAction {
+  type: 'set';
+  path: string;
+  value: CustomModuleValue;
+}
+
+export interface V2NumericAction {
+  type: 'add' | 'subtract';
+  path: string;
+  value: number | CustomModuleReference;
+}
+
+export interface V2CollectionAction {
+  type: 'append' | 'remove';
+  path: string;
+  value: CustomModuleValue;
+}
+
+export type V2Action = V2SetAction | V2NumericAction | ToggleAction | V2CollectionAction | LogAction;
+
 export type CustomModuleAction =
   | SetAction
   | NumericAction
@@ -157,6 +218,23 @@ export interface ModuleLogic {
   onTurnEnd: LifecycleRule[];
   onTick: LifecycleRule[];
   onChoice: LifecycleRule[];
+}
+
+export interface ModuleLogicV2 extends Omit<ModuleLogic, 'onGameStart' | 'onTurnEnd' | 'onTick' | 'onChoice'> {
+  onGameStart: LifecycleRuleV2[];
+  onTurnEnd: LifecycleRuleV2[];
+  onTick: LifecycleRuleV2[];
+  onChoice: LifecycleRuleV2[];
+  onButton: LifecycleRuleV2[];
+}
+
+export interface LifecycleRuleV2 {
+  when?: V2Condition;
+  actions: V2Action[];
+}
+
+export interface CustomModuleInputBinding {
+  path: string;
 }
 
 export type ViewSlot = 'left-panel' | 'right-panel';
@@ -270,7 +348,19 @@ export interface CustomGameplayModule {
   permissions: ModulePermissions;
 }
 
-export type CustomGameplayModuleInput = Omit<CustomGameplayModule, 'logic' | 'permissions'> & {
+export interface CustomGameplayModuleV2 extends Omit<CustomGameplayModule, 'schemaVersion' | 'logic' | 'permissions'> {
+  schemaVersion: 2;
+  inputs: Record<string, string | CustomModuleInputBinding>;
+  logic: ModuleLogicV2;
+  permissions: ModulePermissions;
+}
+
+export type CustomGameplayModuleDefinition = CustomGameplayModule | CustomGameplayModuleV2;
+
+export type CustomGameplayModuleInput = (Omit<CustomGameplayModule, 'logic' | 'permissions'> & {
   logic?: Partial<ModuleLogic>;
   permissions?: Partial<ModulePermissions>;
-};
+}) | (Omit<CustomGameplayModuleV2, 'logic' | 'permissions'> & {
+  logic?: Partial<ModuleLogicV2>;
+  permissions?: Partial<ModulePermissions>;
+});

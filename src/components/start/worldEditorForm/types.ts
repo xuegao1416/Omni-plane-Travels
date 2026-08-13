@@ -5,6 +5,8 @@ import {
 } from '../../../modules/defaults';
 import { createBuildContext } from '../../../modules/buildContext';
 import { generateWorldBookEntries } from '../../../modules/buildPipeline';
+import type { WorldClockConfig } from '../../../time/worldClock';
+import { inferWorldClockConfig } from '../../../time/worldClock';
 
 export type FormState = {
   name: string; description: string; icon: string; coverColor: string; tags: string; difficulty: string;
@@ -12,7 +14,7 @@ export type FormState = {
   overview: string; timePeriod: string; location: string; atmosphere: string;
   powerSystem: string; socialStructure: string; specialRules: string;
   currencyName: string; currencySymbol: string; currencyDesc: string; priceLevel: string;
-  calendar: string; startTime: string; timeSpeed: string;
+  calendar: string; startTime: string; timeSpeed: string; timeSystem?: Partial<WorldClockConfig>;
   factions: Array<{ name: string; description: string; alignment: string }>;
   presetNPCs: Array<{ name: string; role: string; description: string; personality: string }>;
   highlights: string;
@@ -27,7 +29,7 @@ export const defaultForm: FormState = {
   overview: '', timePeriod: '', location: '', atmosphere: '',
   powerSystem: '', socialStructure: '', specialRules: '',
   currencyName: '', currencySymbol: '', currencyDesc: '', priceLevel: '',
-  calendar: '', startTime: '', timeSpeed: '',
+  calendar: '', startTime: '', timeSpeed: '', timeSystem: undefined,
   factions: [], presetNPCs: [], highlights: '',
   locations: [], culture: '', modules: undefined,
 };
@@ -75,7 +77,7 @@ export function worldToForm(w: WorldDef): FormState {
     specialRules: rulesMeta?.specialRules?.join('\n') || '',
     currencyName: economyMeta?.currency?.name || '', currencySymbol: economyMeta?.currency?.symbol || '',
     currencyDesc: economyMeta?.currency?.description || '', priceLevel: economyMeta?.priceLevel || '',
-    calendar: economyMeta?.calendar || '', startTime: economyMeta?.startTime || '', timeSpeed: economyMeta?.timeSpeed || '',
+    calendar: economyMeta?.calendar || '', startTime: economyMeta?.startTime || '', timeSpeed: economyMeta?.timeSpeed || '', timeSystem: economyMeta?.timeSystem,
     factions: allFactions.map((f: any) => ({ name: f.name || '', description: f.description || '', alignment: f.alignment || '中立' })),
     presetNPCs: allNPCs.map((n: any) => ({ name: n.name || '', role: n.role || '', description: n.description || '', personality: typeof n.personality === 'string' ? n.personality : '' })),
     highlights: highlightsMeta?.highlights?.join(', ') || '',
@@ -87,13 +89,49 @@ export function worldToForm(w: WorldDef): FormState {
 /** 将表单转换为 WorldDef */
 export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, refinedEntries: WorldBookEntryDef[]): WorldDef {
   if (refinedEntries.length > 0) {
+    const economy = refinedEntries.find(entry => entry.entryType === 'economy');
+    const economyMeta = economy?.meta || {};
+    const inheritedTimeSystem = economyMeta.timeSystem;
+    const fallbackTimeSystem = inferWorldClockConfig({
+      calendar: form.calendar || economyMeta.calendar,
+      startTime: form.startTime || economyMeta.startTime,
+      timeSpeed: form.timeSpeed || economyMeta.timeSpeed,
+      timePeriod: form.timePeriod,
+      timeSystem: form.timeSystem
+        ? { ...inheritedTimeSystem, ...form.timeSystem }
+        : inheritedTimeSystem,
+    });
+    const fallbackEconomy: WorldBookEntryDef = {
+      uid: refinedEntries.reduce((max, entry) => Math.max(max, entry.uid), 0) + 1,
+      key: ['经济', '时间'], constant: false, comment: '经济 & 时间', content: '', order: 5,
+      position: 'before_char', entryType: 'economy', meta: {
+        currency: form.currencyName ? { name: form.currencyName, symbol: form.currencySymbol || undefined, description: form.currencyDesc || undefined } : undefined,
+        priceLevel: form.priceLevel || undefined,
+        calendar: form.calendar || undefined,
+        startTime: form.startTime || undefined,
+        timeSpeed: form.timeSpeed || undefined,
+        timeSystem: fallbackTimeSystem,
+      },
+    };
+    const normalizedEntries: WorldBookEntryDef[] = economy
+      ? refinedEntries.map(entry => entry === economy ? {
+        ...entry,
+        meta: {
+          ...economyMeta,
+          calendar: form.calendar || economyMeta.calendar,
+          startTime: form.startTime || economyMeta.startTime,
+          timeSpeed: form.timeSpeed || economyMeta.timeSpeed,
+          timeSystem: fallbackTimeSystem,
+        },
+      } : entry)
+      : [...refinedEntries, fallbackEconomy];
     return {
       id: initialWorld?.id || `custom_${Date.now()}`,
       name: form.name.trim(), description: form.description.trim(), entryId: null,
       icon: form.icon || undefined, coverColor: form.coverColor || undefined,
       artwork: form.artwork ?? initialWorld?.artwork,
       tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
-      difficulty: (form.difficulty as any) || undefined, worldBookEntries: refinedEntries, modules: form.modules,
+      difficulty: (form.difficulty as any) || undefined, worldBookEntries: normalizedEntries, modules: form.modules,
       author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),
     };
   }
@@ -115,9 +153,9 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
     const personalitySuffix = (n.personality || '').trim() ? `（性格：${(n.personality || '').trim()}）` : '';
     entries.push({ uid: uid++, key: [n.name.trim()], constant: false, comment: n.name.trim(), content: `${n.role.trim()} — ${n.description.trim()}${personalitySuffix}`, order: 4, position: 'before_char', entryType: 'npcs', meta: { npcs: [{ name: n.name.trim(), role: n.role.trim(), description: n.description.trim(), personality: (n.personality || '').trim() || undefined }] } });
   }
-  if (form.currencyName || form.calendar || form.startTime) {
+  {
     const economyContent = [form.currencyName ? `货币：${form.currencySymbol || ''}${form.currencyName}${form.currencyDesc ? `（${form.currencyDesc}）` : ''}` : '', form.priceLevel ? `物价水平：${form.priceLevel}` : '', form.calendar ? `纪年：${form.calendar}` : '', form.startTime ? `开始时间：${form.startTime}` : '', form.timeSpeed ? `时间流速：${form.timeSpeed}` : ''].filter(Boolean).join('\n');
-    entries.push({ uid: uid++, key: ['花钱', '消费', '买单', '价格', '买东西', '付钱', '货币', '工资', '收入'], constant: false, comment: '经济 & 时间', content: economyContent, order: 5, position: 'before_char', entryType: 'economy', meta: { currency: form.currencyName ? { name: form.currencyName, symbol: form.currencySymbol || undefined, description: form.currencyDesc || undefined } : undefined, priceLevel: form.priceLevel || undefined, calendar: form.calendar || undefined, startTime: form.startTime || undefined, timeSpeed: form.timeSpeed || undefined } });
+    entries.push({ uid: uid++, key: ['花钱', '消费', '买单', '价格', '买东西', '付钱', '货币', '工资', '收入'], constant: false, comment: '经济 & 时间', content: economyContent, order: 5, position: 'before_char', entryType: 'economy', meta: { currency: form.currencyName ? { name: form.currencyName, symbol: form.currencySymbol || undefined, description: form.currencyDesc || undefined } : undefined, priceLevel: form.priceLevel || undefined, calendar: form.calendar || undefined, startTime: form.startTime || undefined, timeSpeed: form.timeSpeed || undefined, timeSystem: inferWorldClockConfig({ timeSystem: form.timeSystem, calendar: form.calendar, startTime: form.startTime, timeSpeed: form.timeSpeed, timePeriod: form.timePeriod }) } });
   }
   const highlightList = form.highlights ? form.highlights.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
   if (highlightList.length > 0) { entries.push({ uid: uid++, key: [], constant: true, comment: '核心特色', content: highlightList.join('、'), order: 6, position: 'before_char', entryType: 'highlights', meta: { highlights: highlightList } }); }

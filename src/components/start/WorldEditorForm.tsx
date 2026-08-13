@@ -150,6 +150,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       overview: find('setting')?.content || '', timePeriod: find('setting')?.meta?.timePeriod || '', location: find('setting')?.meta?.location || '', atmosphere: find('setting')?.meta?.atmosphere || '',
       powerSystem: find('rules')?.meta?.powerSystem || '', socialStructure: find('rules')?.meta?.socialStructure || '', specialRules: find('rules')?.meta?.specialRules?.join('\n') || '',
       currencyName: find('economy')?.meta?.currency?.name || '', currencySymbol: find('economy')?.meta?.currency?.symbol || '', currencyDesc: find('economy')?.meta?.currency?.description || '', priceLevel: find('economy')?.meta?.priceLevel || '',
+      calendar: find('economy')?.meta?.calendar || '', startTime: find('economy')?.meta?.startTime || '', timeSpeed: find('economy')?.meta?.timeSpeed || '', timeSystem: find('economy')?.meta?.timeSystem,
       factions: entries.filter(e => e.entryType === 'factions').flatMap(e => e.meta?.factions ?? []).map(f => ({ name: f.name || '', description: f.description || '', alignment: f.alignment || '中立' })),
       presetNPCs: entries.filter(e => e.entryType === 'npcs').flatMap(e => e.meta?.npcs ?? []).map(n => ({ name: n.name || '', role: n.role || '', description: n.description || '', personality: typeof n.personality === 'string' ? n.personality : '' })),
       highlights: find('highlights')?.meta?.highlights?.join(', ') || '',
@@ -176,7 +177,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     const ctrl = new AbortController(); aiAbortRef.current = ctrl;
     try {
       const selected = enabledModules.map(module => module.id).join(', ');
-      const prompt = `你是世界编织助手。请根据以下世界意图和已选法则，一次生成可编辑的 WorldDef JSON。\n世界意图：${worldIntentPrompt.trim()}\n可选名称：${form.name.trim() || '请生成一个简洁名称'}\n题材/标签：${form.tags || '未指定'}\n氛围基调：${form.atmosphere || '未指定'}\n初始场景偏好：${form.location || '未指定'}\n已选模块：${selected || '无额外模块'}\n\n输出必须是 JSON，不要 Markdown。字段至少包含 name、description、tags、difficulty、worldBookEntries、modules；worldBookEntries 使用真实 entryType（setting、rules、factions、npcs、lore、culture、economy、highlights），modules 只包含已选模块。`;
+      const prompt = `你是世界编织助手。请根据以下世界意图和已选法则，一次生成可编辑的 WorldDef JSON。\n世界意图：${worldIntentPrompt.trim()}\n可选名称：${form.name.trim() || '请生成一个简洁名称'}\n题材/标签：${form.tags || '未指定'}\n氛围基调：${form.atmosphere || '未指定'}\n初始场景偏好：${form.location || '未指定'}\n已选模块：${selected || '无额外模块'}\n\n输出必须是 JSON，不要 Markdown。字段至少包含 name、description、tags、difficulty、worldBookEntries、modules；worldBookEntries 使用真实 entryType（setting、rules、factions、npcs、lore、culture、economy、highlights），modules 只包含已选模块。economy 条目的 meta 必须包含完整 timeSystem：mode、calendarName、eraName、start（年月日时分）、months（全部月份名称和天数）、weekdays、defaultTurnMinutes；无法确定时使用 relative 旅历安全默认值。`;
       const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompt }], { signal: ctrl.signal, onDelta: text => { if (text.length > 80) setPipelineStage('编织法则'); } });
       setPipelineStage('生成编年');
       const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);

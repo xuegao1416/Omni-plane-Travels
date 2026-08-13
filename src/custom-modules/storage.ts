@@ -1,9 +1,10 @@
 import { getGlobal, putGlobal } from '../storage/db';
 import { validateCustomGameplayModule } from './validator';
-import type { CustomGameplayModule, ModuleStatus } from './schema';
+import type { CustomGameplayModuleDefinition, ModuleStatus } from './schema';
+import type { CustomModuleAgentSession } from './agentSession';
 
 export interface StoredCustomGameplayModule {
-  module: CustomGameplayModule;
+  module: CustomGameplayModuleDefinition;
   status: ModuleStatus;
   worldIds: string[];
   installedAt: number;
@@ -11,9 +12,45 @@ export interface StoredCustomGameplayModule {
 }
 
 const REGISTRY_KEY = 'customGameplayModules.v1';
+const AGENT_SESSION_KEY = 'customModuleAgentSession.v2';
+const AGENT_PHASES = new Set(['discovery', 'designing', 'draft_ready', 'revising']);
+const BRIEF_LIST_FIELDS = ['triggers', 'inputs', 'state', 'behavior', 'outputs', 'assumptions', 'unresolved'] as const;
 
 function copy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isValidAgentSessionSnapshot(value: unknown): value is CustomModuleAgentSession {
+  if (!isRecord(value) || value.sessionVersion !== 1 || !AGENT_PHASES.has(String(value.phase))) return false;
+  if (typeof value.revision !== 'number' || !Number.isInteger(value.revision) || value.revision < 0) return false;
+
+  const world = value.world;
+  if (!isRecord(world) || typeof world.id !== 'string' || typeof world.name !== 'string') return false;
+  if (world.description !== undefined && typeof world.description !== 'string') return false;
+  if (world.survivalResourceIds !== undefined && !isStringArray(world.survivalResourceIds)) return false;
+  if (world.availability !== undefined) {
+    const availability = world.availability;
+    if (!isRecord(availability)) return false;
+    if (!['stat', 'survival', 'business', 'currency'].every((key) => typeof availability[key] === 'boolean')) return false;
+  }
+
+  const brief = value.brief;
+  if (!isRecord(brief) || typeof brief.goal !== 'string' || typeof brief.presentation !== 'string') return false;
+  if (!BRIEF_LIST_FIELDS.every((key) => isStringArray(brief[key]))) return false;
+
+  for (const draft of [value.draft, value.lastValidDraft]) {
+    if (draft === undefined) continue;
+    if (!validateCustomGameplayModule(draft).valid) return false;
+  }
+  return true;
 }
 
 async function readRegistry(): Promise<StoredCustomGameplayModule[]> {
@@ -99,5 +136,19 @@ export async function deleteCustomGameplayModule(id: string): Promise<void> {
 /** Test/reset helper and a safe recovery path for a future module manager. */
 export async function clearCustomGameplayModules(): Promise<void> {
   await putGlobal(REGISTRY_KEY, []);
+}
+
+/** Draft sessions are deliberately stored separately from installed modules. */
+export async function saveCustomModuleAgentSession(session: CustomModuleAgentSession): Promise<void> {
+  await putGlobal(AGENT_SESSION_KEY, copy(session));
+}
+
+export async function loadCustomModuleAgentSession(): Promise<CustomModuleAgentSession | undefined> {
+  const session = await getGlobal<unknown>(AGENT_SESSION_KEY);
+  return isValidAgentSessionSnapshot(session) ? copy(session) : undefined;
+}
+
+export async function clearCustomModuleAgentSession(): Promise<void> {
+  await putGlobal(AGENT_SESSION_KEY, undefined);
 }
 

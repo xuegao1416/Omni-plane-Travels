@@ -26,6 +26,28 @@ function getDB(): Promise<IDBPDatabase> {
   });
 }
 
+const portraitUrlsByName = new Map<string, string>();
+let portraitIndexPromise: Promise<void> | null = null;
+
+function ensurePortraitIndex(): Promise<void> {
+  if (!portraitIndexPromise) {
+    portraitIndexPromise = (async () => {
+      const db = await getDB();
+      const records = await db.getAll(STORE_NAME) as ImageBlobRecord[];
+      for (const record of records) {
+        if (!record.key.startsWith('portrait-') || !record.npcName || !record.blob) continue;
+        if (!portraitUrlsByName.has(record.npcName)) {
+          portraitUrlsByName.set(record.npcName, URL.createObjectURL(record.blob));
+        }
+      }
+    })().catch(err => {
+      portraitIndexPromise = null;
+      throw err;
+    });
+  }
+  return portraitIndexPromise;
+}
+
 export const imageDb = {
   async saveBlob(key: string, blob: Blob, mimeType?: string, npcName?: string): Promise<string> {
     try {
@@ -39,6 +61,7 @@ export const imageDb = {
         npcName,
       };
       await db.put(STORE_NAME, data);
+      if (npcName) portraitUrlsByName.set(npcName, URL.createObjectURL(blob));
       return key;
     } catch (err) {
       console.error('[imageDb] saveBlob 失败:', err);
@@ -60,7 +83,13 @@ export const imageDb = {
   async deleteBlob(key: string): Promise<void> {
     try {
       const db = await getDB();
+      const record = await db.get(STORE_NAME, key) as ImageBlobRecord | undefined;
       await db.delete(STORE_NAME, key);
+      if (record?.npcName) {
+        // There may be another portrait record for the same name; rebuild lazily on demand.
+        portraitUrlsByName.clear();
+        portraitIndexPromise = null;
+      }
     } catch (err) {
       console.error('[imageDb] deleteBlob 失败:', err);
     }
@@ -80,6 +109,8 @@ export const imageDb = {
     try {
       const db = await getDB();
       await db.clear(STORE_NAME);
+      portraitUrlsByName.clear();
+      portraitIndexPromise = null;
     } catch (err) {
       console.error('[imageDb] clearAll 失败:', err);
     }
@@ -99,21 +130,13 @@ export const imageDb = {
 
   /**
    * 按 NPC 名字查找头像 URL
-   * 遍历所有 portrait-* 的 key，加载记录比对 npcName 字段
-   * 结果缓存在内存中，避免重复扫描
+   * 首次读取时一次性建立名字索引；后续查询共享同一索引与 object URL。
    */
   async findPortraitUrlByName(npcName: string): Promise<string | null> {
     if (!npcName) return null;
     try {
-      const db = await getDB();
-      const keys: string[] = (await db.getAllKeys(STORE_NAME)).map(String);
-      for (const key of keys) {
-        if (!key.startsWith('portrait-')) continue;
-        const record = await db.get(STORE_NAME, key);
-        if (record?.npcName === npcName && record?.blob) {
-          return URL.createObjectURL(record.blob);
-        }
-      }
+      await ensurePortraitIndex();
+      return portraitUrlsByName.get(npcName) || null;
     } catch (err) {
       console.warn('[imageDb] findPortraitUrlByName 失败:', err);
     }

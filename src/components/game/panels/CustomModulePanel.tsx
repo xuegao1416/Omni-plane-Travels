@@ -8,9 +8,10 @@ import '../../../styles/custom-modules.css';
 interface Props {
   gameState: GameState;
   worldId?: string;
+  onButton?: (moduleId: string, event: string) => void;
 }
 
-export function CustomModulePanel({ gameState, worldId }: Props) {
+export function CustomModulePanel({ gameState, worldId, onButton }: Props) {
   const [modules, setModules] = useState<StoredCustomGameplayModule[]>([]);
 
   useEffect(() => {
@@ -39,9 +40,7 @@ export function CustomModulePanel({ gameState, worldId }: Props) {
         key={record.module.id}
         view={record.module.view}
         values={state.values}
-        onEvent={(event) => window.dispatchEvent(new CustomEvent('custom-module-event', {
-          detail: { moduleId: record.module.id, event },
-        }))}
+        onEvent={(event) => onButton?.(record.module.id, event)}
       />;
     })}
   </>;

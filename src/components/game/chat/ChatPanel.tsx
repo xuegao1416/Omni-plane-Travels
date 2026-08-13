@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback, useLayoutEffect } from 'react';
 import { useUISettings } from '../../../context/UISettingsContext';
 import type { ChatMessage } from '../../../engine/types';
 import type { PipelineStatus as PipelineStatusType, PipelineTaskId } from '../../../engine/pipelineTypes';
@@ -7,6 +7,7 @@ import MessageBubble from './MessageBubble';
 import ErrorBoundary from '../../ErrorBoundary';
 import InputArea from './InputArea';
 import PipelineMonitorModal from './PipelineMonitorModal';
+import { getInitialMessageStart, getPreviousMessageStart } from './messageWindow';
 
 interface Props {
   messages: ChatMessage[];
@@ -33,7 +34,42 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
   const [showMonitor, setShowMonitor] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [visibleStart, setVisibleStart] = useState(() => getInitialMessageStart(messages.length));
+  const historyAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const messageHistoryRef = useRef({ firstId: messages[0]?.id, length: messages.length });
   const { settings, t } = useUISettings();
+
+  const previousHistory = messageHistoryRef.current;
+  const historyWasReplaced = previousHistory.firstId !== messages[0]?.id || messages.length < previousHistory.length;
+  const renderedStart = historyWasReplaced ? getInitialMessageStart(messages.length) : visibleStart;
+  const visibleMessages = useMemo(() => messages.slice(renderedStart), [messages, renderedStart]);
+
+  // A new/truncated save gets a fresh recent window. Appending turns keeps the current reading range.
+  useEffect(() => {
+    const previous = messageHistoryRef.current;
+    const firstId = messages[0]?.id;
+    if (previous.firstId !== firstId || messages.length < previous.length) {
+      historyAnchorRef.current = null;
+      setVisibleStart(renderedStart);
+    }
+    messageHistoryRef.current = { firstId, length: messages.length };
+  }, [messages, renderedStart]);
+
+  const handleMessageListScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 64 || visibleStart === 0 || historyAnchorRef.current) return;
+    historyAnchorRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop };
+    setVisibleStart(current => getPreviousMessageStart(current));
+  }, [visibleStart]);
+
+  // Prepending history must not move the paragraph currently under the reader's eyes.
+  useLayoutEffect(() => {
+    const anchor = historyAnchorRef.current;
+    const el = scrollRef.current;
+    if (!anchor || !el) return;
+    el.scrollTop = anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight);
+    historyAnchorRef.current = null;
+  }, [visibleStart]);
 
   // 处理内联选项点击
   const handleOptionClick = useCallback((optionText: string) => {
@@ -78,13 +114,17 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
       </div>
       {mobileSummary && <div className="game-journey__mobile-summary">{mobileSummary}</div>}
       {/* 消息列表 */}
-      <div ref={scrollRef} className="game-journey__message-list">
+      <div
+        ref={scrollRef}
+        className={`game-journey__message-list${settings.centeredNarrative ? ' is-centered' : ''}`}
+        onScroll={handleMessageListScroll}
+      >
         {messages.length === 0 && (
           <div className="game-journey__empty-state">
             {t('chat.empty')}
           </div>
         )}
-        {messages.map(msg => (
+        {visibleMessages.map(msg => (
           <ErrorBoundary key={msg.id} fallback={
             <div className="game-journey__message-error">
               ⚠ 消息渲染失败 (ID: {msg.id.slice(0, 8)}…)

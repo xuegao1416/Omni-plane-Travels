@@ -1,6 +1,7 @@
 // NPC 管理工具
 import type { GameState, NPCData } from '../schema/variables';
 import { cloneDeep } from 'lodash-es';
+import { formatWorldClock } from '../time/worldClock';
 
 // ─── 常量 ───────────────────────────────────────────
 
@@ -460,12 +461,19 @@ export function formatSnapshotForMainAI(state: GameState): string {
   // 世界状态
   const world = state.世界 ?? ({} as any);
   const time = world.时间系统?.当前时间 ?? '';
+  const clock = world.时间系统?.时钟;
   const weather = world.时间系统?.当前天气 ?? '';
   const location = world.空间定位?.当前位置 ?? '';
   if (time || location || weather) {
     lines.push(`### 【世界状态】`);
     const parts = [];
-    if (time) parts.push(`时间:${time}`);
+    if (clock) {
+      parts.push(`权威时间:${formatWorldClock(clock)}`);
+      parts.push(`已流逝分钟:${clock.elapsedMinutes}`);
+      parts.push(`历法:${clock.calendar.calendarName}（${clock.calendar.mode}）`);
+    } else if (time) {
+      parts.push(`时间:${time}`);
+    }
     if (location) parts.push(`地点:${location}`);
     if (weather) parts.push(`天气:${weather}`);
     lines.push(`> ${parts.join(' | ')}`);
@@ -547,6 +555,16 @@ export function formatSnapshotForMainAI(state: GameState): string {
   if (growthParts.length > 0) {
     lines.push(`### 【成长体系】`);
     lines.push(`> ${growthParts.join(' | ')}`);
+  }
+
+  // 最近一次骰子结果必须进入下一轮叙事上下文，否则 AI 无法承接成功/失败分支。
+  const lastRoll = state.dice?.lastRoll;
+  if (lastRoll) {
+    const outcome = lastRoll.isNatural20 ? '大成功'
+      : lastRoll.isNatural1 ? '大失败'
+      : lastRoll.success ? '成功' : '失败';
+    lines.push('### 【最近骰子检定】');
+    lines.push(`> ${lastRoll.attributeName}：d20(${lastRoll.d20}) + ${lastRoll.modifier} = ${lastRoll.total} / DC${lastRoll.dc}，结果：${outcome}`);
   }
 
   // 生存资源（食物/水/材料等，启用生存模块时填充）

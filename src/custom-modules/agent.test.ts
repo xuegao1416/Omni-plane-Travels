@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
   buildCustomModuleAgentSystemPrompt,
-  getMissingCustomModuleRequestFields,
   extractCustomModuleJson,
   parseCustomModuleAgentTurn,
   parseCustomModuleDraft,
@@ -49,30 +48,16 @@ describe('custom module agent draft protocol', () => {
     expect(prompt).toContain('Do not output legacy rule fields');
     expect(prompt).toContain('"type":"progress"');
     expect(prompt).toContain('"type":"table"');
-  });
-
-  test('requires purpose and presentation mode before starting a draft', () => {
-    expect(getMissingCustomModuleRequestFields([
-      { role: 'user', content: '给我做一个模块' },
-    ])).toEqual(['purpose', 'presentation']);
-
-    expect(getMissingCustomModuleRequestFields([
-      { role: 'user', content: '做一个显示天气的模块' },
-    ])).toEqual(['presentation']);
-
-    expect(getMissingCustomModuleRequestFields([
-      { role: 'user', content: '做一个后台模块，每轮记录玩家声望' },
-    ])).toEqual([]);
-
-    expect(getMissingCustomModuleRequestFields([
-      { role: 'user', content: '做一个前端卡片，显示玩家士气和进度' },
-    ])).toEqual([]);
+    expect(prompt).toContain('permissions.read');
+    expect(prompt).toContain('inputs');
+    expect(prompt).toContain('精确列出');
   });
 
   test('parses a conversational clarification turn without requiring a module', () => {
     const result = parseCustomModuleAgentTurn(JSON.stringify({
       message: '你希望这个模块显示在右侧卡片，还是只在后台运行？',
       status: 'needs_input',
+      question: { id: 'presentation', text: '请选择展示方式', choices: ['右侧卡片', '后台运行'] },
       module: null,
     }));
 
@@ -81,6 +66,8 @@ describe('custom module agent draft protocol', () => {
       expect(result.status).toBe('needs_input');
       expect(result.message).toContain('右侧卡片');
       expect(result.module).toBeUndefined();
+      expect(result.question?.text).toBe('请选择展示方式');
+      expect(result.question?.choices).toEqual(['右侧卡片', '后台运行']);
     }
   });
 

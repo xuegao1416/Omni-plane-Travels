@@ -1,12 +1,13 @@
-import { customGameplayModuleSchema } from './manifestSchema';
+import { customGameplayModuleSchema, customGameplayModuleV1Schema } from './manifestSchema';
 import type {
   CustomGameplayModule,
+  CustomGameplayModuleDefinition,
   ModuleValidationIssue,
 } from './schema';
 
 export type NormalizedModuleResult = {
   ok: true;
-  data: CustomGameplayModule;
+  data: CustomGameplayModuleDefinition;
   warnings: ModuleValidationIssue[];
 } | {
   ok: false;
@@ -50,6 +51,7 @@ export function normalizeCustomGameplayModule(input: unknown): NormalizedModuleR
       onTurnEnd: logic.onTurnEnd ?? [],
       onTick: logic.onTick ?? [],
       onChoice: logic.onChoice ?? [],
+      ...(candidate.schemaVersion === 2 ? { onButton: logic.onButton ?? [] } : {}),
     };
   }
   if (candidate.permissions && typeof candidate.permissions === 'object' && !Array.isArray(candidate.permissions)) {
@@ -65,7 +67,9 @@ export function normalizeCustomGameplayModule(input: unknown): NormalizedModuleR
     candidate.view = { ...view, slot: view.slot ?? 'right-panel', components: view.components ?? [] };
   }
 
-  const parsed = customGameplayModuleSchema.safeParse(candidate);
+  const parsed = candidate.schemaVersion === 1
+    ? customGameplayModuleV1Schema.safeParse(candidate)
+    : customGameplayModuleSchema.safeParse(candidate);
   if (!parsed.success) {
     return {
       ok: false,
@@ -79,5 +83,5 @@ export function normalizeCustomGameplayModule(input: unknown): NormalizedModuleR
     };
   }
 
-  return { ok: true, data: parsed.data as CustomGameplayModule, warnings: [] };
+  return { ok: true, data: parsed.data as CustomGameplayModuleDefinition, warnings: [] };
 }

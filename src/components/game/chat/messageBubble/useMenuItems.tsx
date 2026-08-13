@@ -2,6 +2,8 @@ import { Pencil, Copy, RefreshCw, ArrowLeftToLine, Trash2 } from 'lucide-react';
 import type { ContextMenuItem } from '../ContextMenu';
 import type { ChatMessage } from '../../../../engine/types';
 import { processRegexScripts } from '../../../../utils/regexScripts';
+import { dialogueMarkupToPlainText } from '../../../../utils/dialogueMarkup';
+import { stripTimeAdvanceTags } from '../../../../time/worldClock';
 
 interface UseMenuItemsParams {
   message: ChatMessage;
@@ -38,7 +40,8 @@ export function useMenuItems({
       icon: <Copy size={14} />,
       action: () => {
         const raw = message.rawText || '';
-        onCopy(isUser ? raw : processRegexScripts(raw, displayScripts));
+        const cleaned = processRegexScripts(stripTimeAdvanceTags(raw), displayScripts);
+        onCopy(isUser ? raw : dialogueMarkupToPlainText(stripTimeAdvanceTags(cleaned)));
       },
     },
     ...(isUser ? [{

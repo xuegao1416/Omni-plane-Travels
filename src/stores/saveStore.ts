@@ -158,6 +158,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
 
     // 更新元数据
     const meta: SaveMeta = {
+      ...existingMeta,
       id: saveId,
       name: newName,
       timestamp: newTimestamp,

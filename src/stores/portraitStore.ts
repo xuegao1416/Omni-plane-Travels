@@ -1,5 +1,5 @@
 // 角色头像 URL 响应式 Store
-// 上传/生成头像时写入，InlineDialogueCard 等组件订阅后自动更新
+// 上传/生成头像时写入，聊天中的头像卡会自动更新
 import { create } from 'zustand';
 
 interface PortraitStoreState {

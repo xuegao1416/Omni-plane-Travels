@@ -13,6 +13,7 @@ import { executeCardWorkflow, type CardWorkflowExecutionResult } from '../../mod
 import { useSaveStore } from '../../stores/saveStore';
 import { selectChoice, applyEffectTarget } from '../../modules/eventChoiceState';
 import type { GameState } from '../../schema/variables';
+import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 import JourneyCardShell from '../game/shared/JourneyCardShell';
 
 interface CardEvent {
@@ -22,9 +23,10 @@ interface CardEvent {
 
 interface Props {
   gameState?: GameState;
+  onChoice?: (event: CustomModuleChoiceEvent) => Promise<void> | void;
 }
 
-export default function CardOverlay({ gameState }: Props) {
+export default function CardOverlay({ gameState, onChoice }: Props) {
   const [result, setResult] = useState<CardWorkflowExecutionResult | null>(null);
   const [title, setTitle] = useState('');
   const [current, setCurrent] = useState<CardEvent | null>(null);
@@ -73,7 +75,7 @@ export default function CardOverlay({ gameState }: Props) {
     setSelectedChoice(null);
   }, []);
 
-  const handleSelectChoice = useCallback((index: number) => {
+  const handleSelectChoice = useCallback(async (index: number) => {
     if (!result?.choices || !current) return;
     if (selectedChoice === index) return; // 已选中
 
@@ -119,7 +121,19 @@ export default function CardOverlay({ gameState }: Props) {
 
     // 延迟关闭，让玩家看到选中效果
     setTimeout(close, 600);
-  }, [result, current, selectedChoice, close, gameState]);
+
+    try {
+      const lifecycle = onChoice?.({
+        type: 'choice', eventPackId: current.eventPackId, cardId: current.cardId,
+        blockId: 'choice-0', selectedIndex: index, label: choice.label,
+      });
+      void Promise.resolve(lifecycle).catch((error) => {
+        console.warn('[custom-modules] onChoice failed after the event choice was applied', error);
+      });
+    } catch (error) {
+      console.warn('[custom-modules] onChoice failed after the event choice was applied', error);
+    }
+  }, [result, current, selectedChoice, close, gameState, onChoice]);
 
   if (!result || !current) return null;
 

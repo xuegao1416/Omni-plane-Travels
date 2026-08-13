@@ -73,6 +73,11 @@ export function buildEndpoint(config: ApiConfig): string {
   return `${base}/v1/chat/completions`;
 }
 
+/** DeepSeek 推理模型首 token 和完整生成通常更慢，避免 2 分钟硬中止截断正文。 */
+export function getRequestTimeoutMs(config: ApiConfig): number {
+  return config.provider === 'deepseek' ? 300_000 : 120_000;
+}
+
 function buildRequestBody(config: ApiConfig, messages: Message[], options: RequestOptions = {}) {
   const body: Record<string, unknown> = {
     model: config.model,
@@ -125,6 +130,14 @@ function extractReasoningContent(json: any): string {
   return '';
 }
 
+/** 保留服务端结束原因，用于区分模型主动停止、token 上限和连接提前断开。 */
+export function extractFinishReason(json: any): string | undefined {
+  const reason = json?.choices?.[0]?.finish_reason
+    ?? json?.candidates?.[0]?.finishReason
+    ?? json?.stop_reason;
+  return typeof reason === 'string' && reason ? reason : undefined;
+}
+
 // DeepSeek连续同role合并
 function mergeConsecutiveSameRole(messages: Message[]): Message[] {
   const merged: Message[] = [];
@@ -149,7 +162,7 @@ async function parseSSEStream(
   response: Response,
   onDelta: (delta: string, accumulated: string) => void,
   onReasoning?: (reasoning: string) => void,
-): Promise<{ text: string; reasoning: string }> {
+): Promise<{ text: string; reasoning: string; finishReason?: string }> {
   if (!response.body) {
     throw new Error('SSE 响应体为空（服务端可能未返回流式数据）');
   }
@@ -158,6 +171,7 @@ async function parseSSEStream(
   let buffer = '';
   let accumulated = '';
   let reasoningAccum = '';
+  let finishReason: string | undefined;
 
   /** 处理一批 SSE 行（主循环和 flush 共用，消除重复代码） */
   const processSSELines = (raw: string) => {
@@ -172,6 +186,7 @@ async function parseSSEStream(
         const json = JSON.parse(data);
         const content = extractStreamContent(json);
         const reasoning = extractReasoningContent(json);
+        finishReason = extractFinishReason(json) ?? finishReason;
 
         if (content) {
           // 累积式provider可能发送全文而非增量
@@ -212,7 +227,7 @@ async function parseSSEStream(
     processSSELines(buffer);
   }
 
-  return { text: accumulated, reasoning: reasoningAccum };
+  return { text: accumulated, reasoning: reasoningAccum, finishReason };
 }
 
 // 非流式请求（使用 nativeFetch 绕过 CORS）
@@ -265,6 +280,7 @@ export async function requestCompletion(
   const json = await res.json();
   const text = json.choices?.[0]?.message?.content || extractStreamContent(json) || '';
   const reasoning = json.choices?.[0]?.message?.reasoning_content || '';
+  const finishReason = extractFinishReason(json);
   const usage = json.usage ? {
     promptTokens: json.usage.prompt_tokens || 0,
     completionTokens: json.usage.completion_tokens || 0,
@@ -273,7 +289,7 @@ export async function requestCompletion(
 
   const elapsed = Date.now() - start;
   console.log(`✅ [API] 请求完成，耗时 ${elapsed}ms，${text.length} 字`);
-  return { text, reasoning: reasoning || undefined, usage, elapsed };
+  return { text, reasoning: reasoning || undefined, finishReason, usage, elapsed };
 }
 
 // 流式请求
@@ -313,8 +329,8 @@ export async function requestCompletionStream(
     throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
   }
 
-  const { text, reasoning } = await parseSSEStream(res, options.onDelta, options.onReasoning);
-  return { text, reasoning: reasoning || undefined, elapsed: Date.now() - start };
+  const { text, reasoning, finishReason } = await parseSSEStream(res, options.onDelta, options.onReasoning);
+  return { text, reasoning: reasoning || undefined, finishReason, elapsed: Date.now() - start };
 }
 
 // 重试包装
@@ -374,7 +390,7 @@ export async function requestStreamWithRetry(
   messages: Message[],
   options: StreamOptions,
 ): Promise<CompletionResult> {
-  const timeoutMs = 120_000; // 2分钟超时
+  const timeoutMs = getRequestTimeoutMs(config);
   return withRetry(async () => {
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 

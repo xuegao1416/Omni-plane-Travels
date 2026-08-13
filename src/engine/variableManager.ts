@@ -4,6 +4,8 @@ import { createDefaultGameState } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
 import { cloneDeep, get, set, merge, unset } from 'lodash-es';
+import { formatWorldClock, normalizeWorldClockState, type WorldClockState } from '../time/worldClock';
+import { toDisplayText } from '../utils/displayText';
 
 /** 原型污染防护 — 过滤危险路径段 */
 const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -99,6 +101,13 @@ export class VariableManager {
   // 规范化状态：确保NPC分类、事迹、结构默认值 + 纪事迁移 + 任务系统迁移 + 模块数值校验
   private normalizeState(): void {
     this.repairCoreStateShape();
+    const clock = (this.state.世界.时间系统 as any).时钟;
+    if (clock && typeof clock === 'object') {
+      const normalizedClock = normalizeWorldClockState(clock);
+      this.state.世界.时间系统.时钟 = normalizedClock;
+      // AI may still write the legacy display field. The structured clock always wins.
+      this.state.世界.时间系统.当前时间 = formatWorldClock(normalizedClock);
+    }
     ensureNpcCategoryDefaults(this.state);
     ensureNpcChronicleDefaults(this.state);
     ensureNpcStructureDefaults(this.state);
@@ -107,6 +116,20 @@ export class VariableManager {
     this.migrateNotebookToTaskSystem();
     this.normalizeTaskSystem();
     this.validateAndClampModuleValues();
+  }
+
+  private captureAuthoritativeClock(): WorldClockState | undefined {
+    const clock = (this.state as any)?.世界?.时间系统?.时钟;
+    return clock && typeof clock === 'object' ? cloneDeep(normalizeWorldClockState(clock)) : undefined;
+  }
+
+  private restoreAuthoritativeClock(clock: WorldClockState | undefined): void {
+    if (!clock) return;
+    const state = this.state as any;
+    if (!isRecord(state.世界)) state.世界 = {};
+    if (!isRecord(state.世界.时间系统)) state.世界.时间系统 = {};
+    state.世界.时间系统.时钟 = cloneDeep(clock);
+    state.世界.时间系统.当前时间 = formatWorldClock(clock);
   }
 
   /** 修复旧存档或历史坏补丁留下的无效核心容器，避免后续轮次在构建快照时永久失败。 */
@@ -125,6 +148,7 @@ export class VariableManager {
     for (const key of ['生存状态', '身份信息', '技能系统', '货币资源', '物品栏']) {
       if (!isRecord(player[key])) player[key] = cloneDeep(defaultPlayer[key]);
     }
+    player.当前目标 = toDisplayText(player.当前目标);
 
     if (!isRecord(state.人物档案)) state.人物档案 = {};
   }
@@ -275,17 +299,59 @@ export class VariableManager {
 
   /** 任务系统容量限制 */
   private normalizeTaskSystem(): void {
-    const taskSystem = this.state.玩家?.任务系统;
-    if (!taskSystem) return;
+    const player = this.state.玩家 as unknown as Record<string, unknown>;
+    if (!isRecord(player.任务系统)) {
+      player.任务系统 = { 活跃任务: {}, 已完成任务: {}, 已失败任务: {} };
+    }
+    const taskSystem = player.任务系统 as unknown as Record<string, unknown>;
 
     const CAPS = { 活跃任务: 15, 已完成任务: 50, 已失败任务: 20 } as const;
 
     for (const [section, cap] of Object.entries(CAPS) as [keyof typeof CAPS, number][]) {
-      const entries = taskSystem[section];
-      if (!entries || typeof entries !== 'object') continue;
+      if (!isRecord(taskSystem[section])) taskSystem[section] = {};
+      const entries = taskSystem[section] as Record<string, unknown>;
+
+      // AI 偶尔会把任务或整个任务分区返回为 null/None。坏条目不能进入排序和渲染层。
+      for (const [key, task] of Object.entries(entries)) {
+        if (!isRecord(task)) {
+          delete entries[key];
+          continue;
+        }
+
+        // 早期提示词允许把“目标”写成 { 描述, 阶段 }。这种旧数据会被 React
+        // 当作子节点直接渲染并触发 #31；在状态入口迁移为当前扁平结构。
+        const legacyGoal = isRecord(task.目标) ? task.目标 : undefined;
+        if (legacyGoal) {
+          task.目标 = typeof legacyGoal.描述 === 'string'
+            ? legacyGoal.描述
+            : typeof legacyGoal.名称 === 'string'
+              ? legacyGoal.名称
+              : key;
+          if (!Array.isArray(task.阶段) && Array.isArray(legacyGoal.阶段)) {
+            task.阶段 = legacyGoal.阶段;
+          }
+        }
+
+        task.任务名 = toDisplayText(task.任务名, key);
+        task.描述 = toDisplayText(task.描述, task.任务名 as string);
+        task.目标 = toDisplayText(task.目标, task.描述 as string);
+        if (task.来源 != null) task.来源 = toDisplayText(task.来源);
+        if (task.截止时间 != null) task.截止时间 = toDisplayText(task.截止时间);
+        if (Array.isArray(task.阶段)) {
+          task.阶段 = task.阶段.filter(isRecord).map((stage, index) => ({
+            ...stage,
+            名称: toDisplayText(stage.名称, `阶段 ${index + 1}`),
+            描述: toDisplayText(stage.描述),
+          }));
+        }
+      }
+
       const sorted = Object.entries(entries)
-        .filter(([, v]) => v !== null && v !== undefined)
-        .sort(([,a], [,b]) => ((a as any).$time ?? 0) - ((b as any).$time ?? 0));
+        .sort(([, a], [, b]) => {
+          const aTime = Number((a as Record<string, unknown>).$time);
+          const bTime = Number((b as Record<string, unknown>).$time);
+          return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0);
+        });
       if (sorted.length > cap) {
         const toRemove = sorted.slice(0, sorted.length - cap);
         for (const [key] of toRemove) {
@@ -297,6 +363,7 @@ export class VariableManager {
 
   // 批量应用补丁 (RFC 6902 风格) - NPC 感知版本
   applyPatches(patches: Array<{ op: string; path: string; value?: unknown }>) {
+    const authoritativeClock = this.captureAuthoritativeClock();
     for (const patch of patches) {
       const rawPath = patch.path.replace(/^\//, '').replace(/\//g, '.');
       const pathParts = rawPath.split('.');
@@ -360,6 +427,10 @@ export class VariableManager {
       }
     }
 
+    // Variable AI is allowed to update weather and world axes, but not the
+    // structured clock or its derived legacy display (including via parent replace).
+    this.restoreAuthoritativeClock(authoritativeClock);
+
     // NPC 必填字段校验：在场 NPC 缺少当前想法/当前状态时警告
     for (const [id, npc] of Object.entries(this.state.人物档案)) {
       const npcRecord = npc as any;
@@ -414,6 +485,7 @@ export class VariableManager {
     if (lines.length === 0) return false;
 
     const previousState = cloneDeep(this.state);
+    const authoritativeClock = this.captureAuthoritativeClock();
     try {
       let appliedCount = 0;
       for (const line of lines) {
@@ -425,6 +497,7 @@ export class VariableManager {
         }
       }
       if (appliedCount === 0) return false;
+      this.restoreAuthoritativeClock(authoritativeClock);
       this.normalizeState();
       if (!this.hasValidCoreStateShape()) throw new Error('旧版变量更新破坏了核心状态结构');
       return true;
@@ -455,6 +528,7 @@ export class VariableManager {
 
   // NPC 感知的合并更新
   private applyMergeUpdate(patch: Record<string, unknown>): void {
+    const authoritativeClock = this.captureAuthoritativeClock();
     // ★ 经营资产.资产列表 必须替换而非合并（lodash merge 会按索引覆盖而非追加）
     let pendingAssetList: unknown[] | undefined;
     const playerPatch = patch.玩家 as Record<string, unknown> | undefined;
@@ -606,6 +680,7 @@ export class VariableManager {
       this.state.玩家.经营资产.资产列表 = pendingAssetList as any;
     }
 
+    this.restoreAuthoritativeClock(authoritativeClock);
     this.normalizeState();
   }
 

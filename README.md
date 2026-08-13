@@ -12,7 +12,7 @@
 [![Zustand](https://img.shields.io/badge/Zustand-5-3B3B3B)](https://zustand-demo.pmnd.rs/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-`v2.7.3` · Web / PWA · Tauri 桌面端 · BYOK
+`v2.7.4` · Web / PWA · Tauri 桌面端 · BYOK
 
 </div>
 

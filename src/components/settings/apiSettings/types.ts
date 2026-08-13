@@ -39,3 +39,16 @@ export const rowStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--border)', minHeight: '44px',
   flexWrap: 'wrap', gap: '8px',
 };
+
+/** 警告/提示条样式 - 用于设置页中突出'流式响应'等关键开关的警告 */
+export const warningStyle: React.CSSProperties = {
+  margin: '10px 16px',
+  padding: '10px 14px',
+  background: 'rgba(217, 119, 6, 0.12)',
+  border: '1px solid rgba(217, 119, 6, 0.45)',
+  borderLeft: '4px solid #d97706',
+  borderRadius: '6px',
+  color: 'var(--text-primary)',
+  fontSize: 'var(--font-size-sm)',
+  lineHeight: 1.55,
+};

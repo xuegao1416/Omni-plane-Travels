@@ -4,6 +4,7 @@
 // WorldDef 只保留纯 UI 元数据。详情页、编辑器、游戏引擎全部从 worldBookEntries 读取。
 
 import type { EventRule, PeriodicRule, Permission } from '../modules/schema';
+import type { WorldClockConfig } from '../time/worldClock';
 
 // ═══════════════════════════════════════════════════════════════
 //  通用子接口 —— 6 大结构化概念（供模块系统和 worldBookEntries.meta 使用）
@@ -151,6 +152,8 @@ export interface WorldBookEntryMeta {
   calendar?: string;
   startTime?: string;
   timeSpeed?: string;
+  /** Structured calendar snapshot used by the authoritative world clock. */
+  timeSystem?: Partial<WorldClockConfig>;
 
   // events 类型用
   events?: WorldEventDef[];
