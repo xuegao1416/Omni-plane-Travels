@@ -2,6 +2,7 @@
 // 将系统提示提取为结构化预设，将标签清理逻辑提取为可配置的正则脚本
 
 import type { RegexScript } from '../utils/regexScripts';
+import { DRC_V12_PROMPTS, DRC_V12_REGEX_SCRIPTS } from './presetDrcV12';
 
 // ============ 类型定义 ============
 
@@ -15,6 +16,17 @@ export interface PresetPromptEntry {
   order: number;                   // 排序权重（越小越靠前）
   triggerMode?: 'blue' | 'green';  // blue=常驻, green=关键词触发
   triggerKeywords?: string[];      // green 模式的触发词
+  /** 深度注入（SillyTavern 兼容）：injection_position=1 表示注入到聊天历史指定深度，而非进系统提示。未设或 0 = 进系统提示 */
+  injectionPosition?: 0 | 1;
+  /** 深度注入的深度值（depth=N 表示在倒数第 N 条消息之前插入），仅当 injectionPosition=1 时生效 */
+  injectionDepth?: number;
+}
+
+/** 第三方预设的授权与出处信息（仅用于展示与导出，不参与运行时提示词） */
+export interface PresetAttribution {
+  author: string;
+  sourceUrl: string;
+  note?: string;
 }
 
 /** 预设包（JSON 化，可导出/导入） */
@@ -36,6 +48,7 @@ export interface PresetPack {
   // 元数据
   builtin?: boolean;
   version?: string;
+  attribution?: PresetAttribution;
 }
 
 /** 向后兼容的内置预设类型 */
@@ -725,12 +738,16 @@ const PROMPT_RELATIONSHIP_RULES = `<Relationship>
 </Relationship>`;
 
 /** 思维链要求 */
-const PROMPT_THINKING = `<thinking>
-你必须在输出每次正文前，在<thinking>与</thinking>标签内输出分析：
-- 参考<FigureCrafting>，思考如何让人物更生动真实
-- 按照<WritingProcess>进行步骤推理
-- 检查是否有遗漏的标签输出
-</thinking>`;
+const PROMPT_THINKING = `<ThinkingProtocol>
+每次回复的第一块必须实际输出一组完整的 <thinking>...</thinking> 标签，不能只在内部思考后直接跳到正文，也不能省略、改名或放到正文之后。
+
+<thinking> 内写出本轮简要创作思路：
+- 参考 <FigureCrafting>，确认人物动机、情绪与反应是否符合人设
+- 按照 <WritingProcess> 确认本轮承接、推进和收束位置
+- 检查正文容器与行动选项是否齐全
+
+固定顺序：<thinking>思考内容</thinking> → 正文 → 行动选项。
+</ThinkingProtocol>`;
 
 /** 创作流程 */
 const PROMPT_WRITING_PROCESS = `<WritingProcess>
@@ -1312,6 +1329,21 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
     version: '1.0.0',
+  },
+  {
+    id: 'drc_v12',
+    name: '双人成行 V12（适配版）',
+    description: '第三方预设《双人成行 V12——长夏未央》高保真适配版。原始 Prompt 逐字保留，仅做协议标签/宏/运行时上下文适配。保留项目世界状态/NPC/玩家动态注入。',
+    systemPrompt: DRC_V12_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
+    prompts: DRC_V12_PROMPTS,
+    regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS, ...DRC_V12_REGEX_SCRIPTS],
+    builtin: true,
+    version: '1.0.0',
+    attribution: {
+      author: 'Prism//Fox',
+      sourceUrl: 'https://discord.com/channels/1134557553011998840/1471539565020975205',
+      note: '已获作者授权用于《世界漫游指南》适配。',
+    },
   },
 ];
 

@@ -11,7 +11,7 @@ import { PresetCard } from './presetSettings/PresetCard';
 import { PresetEditorOverlay } from './presetSettings/PresetEditorOverlay';
 
 export default function PresetSettingsTab() {
-  const { userPresets, activePresetId, builtinOverrides, savePreset, deletePreset, setActivePreset, resetToDefault, saveBuiltinOverride, restoreBuiltinDefaults } = usePresetStore();
+  const { userPresets, activePresetId, builtinOverrides, builtinContentOverrides, savePreset, deletePreset, setActivePreset, resetToDefault, saveBuiltinOverride, saveBuiltinContentOverride, restoreBuiltinDefaults } = usePresetStore();
   const { DialogUI, confirm: dlgConfirm } = useDialog();
   const [editingPreset, setEditingPreset] = useState<PresetPack | null>(null);
   const [error, setError] = useState('');
@@ -103,9 +103,19 @@ export default function PresetSettingsTab() {
     ...editingPreset,
     prompts: editingPreset.prompts.map(p => {
       const override = builtinOverrides[editingPreset.id]?.[p.identifier];
-      return override !== undefined ? { ...p, enabled: override } : p;
+      const contentOverride = builtinContentOverrides[editingPreset.id]?.[p.identifier];
+      return {
+        ...p,
+        ...(override !== undefined ? { enabled: override } : {}),
+        ...(contentOverride !== undefined ? { content: contentOverride } : {}),
+      };
     }),
   } : editingPreset;
+
+  // 内置预设同样允许编辑正文条目；“恢复默认”会清除全部内容覆盖层。
+  const editableContentIdentifiers = isBuiltin
+    ? editingPreset.prompts.map(p => p.identifier)
+    : [];
 
   return (
     <PresetEditorOverlay
@@ -119,14 +129,28 @@ export default function PresetSettingsTab() {
             if (original && p.enabled !== original.enabled) {
               saveBuiltinOverride(editingPreset.id, p.identifier, p.enabled);
             }
+            if (original && editableContentIdentifiers.includes(p.identifier) && p.content !== original.content) {
+              saveBuiltinContentOverride(editingPreset.id, p.identifier, p.content);
+            }
           }
           const newDisplay = {
             ...editingPreset,
             prompts: editingPreset.prompts.map(p => {
               const override = builtinOverrides[editingPreset.id]?.[p.identifier];
+              const contentOverride = builtinContentOverrides[editingPreset.id]?.[p.identifier];
               const newEntry = updated.prompts.find(up => up.identifier === p.identifier);
-              if (newEntry) return { ...p, enabled: newEntry.enabled };
-              return override !== undefined ? { ...p, enabled: override } : p;
+              if (newEntry) {
+                return {
+                  ...p,
+                  enabled: newEntry.enabled,
+                  ...(editableContentIdentifiers.includes(p.identifier) && newEntry.content !== p.content ? { content: newEntry.content } : {}),
+                };
+              }
+              return {
+                ...p,
+                ...(override !== undefined ? { enabled: override } : {}),
+                ...(contentOverride !== undefined ? { content: contentOverride } : {}),
+              };
             }),
           };
           setEditingPreset(newDisplay);
@@ -143,6 +167,7 @@ export default function PresetSettingsTab() {
         setEditingPreset(original);
         setActivePreset(editingPreset.id);
       } : undefined}
+      editableContentIdentifiers={editableContentIdentifiers}
     />
   );
 }

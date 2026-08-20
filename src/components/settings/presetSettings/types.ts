@@ -19,4 +19,6 @@ export interface PresetEditorOverlayProps {
   onClose: () => void;
   onSave: (p: PresetPack) => void;
   onRestoreDefaults?: () => void;
+  /** 内置预设中允许用户编辑内容的条目标识符 */
+  editableContentIdentifiers?: string[];
 }

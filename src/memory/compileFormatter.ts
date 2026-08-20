@@ -106,7 +106,7 @@ function selectHotThreads(threads: NarrativeThread[], limit: number): NarrativeT
 
 function selectHotRelations(edges: NarrativeRelationEdge[], limit: number, currentLocation?: string): NarrativeRelationEdge[] {
   return [...edges]
-    .filter(e => e.status === 'active' || e.status === 'changed')
+    .filter(e => (e.status === 'active' || e.status === 'changed') && e.conflictStatus !== 'superseded' && e.conflictStatus !== 'rejected' && e.validUntilRound == null)
     .sort((a, b) => {
       // 当前地点的关系优先
       const aLoc = a.locationScope === currentLocation ? 1 : 0;
@@ -123,7 +123,7 @@ function selectHotRelations(edges: NarrativeRelationEdge[], limit: number, curre
 
 function selectHotRelationNetwork(items: NarrativeRelationNetworkItem[], limit: number, currentLocation?: string): NarrativeRelationNetworkItem[] {
   return [...items]
-    .filter(i => i.status === 'active' || i.status === 'changed')
+    .filter(i => (i.status === 'active' || i.status === 'changed') && i.conflictStatus !== 'superseded' && i.conflictStatus !== 'rejected' && i.validUntilRound == null)
     .sort((a, b) => {
       // 当前地点的关系优先
       const aLoc = a.locationScope === currentLocation ? 1 : 0;
@@ -139,14 +139,14 @@ function selectHotRelationNetwork(items: NarrativeRelationNetworkItem[], limit: 
 }
 
 function selectHotEvents(events: NarrativeEventCard[], limit: number): NarrativeEventCard[] {
-  return [...events].sort((a, b) => {
+  return [...events].filter(e => e.conflictStatus !== 'superseded' && e.conflictStatus !== 'rejected' && e.validUntilRound == null).sort((a, b) => {
     const d = (EVENT_STATUS_BOOST[b.status] ?? 0) - (EVENT_STATUS_BOOST[a.status] ?? 0);
     return d !== 0 ? d : (b.importance ?? 0) - (a.importance ?? 0) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
   }).slice(0, limit);
 }
 
 function selectHotEntities(entities: NarrativeEntityCard[], limit: number): NarrativeEntityCard[] {
-  return [...entities].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)).slice(0, limit);
+  return [...entities].filter(e => e.conflictStatus !== 'superseded' && e.conflictStatus !== 'rejected' && e.validUntilRound == null).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)).slice(0, limit);
 }
 
 function selectFocused<T>(items: T[], keywords: string[], limit: number, excludeIds: Set<string>, getSearchText: (item: T) => string, getId: (item: T) => string): T[] {
@@ -183,22 +183,26 @@ function formatThreadLine(t: NarrativeThread): string {
 
 function formatRelationLine(r: NarrativeRelationEdge): string {
   const loc = r.locationScope ? ` [${r.locationScope}]` : '';
-  return `- ${r.sourceEntityId} → ${r.targetEntityId}：${r.relationType}${loc}｜${r.summary}`;
+  const confidence = r.confidence != null ? `｜置信度${Math.round(r.confidence * 100)}%` : '';
+  return `- ${r.sourceEntityId} → ${r.targetEntityId}：${r.relationType}${loc}｜${r.summary}${confidence}`;
 }
 
 function formatRelationNetworkLine(r: NarrativeRelationNetworkItem): string {
   const loc = r.locationScope ? ` [${r.locationScope}]` : '';
-  return `- ${r.sourceEntityId} ↔ ${r.targetEntityId}：${r.relationType}${loc}｜${r.summary}`;
+  const confidence = r.confidence != null ? `｜置信度${Math.round(r.confidence * 100)}%` : '';
+  return `- ${r.sourceEntityId} ↔ ${r.targetEntityId}：${r.relationType}${loc}｜${r.summary}${confidence}`;
 }
 
 function formatEventLine(e: NarrativeEventCard): string {
   const locs = asArr(e.locationRefs);
   const loc = locs.length > 0 ? ` [${locs.join('/')}]` : '';
-  return `- ${e.title}${loc}｜${e.summary}`;
+  const qualifier = e.layer === 'inference' ? '（推测，非已证实事实）' : e.confidence != null ? `（置信度${Math.round(e.confidence * 100)}%）` : '';
+  return `- ${e.title}${loc}${qualifier}｜${e.summary}`;
 }
 
 function formatEntityLine(e: NarrativeEntityCard): string {
-  const parts = [`- ${e.name}（${e.entityType}）`];
+  const qualifier = e.layer === 'inference' ? '｜来源：玩家推测' : e.sourceType === 'world_fact' ? '｜来源：世界设定' : '';
+  const parts = [`- ${e.name}（${e.entityType}）${qualifier}`];
   const status = asArr(e.currentStatus);
   if (status.length > 0) parts.push(`｜状态：${status.join(', ')}`);
   if (e.currentStance) parts.push(`｜立场：${e.currentStance}`);

@@ -16,6 +16,11 @@ export interface CustomModuleAgentWorldContext {
   survivalResourceIds?: string[];
 }
 
+export interface CustomModuleConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface CustomModuleDesignBrief {
   goal: string;
   presentation: string;
@@ -43,8 +48,10 @@ export interface CustomModuleAgentEnvelope {
 }
 
 export interface CustomModuleAgentSession {
-  sessionVersion: 1;
+  /** Version 2 adds a world-scoped conversation transcript. */
+  sessionVersion: 2;
   world: CustomModuleAgentWorldContext;
+  conversation: CustomModuleConversationMessage[];
   phase: CustomModuleAgentPhase;
   brief: CustomModuleDesignBrief;
   draft?: CustomGameplayModuleDefinition;
@@ -68,8 +75,9 @@ export function createEmptyCustomModuleDesignBrief(): CustomModuleDesignBrief {
 
 export function createCustomModuleAgentSession(world: CustomModuleAgentWorldContext): CustomModuleAgentSession {
   return {
-    sessionVersion: 1,
+    sessionVersion: 2,
     world: { ...world },
+    conversation: [],
     phase: 'discovery',
     brief: createEmptyCustomModuleDesignBrief(),
     revision: 0,

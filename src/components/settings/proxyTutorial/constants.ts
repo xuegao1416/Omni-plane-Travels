@@ -60,11 +60,18 @@ export const PROXY_CODE = `export default {
       );
     }
 
-    // 构建转发请求
+    // 构建转发请求：浏览器上下文头不能转给目标 API。
+    // 某些公益站会因为 Origin/Referer/Sec-Fetch-* 不在白名单而直接返回 403。
+    const browserOnlyHeaders = new Set([
+      'origin', 'referer', 'cookie',
+      'sec-fetch-dest', 'sec-fetch-mode', 'sec-fetch-site', 'sec-fetch-user',
+      'sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform',
+      'x-requested-with',
+    ]);
     const headers = new Headers();
     for (const [key, value] of request.headers) {
-      // 跳过 Worker 相关的头
-      if (key.startsWith('cf-') || key === 'x-target-url' || key === 'host') {
+      // 跳过 Worker、浏览器上下文相关的头，只保留 Authorization/Content-Type/Accept 等 API 头
+      if (key.startsWith('cf-') || key === 'x-target-url' || key === 'host' || browserOnlyHeaders.has(key)) {
         continue;
       }
       headers.set(key, value);

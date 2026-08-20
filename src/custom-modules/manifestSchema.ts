@@ -26,6 +26,11 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 );
 
 const descriptionSchema = z.string().max(500).optional();
+const dependencySchema = z.object({
+  id: z.string().regex(ID_RE, '依赖 id 必须是安全模块标识符'),
+  version: z.string().regex(SEMVER_RE, '依赖版本必须是 x.y.z').optional(),
+  optional: z.boolean().optional(),
+}).strict();
 const stateFieldNameSchema = z.string().regex(NAME_RE, '字段名必须是安全的 ASCII 标识符');
 
 const numberStateFieldSchema = z
@@ -238,6 +243,27 @@ const sectionViewComponentSchema: z.ZodType<unknown> = z.lazy(() =>
     .strict(),
 );
 
+const cardActionSchema = z.object({
+  type: z.literal('button'),
+  label: z.string().min(1).max(120),
+  event: z.string().regex(NAME_RE, 'button event 必须是安全的事件名'),
+}).strict();
+
+const cardViewComponentSchema: z.ZodType<unknown> = z.lazy(() =>
+  z
+    .object({
+      type: z.literal('card'),
+      title: z.string().min(1).max(120).optional(),
+      body: z.string().max(4096).optional(),
+      children: z.array(viewComponentSchema).max(24).optional(),
+      actions: z.array(cardActionSchema).max(4).optional(),
+    })
+    .strict()
+    .refine((component) => Boolean(component.title || component.body || component.children?.length || component.actions?.length), {
+      message: 'card 至少需要标题、正文、子组件或操作按钮之一',
+    }),
+);
+
 const conditionalViewComponentSchema: z.ZodType<unknown> = z.lazy(() =>
   z
     .object({
@@ -251,6 +277,7 @@ const conditionalViewComponentSchema: z.ZodType<unknown> = z.lazy(() =>
 const viewComponentSchema = z.lazy(() =>
   z.union([
     sectionViewComponentSchema,
+    cardViewComponentSchema,
     z
       .object({
         type: z.literal('text'),
@@ -347,6 +374,7 @@ export const customGameplayModuleV1Schema = z
     version: z.string().regex(SEMVER_RE, 'version 必须是 x.y.z'),
     author: z.string().min(1).max(80),
     description: z.string().max(500).optional(),
+    dependencies: z.array(dependencySchema).max(32).optional(),
     scope: z.literal('world'),
     state: z.record(stateFieldNameSchema, stateFieldSchema).refine((value) => Object.keys(value).length <= 64, {
       message: '模块最多定义 64 个状态字段',
@@ -421,6 +449,7 @@ const customGameplayModuleV2Schema = z.object({
   version: z.string().regex(SEMVER_RE, 'version 必须是 x.y.z'),
   author: z.string().min(1).max(80),
   description: z.string().max(500).optional(),
+  dependencies: z.array(dependencySchema).max(32).optional(),
   scope: z.literal('world'),
   state: z.record(stateFieldNameSchema, stateFieldSchema).refine((value) => Object.keys(value).length <= 64, {
     message: '模块最多定义 64 个状态字段',

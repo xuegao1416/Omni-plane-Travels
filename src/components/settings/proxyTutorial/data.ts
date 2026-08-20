@@ -1,4 +1,4 @@
-import { Globe, Shield, Server, Zap, ExternalLink, Check, Terminal } from 'lucide-react';
+import { Globe, Shield, Server, Zap, ExternalLink, Check, Terminal, Info } from 'lucide-react';
 import { PROXY_CODE } from './constants';
 
 export { PROXY_CODE };
@@ -28,8 +28,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   { id: 'intro', title: '什么是代理？为什么需要它？', icon: Globe, content: {
     problem: '浏览器有安全限制（CORS），不允许网页直接调用某些 API 服务。',
     solution: '代理就像一个"快递员"，帮你在浏览器和 API 之间传话。',
-    diagram: `\n┌──────────┐      ┌──────────┐      ┌──────────┐\n│  浏览器   │ ──→  │  代理    │ ──→  │  API     │\n│ (你的网页) │ ←──  │ (中转站) │ ←──  │ (OpenAI) │\n└──────────┘      └──────────┘      └──────────┘`,
-    safety: '代理只做转发，不存储任何数据\n你自己部署，完全可控\nAPI Key 不会被任何人看到',
+    diagram: `\n┌──────────┐      ┌──────────┐      ┌──────────────────┐\n│  浏览器   │ ──→  │  代理    │ ──→  │ OpenAI/DeepSeek等 │\n│ (你的网页) │ ←──  │ (中转站) │ ←──  │ 兼容 API 服务    │\n└──────────┘      └──────────┘      └──────────────────┘`,
+    safety: '代理只做转发，不存储任何数据\n你自己部署，完全可控\nAPI Key 只会发往你自己的 Worker 和目标 API',
   }},
   { id: 'register', title: '第一步：注册 Cloudflare 账号', icon: Shield, content: {
     steps: [
@@ -86,7 +86,19 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       { text: '点击顶部的「Console」（控制台）选项卡' },
       { text: '找到带 [Proxy] 标记的日志', tip: '紫色标题的折叠区域就是代理日志\n展开可以看到完整的请求路由信息' },
       { text: '日志会显示：代理地址是否正确、是否使用了代理、请求是否成功', tip: '✓ 绿色 = 正常\n✗ 红色 = 有问题，展开看具体原因' },
+      { text: '如果代理 Worker 自己返回 403 或预检没有 CORS 头', tip: '重新复制本教程里的最新代理代码并重新部署；最新代码不会转发浏览器 Origin/Referer/Sec-Fetch-*，可避免部分公益站返回空 403。若目标 API 明确返回带正文的 401/403，再检查公益站 Key 和模型权限。' },
       { text: '把红色错误的日志截图发给开发者即可', tip: '重点看：代理地址、目标 API、错误信息这三项' },
+    ] as StepItem[],
+  }},
+  { id: 'deepseek', title: 'DeepSeek 公益站特别说明', icon: Info, content: {
+    problem: '部分 DeepSeek 公益站为了防滥用，不开放 GET /models 或 GET /v1/models。此时点击「获取模型」失败，不代表代理或聊天接口坏了。',
+    solution: '代理只负责解决跨域并转发请求，不会替公益站开放模型目录。模型列表拉取失败时，直接手动填写公益站公布的模型 ID 即可。',
+    steps: [
+      { text: 'API 端点填写公益站提供的根地址或 /v1 地址', tip: '不要把 /chat/completions 直接填进 API 端点，应用会自动拼接。' },
+      { text: 'API 密钥填写公益站发放的 Key' },
+      { text: '模型名称直接手动填写', tip: '以公益站公布的模型 ID 为准，不要根据模型显示名称自行猜测。' },
+      { text: '「获取」失败但「测试连接」成功时，可以忽略模型列表失败，直接保存使用' },
+      { text: '如果聊天请求也返回 401/403', tip: '这通常是 Key、模型权限或公益站限制，不是 Cloudflare 代理的 CORS 问题。' },
     ] as StepItem[],
   }},
 ];

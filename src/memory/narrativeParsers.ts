@@ -10,6 +10,9 @@ import type {
   NarrativeRetrievePlannerResult,
   NarrativeConflictJudgeResult,
   SceneAnchor,
+  MemoryProvenance,
+  MemorySourceType,
+  MemoryLayer,
 } from './types';
 
 // ─── 平衡括号提取（支持嵌套，避免贪婪正则匹配过长内容） ───
@@ -140,11 +143,42 @@ export function parseNarrativeSourceRangeText(
 // ─── 叙事写入结果解析 ───
 
 function normalizeStringArray(value: unknown, limit = 8): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
+  const values = Array.isArray(value) ? value : value == null ? [] : [value];
+  return values
     .map(item => String(item ?? '').trim())
     .filter(item => item.length > 0 && item.length <= 200)
     .slice(0, limit);
+}
+
+function enumValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  const candidate = String(value ?? '').trim() as T;
+  return allowed.includes(candidate) ? candidate : fallback;
+}
+
+function parseProvenance(raw: Record<string, unknown>, fallbackSource: MemorySourceType = 'plot_fact'): MemoryProvenance {
+  const sourceTypes = new Set<MemorySourceType>(['world_fact', 'plot_fact', 'system_state', 'player_statement', 'npc_statement', 'player_inference', 'summary', 'unknown']);
+  const layers = new Set<MemoryLayer>(['fact', 'state', 'inference', 'summary']);
+  const requestedSource = String(raw.sourceType ?? '').trim() as MemorySourceType;
+  const source = sourceTypes.has(requestedSource) ? requestedSource : fallbackSource;
+  const layer = String(raw.layer ?? '').trim() as MemoryLayer;
+  const confidence = Number(raw.confidence);
+  const round = (value: unknown): number | null => value === null || value === undefined || value === '' ? null : Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : null;
+  return {
+    sourceType: source,
+    layer: layers.has(layer) ? layer : source === 'player_inference' ? 'inference' : source === 'system_state' ? 'state' : source === 'summary' ? 'summary' : 'fact',
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,
+    evidence: normalizeStringArray(raw.evidence, 8),
+    // sourceStartIndex/sourceEndIndex describe evidence location, not fact validity.
+    validFromRound: round(raw.validFromRound),
+    validUntilRound: round(raw.validUntilRound),
+    validFromLabel: String(raw.validFromLabel ?? '').trim() || undefined,
+    validUntilLabel: String(raw.validUntilLabel ?? '').trim() || undefined,
+    supersedesId: raw.supersedesId == null ? null : String(raw.supersedesId),
+    previousVersionId: raw.previousVersionId == null ? null : String(raw.previousVersionId),
+    conflictStatus: ['none', 'disputed', 'superseded', 'rejected'].includes(String(raw.conflictStatus))
+      ? String(raw.conflictStatus) as MemoryProvenance['conflictStatus'] : 'none',
+    sourceEventIds: normalizeStringArray(raw.sourceEventIds, Number.MAX_SAFE_INTEGER),
+  };
 }
 
 export function parseNarrativeIngestResult(rawContent: string): NarrativeIngestResult {
@@ -179,6 +213,7 @@ function parseScenePatch(value: unknown): Partial<SceneAnchor> | undefined {
     conversationFocus: String(raw.conversationFocus ?? '').trim() || undefined,
     recentChange: String(raw.recentChange ?? '').trim() || undefined,
     confidence: typeof raw.confidence === 'number' ? raw.confidence : undefined,
+    ...parseProvenance(raw, 'plot_fact'),
   };
 }
 
@@ -188,11 +223,12 @@ function parseThreadUpserts(value: unknown) {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
     return {
+      ...parseProvenance(raw, 'plot_fact'),
       id: String(raw.id ?? ''),
       title: String(raw.title ?? ''),
       summary: String(raw.summary ?? raw.goal ?? ''),
       goal: String(raw.goal ?? raw.summary ?? ''),
-      status: String(raw.status ?? 'open') as 'open' | 'blocked' | 'suspended' | 'resolved' | 'failed' | 'superseded',
+      status: enumValue(raw.status, ['open', 'blocked', 'suspended', 'resolved', 'failed', 'superseded'] as const, 'open'),
       priority: Number(raw.priority ?? 3),
       blockingReason: String(raw.blockingReason ?? ''),
       relatedEntities: normalizeStringArray(raw.relatedEntities),
@@ -211,13 +247,14 @@ function parseStateSlotUpserts(value: unknown) {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
     return {
+      ...parseProvenance(raw, 'system_state'),
       id: String(raw.id ?? ''),
       scopeType: String(raw.scopeType ?? 'player') as 'player' | 'npc' | 'location' | 'world',
       scopeId: String(raw.scopeId ?? ''),
       slotType: String(raw.slotType ?? ''),
       value: String(raw.value ?? raw.summary ?? ''),
       summary: String(raw.summary ?? raw.value ?? ''),
-      status: String(raw.status ?? 'active') as 'active' | 'resolved' | 'expired',
+      status: enumValue(raw.status, ['active', 'resolved', 'expired'] as const, 'active'),
       priority: Number(raw.priority ?? 3),
       sourceStartIndex: Number(raw.sourceStartIndex) || null,
       sourceEndIndex: Number(raw.sourceEndIndex) || null,
@@ -231,13 +268,14 @@ function parseRelationUpserts(value: unknown) {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
     return {
+      ...parseProvenance(raw, 'plot_fact'),
       id: String(raw.id ?? ''),
       sourceEntityId: String(raw.sourceEntityId ?? ''),
       targetEntityId: String(raw.targetEntityId ?? ''),
       relationType: String(raw.relationType ?? ''),
       stance: String(raw.stance ?? ''),
       strength: Number(raw.strength ?? 0.5),
-      status: String(raw.status ?? 'active') as 'active' | 'broken' | 'changed',
+      status: enumValue(raw.status, ['active', 'broken', 'changed'] as const, 'active'),
       summary: String(raw.summary ?? ''),
       sourceStartIndex: Number(raw.sourceStartIndex) || null,
       sourceEndIndex: Number(raw.sourceEndIndex) || null,
@@ -251,13 +289,14 @@ function parseRelationNetworkUpserts(value: unknown) {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
     return {
+      ...parseProvenance(raw, 'plot_fact'),
       id: String(raw.id ?? ''),
       sourceEntityId: String(raw.sourceEntityId ?? ''),
       targetEntityId: String(raw.targetEntityId ?? ''),
       relationType: String(raw.relationType ?? ''),
       summary: String(raw.summary ?? ''),
       strength: Number(raw.strength ?? 0.5),
-      status: String(raw.status ?? 'active') as 'active' | 'changed' | 'broken' | 'superseded',
+      status: enumValue(raw.status, ['active', 'changed', 'broken', 'superseded'] as const, 'active'),
       confidence: Number(raw.confidence ?? 0.5),
       sourceStartIndex: Number(raw.sourceStartIndex) || null,
       sourceEndIndex: Number(raw.sourceEndIndex) || null,
@@ -271,12 +310,13 @@ function parseEventCandidates(value: unknown) {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
     return {
+      ...parseProvenance(raw, 'plot_fact'),
       id: String(raw.id ?? ''),
       title: String(raw.title ?? ''),
       summary: String(raw.summary ?? ''),
       excerpt: String(raw.excerpt ?? ''),
       importance: Number(raw.importance ?? 3),
-      status: String(raw.status ?? 'hot') as 'hot' | 'warm' | 'cold',
+      status: enumValue(raw.status, ['hot', 'warm', 'cold'] as const, 'hot'),
       entityRefs: normalizeStringArray(raw.entityRefs),
       locationRefs: normalizeStringArray(raw.locationRefs),
       threadRefs: normalizeStringArray(raw.threadRefs),
@@ -293,6 +333,7 @@ function parseEntityPatches(value: unknown) {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
     return {
+      ...parseProvenance(raw, 'plot_fact'),
       id: String(raw.id ?? ''),
       name: String(raw.name ?? ''),
       entityType: String(raw.entityType ?? 'other') as 'character' | 'location' | 'faction' | 'item' | 'ability' | 'other',
@@ -314,18 +355,24 @@ function parseArchiveHints(value: unknown) {
   return value.map(item => {
     if (!item || typeof item !== 'object') return null;
     const raw = item as Record<string, unknown>;
-    return {
-      id: String(raw.id ?? '').trim() || undefined,
-      title: String(raw.title ?? '').trim() || undefined,
-      summary: String(raw.summary ?? '').trim() || undefined,
-      keywords: normalizeStringArray(raw.keywords),
-    };
+      return {
+        ...parseProvenance(raw, 'plot_fact'),
+        id: String(raw.id ?? '').trim() || undefined,
+        title: String(raw.title ?? '').trim() || undefined,
+        arcTitle: String(raw.arcTitle ?? raw.title ?? '').trim() || undefined,
+        summary: String(raw.summary ?? '').trim() || undefined,
+        timeSpan: String(raw.timeSpan ?? '').trim() || undefined,
+        keywords: normalizeStringArray(raw.keywords),
+        entityRefs: normalizeStringArray(raw.entityRefs),
+        sourceStartIndex: Number.isFinite(Number(raw.sourceStartIndex)) ? Math.floor(Number(raw.sourceStartIndex)) : undefined,
+        sourceEndIndex: Number.isFinite(Number(raw.sourceEndIndex)) ? Math.floor(Number(raw.sourceEndIndex)) : undefined,
+      };
   }).filter(Boolean);
 }
 
 // ─── 摘要结果解析 ───
 
-interface ParsedSummaryPatchItem {
+interface ParsedSummaryPatchItem extends MemoryProvenance {
   id: string;
   title: string;
   summary: string;
@@ -345,6 +392,7 @@ function normalizeSummaryPatchItem(item: unknown): ParsedSummaryPatchItem | null
   if (!title && !summary) return null;
 
   return {
+    ...parseProvenance(raw, 'summary'),
     id: String(raw.id ?? '').trim(),
     title: title || '未命名记忆',
     summary: summary || title || '',
@@ -375,6 +423,18 @@ export function parseNarrativeSummaryResult(rawContent: string): NarrativeSummar
         sourceStartIndex: item.sourceStartIndex ?? null,
         sourceEndIndex: item.sourceEndIndex ?? null,
         savedAt: item.savedAt,
+        sourceType: item.sourceType,
+        layer: item.layer,
+        confidence: item.confidence,
+        evidence: item.evidence,
+        validFromRound: item.validFromRound,
+        validUntilRound: item.validUntilRound,
+        validFromLabel: item.validFromLabel,
+        validUntilLabel: item.validUntilLabel,
+        supersedesId: item.supersedesId,
+        previousVersionId: item.previousVersionId,
+        conflictStatus: item.conflictStatus,
+        sourceEventIds: item.sourceEventIds,
       }));
   };
 

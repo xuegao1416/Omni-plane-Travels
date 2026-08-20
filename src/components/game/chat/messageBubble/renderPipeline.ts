@@ -45,15 +45,16 @@ export function useRenderedContent(
   const activePresetId = usePresetStore(s => s.activePresetId);
   const userPresets = usePresetStore(s => s.userPresets);
   const builtinOverrides = usePresetStore(s => s.builtinOverrides);
+  const builtinContentOverrides = usePresetStore(s => s.builtinContentOverrides);
   const activePreset = useMemo(() => {
     if (activePresetId) {
       const found = userPresets.find(p => p.id === activePresetId);
       if (found) return found;
       const builtin = getBuiltinPreset(activePresetId);
-      return applyOverrides(builtin, builtinOverrides);
+      return applyOverrides(builtin, builtinOverrides, builtinContentOverrides);
     }
-    return applyOverrides(getBuiltinPreset('default'), builtinOverrides);
-  }, [activePresetId, userPresets, builtinOverrides]);
+    return applyOverrides(getBuiltinPreset('default'), builtinOverrides, builtinContentOverrides);
+  }, [activePresetId, userPresets, builtinOverrides, builtinContentOverrides]);
   const presetDisplayScripts = useMemo(
     () => (activePreset?.regexScripts || []).filter(s => (s.markdownOnly || (!s.markdownOnly && !s.promptOnly)) && !s.disabled),
     [activePreset],
@@ -99,15 +100,16 @@ export function useDisplayScripts() {
   const activePresetId = usePresetStore(s => s.activePresetId);
   const userPresets = usePresetStore(s => s.userPresets);
   const builtinOverrides = usePresetStore(s => s.builtinOverrides);
+  const builtinContentOverrides = usePresetStore(s => s.builtinContentOverrides);
   const activePreset = useMemo(() => {
     if (activePresetId) {
       const found = userPresets.find(p => p.id === activePresetId);
       if (found) return found;
       const builtin = getBuiltinPreset(activePresetId);
-      return applyOverrides(builtin, builtinOverrides);
+      return applyOverrides(builtin, builtinOverrides, builtinContentOverrides);
     }
-    return applyOverrides(getBuiltinPreset('default'), builtinOverrides);
-  }, [activePresetId, userPresets, builtinOverrides]);
+    return applyOverrides(getBuiltinPreset('default'), builtinOverrides, builtinContentOverrides);
+  }, [activePresetId, userPresets, builtinOverrides, builtinContentOverrides]);
   const presetDisplayScripts = useMemo(
     () => (activePreset?.regexScripts || []).filter(s => (s.markdownOnly || (!s.markdownOnly && !s.promptOnly)) && !s.disabled),
     [activePreset],

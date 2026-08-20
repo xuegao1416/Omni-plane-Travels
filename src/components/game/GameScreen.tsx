@@ -355,7 +355,7 @@ export default function GameScreen() {
         case 'notebook': return <NotebookPanel gameState={gameState} />;
         case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onRollbackToSnapshot={(msgIndex) => { engine.rollbackToSnapshot(msgIndex); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
         case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
-        case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => {}} mode="inline" />;
+        case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => useSaveStore.getState().scheduleAutoSave()} messages={engine.messages} mode="inline" />;
         case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
         case 'modules': return <EventConfigPanel onClose={onClose} worldDef={worldDef} />;
         default: return null;

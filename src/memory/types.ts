@@ -94,6 +94,8 @@ export interface MemoryRetentionConfig {
   maxHotEventCards: number;
   checkpointInterval: number;
   maxVectorMemories: number;
+  /** @deprecated 原始事实账本不再截断；保留字段仅用于兼容旧配置。 */
+  maxSourceEvents: number;
 }
 
 export interface MemoryDebugConfig {
@@ -136,6 +138,10 @@ export interface MemorySystemConfig {
   vectorApiUrl: string;
   vectorApiKey: string;
   vectorApiModel: string;
+  /** remote=远程 API；local=应用内 WASM 推理；local_endpoint=外部本地服务。 */
+  vectorRuntime: 'remote' | 'local' | 'local_endpoint';
+  localEmbeddingModelId: string | null;
+  localEmbeddingEndpoint: string;
   vectorRerankApiUrl: string;
   vectorRerankApiKey: string;
   vectorRerankModel: string;
@@ -188,9 +194,53 @@ export interface SceneAnchor {
   recentChange: string;
   confidence: number;
   updatedAt?: number;
+  /** 事实来源治理：旧存档缺失时按 unknown 处理。 */
+  sourceType?: MemorySourceType;
+  validFromRound?: number | null;
+  validUntilRound?: number | null;
+  sourceEventIds?: string[];
 }
 
-export interface NarrativeThread {
+/** 记忆来源类型。区分世界设定、剧情事实与玩家推测，避免摘要把推测当事实。 */
+export type MemorySourceType =
+  | 'world_fact'
+  | 'plot_fact'
+  | 'system_state'
+  | 'player_statement'
+  | 'npc_statement'
+  | 'player_inference'
+  | 'summary'
+  | 'unknown';
+
+export type MemoryLayer = 'fact' | 'state' | 'inference' | 'summary';
+
+export interface MemoryProvenance {
+  sourceType?: MemorySourceType;
+  layer?: MemoryLayer;
+  confidence?: number;
+  evidence?: string[];
+  /** 叙事轮次中的有效区间；null 表示未知/开放。 */
+  validFromRound?: number | null;
+  validUntilRound?: number | null;
+  validFromLabel?: string;
+  validUntilLabel?: string;
+  supersedesId?: string | null;
+  previousVersionId?: string | null;
+  conflictStatus?: 'none' | 'disputed' | 'superseded' | 'rejected';
+  /** 该结构化对象由哪些原始叙事事件产生。 */
+  sourceEventIds?: string[];
+}
+
+/** 不可变的原始叙事事件账本条目。 */
+export interface NarrativeSourceEvent {
+  id: string;
+  round: number;
+  userText: string;
+  assistantText: string;
+  createdAt: number;
+}
+
+export interface NarrativeThread extends MemoryProvenance {
   id: string;
   title: string;
   summary: string;
@@ -209,7 +259,7 @@ export interface NarrativeThread {
   updatedAt?: number;
 }
 
-export interface NarrativeStateSlot {
+export interface NarrativeStateSlot extends MemoryProvenance {
   id: string;
   scopeType: 'player' | 'npc' | 'location' | 'world';
   scopeId: string;
@@ -222,9 +272,10 @@ export interface NarrativeStateSlot {
   sourceEndIndex: number | null;
   createdAt?: number;
   updatedAt?: number;
+  history?: Array<{ value: string; summary: string; recordedAt: number } & MemoryProvenance>;
 }
 
-export interface NarrativeRelationEdge {
+export interface NarrativeRelationEdge extends MemoryProvenance {
   id: string;
   sourceEntityId: string;
   targetEntityId: string;
@@ -241,7 +292,7 @@ export interface NarrativeRelationEdge {
   locationScope?: string;
 }
 
-export interface NarrativeRelationNetworkItem {
+export interface NarrativeRelationNetworkItem extends MemoryProvenance {
   id: string;
   sourceEntityId: string;
   targetEntityId: string;
@@ -258,7 +309,7 @@ export interface NarrativeRelationNetworkItem {
   locationScope?: string;
 }
 
-export interface NarrativeEventCard {
+export interface NarrativeEventCard extends MemoryProvenance {
   id: string;
   title: string;
   summary: string;
@@ -277,7 +328,7 @@ export interface NarrativeEventCard {
 
 export type NarrativeEntityType = 'character' | 'location' | 'faction' | 'item' | 'ability' | 'other';
 
-export interface NarrativeEntityCard {
+export interface NarrativeEntityCard extends MemoryProvenance {
   id: string;
   name: string;
   entityType: NarrativeEntityType;
@@ -294,9 +345,11 @@ export interface NarrativeEntityCard {
   updatedAt?: number;
   /** 带地点标注的事实，用于空间感知记忆。如 { location: "袁小安家", fact: "在此处与赖方杭发生关系" } */
   locationFacts?: Array<{ location: string; fact: string }>;
+  /** 同一实体的历史版本，旧事实保留但不会作为当前事实编译。 */
+  factHistory?: Array<MemoryProvenance & { fact: string; recordedAt: number }>;
 }
 
-export interface NarrativeArchiveCard {
+export interface NarrativeArchiveCard extends MemoryProvenance {
   id: string;
   title: string;
   arcTitle: string;
@@ -327,9 +380,12 @@ export interface NarrativeCheckpoint {
   eventCount: number;
   entityCount: number;
   snapshot?: NarrativeMemoryRuntime;
+  /** 向量记忆独立于 memoryRuntime，checkpoint 需要一起保存；旧 checkpoint 可能没有此字段。 */
+  vectorMemory?: VectorMemoryItem[];
 }
 
-export interface SummarySaveRecord {
+export interface SummarySaveRecord extends MemoryProvenance {
+  id?: string;
   savedAt: number;
   status: 'success' | 'error';
   sourceStartIndex: number | null;
@@ -349,7 +405,7 @@ export interface SummarySaveRecord {
   };
 }
 
-export interface SummaryMemoryItem {
+export interface SummaryMemoryItem extends MemoryProvenance {
   id?: string;
   title: string;
   summary: string;
@@ -357,6 +413,28 @@ export interface SummaryMemoryItem {
   sourceStartIndex?: number | null;
   sourceEndIndex?: number | null;
   savedAt?: number;
+}
+
+export type MemoryEntryType =
+  | 'player'
+  | 'otherCharacter'
+  | 'item'
+  | 'thread'
+  | 'state'
+  | 'relation'
+  | 'event'
+  | 'entity'
+  | 'archive';
+
+/** 统一检索候选。摘要和所有结构化记忆使用同一份来源契约。 */
+export interface MemoryEntry extends MemoryProvenance {
+  id: string;
+  title: string;
+  summary: string;
+  keywords: string[];
+  type: MemoryEntryType;
+  sourceFloor: number;
+  savedAt: number;
 }
 
 export interface RetrievePlanSnapshot {
@@ -443,6 +521,8 @@ export interface NarrativeMemoryRuntime {
   retrieveDebugLogs: DebugLog[];
   compileDebugLogs: DebugLog[];
   vectorMemory?: VectorFact[];
+  /** 只追加、不原地修改。原始叙事证据不会被摘要或保留策略静默删除。 */
+  sourceEvents: NarrativeSourceEvent[];
 }
 
 // ─── 向量记忆 ───
@@ -475,6 +555,18 @@ export interface VectorFact {
   sourceEndIndex?: number | null;
   createdAt?: number;
   embedding?: number[];
+  sourceType?: MemorySourceType;
+  layer?: MemoryLayer;
+  confidence?: number;
+  evidence?: string[];
+  validFromRound?: number | null;
+  validUntilRound?: number | null;
+  validFromLabel?: string;
+  validUntilLabel?: string;
+  supersedesId?: string | null;
+  previousVersionId?: string | null;
+  conflictStatus?: 'none' | 'disputed' | 'superseded' | 'rejected';
+  sourceEventIds?: string[];
 }
 
 export interface VectorMemoryItem extends VectorFact {
@@ -561,7 +653,20 @@ export interface NarrativeIngestResult {
   relationNetworkUpserts?: NarrativeRelationNetworkItem[];
   eventCandidates?: NarrativeEventCard[];
   entityPatches?: NarrativeEntityCard[];
-  archiveHints?: Array<{ id?: string; title?: string; summary?: string; keywords?: string[] }>;
+  archiveHints?: NarrativeArchiveHint[];
+}
+
+/** 归档提示是 archive card 的不完整输入，但必须保留完整来源治理元数据。 */
+export interface NarrativeArchiveHint extends MemoryProvenance {
+  id?: string;
+  title?: string;
+  arcTitle?: string;
+  summary?: string;
+  timeSpan?: string;
+  keywords?: string[];
+  entityRefs?: string[];
+  sourceStartIndex?: number;
+  sourceEndIndex?: number;
 }
 
 // ─── 摘要保存结果 ───

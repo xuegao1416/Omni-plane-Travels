@@ -30,6 +30,8 @@ export interface EventRuntimePack {
   id: string;
   manifest: Manifest;
   files: Record<string, string>;
+  /** Record-level binding retained for legacy built-in packs whose manifest predates worldId. */
+  worldId?: string;
 }
 
 /** Tauri reject 的对象 message 即 EventError 的 JSON 字符串，解析回 EventError */

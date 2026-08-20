@@ -28,6 +28,7 @@ import { PipelineExecutor } from './pipelineExecutor';
 import { loadPipelineConfig, type PipelineStatus, type PipelineTaskId } from './pipelineTypes';
 import type { ChatMessage, GameEngine } from './types';
 import { PROMPT_INLINE_IMAGE } from '../data/builtinPresets';
+import { DRC_FORMAT_REPAIR_PROMPT_ID } from '../data/presetDrcV12';
 import { getPlayerDecisionContext } from '../modules/playerDecisionLog';
 import { usePresetStore } from '../stores/presetStore';
 import { STORAGE_KEYS } from '../config/storageKeys';
@@ -59,6 +60,8 @@ import {
   executeMemoryRerank,
   executeMemoryRetrieveFinalize,
   executeMemoryCompile,
+  executeMemoryPrepareForMain,
+  buildMemoryBatchText,
 } from '../memory/memoryPipeline';
 
 export type { ChatMessage, GameEngine };
@@ -611,7 +614,7 @@ export function useGameEngine(
       const memConfig = memStore.config;
 
       const playerName = playerProfileRef.current?.name || '冒险者';
-      const batchText = userText + '\n\n' + '(等待AI回复)';
+      const batchText = buildMemoryBatchText(userText, '');
       const recentContext = sanitizeForContext(messagesRef.current, round)
         .slice(-6)
         .map(m => m.content || '')
@@ -699,6 +702,15 @@ export function useGameEngine(
         }
       } catch (simErr) {
         console.warn('[世界演化] 初始化失败（不影响管线）:', simErr);
+      }
+
+      // 正文生成前按本轮输入刷新记忆上下文；不再使用上一轮的检索结果回答当前问题。
+      if (memConfig.enabled) {
+        try {
+          await executeMemoryPrepareForMain(memStore, memCtx);
+        } catch (memoryPrepareError) {
+          console.warn('[记忆系统] 本轮发送前准备失败，正文将使用现有热态记忆:', memoryPrepareError);
+        }
       }
 
       const progressionBaseline = {
@@ -846,8 +858,11 @@ ${perspectiveInstruction}
               };
             }
           }
+          const useFormatRepairGuard = preset.id === 'deepseek'
+            || (preset.id === 'drc_v12'
+              && preset.prompts.some(p => p.identifier === DRC_FORMAT_REPAIR_PROMPT_ID && p.enabled));
           const macroEngine = new MacroEngine();
-          let systemPrompt = assembleSystemPrompt(preset, {
+          const assembleResult = assembleSystemPrompt(preset, {
             varSnapshot,
             wbInjection,
             playerProfileBlock,
@@ -859,7 +874,9 @@ ${perspectiveInstruction}
             compiledMemoryContext,  // ← 注入记忆上下文
             simulationBrief,  // ← 注入世界模拟简报
             playerDecisionContext,  // ← 注入玩家决策记录（选择卡路径 C）
+            userPersonaName: playerProfileRef.current?.name || '',  // ← 供 {{user}} 宏（双人成行等第三方预设）
           });
+          let systemPrompt = assembleResult.systemPrompt;
 
           // 正文生图：在系统提示末尾追加格式提醒（提高 Gemini 等模型的遵循率）
           if (imageConfig.inlineImageEnabled) {
@@ -867,13 +884,18 @@ ${perspectiveInstruction}
           }
 
           const chatHistory = sanitizeForContext(messagesRef.current, round);
-          // 注入 atDepth 世界书条目到聊天历史
-          const chatHistoryWithDepth = injectAtDepthEntries(chatHistory, atDepthEntries);
+          // 注入 atDepth 世界书条目 + 预设自带深度注入条目（双人成行 🔒丨文风 depth=2 等）到聊天历史
+          const mergedAtDepth = [...(atDepthEntries || []), ...(assembleResult.depthEntries || [])];
+          const chatHistoryWithDepth = injectAtDepthEntries(chatHistory, mergedAtDepth);
           const apiMessages: Message[] = [
             { role: 'system', content: systemPrompt },
             ...chatHistoryWithDepth,
             { role: 'user', content: userText },
           ];
+          // 尾部 assistant 预填充（SillyTavern 兼容：仅第三方预设如双人成行有此条目；现有 4 预设为空，行为不变）
+          if (assembleResult.assistantPrefill) {
+            apiMessages.push({ role: 'assistant', content: assembleResult.assistantPrefill });
+          }
 
           let accumulated = '';
 
@@ -905,11 +927,11 @@ ${perspectiveInstruction}
             }
           }
 
-          // DeepSeek 偶尔会把非空半成品当作完整回复正常结束。
-          // 检测到正文或选项未闭合时，只请求一次缺失尾部；再次失败则本地补通用选项兜底。
-          if (preset.id === 'deepseek' && rawText.trim() && !isDeepSeekResponseComplete(rawText)) {
+          // 内置 DeepSeek，或用户手动开启双人成行的格式补尾时：
+          // 检测正文/选项未闭合，只请求一次缺失尾部；再次失败则本地补通用选项兜底。
+          if (useFormatRepairGuard && rawText.trim() && !isDeepSeekResponseComplete(rawText)) {
             const partialResponse = rawText;
-            console.warn('[DeepSeek] 首次响应格式不完整，准备自动补尾', {
+            console.warn('[FormatRepair] 首次响应格式不完整，准备自动补尾', {
               finishReason: result.finishReason ?? '(服务端未提供)',
               length: partialResponse.length,
             });
@@ -929,14 +951,14 @@ ${perspectiveInstruction}
               });
               rawText = appendDeepSeekRepair(partialResponse, repairResult.text || repairAccumulated);
               if (!isDeepSeekResponseComplete(rawText)) {
-                console.warn('[DeepSeek] 补尾响应仍不完整，准备本地清理残片', {
+                console.warn('[FormatRepair] 补尾响应仍不完整，准备本地清理残片', {
                   finishReason: repairResult.finishReason ?? '(服务端未提供)',
                   repairLength: (repairResult.text || repairAccumulated).length,
                 });
               }
             } catch (repairError) {
               if (controller.signal.aborted) throw repairError;
-              console.warn('[DeepSeek] 自动补写缺失尾部失败，使用本地行动选项兜底:', repairError);
+              console.warn('[FormatRepair] 自动补写缺失尾部失败，使用本地行动选项兜底:', repairError);
             }
 
             if (!isDeepSeekResponseComplete(rawText)) {
@@ -950,6 +972,16 @@ ${perspectiveInstruction}
             if (!rawText) {
               rawText = '🌍 欢迎来到世界漫游指南！\n\n请描述你的角色和想要穿越的世界，开始你的冒险之旅。\n\n你可以：\n• 直接描述你想做什么\n• 选择下方的推荐行动\n• 输入任何你想尝试的行动';
             }
+          }
+
+          // 记忆写入必须读取本轮完整剧情，不能再保存“等待 AI 回复”占位文本。
+          const completedBatchText = buildMemoryBatchText(
+            userText,
+            extractContentForPrompt(rawText).trim() || rawText,
+          );
+          memCtx.batchText = completedBatchText;
+          if (lastPipelineCtxRef.current?.aiMsgId === aiMsgId) {
+            lastPipelineCtxRef.current.batchText = completedBatchText;
           }
 
           // 存储完整原始响应（thinking/options/summary 全由正则脚本处理）

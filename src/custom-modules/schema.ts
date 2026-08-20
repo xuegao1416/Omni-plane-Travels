@@ -245,6 +245,14 @@ export interface SectionViewComponent {
   children: ViewComponent[];
 }
 
+export interface CardViewComponent {
+  type: 'card';
+  title?: string;
+  body?: string;
+  children?: ViewComponent[];
+  actions?: ButtonViewComponent[];
+}
+
 export interface TextViewComponent {
   type: 'text';
   text?: string;
@@ -312,6 +320,7 @@ export interface ButtonViewComponent {
 
 export type ViewComponent =
   | SectionViewComponent
+  | CardViewComponent
   | TextViewComponent
   | NumberViewComponent
   | ProgressViewComponent
@@ -333,6 +342,13 @@ export interface ModulePermissions {
   write: 'own-state-only';
 }
 
+/** Optional distribution metadata used by the workshop installer. */
+export interface CustomModuleDependency {
+  id: string;
+  version?: string;
+  optional?: boolean;
+}
+
 export interface CustomGameplayModule {
   kind: CustomGameplayModuleKind;
   schemaVersion: 1;
@@ -341,6 +357,7 @@ export interface CustomGameplayModule {
   version: string;
   author: string;
   description?: string;
+  dependencies?: CustomModuleDependency[];
   scope: CustomGameplayModuleScope;
   state: StateDefinition;
   logic: ModuleLogic;

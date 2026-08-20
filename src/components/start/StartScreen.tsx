@@ -8,23 +8,27 @@ import WorldHallView from './WorldHallView';
 import WorldEditorForm from './WorldEditorForm';
 import { useState, useEffect, useRef } from 'react';
 import { reportDepth } from '../../modules/playTracker';
+import { useConfigStore } from '../../stores/configStore';
+import { clearSegmentsCache } from '../../hooks/useCharacterHistory';
 import { Volume2, VolumeX } from 'lucide-react';
 
 /** 大厅背景音乐 — 仅在 WorldHallView 可见时播放，首页/过场/向导/游戏过程不播放 */
 function HallMusic() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const theme = useConfigStore(s => s.settings.theme);
+  const musicSrc = theme === 'dark' ? '/audio/omni-hall-dawn-original.mp3' : '/scarborough-fair.mp3';
   const [muted, setMuted] = useState(() => {
     return typeof window !== 'undefined' && localStorage.getItem('omni.hall.musicMuted') === 'true';
   });
 
   useEffect(() => {
-    const audio = new Audio('/audio/omni-hall-dawn-original.mp3');
+    const audio = new Audio(musicSrc);
     audio.loop = true;
     audio.volume = muted ? 0 : 0.45;
     audio.play().catch(() => { /* autoplay blocked — user gesture needed */ });
     audioRef.current = audio;
     return () => { audio.pause(); audio.src = ''; };
-  }, []);
+  }, [musicSrc]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -71,9 +75,17 @@ export default function StartScreen() {
   const [customModuleOpen, setCustomModuleOpen] = useState(false);
   const [entryPhase, setEntryPhase] = useState<'home' | 'transition' | 'hall'>(() => {
     const returnedFromHall = typeof window !== 'undefined' && sessionStorage.getItem('omni.start.returnTarget') === 'hall';
-    if (returnedFromHall) sessionStorage.removeItem('omni.start.returnTarget');
+    // 设置/事件等页面会先在返回前挂载一个底层 StartScreen；此时不能消费标记，
+    // 否则保存设置后重新挂载 StartScreen 会丢失大厅入口状态并回到首页。
     return returnedFromHall || h.state.selectedWorld !== 'default' ? 'hall' : 'home';
   });
+
+  // 只在真正回到 StartScreen 后消费返回标记；设置页底层的 StartScreen 仍处于 settings 路由。
+  useEffect(() => {
+    if (h.state.currentScreen === 'start' && sessionStorage.getItem('omni.start.returnTarget') === 'hall') {
+      sessionStorage.removeItem('omni.start.returnTarget');
+    }
+  }, [h.state.currentScreen]);
 
   // 记录大厅与创建角色流程的匿名到达深度。
   useEffect(() => {
@@ -84,8 +96,12 @@ export default function StartScreen() {
 
   const enterHall = () => setEntryPhase('transition');
   const enterCharacterCreation = () => {
+    // 新旅程必须从空白向导开始，避免复用当前存档的角色与经历草稿。
+    clearSegmentsCache();
+    h.resetForNewJourney();
+    h.setSegments({});
+    h.setIncludeAgeStages(true);
     h.setView('wizard');
-    h.setStep(1);
     setEntryPhase('home');
   };
 

@@ -10,6 +10,49 @@ export function ensureStrArray(val: unknown): string[] {
   return [];
 }
 
+/** 归一化事实治理元数据；旧存档没有这些字段时保持可运行并使用保守默认值。 */
+export function normalizeProvenance<T extends Record<string, unknown>>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj;
+  const result = { ...obj } as Record<string, unknown>;
+  const sourceTypes = new Set(['world_fact', 'plot_fact', 'system_state', 'player_statement', 'npc_statement', 'player_inference', 'summary', 'unknown']);
+  const layers = new Set(['fact', 'state', 'inference', 'summary']);
+  const conflictStatuses = new Set(['none', 'disputed', 'superseded', 'rejected']);
+  const sourceType = String(result.sourceType ?? '').trim();
+  const layer = String(result.layer ?? '').trim();
+  const normalizedSourceType = sourceTypes.has(sourceType) ? sourceType : 'unknown';
+  const normalizedLayer = layers.has(layer)
+    ? layer
+    : normalizedSourceType === 'player_inference' ? 'inference'
+      : normalizedSourceType === 'system_state' ? 'state'
+        : normalizedSourceType === 'summary' ? 'summary' : 'fact';
+  // 推测不能伪装成世界事实；这是运行时边界，不只依赖提示词约束。
+  if (normalizedLayer === 'inference' || normalizedSourceType === 'player_inference') {
+    result.sourceType = 'player_inference';
+    result.layer = 'inference';
+  } else {
+    result.sourceType = normalizedSourceType;
+    result.layer = normalizedLayer;
+  }
+  const confidence = Number(result.confidence);
+  result.confidence = Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5;
+  for (const field of ['validFromRound', 'validUntilRound']) {
+    const value = result[field];
+    result[field] = value === null || value === undefined || value === ''
+      ? null
+      : Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : null;
+  }
+  if (result.evidence !== undefined) result.evidence = ensureStrArray(result.evidence).slice(0, 8);
+  // 原始事件账本是不可变证据链；来源 ID 不能按存档瘦身策略静默截断。
+  if (result.sourceEventIds !== undefined) {
+    result.sourceEventIds = [...new Set(ensureStrArray(result.sourceEventIds))];
+  }
+  if (result.supersedesId !== undefined && result.supersedesId !== null) result.supersedesId = String(result.supersedesId);
+  if (result.previousVersionId !== undefined && result.previousVersionId !== null) result.previousVersionId = String(result.previousVersionId);
+  const conflictStatus = String(result.conflictStatus ?? '').trim();
+  result.conflictStatus = conflictStatuses.has(conflictStatus) ? conflictStatus : 'none';
+  return result as T;
+}
+
 /**
  * 确保返回数组
  */
@@ -53,12 +96,14 @@ export function normalizeObjectArrays<T extends Record<string, unknown>>(obj: T)
  */
 export function normalizeThread<T extends Record<string, unknown>>(thread: T): T {
   const arrayFields = ['relatedLocations', 'relatedEntities', 'relatedEvents', 'tags', 'keywords', 'participants'];
-  const result = { ...thread };
+  const result = normalizeProvenance({ ...thread });
   for (const field of arrayFields) {
     if (field in result) {
       (result as any)[field] = ensureStrArray((result as any)[field]);
     }
   }
+  const statuses = new Set(['open', 'blocked', 'suspended', 'resolved', 'failed', 'superseded']);
+  (result as Record<string, unknown>).status = statuses.has(String(result.status)) ? result.status : 'open';
   return result;
 }
 
@@ -67,24 +112,56 @@ export function normalizeThread<T extends Record<string, unknown>>(thread: T): T
  */
 export function normalizeEventCard<T extends Record<string, unknown>>(card: T): T {
   const arrayFields = ['tags', 'keywords', 'relatedEntities', 'relatedLocations', 'triggers', 'effects'];
-  const result = { ...card };
+  const result = normalizeProvenance({ ...card });
   for (const field of arrayFields) {
     if (field in result) {
       (result as any)[field] = ensureStrArray((result as any)[field]);
     }
   }
+  const statuses = new Set(['hot', 'warm', 'cold']);
+  (result as Record<string, unknown>).status = statuses.has(String(result.status)) ? result.status : 'hot';
   return result;
+}
+
+/** 归一化状态槽及关系对象的运行时枚举；旧存档可能带有未知字符串。 */
+export function normalizeStateSlot<T extends Record<string, unknown>>(slot: T): T {
+  const result = normalizeProvenance({ ...slot });
+  const statuses = new Set(['active', 'resolved', 'expired']);
+  (result as Record<string, unknown>).status = statuses.has(String(result.status)) ? result.status : 'active';
+  return result as T;
+}
+
+export function normalizeRelationEdge<T extends Record<string, unknown>>(edge: T): T {
+  const result = normalizeProvenance({ ...edge });
+  const statuses = new Set(['active', 'broken', 'changed']);
+  (result as Record<string, unknown>).status = statuses.has(String(result.status)) ? result.status : 'active';
+  return result as T;
+}
+
+export function normalizeRelationNetworkItem<T extends Record<string, unknown>>(item: T): T {
+  const result = normalizeProvenance({ ...item });
+  const statuses = new Set(['active', 'changed', 'broken', 'superseded']);
+  (result as Record<string, unknown>).status = statuses.has(String(result.status)) ? result.status : 'active';
+  return result as T;
 }
 
 /**
  * 归一化实体卡（entity card）对象
  */
 export function normalizeEntityCard<T extends Record<string, unknown>>(card: T): T {
-  const arrayFields = ['tags', 'aliases', 'traits', 'relations', 'roles', 'knownLocations'];
-  const result = { ...card };
+  const arrayFields = ['tags', 'aliases', 'traits', 'relations', 'roles', 'knownLocations', 'currentStatus', 'stableFacts', 'affiliations', 'relatedThreads', 'relatedEvents', 'sourceEventIds'];
+  const result = normalizeProvenance({ ...card });
   for (const field of arrayFields) {
     if (field in result) {
       (result as any)[field] = ensureStrArray((result as any)[field]);
+    }
+  }
+  if (result.layer === 'inference' || result.sourceType === 'player_inference') {
+    const inferredFacts = ensureStrArray((result as any).stableFacts);
+    if (inferredFacts.length > 0) {
+      const existingHistory = Array.isArray((result as any).factHistory) ? (result as any).factHistory : [];
+      (result as any).factHistory = [...existingHistory, ...inferredFacts.map(fact => ({ fact, recordedAt: Date.now(), sourceType: 'player_inference', layer: 'inference', confidence: result.confidence }))].slice(-20);
+      (result as any).stableFacts = [];
     }
   }
   return result;

@@ -3,6 +3,7 @@ import type { Condition, JsonValue, ModuleView, ViewComponent } from './schema';
 
 export type CustomModuleViewModel =
   | { type: 'section'; title?: string; children: CustomModuleViewModel[] }
+  | { type: 'card'; title?: string; body?: string; children: CustomModuleViewModel[]; actions: Array<{ label: string; event: string }> }
   | { type: 'text'; label?: string; value: string }
   | { type: 'number'; label?: string; value: number; format?: 'integer' | 'decimal' }
   | { type: 'progress'; label?: string; value: number; min: number; max: number; color?: string }
@@ -58,6 +59,14 @@ function componentToModel(component: ViewComponent, values: Record<string, JsonV
   switch (component.type) {
     case 'section':
       return [{ type: 'section', title: component.title, children: component.children.flatMap((child) => componentToModel(child, values)) }];
+    case 'card':
+      return [{
+        type: 'card',
+        title: component.title,
+        body: component.body,
+        children: (component.children ?? []).flatMap((child) => componentToModel(child, values)),
+        actions: (component.actions ?? []).map((action) => ({ label: action.label, event: action.event })),
+      }];
     case 'text':
       return [{ type: 'text', label: component.label, value: component.text ?? asText(readPath(values, component.path!)) }];
     case 'number': {
@@ -98,6 +107,13 @@ function renderModel(item: CustomModuleViewModel, index: number, onEvent?: (even
   switch (item.type) {
     case 'section':
       return <div key={index} className="custom-module-section">{item.title && <h5>{item.title}</h5>}{item.children.map((child, childIndex) => renderModel(child, childIndex, onEvent))}</div>;
+    case 'card':
+      return <article key={index} className="custom-module-card">
+        {item.title && <h5>{item.title}</h5>}
+        {item.body && <p className="custom-module-card-body">{item.body}</p>}
+        {item.children.map((child, childIndex) => renderModel(child, childIndex, onEvent))}
+        {item.actions.length > 0 && <div className="custom-module-card-actions">{item.actions.map((action) => <button key={action.event} type="button" className="custom-module-button" onClick={() => onEvent?.(action.event)}>{action.label}</button>)}</div>}
+      </article>;
     case 'text': return <div key={index}>{labelFor(item.label, <span className="custom-module-text">{item.value}</span>)}</div>;
     case 'number': return <div key={index}>{labelFor(item.label, <span className="custom-module-number">{item.format === 'integer' ? Math.round(item.value) : item.value}</span>)}</div>;
     case 'progress': {

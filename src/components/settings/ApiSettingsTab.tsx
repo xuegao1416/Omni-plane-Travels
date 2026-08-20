@@ -48,7 +48,7 @@ const ApiSettingsTab = forwardRef<ApiSettingsRef, ApiSettingsTabProps>(
         if (list.length > 0 && !config.model) set('model', list[0]);
       } catch (err: unknown) {
         setTestSuccess(false);
-        setTestResult(`获取模型失败: ${err instanceof Error ? err.message : String(err)}`);
+        setTestResult(`获取模型失败: ${err instanceof Error ? err.message : String(err)}；模型列表不可用时可直接手动填写模型名称`);
       }
       setLoadingModels(false);
     }, [config, set]);

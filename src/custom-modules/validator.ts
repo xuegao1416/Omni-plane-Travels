@@ -325,6 +325,10 @@ function validateComponent(
     component.children.forEach((child, index) => validateComponent(child, state, [...path, 'children', String(index)], errors));
     return;
   }
+  if (component.type === 'card') {
+    component.children?.forEach((child, index) => validateComponent(child, state, [...path, 'children', String(index)], errors));
+    return;
+  }
   if (component.type === 'conditional') {
     validateCondition(component.when, state, [...path, 'when'], errors);
     component.children.forEach((child, index) => validateComponent(child, state, [...path, 'children', String(index)], errors));

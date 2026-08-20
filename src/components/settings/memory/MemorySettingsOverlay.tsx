@@ -17,10 +17,11 @@ import { MemoryFooter } from './MemoryFooter';
 import { RawEditor } from './RawEditor';
 import { useMemoryConfig } from './useMemoryConfig';
 import { useRawEditor } from './useRawEditor';
+import type { ChatMessage } from '../../../engine/types';
 import '../MemorySettingsOverlay.css';
 
-export function MemorySettingsOverlay({ visible, onClose, onSave, mode = 'overlay' }: {
-  visible: boolean; onClose: () => void; onSave: () => void; mode?: 'overlay' | 'inline';
+export function MemorySettingsOverlay({ visible, onClose, onSave, messages = [], mode = 'overlay' }: {
+  visible: boolean; onClose: () => void; onSave: () => void; messages?: ChatMessage[]; mode?: 'overlay' | 'inline';
 }) {
   const store = useMemoryStore();
   const { config, memoryRuntime, vectorMemory } = store;
@@ -155,7 +156,17 @@ export function MemorySettingsOverlay({ visible, onClose, onSave, mode = 'overla
       <ExportPickerDialog onClose={() => setExportPickerVisible(false)}
         store={store} vectorMemory={vectorMemory} memoryRuntime={memoryRuntime} />
     )}
-    {vectorExtractVisible && <VectorExtractDialog onClose={() => setVectorExtractVisible(false)} />}
+    {vectorExtractVisible && (
+      <VectorExtractDialog
+        onClose={() => setVectorExtractVisible(false)}
+        onComplete={() => {
+          updateConfig({ vectorEnabled: true, semanticRetrieveEnabled: true });
+          onSave();
+        }}
+        messages={messages}
+        config={{ ...localConfig, narrativePromptTemplates: localPromptTemplates }}
+      />
+    )}
     {rawEditorVisible && (
       <RawEditor tabKey={rawEditorTabKey} text={rawEditorText} saving={rawEditorSaving}
         error={rawEditorError} onTextChange={setRawEditorText}

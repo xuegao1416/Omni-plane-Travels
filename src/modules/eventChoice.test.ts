@@ -99,7 +99,7 @@ test('(3b) promptAssembler：玩家决策上下文被拼入系统提示', () => 
     macroEngine: new MacroEngine(),
     playerDecisionContext: ctxText,
   });
-  expect(out).toContain('玩家选择了激进路线');
+  expect(out.systemPrompt).toContain('玩家选择了激进路线');
 });
 
 // ─── 阶段 B：effect 支持 resourcePath（决策B）───

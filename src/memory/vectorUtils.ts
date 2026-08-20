@@ -8,6 +8,7 @@ import type {
   VectorFactType,
   VectorMemoryItem,
 } from './types';
+import { normalizeProvenance } from './normalize';
 
 // ─── 余弦相似度 ───
 
@@ -235,7 +236,7 @@ export function normalizeVectorFact(item: unknown): VectorFact | null {
   // 如果没有实体槽位数据，从 entities 推断
   const slots = buildVectorFallbackEntitySlots(primaryType, entities);
 
-  return {
+  return normalizeProvenance({
     fact,
     title: String(raw.title ?? '').trim() || undefined,
     summary: String(raw.summary ?? '').trim() || undefined,
@@ -257,7 +258,19 @@ export function normalizeVectorFact(item: unknown): VectorFact | null {
     sourceStartIndex: Number.isFinite(Number(raw.sourceStartIndex)) ? Math.floor(Number(raw.sourceStartIndex)) : null,
     sourceEndIndex: Number.isFinite(Number(raw.sourceEndIndex)) ? Math.floor(Number(raw.sourceEndIndex)) : null,
     createdAt: Number.isFinite(Number(raw.createdAt)) ? Math.floor(Number(raw.createdAt)) : Date.now(),
-  };
+    sourceType: raw.sourceType,
+    layer: raw.layer,
+    confidence: raw.confidence,
+    evidence: raw.evidence,
+    validFromRound: raw.validFromRound,
+    validUntilRound: raw.validUntilRound,
+    validFromLabel: raw.validFromLabel,
+    validUntilLabel: raw.validUntilLabel,
+    supersedesId: raw.supersedesId,
+    previousVersionId: raw.previousVersionId,
+    conflictStatus: raw.conflictStatus,
+    sourceEventIds: raw.sourceEventIds,
+  }) as VectorFact;
 }
 
 export function normalizeVectorMemoryItem(item: unknown, index = 0): VectorMemoryItem | null {

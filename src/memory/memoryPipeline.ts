@@ -1,14 +1,19 @@
 // 记忆系统管线执行器 - 从 useGameEngine.ts 提取
-import { requestCompletion } from '../api/client';
+import { fetchRerank, requestCompletion } from '../api/client';
 import { waitForRateLimit } from '../api/rateLimiter';
 import type { MemoryPipelineContext } from './useMemorySystem';
 import type {
   NarrativeMemoryRuntime, SummaryMemoryItem, VectorMemoryItem,
   NarrativeStateSlot, NarrativeRelationEdge, NarrativeRelationNetworkItem, NarrativeArchiveCard,
+  NarrativeConflictJudgeResult,
 } from './types';
-import { normalizeVectorFact } from './vectorUtils';
+import { cosineSimilarity, normalizeVectorFact } from './vectorUtils';
+import { createEmbeddingClient, resolveEmbeddingEndpoint } from './embeddingRuntime';
+import { normalizeProvenance } from './normalize';
+import { collectMemoryEntries } from './memoryCandidates';
 import {
   parseNarrativePayload,
+  parseNarrativeIngestResult,
   parseNarrativeSummaryResult,
   parseNarrativeRetrievePlannerResult,
   parseNarrativeConflictJudgeResult,
@@ -17,6 +22,160 @@ import {
 } from './narrativeParsers';
 
 type MemoryStore = ReturnType<typeof import('./memoryStore').useMemoryStore.getState>;
+type ConflictAction = NarrativeConflictJudgeResult['action'];
+type ConflictDecisionMap = WeakMap<object, ConflictAction>;
+
+export function buildMemoryBatchText(userText: string, assistantText: string): string {
+  const parts: string[] = [];
+  const user = String(userText ?? '').trim();
+  const assistant = String(assistantText ?? '').trim();
+  if (user) parts.push(`【玩家输入】\n${user}`);
+  if (assistant) parts.push(`【AI正文】\n${assistant}`);
+  return parts.join('\n\n');
+}
+
+function extractQueryTerms(inputText: string, recentContext = ''): string[] {
+  const source = `${inputText}\n${recentContext.slice(-800)}`.toLowerCase();
+  const terms = source
+    .split(/[\s,，。！？、；："“”'‘’（）()【】\[\]\n]+/)
+    .map(term => term.trim())
+    .filter(term => term.length >= 2 && term.length <= 32);
+  return [...new Set(terms)].slice(0, 24);
+}
+
+function selectSummaryEntriesForCurrentTurn(
+  entries: MemoryPipelineContext['_selectedEntries'],
+  inputText: string,
+  recentContext: string,
+  limit: number,
+) {
+  const query = `${inputText}\n${recentContext.slice(-800)}`.toLowerCase();
+  return [...(entries ?? [])]
+    .map(entry => {
+      const keywordHits = entry.keywords.filter(keyword => {
+        const normalized = String(keyword ?? '').trim().toLowerCase();
+        return normalized.length >= 2 && query.includes(normalized);
+      }).length;
+      const title = entry.title.trim().toLowerCase();
+      const titleHit = title.length >= 2 && query.includes(title) ? 2 : 0;
+      return { entry, score: keywordHits * 3 + titleHit };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score || b.entry.savedAt - a.entry.savedAt)
+    .slice(0, limit)
+    .map(item => item.entry);
+}
+
+function vectorSearchText(item: VectorMemoryItem): string {
+  return item.searchText?.trim()
+    || [
+      item.fact,
+      item.summary,
+      ...(Array.isArray(item.keywords) ? item.keywords : []),
+      ...(Array.isArray(item.entities) ? item.entities : []),
+    ].filter(Boolean).join(' ');
+}
+
+function getSourceEventId(round: number): string {
+  return `turn_${Math.max(0, Math.floor(round))}`;
+}
+
+function extractAssistantText(batchText: string): string {
+  const match = String(batchText ?? '').match(/【AI正文】\s*([\s\S]*)$/);
+  return match?.[1]?.trim() || '';
+}
+
+function appendSourceEvent(memStore: MemoryStore, ctx: MemoryPipelineContext): string {
+  const runtime = memStore.getMemoryRuntime();
+  const id = getSourceEventId(ctx.floor);
+  if (runtime.sourceEvents.some(event => event.id === id)) return id;
+  const event = {
+    id,
+    round: Math.max(0, Math.floor(ctx.floor)),
+    userText: String(ctx.inputText ?? ''),
+    assistantText: String(ctx.assistantText ?? extractAssistantText(ctx.batchText)),
+    createdAt: Date.now(),
+  };
+  runtime.sourceEvents = [...runtime.sourceEvents, event];
+  return id;
+}
+
+async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineContext): Promise<void> {
+  const config = memStore.config;
+  if (!config.vectorEnabled || !config.semanticRetrieveEnabled || memStore.vectorMemory.length === 0) return;
+  const embeddingEndpoint = resolveEmbeddingEndpoint(config);
+  if (config.vectorRuntime !== 'local' && (!embeddingEndpoint || !config.vectorApiModel.trim())) return;
+  const embeddingClient = createEmbeddingClient({
+    ...config,
+    vectorApiKey: config.vectorApiKey.trim() || ctx.apiConfig.apiKey,
+  });
+
+  const eligible = memStore.vectorMemory.filter(item =>
+    item.state !== 'expired'
+      && item.conflictStatus !== 'superseded'
+      && item.conflictStatus !== 'rejected'
+      && item.importance >= config.vectorRetrieveMinImportance
+  );
+  if (eligible.length === 0) return;
+
+  // 兼容旧存档：首次启用语义检索时，补齐已有事实的 embedding。
+  const missing = eligible.filter(item => !Array.isArray(item.embedding) || item.embedding.length === 0);
+  if (missing.length > 0) {
+    const batchSize = 64;
+    for (let start = 0; start < missing.length; start += batchSize) {
+      const chunk = missing.slice(start, start + batchSize);
+      const embeddings = await embeddingClient.embed(chunk.map(vectorSearchText));
+      chunk.forEach((item, index) => {
+        item.embedding = embeddings[index];
+        item.embeddingTimestamp = Date.now();
+      });
+    }
+    memStore.setVectorMemory([...memStore.vectorMemory]);
+  }
+
+  const queryText = config.vectorRetrieveUseContextQuery
+    ? `${ctx.inputText}\n${ctx.recentContext.slice(-1000)}`
+    : ctx.inputText;
+  const [queryEmbedding] = await embeddingClient.embed([queryText]);
+  if (!queryEmbedding) return;
+  const scored = eligible
+    .filter(item => Array.isArray(item.embedding) && item.embedding.length > 0)
+    .map(item => ({ ...item, similarity: cosineSimilarity(queryEmbedding, item.embedding!) }))
+    .filter(item => item.similarity >= config.vectorScoreThreshold)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, config.vectorRetrieveCandidateCount);
+
+  let ranked = scored;
+  if (
+    scored.length > 1
+    && (config.vectorRetrieveMode === 'cross_encoder' || config.vectorRetrieveMode === 'hybrid')
+    && config.vectorRerankApiUrl.trim()
+    && config.vectorRerankModel.trim()
+  ) {
+    const reranked = await fetchRerank({
+      baseUrl: config.vectorRerankApiUrl.trim(),
+      apiKey: config.vectorRerankApiKey.trim() || config.vectorApiKey.trim() || ctx.apiConfig.apiKey,
+      model: config.vectorRerankModel.trim(),
+    }, queryText, scored.map(vectorSearchText));
+    const scoreByIndex = new Map(reranked.map(item => [item.index, item.relevance_score]));
+    ranked = scored
+      .map((item, index) => ({ ...item, similarity: scoreByIndex.get(index) ?? item.similarity }))
+      .sort((a, b) => b.similarity - a.similarity);
+  }
+
+  const perType = new Map<string, number>();
+  ctx._selectedVectorFacts = ranked.filter(item => {
+    const isHistoryIndex = item.id.startsWith('history_round_');
+    const typeKey = isHistoryIndex ? '__history_index__' : item.primaryType;
+    const typeLimit = isHistoryIndex
+      ? Math.min(3, config.vectorRetrieveTopK)
+      : config.vectorRetrieveMaxPerType;
+    const count = perType.get(typeKey) ?? 0;
+    if (count >= typeLimit) return false;
+    perType.set(typeKey, count + 1);
+    return true;
+  }).slice(0, config.vectorRetrieveTopK);
+}
 
 /** 带超时的 Promise 包装 */
 function withTimeout<T>(promise: Promise<T>, ms: number, label = '操作'): Promise<T> {
@@ -57,16 +216,93 @@ export async function callMemoryAI(
   }
 }
 
+/**
+ * 正文生成前的本轮记忆准备。
+ * 本地关键词召回始终可用；玩家配置真实 embedding 后再叠加语义召回。
+ */
+export async function executeMemoryPrepareForMain(memStore: MemoryStore, ctx: MemoryPipelineContext): Promise<void> {
+  if (!memStore.config.enabled) return;
+
+  const allMemories = collectAllMemoriesFromRuntime(memStore.getMemoryRuntime());
+  ctx._retrievalKeywords = extractQueryTerms(ctx.inputText, ctx.recentContext);
+  ctx._selectedEntries = selectSummaryEntriesForCurrentTurn(
+    allMemories,
+    ctx.inputText,
+    ctx.recentContext,
+    memStore.config.compiler.rerankSelectedTotalLimit,
+  );
+
+  try {
+    await recallVectorFacts(memStore, ctx);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!memStore.config.retrieval.vectorFallbackEnabled) {
+      ctx._degradedStages = [...(ctx._degradedStages || []), 'memory_vector_strict_failure'];
+      throw error;
+    }
+    memStore.appendRetrieveDebugLog({ kind: 'vector_recall', message, mode: 'error' });
+    console.warn('[向量召回] 失败，已降级为本地关键词记忆:', message);
+    ctx._degradedStages = [...(ctx._degradedStages || []), 'memory_vector'];
+  }
+
+  await executeMemoryCompile(memStore, ctx);
+}
+
+function uniqueVersionId(list: readonly object[], sourceId: string, currentRound: number): string {
+  const baseId = `${sourceId}@${currentRound}`;
+  let candidate = baseId;
+  let suffix = 2;
+  while (list.some(item => (item as Record<string, unknown>).id === candidate)) {
+    candidate = `${baseId}@${suffix++}`;
+  }
+  return candidate;
+}
+
+/** Apply one semantic judge decision without assuming a specific memory-card status enum. */
+export function applyMemoryConflictDecision<T extends object>(
+  runtimeList: T[],
+  existingIndex: number,
+  decision: Pick<NarrativeConflictJudgeResult, 'action' | 'confidence'>,
+  currentRound: number,
+  supersededStatus?: string,
+): void {
+  const existing = runtimeList[existingIndex];
+  if (!existing) return;
+  const record = existing as Record<string, unknown>;
+  if (decision.action === 'mark_expired' || decision.action === 'supersede_current') {
+    const archivedId = typeof record.id === 'string' && record.id
+      ? uniqueVersionId(runtimeList, record.id, currentRound)
+      : undefined;
+    runtimeList[existingIndex] = {
+      ...record,
+      ...(archivedId ? { id: archivedId } : {}),
+      ...(supersededStatus ? { status: supersededStatus } : {}),
+      conflictStatus: 'superseded',
+      validUntilRound: currentRound,
+    } as T;
+    return;
+  }
+  if (decision.action === 'update_current') {
+    runtimeList[existingIndex] = {
+      ...record,
+      conflictStatus: 'disputed',
+      confidence: Math.max(Number(record.confidence) || 0.5, decision.confidence),
+    } as T;
+  }
+}
+
 // ─── 阶段1: 记忆写入（带重试）───
 
 export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipelineContext): Promise<void> {
   const runtime = memStore.getMemoryRuntime();
+  const sourceEventId = appendSourceEvent(memStore, ctx);
   const templates = memStore.config.narrativePromptTemplates;
   const retryCount = memStore.config.writePipeline.retryCount ?? 2;
   const retryDelayMs = memStore.config.writePipeline.retryDelayMs ?? 1200;
   const maxAttempts = retryCount + 1;
 
   memStore.setLoading(true, '正在写入叙事记忆...');
+  runtime.lastIngestAttemptAt = Date.now();
 
   let lastError: Error | null = null;
 
@@ -80,26 +316,47 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
           .replace(/\{\{剧情原文\}\}/g, ctx.batchText);
 
         const rawResult = await callMemoryAI(ctx.writeApiConfig ?? ctx.apiConfig, prompt, '请分析上述剧情并输出结构化叙事记忆 JSON。');
-        const parsed = parseNarrativePayload(rawResult);
+        const parsed = parseNarrativeIngestResult(rawResult) as unknown as Record<string, unknown>;
+        const conflictDecisions: ConflictDecisionMap = new WeakMap();
 
-        // 冲突裁决（并行处理所有冲突）
+        // 冲突裁决覆盖全部结构化对象；裁决失败时仍由 versionedUpsert 保留历史。
         if (memStore.config.writePipeline.conflictJudgeEnabled) {
           const conflictTasks: Array<() => Promise<void>> = [];
-          const eventCandidates = parsed.eventCandidates as Array<{ id?: string; title?: string; status?: string }> | undefined;
-          const entityPatches = parsed.entityPatches as Array<{ id?: string; title?: string; status?: string }> | undefined;
+          type MemoryRecord = Record<string, unknown>;
+          const sameIdOr = (left: MemoryRecord, right: MemoryRecord, fields: string[]) =>
+            Boolean(left.id && right.id && left.id === right.id)
+              || fields.every(field => left[field] != null && left[field] === right[field]);
+          const specs: Array<{
+            key: string;
+            runtimeList: MemoryRecord[];
+            matchFields: string[];
+            supersededStatus?: string;
+          }> = [
+            { key: 'threadUpserts', runtimeList: runtime.activeThreads as unknown as MemoryRecord[], matchFields: ['title'], supersededStatus: 'superseded' },
+            { key: 'stateSlotUpserts', runtimeList: runtime.stateSlots as unknown as MemoryRecord[], matchFields: ['scopeType', 'scopeId', 'slotType'], supersededStatus: 'expired' },
+            { key: 'relationUpserts', runtimeList: runtime.relationEdges as unknown as MemoryRecord[], matchFields: ['sourceEntityId', 'targetEntityId', 'relationType'], supersededStatus: 'changed' },
+            { key: 'relationNetworkUpserts', runtimeList: runtime.relationNetwork as unknown as MemoryRecord[], matchFields: ['sourceEntityId', 'targetEntityId', 'relationType'], supersededStatus: 'superseded' },
+            { key: 'eventCandidates', runtimeList: runtime.eventCards as unknown as MemoryRecord[], matchFields: ['title'], supersededStatus: 'cold' },
+            { key: 'entityPatches', runtimeList: runtime.entityCards as unknown as MemoryRecord[], matchFields: ['name'] },
+            { key: 'archiveHints', runtimeList: runtime.archiveCards as unknown as MemoryRecord[], matchFields: ['title'] },
+          ];
 
-          const checkConflict = <T extends { id?: string; title?: string; status?: string }>(
-            incomingList: T[] | undefined,
-            runtimeList: T[],
-          ) => {
+          const checkConflict = (spec: typeof specs[number]) => {
+            const incomingList = parsed[spec.key] as Array<MemoryRecord | null> | undefined;
             if (!Array.isArray(incomingList)) return;
             for (let i = 0; i < incomingList.length; i++) {
               const incoming = incomingList[i];
-              if (!incoming || !incoming.id) continue;
-              const existing = runtimeList.find((c) => c.title === incoming.title || c.id === incoming.id);
-              if (existing) {
+              if (!incoming) continue;
+              const existingIndex = spec.runtimeList.findIndex(existing =>
+                existing.conflictStatus !== 'superseded'
+                && existing.conflictStatus !== 'rejected'
+                && existing.validUntilRound == null
+                && sameIdOr(existing, incoming, spec.matchFields)
+              );
+              if (existingIndex >= 0) {
                 conflictTasks.push(async () => {
                   try {
+                    const existing = spec.runtimeList[existingIndex];
                     const judgePrompt = templates.conflictJudge
                       .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
                       .replace(/\{\{currentObject\}\}/g, JSON.stringify(existing))
@@ -107,30 +364,45 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
                     const judgeRaw = await callMemoryAI(ctx.conflictJudgeApiConfig ?? ctx.apiConfig, judgePrompt, '请裁决冲突，输出 JSON。');
                     const judgeResult = parseNarrativeConflictJudgeResult(judgeRaw);
                     if (judgeResult.action === 'reject_incoming') {
-                      incomingList[i] = null as unknown as T;
-                    } else if (judgeResult.action === 'mark_expired') {
-                      // 创建副本再修改，避免直接污染运行时对象
-                      const idx = runtimeList.indexOf(existing);
-                      if (idx !== -1) runtimeList[idx] = { ...existing, status: 'cold' };
+                      incomingList[i] = null;
+                    } else {
+                      conflictDecisions.set(incoming, judgeResult.action);
+                      if (judgeResult.action === 'mark_expired' || judgeResult.action === 'supersede_current') {
+                        if (incoming.previousVersionId == null && typeof existing.id === 'string') {
+                          incoming.previousVersionId = existing.id;
+                        }
+                        applyMemoryConflictDecision(spec.runtimeList, existingIndex, judgeResult, ctx.floor, spec.supersededStatus);
+                      }
                     }
-                  } catch { /* 裁决失败按默认处理 */ }
+                  } catch {
+                    // 裁决不可用时保留双方，避免一次 AI 失败静默覆盖旧事实。
+                    conflictDecisions.set(incoming, 'keep_both');
+                  }
                 });
               }
             }
           };
 
-          checkConflict(eventCandidates, runtime.eventCards);
-          checkConflict(entityPatches, runtime.entityCards);
+          specs.forEach(checkConflict);
 
           if (conflictTasks.length > 0) {
             await Promise.all(conflictTasks.map(t => t()));
-            // 清理被 reject 的元素
-            if (eventCandidates) parsed.eventCandidates = eventCandidates.filter(Boolean);
-            if (entityPatches) parsed.entityPatches = entityPatches.filter(Boolean);
+            for (const spec of specs) {
+              const incomingList = parsed[spec.key];
+              if (Array.isArray(incomingList)) parsed[spec.key] = incomingList.filter(Boolean);
+            }
           }
         }
 
-        applyIngestToRuntime(runtime, parsed);
+        applyIngestToRuntime(runtime, parsed, [sourceEventId], ctx.floor, conflictDecisions);
+        runtime.lastIngestCursor = Math.max(runtime.lastIngestCursor, ctx.floor);
+        if (runtime.lastIngestFailure?.status === 'active') {
+          runtime.lastIngestFailure = {
+            ...runtime.lastIngestFailure,
+            status: 'resolved',
+            resolvedAt: Date.now(),
+          };
+        }
         memStore.bumpRuntimeVersion();
         memStore.appendWriteDebugLog({ kind: 'ingest', message: '写入完成', sourceStartIndex: ctx.floor, sourceEndIndex: ctx.floor });
         return; // 成功，退出
@@ -147,6 +419,20 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
 
     // 所有重试都失败
     const errorMessage = lastError?.message || '写入失败';
+    runtime.lastIngestFailure = {
+      occurredAt: Date.now(),
+      message: errorMessage,
+      sourceStartIndex: ctx.floor,
+      sourceEndIndex: ctx.floor,
+      cursor: runtime.lastIngestCursor,
+      pendingCount: 1,
+      attempt: maxAttempts,
+      maxAttempts,
+      source: 'post_assistant_turn',
+      status: 'active',
+      resolvedAt: 0,
+    };
+    memStore.bumpRuntimeVersion();
     memStore.appendWriteDebugLog({ kind: 'ingest', message: `写入失败: ${errorMessage}`, mode: 'error', sourceStartIndex: ctx.floor, sourceEndIndex: ctx.floor });
     console.error('[记忆写入] 所有重试都失败:', errorMessage);
     throw new Error(`记忆写入失败: ${errorMessage}`);
@@ -178,11 +464,24 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
         const rawResult = await callMemoryAI(ctx.summaryApiConfig ?? ctx.apiConfig, prompt, '请为当前剧情批次产出结构化摘要 JSON。');
         const parsed = parseNarrativeSummaryResult(rawResult);
         const savedAt = Date.now();
+        const sourceEventId = appendSourceEvent(memStore, ctx);
+        const attachSource = (items: typeof parsed.playerMemories) => items.map(item => ({
+          ...item,
+          sourceType: item.sourceType ?? 'summary' as const,
+          layer: item.layer ?? 'summary' as const,
+          confidence: Number.isFinite(item.confidence) ? item.confidence : 0.5,
+          sourceStartIndex: item.sourceStartIndex ?? ctx.floor,
+          sourceEndIndex: item.sourceEndIndex ?? ctx.floor,
+          validFromRound: item.validFromRound ?? ctx.floor,
+          validUntilRound: item.validUntilRound ?? null,
+          sourceEventIds: [...new Set([...(item.sourceEventIds || []), sourceEventId])],
+        }));
 
         memStore.appendSummarySaveRecord({
           savedAt, status: 'success', sourceStartIndex: ctx.floor, sourceEndIndex: ctx.floor,
+          sourceEventIds: [sourceEventId],
           applyResult: { otherCharacterCount: parsed.otherCharacterMemories.length, playerCount: parsed.playerMemories.length, itemCount: parsed.itemMemories.length },
-          summaryData: { otherCharacterMemories: parsed.otherCharacterMemories, playerMemories: parsed.playerMemories, itemMemories: parsed.itemMemories },
+          summaryData: { otherCharacterMemories: attachSource(parsed.otherCharacterMemories), playerMemories: attachSource(parsed.playerMemories), itemMemories: attachSource(parsed.itemMemories) },
         });
         memStore.bumpRuntimeVersion();
         return; // 成功，退出
@@ -221,14 +520,47 @@ export async function executeMemoryVector(memStore: MemoryStore, ctx: MemoryPipe
     const rawResult = await callMemoryAI(ctx.vectorApiConfig ?? ctx.apiConfig, prompt, '请提取长期事实，输出 JSON 数组。');
     const parsed = parseNarrativePayload(rawResult);
     const factsArray = Array.isArray(parsed) ? parsed : Array.isArray(parsed.facts) ? parsed.facts : Array.isArray(parsed.data) ? parsed.data : [];
+    const sourceEventId = appendSourceEvent(memStore, ctx);
 
-    const vectorItems: VectorMemoryItem[] = factsArray
+    let vectorItems: VectorMemoryItem[] = factsArray
       .map((item: unknown, index: number) => {
         const fact = normalizeVectorFact(item);
         if (!fact) return null;
-        return { ...fact, id: `vec_${ctx.floor}_${index}`, searchText: [fact.fact, ...fact.keywords, ...fact.entities].join(' ') } as VectorMemoryItem;
+        return {
+          ...fact,
+          id: `vec_${ctx.floor}_${index}`,
+          sourceStartIndex: ctx.floor,
+          sourceEndIndex: ctx.floor,
+          createdAt: Date.now(),
+          sourceEventIds: [...new Set([...(fact.sourceEventIds || []), sourceEventId])],
+          searchText: [fact.fact, ...fact.keywords, ...fact.entities].join(' '),
+        } as VectorMemoryItem;
       })
       .filter((item): item is VectorMemoryItem => item != null);
+
+    // 本地模型或真实 Embedding 服务可用时写入向量；失败仍保留文本事实供关键词兜底。
+    const config = memStore.config;
+    const embeddingEndpoint = resolveEmbeddingEndpoint(config);
+    const canEmbed = config.vectorRuntime === 'local'
+      || Boolean(embeddingEndpoint && config.vectorApiModel.trim());
+    if (vectorItems.length > 0 && config.semanticRetrieveEnabled && canEmbed) {
+      try {
+        const embeddings = await createEmbeddingClient({
+          ...config,
+          vectorApiKey: config.vectorApiKey.trim() || ctx.apiConfig.apiKey,
+        }).embed(vectorItems.map(vectorSearchText));
+        const embeddedAt = Date.now();
+        vectorItems = vectorItems.map((item, index) => ({
+          ...item,
+          embedding: embeddings[index],
+          embeddingTimestamp: embeddedAt,
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        memStore.appendWriteDebugLog({ kind: 'vector_embedding', message, mode: 'error' });
+        console.warn('[向量写入] Embedding 失败，已保留文本事实:', message);
+      }
+    }
 
     memStore.appendVectorMemories(vectorItems);
     memStore.bumpRuntimeVersion();
@@ -492,17 +824,44 @@ export async function executeMemoryCompile(memStore: MemoryStore, ctx: MemoryPip
 
   const result = formatRuntimeToCompiledText(runtime, queryKeywords, DEFAULT_COMPILE_BUDGET, ctx.resourceState);
 
-  ctx._compiledContext = result.text;
+  const retrievedLines = (ctx._selectedEntries ?? [])
+    .slice(0, memStore.config.compiler.rerankSelectedTotalLimit)
+    .map(entry => `- [第${entry.sourceFloor}轮] ${entry.title}：${entry.summary}`);
+  const vectorLines = (ctx._selectedVectorFacts ?? [])
+    .slice(0, memStore.config.vectorRetrieveTopK)
+    .map(entry => {
+      const fact = String(entry.fact ?? '').trim();
+      const clipped = fact.length > 900 ? `${fact.slice(0, 900)}…` : fact;
+      return `- [长期事实] ${clipped}`;
+    });
+  const recallLines = [...retrievedLines, ...vectorLines];
+
+  // 控制检索补充层体积，避免长存档把系统提示撑爆。
+  const recallBudgetChars = 2400;
+  const keptRecallLines: string[] = [];
+  let recallChars = 0;
+  for (const line of recallLines) {
+    if (keptRecallLines.length > 0 && recallChars + line.length > recallBudgetChars) break;
+    keptRecallLines.push(line);
+    recallChars += line.length;
+  }
+  const recallText = keptRecallLines.length > 0
+    ? `【本轮检索到的长期记忆】\n${keptRecallLines.join('\n')}`
+    : '';
+  const fullText = [result.text, recallText].filter(Boolean).join('\n\n');
+  if (recallText) result.sections.retrieved = recallText;
+
+  ctx._compiledContext = fullText;
   memStore.setCompiledContext({
     compiledAt: Date.now(),
-    fullText: result.text,
+    fullText,
     sections: result.sections,
     sceneAnchor: runtime.sceneAnchor,
   });
 
   memStore.appendCompileDebugLog({
     kind: 'compile',
-    message: `双层编译完成: ${result.tokenEstimate} tokens, hot=[${Object.values(result.hotIds).flat().length} items]`,
+    message: `双层编译完成: ${result.tokenEstimate + Math.ceil(recallText.length / 2.5)} tokens, hot=[${Object.values(result.hotIds).flat().length} items], recalled=${keptRecallLines.length}`,
     sourceStartIndex: ctx.floor,
     sourceEndIndex: ctx.floor,
   });
@@ -534,7 +893,120 @@ function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, playerName: 
   return parts.length > 0 ? parts.join('\n') : '暂无已知参考锚点';
 }
 
-function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<string, unknown>): void {
+function meaningfulSnapshot(value: Record<string, unknown>): string {
+  const ignored = new Set(['createdAt', 'updatedAt', 'sourceEventIds', 'previousVersionId', 'validFromRound', 'validUntilRound', 'conflictStatus']);
+  return JSON.stringify(Object.fromEntries(Object.entries(value).filter(([key]) => !ignored.has(key))));
+}
+
+function versionedUpsert<T extends { id: string }>(
+  list: T[],
+  incoming: T,
+  matcher: (item: T) => boolean,
+  currentRound: number,
+  options: { conflictAction?: ConflictAction } = {},
+): void {
+  const asRecord = (value: T): Record<string, unknown> => value as unknown as Record<string, unknown>;
+  const idx = list.findIndex(item => {
+    const record = asRecord(item);
+    return matcher(item)
+      && record.conflictStatus !== 'superseded'
+      && record.conflictStatus !== 'rejected'
+      && record.validUntilRound == null;
+  });
+  if (idx < 0) {
+    const record = asRecord(incoming);
+    list.push({
+      ...incoming,
+      ...(record.createdAt == null ? { createdAt: Date.now() } : {}),
+      updatedAt: Date.now(),
+    } as T);
+    return;
+  }
+  const existing = list[idx];
+  const existingRecord = asRecord(existing);
+  const incomingRecord = asRecord(incoming);
+  if (meaningfulSnapshot(existingRecord) === meaningfulSnapshot(incomingRecord)) {
+    const existingSourceIds = Array.isArray(existingRecord.sourceEventIds)
+      ? existingRecord.sourceEventIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    const incomingSourceIds = Array.isArray(incomingRecord.sourceEventIds)
+      ? incomingRecord.sourceEventIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    list[idx] = {
+      ...existing,
+      ...incoming,
+      sourceEventIds: [...new Set([...existingSourceIds, ...incomingSourceIds])],
+      updatedAt: Date.now(),
+    } as T;
+    return;
+  }
+  if (options.conflictAction === 'update_current') {
+    list[idx] = {
+      ...existing,
+      ...incoming,
+      id: existing.id,
+      createdAt: existingRecord.createdAt ?? incomingRecord.createdAt ?? Date.now(),
+      sourceEventIds: [...new Set([
+        ...(Array.isArray(existingRecord.sourceEventIds) ? existingRecord.sourceEventIds.filter((id): id is string => typeof id === 'string') : []),
+        ...(Array.isArray(incomingRecord.sourceEventIds) ? incomingRecord.sourceEventIds.filter((id): id is string => typeof id === 'string') : []),
+      ])],
+      conflictStatus: 'none',
+      validUntilRound: incomingRecord.validUntilRound ?? null,
+      updatedAt: Date.now(),
+    } as T;
+    return;
+  }
+  if (options.conflictAction === 'keep_both') {
+    const baseId = String(incoming.id || `${existing.id}@${currentRound}`);
+    let branchId = `${baseId}@branch`;
+    let branchIndex = 2;
+    while (list.some(item => item.id === branchId)) {
+      branchId = `${baseId}@branch${branchIndex++}`;
+    }
+    list.push({
+      ...incoming,
+      id: branchId,
+      previousVersionId: incomingRecord.previousVersionId ?? existing.id,
+      ...(incomingRecord.createdAt == null ? { createdAt: Date.now() } : {}),
+      updatedAt: Date.now(),
+    } as T);
+    return;
+  }
+  const oldId = existing.id;
+  list[idx] = {
+    ...existing,
+    id: uniqueVersionId(list, oldId, currentRound),
+    conflictStatus: 'superseded',
+    validUntilRound: currentRound,
+    updatedAt: Date.now(),
+  } as T;
+  list.push({
+    ...incoming,
+    id: incoming.id || oldId,
+    previousVersionId: oldId,
+    ...(incomingRecord.createdAt == null ? { createdAt: Date.now() } : {}),
+    updatedAt: Date.now(),
+  } as T);
+}
+function normalizeIncomingObject(raw: Record<string, unknown>, sourceEventIds: string[], currentRound: number): Record<string, unknown> {
+  const normalized = normalizeProvenance({ ...raw });
+  const existingIds = Array.isArray(normalized.sourceEventIds)
+    ? normalized.sourceEventIds.filter((id): id is string => typeof id === 'string')
+    : [];
+  normalized.sourceEventIds = [...new Set([...existingIds, ...sourceEventIds])];
+  if (normalized.validFromRound == null) normalized.validFromRound = currentRound;
+  if ('sourceStartIndex' in normalized && normalized.sourceStartIndex == null) normalized.sourceStartIndex = currentRound;
+  if ('sourceEndIndex' in normalized && normalized.sourceEndIndex == null) normalized.sourceEndIndex = currentRound;
+  return normalized;
+}
+
+function applyIngestToRuntime(
+  runtime: NarrativeMemoryRuntime,
+  parsed: Record<string, unknown>,
+  sourceEventIds: string[] = [],
+  currentRound = 0,
+  conflictDecisions?: ConflictDecisionMap,
+): void {
   const scenePatch = parsed.scenePatch as Record<string, string> | undefined;
   if (scenePatch && typeof scenePatch === 'object') {
     const existing = runtime.sceneAnchor;
@@ -551,6 +1023,7 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
       ? scenePatch.presentEntities as string[]
       : (Array.isArray(existing?.presentEntities) ? existing.presentEntities : []);
 
+    const sceneProvenance = normalizeIncomingObject(scenePatch, sourceEventIds, currentRound);
     runtime.sceneAnchor = {
       timeLabel: pick('timeLabel'),
       locationLabel: newLocation,
@@ -560,6 +1033,10 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
       conversationFocus: pick('conversationFocus'),
       recentChange: pick('recentChange'),
       confidence: Number(scenePatch.confidence) || existing?.confidence || 0.5,
+      sourceType: sceneProvenance.sourceType as any,
+      validFromRound: sceneProvenance.validFromRound as number | null,
+      validUntilRound: sceneProvenance.validUntilRound as number | null,
+      sourceEventIds: sceneProvenance.sourceEventIds as string[],
       updatedAt: Date.now(),
     };
 
@@ -583,18 +1060,16 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
   const threadUpserts = parsed.threadUpserts as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(threadUpserts)) {
     for (const thread of threadUpserts) {
-      const idx = runtime.activeThreads.findIndex(t => t.id === thread.id);
-      if (idx >= 0) runtime.activeThreads[idx] = { ...runtime.activeThreads[idx], ...thread, updatedAt: Date.now() } as typeof runtime.activeThreads[number];
-      else runtime.activeThreads.push({ ...thread, createdAt: Date.now(), updatedAt: Date.now() } as typeof runtime.activeThreads[number]);
+      const incoming = normalizeIncomingObject(thread, sourceEventIds, currentRound) as unknown as typeof runtime.activeThreads[number];
+      versionedUpsert(runtime.activeThreads, incoming, item => item.id === incoming.id, currentRound, { conflictAction: conflictDecisions?.get(thread) });
     }
   }
 
   const eventCandidates = parsed.eventCandidates as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(eventCandidates)) {
     for (const card of eventCandidates) {
-      const idx = runtime.eventCards.findIndex(c => c.id === card.id);
-      if (idx >= 0) runtime.eventCards[idx] = { ...runtime.eventCards[idx], ...card, updatedAt: Date.now() } as typeof runtime.eventCards[number];
-      else runtime.eventCards.push({ ...card, createdAt: Date.now(), updatedAt: Date.now() } as typeof runtime.eventCards[number]);
+      const incoming = normalizeIncomingObject(card, sourceEventIds, currentRound) as unknown as typeof runtime.eventCards[number];
+      versionedUpsert(runtime.eventCards, incoming, item => item.id === incoming.id || item.title === incoming.title, currentRound, { conflictAction: conflictDecisions?.get(card) });
     }
   }
 
@@ -602,31 +1077,58 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
   if (Array.isArray(entityPatches)) {
     const ensureArr = (v: unknown): string[] => Array.isArray(v) ? v as string[] : (v ? [String(v)] : []);
     for (const patch of entityPatches) {
+      Object.assign(patch, normalizeIncomingObject(patch, sourceEventIds, currentRound));
       // 防御：currentStatus/aliases/stableFacts/affiliations 应为数组，AI 可能返回字符串
       for (const arrField of ['currentStatus', 'aliases', 'stableFacts', 'affiliations', 'relatedThreads', 'relatedEvents']) {
         if (patch[arrField] && !Array.isArray(patch[arrField])) {
           patch[arrField] = [patch[arrField]];
         }
       }
-      const idx = runtime.entityCards.findIndex(c => c.id === patch.id || c.name === patch.name);
+      const idx = runtime.entityCards.findIndex(c => (c.id === patch.id || c.name === patch.name) && c.conflictStatus !== 'superseded' && c.validUntilRound == null);
+      const existing = idx >= 0 ? runtime.entityCards[idx] : undefined;
+      const priorFacts = ensureArr(existing?.stableFacts);
+      const incomingFacts = ensureArr(patch.stableFacts);
+      const inferenceOnly = patch.layer === 'inference' || patch.sourceType === 'player_inference';
+      const acceptedFacts = inferenceOnly ? [] : incomingFacts;
+      const inferredFacts = inferenceOnly ? incomingFacts : [];
+      const oldLocFacts = Array.isArray(existing?.locationFacts) ? existing.locationFacts : [];
+      const newLocFacts = Array.isArray(patch.locationFacts) ? patch.locationFacts as Array<{ location: string; fact: string }> : [];
+      const mergedLocFacts = [...oldLocFacts, ...newLocFacts].filter((v, i, arr) => arr.findIndex(x => x.location === v.location && x.fact === v.fact) === i).slice(-15);
+      const factHistory = Array.isArray(existing?.factHistory) ? [...existing.factHistory] : [];
+      if (inferredFacts.length > 0) factHistory.push(...inferredFacts.map(fact => ({ fact, recordedAt: Date.now(), sourceType: 'player_inference' as const, layer: 'inference' as const, confidence: Number(patch.confidence) || 0.5, sourceEventIds: patch.sourceEventIds as string[] })));
+      if (existing && acceptedFacts.some(fact => !priorFacts.includes(fact))) factHistory.push(...priorFacts.map(fact => ({ fact, recordedAt: Date.now(), sourceType: existing.sourceType, layer: existing.layer, confidence: existing.confidence, sourceEventIds: existing.sourceEventIds })));
+      const candidate = {
+        ...(existing || {}), ...patch,
+        stableFacts: [...new Set([...priorFacts, ...acceptedFacts])].slice(-10),
+        factHistory: factHistory.slice(-20),
+        locationFacts: mergedLocFacts,
+      } as typeof runtime.entityCards[number];
+      const conflictAction = conflictDecisions?.get(patch);
       if (idx >= 0) {
-        const existing = runtime.entityCards[idx];
-        // locationFacts 累积：保留旧的 + 合并新的，按 location+fact 去重
-        const oldLocFacts = Array.isArray(existing.locationFacts) ? existing.locationFacts : [];
-        const newLocFacts = Array.isArray(patch.locationFacts) ? patch.locationFacts as Array<{ location: string; fact: string }> : [];
-        const mergedLocFacts = [...oldLocFacts, ...newLocFacts]
-          .filter((v, i, arr) => arr.findIndex(x => x.location === v.location && x.fact === v.fact) === i)
-          .slice(-15);
-        runtime.entityCards[idx] = {
-          ...existing, ...patch,
-          // stableFacts 累积而非覆盖，保留历史事实，上限 10 条
-          stableFacts: [...new Set([...ensureArr(existing.stableFacts), ...ensureArr(patch.stableFacts)])].slice(-10),
-          locationFacts: mergedLocFacts,
-          updatedAt: Date.now(),
-        } as typeof runtime.entityCards[number];
-      } else {
-        runtime.entityCards.push({ ...patch, createdAt: Date.now(), updatedAt: Date.now() } as typeof runtime.entityCards[number]);
-      }
+        const oldId = runtime.entityCards[idx].id;
+        if (meaningfulSnapshot(runtime.entityCards[idx] as unknown as Record<string, unknown>) === meaningfulSnapshot(candidate as unknown as Record<string, unknown>)) runtime.entityCards[idx] = { ...runtime.entityCards[idx], sourceEventIds: candidate.sourceEventIds, updatedAt: Date.now() };
+        else if (conflictAction === 'update_current') {
+          runtime.entityCards[idx] = {
+            ...runtime.entityCards[idx],
+            ...candidate,
+            id: oldId,
+            createdAt: runtime.entityCards[idx].createdAt ?? candidate.createdAt,
+            sourceEventIds: [...new Set([...(runtime.entityCards[idx].sourceEventIds || []), ...(candidate.sourceEventIds || [])])],
+            conflictStatus: 'none',
+            validUntilRound: candidate.validUntilRound ?? null,
+            updatedAt: Date.now(),
+          };
+        } else if (conflictAction === 'keep_both') {
+          const baseId = String(candidate.id || oldId);
+          let branchId = `${baseId}@branch`;
+          let branchIndex = 2;
+          while (runtime.entityCards.some(item => item.id === branchId)) branchId = `${baseId}@branch${branchIndex++}`;
+          runtime.entityCards.push({ ...candidate, id: branchId, previousVersionId: candidate.previousVersionId ?? oldId, createdAt: Date.now(), updatedAt: Date.now() });
+        } else {
+          runtime.entityCards[idx] = { ...runtime.entityCards[idx], id: uniqueVersionId(runtime.entityCards, oldId, currentRound), conflictStatus: 'superseded', validUntilRound: currentRound, updatedAt: Date.now() };
+          runtime.entityCards.push({ ...candidate, id: String(patch.id || oldId), previousVersionId: oldId, createdAt: Date.now(), updatedAt: Date.now() });
+        }
+      } else runtime.entityCards.push({ ...candidate, createdAt: Date.now(), updatedAt: Date.now() });
     }
   }
 
@@ -634,9 +1136,12 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
   const stateSlotUpserts = parsed.stateSlotUpserts as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(stateSlotUpserts)) {
     for (const slot of stateSlotUpserts) {
-      const idx = runtime.stateSlots.findIndex(s => s.id === slot.id);
-      if (idx >= 0) runtime.stateSlots[idx] = { ...runtime.stateSlots[idx], ...slot, updatedAt: Date.now() } as NarrativeStateSlot;
-      else runtime.stateSlots.push({ ...slot, createdAt: Date.now(), updatedAt: Date.now() } as NarrativeStateSlot);
+      const incoming = normalizeIncomingObject(slot, sourceEventIds, currentRound) as unknown as typeof runtime.stateSlots[number];
+      const existing = runtime.stateSlots.find(item => item.id === incoming.id && item.conflictStatus !== 'superseded' && item.validUntilRound == null);
+      const history = existing && (existing.value !== incoming.value || existing.summary !== incoming.summary)
+        ? [...(existing.history || []), { value: existing.value, summary: existing.summary, recordedAt: Date.now(), sourceType: existing.sourceType, layer: existing.layer, confidence: existing.confidence, sourceEventIds: existing.sourceEventIds }].slice(-12)
+        : existing?.history;
+      versionedUpsert(runtime.stateSlots, { ...incoming, ...(history ? { history } : {}) }, item => item.id === incoming.id, currentRound, { conflictAction: conflictDecisions?.get(slot) });
     }
   }
 
@@ -644,9 +1149,8 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
   const relationUpserts = parsed.relationUpserts as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(relationUpserts)) {
     for (const edge of relationUpserts) {
-      const idx = runtime.relationEdges.findIndex(r => r.id === edge.id);
-      if (idx >= 0) runtime.relationEdges[idx] = { ...runtime.relationEdges[idx], ...edge, updatedAt: Date.now() } as NarrativeRelationEdge;
-      else runtime.relationEdges.push({ ...edge, createdAt: Date.now(), updatedAt: Date.now() } as NarrativeRelationEdge);
+      const incoming = normalizeIncomingObject(edge, sourceEventIds, currentRound) as unknown as typeof runtime.relationEdges[number];
+      versionedUpsert(runtime.relationEdges, incoming, item => item.id === incoming.id || (item.sourceEntityId === incoming.sourceEntityId && item.targetEntityId === incoming.targetEntityId && item.relationType === incoming.relationType), currentRound, { conflictAction: conflictDecisions?.get(edge) });
     }
   }
 
@@ -654,9 +1158,8 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
   const relationNetworkUpserts = parsed.relationNetworkUpserts as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(relationNetworkUpserts)) {
     for (const item of relationNetworkUpserts) {
-      const idx = runtime.relationNetwork.findIndex(r => r.id === item.id);
-      if (idx >= 0) runtime.relationNetwork[idx] = { ...runtime.relationNetwork[idx], ...item, updatedAt: Date.now() } as NarrativeRelationNetworkItem;
-      else runtime.relationNetwork.push({ ...item, createdAt: Date.now(), updatedAt: Date.now() } as NarrativeRelationNetworkItem);
+      const incoming = normalizeIncomingObject(item, sourceEventIds, currentRound) as unknown as typeof runtime.relationNetwork[number];
+      versionedUpsert(runtime.relationNetwork, incoming, existing => existing.id === incoming.id || (existing.sourceEntityId === incoming.sourceEntityId && existing.targetEntityId === incoming.targetEntityId && existing.relationType === incoming.relationType), currentRound, { conflictAction: conflictDecisions?.get(item) });
     }
   }
 
@@ -665,22 +1168,29 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
   if (Array.isArray(archiveHints)) {
     for (const hint of archiveHints) {
       const id = (hint.id as string) || `arc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      const idx = runtime.archiveCards.findIndex(a => a.id === id);
+      const normalizedHint = normalizeIncomingObject(hint, sourceEventIds, currentRound);
       const card: NarrativeArchiveCard = {
+        ...normalizedHint,
         id,
-        title: (hint.title as string) || '',
-        arcTitle: (hint.title as string) || '',
-        summary: (hint.summary as string) || '',
-        timeSpan: (hint.timeSpan as string) || '',
-        keywords: Array.isArray(hint.keywords) ? [...hint.keywords] as string[] : [],
-        entityRefs: [],
-        sourceStartIndex: null,
-        sourceEndIndex: null,
-        createdAt: Date.now(),
+        title: String(hint.title ?? ''),
+        arcTitle: String(hint.arcTitle ?? hint.title ?? ''),
+        summary: String(hint.summary ?? ''),
+        timeSpan: String(hint.timeSpan ?? ''),
+        keywords: Array.isArray(hint.keywords) ? hint.keywords.filter((value): value is string => typeof value === 'string') : [],
+        entityRefs: Array.isArray(hint.entityRefs) ? hint.entityRefs.filter((value): value is string => typeof value === 'string') : [],
+        sourceStartIndex: Number.isFinite(Number(hint.sourceStartIndex)) ? Number(hint.sourceStartIndex) : currentRound,
+        sourceEndIndex: Number.isFinite(Number(hint.sourceEndIndex)) ? Number(hint.sourceEndIndex) : currentRound,
+        sourceEventIds: [...new Set([...(Array.isArray(hint.sourceEventIds) ? hint.sourceEventIds : []), ...sourceEventIds])],
+        createdAt: Number(hint.createdAt) || Date.now(),
         archivedAt: Date.now(),
-      };
-      if (idx >= 0) runtime.archiveCards[idx] = { ...runtime.archiveCards[idx], ...card };
-      else runtime.archiveCards.push(card);
+      } as NarrativeArchiveCard;
+      versionedUpsert(
+        runtime.archiveCards,
+        card as NarrativeArchiveCard & Record<string, unknown>,
+        item => item.id === id || item.title === card.title,
+        currentRound,
+        { conflictAction: conflictDecisions?.get(hint) },
+      );
     }
   }
 
@@ -688,19 +1198,5 @@ function applyIngestToRuntime(runtime: NarrativeMemoryRuntime, parsed: Record<st
 }
 
 export function collectAllMemoriesFromRuntime(runtime: NarrativeMemoryRuntime) {
-  const memories: Array<{ id: string; title: string; summary: string; keywords: string[]; type: 'player' | 'otherCharacter' | 'item'; sourceFloor: number; savedAt: number }> = [];
-  for (const record of runtime.summarySaveHistory) {
-    if (!record.summaryData) continue;
-    const floor = record.sourceStartIndex ?? 0;
-    for (const item of record.summaryData.playerMemories ?? []) {
-      memories.push({ id: item.id || `pm_${floor}_${memories.length}`, title: item.title, summary: item.summary, keywords: Array.isArray(item.keywords) ? item.keywords : [], type: 'player', sourceFloor: floor, savedAt: item.savedAt ?? record.savedAt });
-    }
-    for (const item of record.summaryData.otherCharacterMemories ?? []) {
-      memories.push({ id: item.id || `oc_${floor}_${memories.length}`, title: item.title, summary: item.summary, keywords: Array.isArray(item.keywords) ? item.keywords : [], type: 'otherCharacter', sourceFloor: floor, savedAt: item.savedAt ?? record.savedAt });
-    }
-    for (const item of record.summaryData.itemMemories ?? []) {
-      memories.push({ id: item.id || `im_${floor}_${memories.length}`, title: item.title, summary: item.summary, keywords: Array.isArray(item.keywords) ? item.keywords : [], type: 'item', sourceFloor: floor, savedAt: item.savedAt ?? record.savedAt });
-    }
-  }
-  return memories;
+  return collectMemoryEntries(runtime);
 }

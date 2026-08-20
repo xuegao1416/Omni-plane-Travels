@@ -60,7 +60,7 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
 
       const execResult = executeCardWorkflow(workflow, ctx);
 
-      setTitle(worldName);
+      setTitle(workflow.name || worldName);
       setCurrent(evt);
       setSelectedChoice(null);
       setResult(execResult);
@@ -92,7 +92,7 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
       blockId: 'choice-0',
       selectedIndex: index,
       effect: choice.effect ? { statId: choice.effect.statId ?? '', resourcePath: choice.effect.resourcePath, delta: choice.effect.delta } : undefined,
-      aiNote: choice.aiNote,
+      aiNote: `事件「${title || current.cardId}」中，玩家选择了「${choice.label}」。${choice.aiNote ?? ''}`.trim(),
       baseStatValue: 0,
     });
 
@@ -147,7 +147,7 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
         padding: 'var(--space-6)',
       }}
     >
-      <JourneyCardShell mode="panel" className="game-journey-card--event" label="浜嬩欢鍗?">
+      <JourneyCardShell mode="panel" className="game-journey-card--event" label="事件卡">
         <div
           className="event-fade-in game-journey-card__event-content"
           onClick={(e) => e.stopPropagation()}

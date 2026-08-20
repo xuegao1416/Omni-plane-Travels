@@ -7,6 +7,7 @@ import type { WorkflowDefinition, WorkflowExecutionContext, WorkflowExecutionRes
 import { executeWorkflow } from './workflowEngine';
 import type { EvaluateResult } from './ruleEngine';
 import type { WorldContext, EventRuntimeState, Literal } from './schema';
+import './nodeExecutors';
 
 /** setPath：沿点分路径写值（同 ruleEngine 内部的实现） */
 function setPath(obj: Record<string, unknown>, path: string, value: unknown): void {

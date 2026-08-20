@@ -49,7 +49,7 @@ export interface AssemblerContext {
   firewallTitle: string;
   /** 角色认知防火墙内容 */
   firewallContent: string;
-  /** 当前用户输入文本（用于 green 触发过滤） */
+  /** 当前用户输入文本（用于 green 触发过滤 + {{lastUserMessage}} 宏） */
   userText: string;
   /** 当前轮次 */
   round: number;
@@ -63,6 +63,21 @@ export interface AssemblerContext {
   playerDecisionContext?: string;
   /** 世界书 atDepth 条目（需要插入到聊天历史中的指定深度） */
   atDepthEntries?: Array<{ depth: number; content: string }>;
+  /** 玩家角色名（供 {{user}} 宏解析；双人成行等第三方预设使用） */
+  userPersonaName?: string;
+}
+
+/** 组装结果 */
+export interface AssembleResult {
+  /** 系统提示正文（已解析宏，前置区块 + 预设主体） */
+  systemPrompt: string;
+  /** 尾部 assistant 预填充（SillyTavern 兼容：最后一个 role=assistant 的 enabled 条目解析后内容）。
+   *  供调用方作为 trailing assistant message 追加，以原样保留原始 assistant 起笔语义。
+   *  现有 4 个内置预设无 assistant 条目，此字段为 undefined，行为不变。 */
+  assistantPrefill?: string;
+  /** 预设自带的深度注入条目（injection_position=1，如双人成行的 🔒丨文风 depth=2）。
+   *  供调用方合并进 atDepthEntries，注入到聊天历史指定深度。现有 4 预设无此类条目。 */
+  depthEntries: Array<{ depth: number; content: string }>;
 }
 
 /**
@@ -77,23 +92,40 @@ export interface AssemblerContext {
  * 6. 预设提示词条目（按 order 排序，过滤 enabled + 触发模式）
  *
  * 每个条目的 content 在拼接前通过 macroEngine.resolve() 解析宏
+ *
+ * 特殊处理（SillyTavern 兼容，仅对含相关条目的预设生效，不影响现有 4 预设）：
+ * - role=assistant 条目：最后一个（按 order）解析为 assistantPrefill，不进系统提示正文；
+ *   其余 assistant 条目文本仍按序并入正文（role 降级为 system，文本逐字保留）。
+ * - injectionPosition=1 条目：从正文剥离，转为 depthEntries 供调用方注入聊天历史。
  */
 export function assembleSystemPrompt(
   preset: PresetPack,
   ctx: AssemblerContext,
-): string {
+): AssembleResult {
+  // 注入 {{user}} / {{lastUserMessage}} 宏上下文
+  ctx.macroEngine.setVar('user', ctx.userPersonaName ?? '');
+  ctx.macroEngine.setVar('lastUserMessage', ctx.userText ?? '');
+
   // 1. 获取已启用的条目并按 order 排序
   const enabled = getEnabledPrompts(preset);
 
   // 2. 过滤 green 触发的条目
   const triggered = filterTriggeredPrompts(enabled, ctx.userText);
 
+  // 找到最后一个 role=assistant 条目的下标（用于剥离为 assistantPrefill）
+  let lastAssistantIdx = -1;
+  triggered.forEach((p, i) => { if (p.role === 'assistant') lastAssistantIdx = i; });
+
   // 3. 解析每个条目的宏并拼接
   // 对 varSnapshot 做 token budget 裁剪，防止系统提示过大撑爆上下文
   const VAR_SNAPSHOT_TOKEN_BUDGET = 1800;
   const trimmedVarSnapshot = trimToTokenBudget(ctx.varSnapshot, VAR_SNAPSHOT_TOKEN_BUDGET);
 
-  const resolvedParts = triggered.map(entry => {
+  const bodyParts: string[] = [];
+  const depthEntries: Array<{ depth: number; content: string }> = [];
+  let assistantPrefill: string | undefined;
+
+  triggered.forEach((entry, i) => {
     let content = entry.content;
 
     // 替换 {{VAR_SNAPSHOT}} 占位符（延迟绑定）
@@ -102,10 +134,26 @@ export function assembleSystemPrompt(
     // 通过宏引擎解析其他宏
     content = ctx.macroEngine.resolve(content);
 
-    return content;
+    // 深度注入条目：剥离正文，转为 depthEntries
+    if (entry.injectionPosition === 1) {
+      if (content.trim()) {
+        depthEntries.push({ depth: entry.injectionDepth ?? 4, content });
+      }
+      return;
+    }
+
+    // 尾部 assistant 条目：剥离正文，作为 assistantPrefill
+    if (i === lastAssistantIdx) {
+      if (content.trim()) {
+        assistantPrefill = content;
+      }
+      return;
+    }
+
+    bodyParts.push(content);
   });
 
-  const presetBody = resolvedParts.join('\n\n');
+  const presetBody = bodyParts.join('\n\n');
 
   // 4. 组装最终系统提示（前置部分 + 预设主体）
   const parts: string[] = [];
@@ -139,7 +187,7 @@ export function assembleSystemPrompt(
 
   parts.push(presetBody);
 
-  return parts.join('\n\n');
+  return { systemPrompt: parts.join('\n\n'), assistantPrefill, depthEntries };
 }
 
 /**

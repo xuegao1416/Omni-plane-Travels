@@ -11,9 +11,10 @@ interface PromptEntryProps {
   onToggle: () => void;
   onUpdate: (patch: Partial<PresetPromptEntry>) => void;
   onDelete: () => void;
+  editableContent?: boolean;
 }
 
-export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onToggle, onUpdate, onDelete }: PromptEntryProps) {
+export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onToggle, onUpdate, onDelete, editableContent = false }: PromptEntryProps) {
   return (
     <div style={{
       borderRadius: '8px',
@@ -105,12 +106,12 @@ export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onTog
           </Field>
 
           {/* 内容预览/编辑 */}
-          <Field label="内容">
+          <Field label={builtin && editableContent ? '内容（可编辑）' : '内容'}>
             <textarea
               className="input-field"
               style={{ ...inputStyle, fontFamily: 'monospace', minHeight: '120px', resize: 'vertical', fontSize: 'var(--font-size-xs)' }}
               value={p.content}
-              disabled={builtin}
+              disabled={builtin && !editableContent}
               onChange={e => onUpdate({ content: e.target.value })}
             />
           </Field>

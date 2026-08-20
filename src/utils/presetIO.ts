@@ -17,6 +17,8 @@ export function exportPresetJSON(pack: PresetPack): string {
   // 导出为 SillyTavern 兼容格式
   const exportData: Record<string, unknown> = {
     name: pack.name,
+    ...(pack.description && { description: pack.description }),
+    ...(pack.attribution && { attribution: pack.attribution }),
     // 模型参数（如果有）
     ...(pack.temperature != null && { temperature: pack.temperature }),
     ...(pack.top_p != null && { top_p: pack.top_p }),
@@ -106,6 +108,17 @@ export function parsePresetJSON(jsonStr: string): ValidateResult<PresetPack> {
   const top_p = typeof data.top_p === 'number' ? data.top_p : undefined;
   const max_tokens = typeof data.max_tokens === 'number' ? data.max_tokens : undefined;
   const max_context = typeof data.max_context === 'number' ? data.max_context : undefined;
+  const rawAttribution = data.attribution;
+  const attribution = isObj(rawAttribution)
+    && isStr(rawAttribution.author)
+    && isStr(rawAttribution.sourceUrl)
+    && /^https?:\/\//i.test(rawAttribution.sourceUrl)
+    ? {
+      author: rawAttribution.author,
+      sourceUrl: rawAttribution.sourceUrl,
+      ...(isStr(rawAttribution.note) && { note: rawAttribution.note }),
+    }
+    : undefined;
 
   return {
     ok: true,
@@ -120,6 +133,7 @@ export function parsePresetJSON(jsonStr: string): ValidateResult<PresetPack> {
       prompts,
       regexScripts,
       builtin: false,
+      attribution,
     },
   };
 }

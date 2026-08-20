@@ -66,6 +66,9 @@ export default function ProviderForm({
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>模型名称</div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
+            可手动填写；部分 DeepSeek 公益站不开放模型列表
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <input

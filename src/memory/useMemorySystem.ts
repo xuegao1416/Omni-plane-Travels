@@ -12,7 +12,9 @@ import type {
   SummarySaveRecord,
   VectorFact,
   VectorMemoryItem,
+  MemoryEntry,
 } from './types';
+import { collectMemoryEntries } from './memoryCandidates';
 import {
   parseNarrativePayload,
   parseNarrativeSummaryResult,
@@ -26,15 +28,7 @@ import { formatRuntimeToCompiledText, DEFAULT_COMPILE_BUDGET } from './compileFo
 
 // ─── 类型定义 ───
 
-export interface MemoryEntry {
-  id: string;
-  title: string;
-  summary: string;
-  keywords: string[];
-  type: 'player' | 'otherCharacter' | 'item';
-  sourceFloor: number;
-  savedAt: number;
-}
+export type { MemoryEntry } from './types';
 
 export interface RetrieveResult {
   entries: MemoryEntry[];
@@ -51,6 +45,8 @@ export interface MemoryPipelineContext {
   batchText: string;
   /** 用户输入 */
   inputText: string;
+  /** 本轮 AI 原文；首轮准备阶段可能尚未填充。 */
+  assistantText?: string;
   /** 最近上下文 */
   recentContext: string;
   /** 玩家名字 */
@@ -68,6 +64,8 @@ export interface MemoryPipelineContext {
   _plannerResult?: ReturnType<typeof parseNarrativeRetrievePlannerResult>;
   _rerankResult?: ReturnType<typeof parseRerankResult>;
   _selectedEntries?: MemoryEntry[];
+  /** 当前输入通过真实 embedding 召回的长期事实 */
+  _selectedVectorFacts?: Array<VectorMemoryItem & { similarity?: number }>;
   _compiledContext?: string;
   /** 查询改写阶段数据 */
   _retrievalKeywords?: string[];
@@ -145,21 +143,7 @@ function sortByFloorAsc(entries: MemoryEntry[]): MemoryEntry[] {
 }
 
 function collectAllMemories(runtime: NarrativeMemoryRuntime): MemoryEntry[] {
-  const memories: MemoryEntry[] = [];
-  for (const record of runtime.summarySaveHistory) {
-    if (!record.summaryData) continue;
-    const floor = record.sourceStartIndex ?? 0;
-    for (const item of record.summaryData.playerMemories ?? []) {
-      memories.push({ id: item.id || `pm_${floor}_${memories.length}`, title: item.title, summary: item.summary, keywords: item.keywords ?? [], type: 'player', sourceFloor: floor, savedAt: item.savedAt ?? record.savedAt });
-    }
-    for (const item of record.summaryData.otherCharacterMemories ?? []) {
-      memories.push({ id: item.id || `oc_${floor}_${memories.length}`, title: item.title, summary: item.summary, keywords: item.keywords ?? [], type: 'otherCharacter', sourceFloor: floor, savedAt: item.savedAt ?? record.savedAt });
-    }
-    for (const item of record.summaryData.itemMemories ?? []) {
-      memories.push({ id: item.id || `im_${floor}_${memories.length}`, title: item.title, summary: item.summary, keywords: item.keywords ?? [], type: 'item', sourceFloor: floor, savedAt: item.savedAt ?? record.savedAt });
-    }
-  }
-  return memories;
+  return collectMemoryEntries(runtime);
 }
 
 import { waitForRateLimit } from '../api/rateLimiter';

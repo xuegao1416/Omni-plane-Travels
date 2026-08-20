@@ -5,7 +5,7 @@ export const CUSTOM_MODULE_LIFECYCLES = ['onGameStart', 'onTurnEnd', 'onTick', '
 export const CUSTOM_MODULE_STATE_FIELD_TYPES = ['number', 'string', 'boolean', 'enum', 'array', 'object'] as const;
 export const CUSTOM_MODULE_CONDITION_KINDS = ['compare', 'all', 'any', 'not'] as const;
 export const CUSTOM_MODULE_ACTION_KINDS = ['set', 'add', 'subtract', 'toggle', 'append', 'remove', 'log'] as const;
-export const CUSTOM_MODULE_VIEW_COMPONENTS = ['section', 'text', 'number', 'progress', 'badge', 'list', 'table', 'divider', 'conditional', 'button'] as const;
+export const CUSTOM_MODULE_VIEW_COMPONENTS = ['section', 'card', 'text', 'number', 'progress', 'badge', 'list', 'table', 'divider', 'conditional', 'button'] as const;
 
 export type CustomModuleValueType = 'number' | 'string' | 'boolean' | 'array' | 'object';
 

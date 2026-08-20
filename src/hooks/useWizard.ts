@@ -47,6 +47,12 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
     ...(initialPersonalInfo || {}),
   });
 
+  // 开始一段全新的旅程时，不应把上一个存档的旅者资料带进向导。
+  const resetForNewJourney = () => {
+    setPersonalInfo({ ...emptyProfile });
+    setStep(1);
+  };
+
   // 返回首页时重置角色信息
   const prevViewRef = useRef(view);
   useEffect(() => {
@@ -166,6 +172,7 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
     worldEntry,
     // 角色
     personalInfo, setPersonalInfo,
+    resetForNewJourney,
     // 世界列表
     allWorlds, createdWorlds,
     // 编辑器

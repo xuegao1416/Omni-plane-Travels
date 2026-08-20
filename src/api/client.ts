@@ -419,52 +419,70 @@ export async function requestStreamWithRetry(
   });
 }
 
+function getModelListUrls(config: ApiConfig): string[] {
+  const base = config.baseUrl.replace(/\/+$/, '');
+  if (config.provider === 'google') {
+    return [`${base}/v1beta/models?key=${config.apiKey}`];
+  }
+
+  const standardUrl = base.endsWith('/v1') || base.endsWith('/openai')
+    ? `${base}/models`
+    : base.endsWith('/v1/chat/completions')
+      ? base.replace(/\/chat\/completions$/, '/models')
+      : /\/v\d+\//.test(base)
+        ? `${base}/models`
+        : `${base}/v1/models`;
+
+  // DeepSeek 官方接口及部分公益站把模型目录放在 /models，
+  // 但聊天接口仍使用 /v1/chat/completions；两种路径都兼容。
+  if (config.provider !== 'deepseek') return [standardUrl];
+  const root = base
+    .replace(/\/chat\/completions\/?$/, '')
+    .replace(/\/v\d+\/?$/, '');
+  return [...new Set([`${root}/models`, standardUrl])];
+}
+
 // 获取模型列表（使用 nativeFetch 绕过 CORS）
 export async function fetchModels(config: ApiConfig): Promise<string[]> {
-  const base = config.baseUrl.replace(/\/+$/, '');
-  let url: string;
-  if (config.provider === 'google') {
-    url = `${base}/v1beta/models?key=${config.apiKey}`;
-  } else if (base.endsWith('/v1') || base.endsWith('/openai')) {
-    url = `${base}/models`;
-  } else if (base.endsWith('/v1/chat/completions')) {
-    url = base.replace(/\/chat\/completions$/, '/models');
-  } else if (/\/v\d+\//.test(base)) {
-    url = `${base}/models`;
-  } else {
-    url = `${base}/v1/models`;
+  const urls = getModelListUrls(config);
+  const failures: string[] = [];
+
+  for (const url of urls) {
+    const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
+      url,
+      config.provider !== 'google' ? config.apiKey : undefined,
+    );
+
+    // 每个候选地址单独计时，避免某个公益站端点无响应时按钮一直转圈。
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await nativeFetch(fetchUrl, { headers: fetchHeaders, signal: controller.signal });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        failures.push(`${url} → ${res.status} ${errText.slice(0, 120)}`);
+        continue;
+      }
+      const json = await res.json();
+      const models = Array.isArray(json.data) ? json.data : Array.isArray(json.models) ? json.models : [];
+      const modelIds = models.map((m: any) => m.id || m.name).filter(Boolean);
+      if (modelIds.length > 0) return modelIds;
+      failures.push(`${url} → 返回了空模型列表`);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        failures.push(`${url} → 请求超时(30秒)`);
+      } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+        failures.push(`${url} → 网络请求失败`);
+      } else {
+        failures.push(`${url} → ${errMsg}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
-    url,
-    config.provider !== 'google' ? config.apiKey : undefined,
-  );
-
-  // 30秒超时，避免请求无响应时按钮永远转圈
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-  try {
-    const res = await nativeFetch(fetchUrl, { headers: fetchHeaders, signal: controller.signal });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`获取模型列表失败: ${res.status} ${errText.slice(0, 200)}`);
-    }
-    const json = await res.json();
-    const models = json.data || json.models || [];
-    return models.map((m: any) => m.id || m.name).filter(Boolean);
-  } catch (err: unknown) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('请求超时(30秒)，请检查网络连接或 API 地址是否正确');
-    }
-    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
-      throw new Error('网络请求失败，请检查 API 地址是否正确');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  throw new Error(`获取模型列表失败：${failures.join('；')}。部分公益站不开放模型列表时，可直接手动填写模型名称。`);
 }
 
 // 测试连接（使用 nativeFetch 绕过 CORS）
@@ -605,14 +623,36 @@ export async function fetchEmbeddingBatch(
     throw new Error('Embedding 批量响应格式无效');
   }
 
-  // 按 index 排序
-  const sorted = [...data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-  return sorted.map(item => {
-    if (!Array.isArray(item.embedding)) {
-      throw new Error(`Embedding 第 ${item.index} 项格式无效`);
+  if (data.length !== texts.length) {
+    throw new Error(`Embedding 批量响应数量不匹配：期望 ${texts.length}，实际 ${data.length}`);
+  }
+
+  const sorted: Array<{ index: number; embedding: number[] }> = [];
+  let dimension: number | null = null;
+  for (const item of data) {
+    if (!item || typeof item !== 'object' || !Number.isInteger((item as { index?: unknown }).index)) {
+      throw new Error('Embedding 批量响应索引无效');
     }
-    return item.embedding as number[];
-  });
+    const index = (item as { index: number }).index;
+    if (index < 0 || index >= texts.length || sorted.some(row => row.index === index)) {
+      throw new Error(`Embedding 批量响应索引重复或越界：${index}`);
+    }
+    const embedding = (item as { embedding?: unknown }).embedding;
+    if (!Array.isArray(embedding) || embedding.length === 0 || embedding.some(value => typeof value !== 'number' || !Number.isFinite(value))) {
+      throw new Error(`Embedding 第 ${index} 项格式无效`);
+    }
+    if (dimension == null) dimension = embedding.length;
+    if (embedding.length !== dimension) {
+      throw new Error(`Embedding 第 ${index} 项维度不一致`);
+    }
+    sorted.push({ index, embedding });
+  }
+
+  sorted.sort((a, b) => a.index - b.index);
+  for (let index = 0; index < sorted.length; index++) {
+    if (sorted[index].index !== index) throw new Error(`Embedding 批量响应缺少索引：${index}`);
+  }
+  return sorted.map(item => item.embedding);
 }
 
 // ─── Rerank API (记忆系统精排) ───

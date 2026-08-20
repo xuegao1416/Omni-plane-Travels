@@ -54,6 +54,17 @@ describe('custom gameplay module storage', () => {
     expect(await listCustomGameplayModules()).toEqual([]);
   });
 
+  test('persists complete agent transcripts independently for each world', async () => {
+    const first = createCustomModuleAgentSession({ id: 'world-a', name: 'World A' });
+    first.conversation = [{ role: 'assistant', content: '欢迎 A' }, { role: 'user', content: '做一个声望模块' }];
+    const second = createCustomModuleAgentSession({ id: 'world-b', name: 'World B' });
+    second.conversation = [{ role: 'assistant', content: '欢迎 B' }];
+    await saveCustomModuleAgentSession(first);
+    await saveCustomModuleAgentSession(second);
+    expect((await loadCustomModuleAgentSession('world-a'))?.conversation).toEqual(first.conversation);
+    expect((await loadCustomModuleAgentSession('world-b'))?.conversation).toEqual(second.conversation);
+  });
+
   test('ignores a corrupted agent session snapshot', async () => {
     await saveCustomModuleAgentSession({ sessionVersion: 99, world: null } as never);
     expect(await loadCustomModuleAgentSession()).toBeUndefined();
@@ -79,6 +90,21 @@ describe('custom gameplay module storage', () => {
 
     await disableCustomGameplayModuleForWorld('mood-system', 'world-a');
     expect(await getCustomGameplayModulesForWorld('world-a')).toEqual([]);
+  });
+
+  test('requires dependencies to be enabled, bound, and version-compatible', async () => {
+    const dependency = { ...moduleDefinition, id: 'core-module', version: '1.0.0' };
+    const dependent = { ...moduleDefinition, id: 'dependent-module', dependencies: [{ id: dependency.id, version: '1.1.0' }] };
+    await saveCustomGameplayModule(dependency);
+    await saveCustomGameplayModule(dependent);
+    await bindCustomGameplayModule(dependent.id, 'world-a');
+    expect(await getCustomGameplayModulesForWorld('world-a')).toEqual([]);
+
+    await bindCustomGameplayModule(dependency.id, 'world-a');
+    expect((await getCustomGameplayModulesForWorld('world-a')).map((item) => item.module.id)).toEqual(['core-module']);
+
+    await saveCustomGameplayModule({ ...dependency, version: '1.1.0' });
+    expect((await getCustomGameplayModulesForWorld('world-a')).map((item) => item.module.id)).toEqual(['core-module', 'dependent-module']);
   });
 
   test('initializes only the customModules namespace and preserves core game state', () => {

@@ -183,6 +183,23 @@ export function executeWorkflow(
     // 合并 widget 值到 inputs（widget 值作为额外上下文）
     const widgetValues = node.widgetValues ?? {};
 
+    // Connected flow sockets gate downstream execution. Without this, false
+    // triggers and failed conditions still execute their actions.
+    const connectedFlowInputs = def.inputs.filter((inputDef) =>
+      inputDef.type === 'flow'
+      && (revAdj.get(nodeId) ?? []).some((edge) => edge.targetSocket === inputDef.key),
+    );
+    if (connectedFlowInputs.some((inputDef) => inputs[inputDef.key] !== true)) {
+      const outputs: Record<string, unknown> = {};
+      for (const outputDef of def.outputs) {
+        if (outputDef.type === 'flow') outputs[outputDef.key] = false;
+      }
+      nodeOutputs.set(nodeId, outputs);
+      executedCount++;
+      node.runtimeState = { executed: false, outputs };
+      continue;
+    }
+
     // 获取执行器
     const executor = getNodeExecutor(node.typeId);
     if (!executor) {

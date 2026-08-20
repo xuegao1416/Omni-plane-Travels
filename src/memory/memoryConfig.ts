@@ -113,6 +113,7 @@ function createDefaultRetentionConfig(): MemoryRetentionConfig {
     maxHotEventCards: 50,
     checkpointInterval: 12,
     maxVectorMemories: 500,
+    maxSourceEvents: 200,
   };
 }
 
@@ -159,6 +160,9 @@ export function createDefaultMemorySystemConfig(): MemorySystemConfig {
     vectorApiUrl: '',
     vectorApiKey: '',
     vectorApiModel: 'text-embedding-3-small',
+    vectorRuntime: 'remote',
+    localEmbeddingModelId: 'onnx-community/bge-small-zh-v1.5-ONNX',
+    localEmbeddingEndpoint: 'http://127.0.0.1:8080/v1',
     vectorRerankApiUrl: '',
     vectorRerankApiKey: '',
     vectorRerankModel: '',

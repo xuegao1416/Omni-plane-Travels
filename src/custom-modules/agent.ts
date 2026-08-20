@@ -8,6 +8,7 @@ import {
   type CustomModuleAgentPhase,
   type CustomModuleAgentSession,
   type CustomModuleAgentWorldContext,
+  type CustomModuleConversationMessage,
 } from './agentSession';
 import { buildCustomModuleCapabilityCatalog } from './capabilities';
 import type { CustomGameplayModuleDefinition, ModuleValidationIssue } from './schema';
@@ -44,10 +45,7 @@ export type CustomModuleAgentTurnResult = {
   session?: CustomModuleAgentSession;
 };
 
-export interface CustomModuleConversationMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+export type { CustomModuleConversationMessage } from './agentSession';
 
 function errorIssue(message: string, code = 'invalid-agent-output'): ModuleValidationIssue {
   return { path: [], code, severity: 'error', message };
@@ -170,8 +168,8 @@ function buildBaseCustomModuleAgentSystemPrompt(
   return `你是 Omni Plane Travels 的自定义玩法模块共创 Agent。你必须先理解需求，再生成可审查的声明式模块。\n
 本轮只输出一个 JSON envelope：message、phase、brief、可选 question、module。phase 只能是 discovery、designing、draft_ready、revising；每轮最多一个 question。需求未闭合时 module 必须为 null；需求足够时直接返回完整模块。修订必须返回完整新模块，未提及部分保持原样。玩家说“你看着办”时，把明确选择写入 brief.assumptions。\n
 下面是运行时导出的能力目录，禁止生成目录之外的输入、生命周期、动作、状态类型或视图组件：\n${JSON.stringify(catalog)}\n
-V2 模块必须 schemaVersion=2、inputs 只绑定能力目录中的安全路径、logic 包含 onGameStart/onTurnEnd/onTick/onChoice/onButton；permissions.read 必须精确列出 inputs 使用的每一条宿主路径，不要声明未使用路径；条件可读 state/input/event，动作值可用字面量或安全引用，写入只能指向自身 state。禁止 code、script、eval、import、网络、文件、Tauri 或任意代码执行。V1 仅用于兼容历史模块，不作为新生成默认。\n
-模块 kind 固定为 "custom-gameplay-module"，scope 固定为 "world"，permissions.write 固定为 "own-state-only"；可视模块使用 right-panel 或 left-panel。规则动作使用完整的 actions 数组，例如 "onTurnEnd":[{"actions":[{"type":"add","path":"count","value":1}]}]。示例结构："actions": [{ "type": "add", "path": "count", "value": 1 }]。Do not output legacy rule fields。不要输出旧式 action/path/value 规则。合法视图例子：{"type":"progress","path":"count"}、{"type":"table","path":"rows","columns":[{"key":"name","label":"名称"}]}。\n
+V2 模块必须 schemaVersion=2、inputs 只绑定能力目录中的安全路径、logic 包含 onGameStart/onTurnEnd/onTick/onChoice/onButton；permissions.read 必须精确列出 inputs 使用的每一条宿主路径，不要声明未使用路径；条件可读 state/input/event，动作值可用字面量或安全引用，写入只能指向自身 state。可选 dependencies 只声明确实需要的其他模块 id 和版本。禁止 code、script、eval、import、网络、文件、Tauri 或任意代码执行。V1 仅用于兼容历史模块，不作为新生成默认。\n
+模块 kind 固定为 "custom-gameplay-module"，scope 固定为 "world"，permissions.write 固定为 "own-state-only"；可视模块使用 right-panel 或 left-panel。规则动作必须使用完整的 actions 数组，不要输出旧式 action/path/value 规则。card 视图可使用 title、body、声明式 children 和最多 4 个安全操作按钮。\n
 brief 字段必须完整返回：goal、presentation、triggers、inputs、state、behavior、outputs、assumptions、unresolved。当前世界：${world?.name ?? '当前世界'}（${world?.id ?? 'unknown'}）。`;
 }
 

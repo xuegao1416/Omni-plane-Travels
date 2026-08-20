@@ -30,6 +30,7 @@ import type {
 import { EventPackFormatError, normalizeCardPackFiles, parseCanonicalEventIndex } from './eventPackFormat';
 import { ensureEventApiError, EventApiError } from './eventErrors';
 import type { EventApiErrorCode } from './eventErrors';
+import { normalizeBuiltinCardWorkflow, WORLD_WORKFLOWS } from './worldWorkflows';
 import {
   putWebEvent,
   getWebEvent,
@@ -44,7 +45,7 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.7.4';
+const APP_VERSION = '2.7.5';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
@@ -478,6 +479,7 @@ export async function webGetRuntimePack(id: string): Promise<{
   id: string;
   manifest: Manifest;
   files: Record<string, string>;
+  worldId?: string;
 }> {
   const rec = await getWebEvent(id);
   if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${id}`);
@@ -487,7 +489,7 @@ export async function webGetRuntimePack(id: string): Promise<{
     if (typeof value === 'string') files[path] = value;
   }
 
-  return { id: rec.id, manifest: rec.manifest, files };
+  return { id: rec.id, manifest: rec.manifest, files, worldId: rec.worldId };
 }
 
 export async function saveEventToPack(
@@ -848,6 +850,7 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
       enabledByDefault: true,
       loadOrder: 0,
       permissions: pack.permissions ?? (packType === 'card' ? ['add_card'] : ['modify_world_state']),
+      worldId: world.id,
     };
 
     const files: Record<string, string> = {
@@ -864,10 +867,13 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
       files['schema/rules.json'] = JSON.stringify(ruleFile, null, 2);
       // 同时生成 workflow.json（新工作流格式）
       try {
-        const { WORLD_WORKFLOWS } = await import('./worldWorkflows');
         const workflowFn = WORLD_WORKFLOWS[world.id];
         if (workflowFn) {
-          const workflow = workflowFn();
+          const cardPack = packs.find((candidate) => candidate.type === 'card');
+          const workflow = workflowFn(
+            cardPack?.id ?? pack.id,
+            (cardPack?.events ?? []).map(({ id, name }) => ({ id, name })),
+          );
           files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
         }
       } catch { /* 世界工作流生成失败不影响旧规则 */ }
@@ -881,7 +887,7 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
         const entry: EventIndexEntry = { id: event.id, name: event.name };
         return {
           entry,
-          workflow: { ...event.workflow, id: entry.id, name: entry.name },
+          workflow: normalizeBuiltinCardWorkflow({ ...event.workflow, id: entry.id, name: entry.name }),
         };
       });
       Object.assign(files, buildCanonicalCardPackFiles(manifest.name, events));
@@ -899,6 +905,51 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
     };
 
     await putWebEvent(rec);
+  }
+
+  // The six shipped worlds store card content in their world definition. Install
+  // the corresponding trigger graph as a separate rule pack so both layers are
+  // visible in the event archive and can be enabled independently.
+  const workflowFn = WORLD_WORKFLOWS[world.id];
+  const cardPack = packs.find((pack) => pack.type === 'card' && (pack.events?.length ?? 0) > 0);
+  const hasDeclaredRulePack = packs.some((pack) => pack.type === 'rule');
+  if (workflowFn && cardPack && !hasDeclaredRulePack) {
+    const id = `world:${world.id}:rules`;
+    const existing = await getWebEvent(id);
+    const manifest: Manifest = {
+      id,
+      name: `${world.name ?? world.id} · 触发工作流`,
+      version: '1.0.0',
+      author: '内置',
+      description: `负责调度「${cardPack.name ?? world.name ?? world.id}」中的事件内容`,
+      engine: 'opt-event',
+      schemaVersion: 1,
+      minAppVersion: '2.7.5',
+      type: 'rule',
+      coverColor: '#6366f1',
+      icon: 'Zap',
+      enabledByDefault: true,
+      loadOrder: 0,
+      permissions: ['add_card'],
+      worldId: world.id,
+    };
+    const workflow = workflowFn(cardPack.id, cardPack.events!.map(({ id: eventId, name }) => ({ id: eventId, name })));
+    const files: Record<string, string> = {
+      'manifest.json': JSON.stringify(manifest, null, 2),
+      'schema/rules.json': JSON.stringify({ version: 1, rules: [], periodicRules: [] }, null, 2),
+      'schema/workflow.json': JSON.stringify(workflow, null, 2),
+      ...buildCanonicalCardPackFiles(manifest.name, []),
+    };
+    await putWebEvent({
+      id,
+      manifest,
+      enabled: existing?.enabled ?? true,
+      status: existing?.enabled === false ? 'disabled' : 'enabled',
+      installedAt: existing?.installedAt ?? new Date().toISOString(),
+      builtin: true,
+      worldId: world.id,
+      files,
+    });
   }
 }
 

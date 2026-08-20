@@ -24,6 +24,7 @@ import { ensureEventApiError, EventApiError } from './eventErrors';
 import { allWebEvents, deleteWebEvent, getWebEvent, putWebEvent } from './eventDb';
 import type { CardWorkflowDefinition, EventIndexEntry, Manifest, PeriodicRule } from './schema';
 import type { WorldDef } from '../data/worlds-schema';
+import { WORLDS } from '../data/worldLoader';
 
 afterEach(async () => {
   const records = await allWebEvents();
@@ -37,7 +38,7 @@ const manifest: Manifest = {
   author: 'tester',
   engine: 'opt-event',
   schemaVersion: 1,
-  minAppVersion: '2.7.4',
+  minAppVersion: '2.7.5',
   type: 'card',
   coverColor: '#3b82f6',
   icon: 'FileText',
@@ -540,6 +541,22 @@ test('installWorldEventPacks writes canonical card metadata and required workflo
     ) as CardWorkflowDefinition;
     expect(storedWorkflow).toMatchObject({ id: entry.id, name: entry.name });
   }
+});
+
+test('installWorldEventPacks pairs a shipped card pack with its trigger workflow', async () => {
+  const world = WORLDS.find((candidate) => candidate.id === 'japanese_school')!;
+  await installWorldEventPacks(world);
+
+  const cardPack = world.eventPacks!.find((pack) => pack.type === 'card')!;
+  const ruleRecord = await getWebEvent(`world:${world.id}:rules`);
+  expect(ruleRecord?.manifest.type).toBe('rule');
+  const workflow = JSON.parse(ruleRecord!.files['schema/workflow.json'] as string) as {
+    nodes: Array<{ typeId: string; widgetValues?: Record<string, unknown> }>;
+  };
+  expect(workflow.nodes.filter((node) => node.typeId === 'actions.add_event')).toHaveLength(cardPack.events!.length);
+  expect(workflow.nodes.filter((node) => node.typeId === 'actions.add_event').every(
+    (node) => node.widgetValues?.event_pack_id === cardPack.id,
+  )).toBe(true);
 });
 
 test('installWorldEventPacks rejects a card event without a workflow', async () => {

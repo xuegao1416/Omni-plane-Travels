@@ -74,7 +74,7 @@ export function PreviewCards({ rt, isSimple, config, vectorMemory, onOpenVectorE
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', fontSize: 'var(--font-size-base)', fontWeight: '600', borderBottom: '1px solid var(--border)' }}>
             <span>向量提取概览</span>
-            <Button onClick={onOpenVectorExtract}>手动提取</Button>
+            <Button onClick={onOpenVectorExtract}>重建历史索引</Button>
           </div>
           <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <MetaLine label="事实库总量" value={`${vectorMemory.length} 条`} />

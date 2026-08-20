@@ -168,4 +168,21 @@ describe('custom module lifecycle commit bridge', () => {
     expect(gameState.customModules?.[secondWorldModule.id]?.values.pulseCount).toBe(1);
     expect(gameState.customModules?.[moduleDefinition.id]).toBeUndefined();
   });
+
+  test('blocks a module when a required dependency is not enabled and reports the reason', async () => {
+    const dependency = { ...moduleDefinition, id: 'required-core', version: '2.0.0' };
+    const dependent = {
+      ...moduleDefinition,
+      id: 'dependent-feature',
+      dependencies: [{ id: dependency.id, version: '2.1.0' }],
+    };
+    await saveCustomGameplayModule(dependency);
+    await saveCustomGameplayModule(dependent);
+    await bindCustomGameplayModule(dependent.id, 'world-a');
+    const gameState = createDefaultGameState();
+    const result = await runCustomModulesForWorldAndCommit(gameState, 'world-a', 'onTick', 1, { commit: () => undefined });
+    expect(result.activeModuleIds).toEqual([]);
+    expect(result.warnings.join('\n')).toContain('required-core');
+    expect(gameState.customModules?.[dependent.id]).toBeUndefined();
+  });
 });

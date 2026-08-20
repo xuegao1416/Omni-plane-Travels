@@ -34,6 +34,7 @@ export const STORAGE_KEYS = {
   PRESET_PACKS: 'world_travel_guide_preset_packs',
   ACTIVE_PRESET_ID: 'world_travel_guide_active_preset_id',
   BUILTIN_OVERRIDES: 'world_travel_guide_builtin_overrides',
+  BUILTIN_CONTENT_OVERRIDES: 'world_travel_guide_builtin_content_overrides',
 
   // API 预设（不同"预设"概念 — 此为 API 配置模板，非提示词预设包）
   API_PRESETS: 'world_travel_guide_api_presets',

@@ -69,6 +69,13 @@ const validModule: CustomGameplayModule = {
         children: [{ type: 'text', text: '已建立联系' }],
       },
       { type: 'button', label: '查看记录', event: 'open-history' },
+      {
+        type: 'card',
+        title: '行动卡',
+        body: '选择一个行动。',
+        children: [{ type: 'text', text: '可执行' }],
+        actions: [{ type: 'button', label: '确认', event: 'confirm-action' }],
+      },
     ],
   },
   permissions: { read: ['world.time', 'player.behavior'], write: 'own-state-only' },

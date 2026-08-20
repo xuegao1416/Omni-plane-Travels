@@ -20,6 +20,7 @@ describe('custom module agent session', () => {
     expect(session.phase).toBe('discovery');
     expect(session.brief).toEqual(createEmptyCustomModuleDesignBrief());
     expect(session.revision).toBe(0);
+    expect(session.conversation).toEqual([]);
   });
 
   test('keeps scalar context while treating each envelope list as the complete current brief', () => {

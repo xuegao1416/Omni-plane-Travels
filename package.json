@@ -1,6 +1,6 @@
 {
   "name": "omni-plane-travels",
-  "version": "2.7.4",
+  "version": "2.7.5",
   "description": "AI-Powered Interactive Fiction Engine — 多世界观、多阶段管线、编译式记忆系统",
   "type": "module",
   "private": true,
@@ -28,6 +28,7 @@
     "typescript": "6.0.3"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@types/dagre": "^0.7.54",

@@ -17,6 +17,13 @@ const view: ModuleView = {
       children: [{ type: 'text', text: '已启用' }],
     },
     { type: 'button', label: '查看', event: 'open-history' },
+    {
+      type: 'card',
+      title: '行动卡',
+      body: '选择一个行动。',
+      children: [{ type: 'number', label: '消耗', path: 'score' }],
+      actions: [{ type: 'button', label: '确认', event: 'confirm-action' }],
+    },
   ],
 };
 
@@ -26,17 +33,19 @@ describe('custom module declarative view', () => {
       title: '专注', score: 42.4, enabled: true, tags: ['calm', 'deep'],
     });
 
-    expect(model.map((item) => item.type)).toEqual(['text', 'number', 'progress', 'badge', 'list', 'text', 'button']);
+    expect(model.map((item) => item.type)).toEqual(['text', 'number', 'progress', 'badge', 'list', 'text', 'button', 'card']);
     expect(model[0]).toMatchObject({ type: 'text', label: '状态', value: '专注' });
     expect(model[1]).toMatchObject({ type: 'number', label: '分数', value: 42.4, format: 'integer' });
     expect(model[2]).toMatchObject({ type: 'progress', value: 42.4, min: 0, max: 100 });
     expect(model[4]).toMatchObject({ type: 'list', value: ['calm', 'deep'] });
     expect(model[6]).toMatchObject({ type: 'button', event: 'open-history' });
+    expect(model[7]).toMatchObject({ type: 'card', title: '行动卡', body: '选择一个行动。', actions: [{ event: 'confirm-action' }] });
+    expect(model[7].type === 'card' && model[7].children[0]).toMatchObject({ type: 'number', value: 42.4 });
   });
 
   test('does not render false condition branches and safely returns empty values', () => {
     const model = buildCustomModuleViewModel(view, { title: '专注', score: 0, enabled: false });
-    expect(model.map((item) => item.type)).toEqual(['text', 'number', 'progress', 'badge', 'list', 'button']);
+    expect(model.map((item) => item.type)).toEqual(['text', 'number', 'progress', 'badge', 'list', 'button', 'card']);
     expect(model[4]).toMatchObject({ type: 'list', value: [] });
   });
 });

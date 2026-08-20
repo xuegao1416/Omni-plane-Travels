@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { getBuiltinPreset, getEnabledPrompts } from './builtinPresets';
+import {
+  getBuiltinPreset,
+  getEnabledPrompts,
+} from './builtinPresets';
+import { DRC_FORMAT_REPAIR_PROMPT_ID } from './presetDrcV12';
 
 describe('DeepSeek built-in preset', () => {
   const preset = getBuiltinPreset('deepseek');
@@ -18,6 +22,14 @@ describe('DeepSeek built-in preset', () => {
     expect(outputFormat).toContain('600-1000');
     expect(outputFormat.indexOf('[OPTION_START]')).toBeGreaterThan(outputFormat.indexOf('<contenttext>'));
     expect(outputFormat).toContain('[OPTION_END]');
+  });
+
+  test('keeps the DRC format repair switch off by default', () => {
+    const repair = getBuiltinPreset('drc_v12').prompts.find(
+      prompt => prompt.identifier === DRC_FORMAT_REPAIR_PROMPT_ID,
+    );
+
+    expect(repair?.enabled).toBe(false);
   });
 
   test('contains balanced writing-style tags and no Claude-only compatibility text', () => {

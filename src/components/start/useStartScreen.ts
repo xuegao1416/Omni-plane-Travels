@@ -384,6 +384,7 @@ export function useStartScreen() {
     DialogUI,
     // wizard
     view: wizard.view, setView: wizard.setView,
+    resetForNewJourney: wizard.resetForNewJourney,
     step: wizard.step, setStep: wizard.setStep,
     selectedWorld: wizard.selectedWorld, setSelectedWorld: wizard.setSelectedWorld,
     worldEntry: wizard.worldEntry,

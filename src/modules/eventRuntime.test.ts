@@ -20,6 +20,11 @@ const runtimePack = (id: string, worldId?: string): EventRuntimePack => ({
   files: {},
 });
 
+const legacyBuiltinPack = (id: string, worldId: string): EventRuntimePack => ({
+  ...runtimePack(id),
+  worldId,
+});
+
 test('selectRuntimePacksForWorld keeps global and matching world packs', () => {
   const selected = selectRuntimePacksForWorld(
     [runtimePack('global'), runtimePack('current', 'world-a'), runtimePack('other', 'world-b')],
@@ -27,4 +32,13 @@ test('selectRuntimePacksForWorld keeps global and matching world packs', () => {
   );
 
   expect(selected.map(pack => pack.id)).toEqual(['global', 'current']);
+});
+
+test('selectRuntimePacksForWorld honors record-level world binding from legacy built-in packs', () => {
+  const selected = selectRuntimePacksForWorld(
+    [legacyBuiltinPack('wuxia', 'world-a'), legacyBuiltinPack('wasteland', 'world-b')],
+    'world-a',
+  );
+
+  expect(selected.map(pack => pack.id)).toEqual(['wuxia']);
 });

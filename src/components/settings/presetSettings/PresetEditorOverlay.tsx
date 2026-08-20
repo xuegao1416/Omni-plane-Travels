@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { FileText, Plus, Upload, X } from 'lucide-react';
+import { ExternalLink, FileText, Plus, Upload, X } from 'lucide-react';
 import type { PresetPromptEntry } from '@/data/builtinPresets';
 import { getBuiltinPreset } from '@/data/builtinPresets';
 import type { RegexScript } from '@/utils/regexScripts';
@@ -12,7 +12,7 @@ import { iconBtnStyle } from './constants';
 import { PromptEntry } from './PromptEntry';
 import { RegexEntry } from './RegexEntry';
 
-export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestoreDefaults }: PresetEditorOverlayProps) {
+export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestoreDefaults, editableContentIdentifiers = [] }: PresetEditorOverlayProps) {
   const { DialogUI, confirm: dlgConfirm } = useDialog();
   const [tab, setTab] = useState<'prompts' | 'regex'>('prompts');
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
@@ -136,6 +136,39 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
           <button onClick={onClose} style={iconBtnStyle}><X size={18} /></button>
         </div>
 
+        {preset.attribution && (
+          <div
+            role="note"
+            aria-label="预设授权与出处"
+            style={{
+              margin: '10px 16px 0', padding: '10px 12px',
+              border: '1px solid color-mix(in srgb, var(--accent) 45%, var(--border))',
+              borderRadius: '8px',
+              background: 'color-mix(in srgb, var(--accent) 10%, var(--bg-secondary, var(--bg-primary)))',
+              color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: '4px' }}>授权与出处</div>
+            <div>原作者：{preset.attribution.author}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+              <span>原贴：</span>
+              <a
+                href={preset.attribution.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{ color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+              >
+                打开 Discord 原贴 <ExternalLink size={13} />
+              </a>
+            </div>
+            {preset.attribution.note && (
+              <div style={{ marginTop: '3px', color: 'var(--text-muted)' }}>{preset.attribution.note}</div>
+            )}
+          </div>
+        )}
+
         {/* ─── Tab 切换 ─── */}
         <div style={{
           display: 'flex', borderBottom: '1px solid var(--border)',
@@ -186,6 +219,7 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
                   onToggle={() => togglePrompt(p.identifier)}
                   onUpdate={(patch) => updatePrompt(p.identifier, patch)}
                   onDelete={() => deletePrompt(p.identifier)}
+                  editableContent={editableContentIdentifiers.includes(p.identifier)}
                 />
               ))}
             </div>

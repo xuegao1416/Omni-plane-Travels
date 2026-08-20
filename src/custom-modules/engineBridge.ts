@@ -1,7 +1,7 @@
 import type { GameState } from '../schema/variables';
 import { executeCustomModuleLifecycle, type CustomModuleLifecycle } from './runtime';
 import { installCustomModuleState } from './stateStore';
-import { getCustomGameplayModulesForWorld } from './storage';
+import { resolveCustomGameplayModulesForWorld } from './storage';
 import { buildCustomModuleHostContext, sanitizeCustomModuleEvent, type CustomModuleContextOptions } from './context';
 
 export interface CustomModuleBridgeResult {
@@ -36,8 +36,9 @@ export async function runCustomModulesForWorld(
     return { activeModuleIds: [], applied: 0, warnings: [] };
   }
 
-  const active = await getCustomGameplayModulesForWorld(worldId);
-  const warnings: string[] = [];
+  const resolved = await resolveCustomGameplayModulesForWorld(worldId);
+  const active = resolved.modules;
+  const warnings: string[] = [...resolved.warnings];
   let applied = 0;
 
   const now = typeof nowOrContext === 'number' ? nowOrContext : contextOptions.now ?? Date.now();

@@ -27,6 +27,7 @@ import type {
   NarrativeQueryPackage,
   NarrativeRetrieveCandidate,
   VectorFact,
+  NarrativeSourceEvent,
 } from './types';
 import {
   createDefaultMemorySystemConfig,
@@ -36,6 +37,10 @@ import {
   normalizeThread,
   normalizeEventCard,
   normalizeEntityCard,
+  normalizeStateSlot,
+  normalizeRelationEdge,
+  normalizeRelationNetworkItem,
+  normalizeProvenance,
 } from './normalize';
 import { STORAGE_KEYS } from '@/config/storageKeys';
 
@@ -45,6 +50,8 @@ let _loadingRefCount = 0;
 // ─── localStorage 持久化 ───
 
 const MEMORY_CONFIG_STORAGE_KEY = STORAGE_KEYS.MEMORY_CONFIG;
+/** 500 个回合摘要足以覆盖约 1000 条用户/AI消息，同时仍保持存档体积可控。 */
+export const MAX_SUMMARY_HISTORY = 500;
 
 function loadMemoryConfigFromStorage(): MemorySystemConfig {
   try {
@@ -111,6 +118,9 @@ interface MemoryStoreActions {
 
   // 场景锚点
   updateSceneAnchor: (patch: Partial<SceneAnchor>) => void;
+
+  // 原始事件账本（只追加）
+  appendSourceEvent: (event: NarrativeSourceEvent) => void;
 
   // 线程管理
   upsertThread: (thread: NarrativeThread) => void;
@@ -202,6 +212,7 @@ function createDefaultMemoryRuntime(bankId = ''): NarrativeMemoryRuntime {
     retrieveDebugLogs: [],
     compileDebugLogs: [],
     vectorMemory: [],
+    sourceEvents: [],
   };
 }
 
@@ -231,9 +242,15 @@ function normalizeMemoryRuntime(raw: unknown): NarrativeMemoryRuntime {
     activeThreads: normalizeArray(safe.activeThreads)
       .map((t: unknown) => t && typeof t === 'object' ? normalizeThread(t as Record<string, unknown>) : t)
       .slice(-30) as NarrativeThread[],
-    stateSlots: normalizeArray(safe.stateSlots).slice(-30) as NarrativeStateSlot[],
-    relationEdges: normalizeArray(safe.relationEdges).slice(-50) as NarrativeRelationEdge[],
-    relationNetwork: normalizeArray(safe.relationNetwork).slice(-50) as NarrativeRelationNetworkItem[],
+    stateSlots: normalizeArray(safe.stateSlots)
+      .map((s: unknown) => s && typeof s === 'object' ? normalizeStateSlot(s as Record<string, unknown>) : s)
+      .slice(-30) as NarrativeStateSlot[],
+    relationEdges: normalizeArray(safe.relationEdges)
+      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationEdge(r as Record<string, unknown>) : r)
+      .slice(-50) as NarrativeRelationEdge[],
+    relationNetwork: normalizeArray(safe.relationNetwork)
+      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationNetworkItem(r as Record<string, unknown>) : r)
+      .slice(-50) as NarrativeRelationNetworkItem[],
     eventCards: (normalizeArray(safe.eventCards) as unknown[])
       .map((c: unknown) => c && typeof c === 'object' ? normalizeEventCard(c as Record<string, unknown>) : c)
       .sort((a: any, b: any) => (Number(b.importance || 0) - Number(a.importance || 0)) || (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)))
@@ -241,10 +258,12 @@ function normalizeMemoryRuntime(raw: unknown): NarrativeMemoryRuntime {
     entityCards: normalizeArray(safe.entityCards)
       .map((c: unknown) => c && typeof c === 'object' ? normalizeEntityCard(c as Record<string, unknown>) : c)
       .slice(-30) as NarrativeEntityCard[],
-    archiveCards: normalizeArray(safe.archiveCards).slice(-30) as NarrativeArchiveCard[],
+    archiveCards: normalizeArray(safe.archiveCards)
+      .map((a: unknown) => a && typeof a === 'object' ? normalizeProvenance(a as Record<string, unknown>) : a)
+      .slice(-30) as NarrativeArchiveCard[],
     mutationLog: normalizeArray(safe.mutationLog).slice(-50) as NarrativeMutation[],
     checkpoints: normalizeArray(safe.checkpoints).slice(-5) as NarrativeCheckpoint[],
-    summarySaveHistory: normalizeArray(safe.summarySaveHistory).slice(-10) as SummarySaveRecord[],
+    summarySaveHistory: normalizeArray(safe.summarySaveHistory).slice(-MAX_SUMMARY_HISTORY) as SummarySaveRecord[],
     lastSummarySave: safe.lastSummarySave && typeof safe.lastSummarySave === 'object'
       ? safe.lastSummarySave as SummarySaveRecord
       : null,
@@ -260,7 +279,19 @@ function normalizeMemoryRuntime(raw: unknown): NarrativeMemoryRuntime {
     writeDebugLogs: normalizeArray(safe.writeDebugLogs).slice(-100) as DebugLog[],
     retrieveDebugLogs: normalizeArray(safe.retrieveDebugLogs).slice(-100) as DebugLog[],
     compileDebugLogs: normalizeArray(safe.compileDebugLogs).slice(-100) as DebugLog[],
-    vectorMemory: normalizeArray(safe.vectorMemory) as VectorMemoryItem[],
+    vectorMemory: normalizeArray(safe.vectorMemory)
+      .map((v: unknown) => v && typeof v === 'object' ? normalizeProvenance(v as Record<string, unknown>) : v)
+      .filter(Boolean) as VectorMemoryItem[],
+    sourceEvents: normalizeArray(safe.sourceEvents)
+      .filter((event): event is Record<string, unknown> => Boolean(event && typeof event === 'object'))
+      .map(event => ({
+        id: String(event.id ?? ''),
+        round: Math.max(0, Math.floor(Number(event.round) || 0)),
+        userText: String(event.userText ?? ''),
+        assistantText: String(event.assistantText ?? ''),
+        createdAt: Math.max(0, Math.floor(Number(event.createdAt) || 0)),
+      }))
+      .filter(event => event.id.length > 0),
   };
 }
 
@@ -337,6 +368,9 @@ export function slimMemoryRuntimeForSave(runtime: any): any {
           snapshot: cp.snapshot ? slimCheckpointSnapshot(cp.snapshot) : cp.snapshot,
         }))
       : runtime.checkpoints,
+    sourceEvents: Array.isArray(runtime.sourceEvents)
+      ? runtime.sourceEvents
+      : [],
   };
 }
 
@@ -453,6 +487,21 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
           },
         },
       };
+    });
+  },
+
+  appendSourceEvent: (event) => {
+    set((state) => {
+      if (!state.memoryRuntime || !event.id) return state;
+      if (state.memoryRuntime.sourceEvents.some(existing => existing.id === event.id)) return state;
+      const sourceEvents = [...state.memoryRuntime.sourceEvents, {
+        id: event.id,
+        round: Math.max(0, Math.floor(event.round || 0)),
+        userText: String(event.userText ?? ''),
+        assistantText: String(event.assistantText ?? ''),
+        createdAt: event.createdAt || Date.now(),
+      }];
+      return { memoryRuntime: { ...state.memoryRuntime, sourceEvents }, runtimeVersion: state.runtimeVersion + 1 };
     });
   },
 
@@ -601,8 +650,23 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
   appendVectorMemories: (memories) => {
     set((state) => {
       const maxVector = state.config.retention.maxVectorMemories;
-      const combined = [...state.vectorMemory, ...memories];
-      // 如果超过上限，保留最新的（后面的）
+      const combined = [...state.vectorMemory];
+      for (const item of memories) {
+        const factKey = String(item.fact ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+        const idx = combined.findIndex(existing => existing.id === item.id || (String(existing.fact ?? '').trim().replace(/\s+/g, ' ').toLowerCase() === factKey && existing.conflictStatus !== 'superseded'));
+        if (idx < 0) {
+          combined.push(item);
+          continue;
+        }
+        const existing = combined[idx];
+        const comparable = (value: VectorMemoryItem) => JSON.stringify({ fact: value.fact, title: value.title, summary: value.summary, keywords: value.keywords, entities: value.entities, state: value.state, importance: value.importance, sourceEventIds: value.sourceEventIds });
+        if (comparable(existing) === comparable(item)) {
+          combined[idx] = { ...existing, ...item, sourceEventIds: [...new Set([...(existing.sourceEventIds || []), ...(item.sourceEventIds || [])])] };
+        } else {
+          combined[idx] = { ...existing, id: `${existing.id}@${item.sourceStartIndex ?? Date.now()}`, conflictStatus: 'superseded', validUntilRound: item.sourceStartIndex ?? null };
+          combined.push({ ...item, previousVersionId: existing.id });
+        }
+      }
       const trimmed = maxVector > 0 ? combined.slice(-maxVector) : combined;
       return { vectorMemory: trimmed };
     });
@@ -622,13 +686,33 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const retention = state.config.retention;
     const currentRound = state.memoryRuntime.lastIngestCursor;
 
-    // 1. 归档已解决的 threads（超过 N 轮未更新）
-    const activeThreads = state.memoryRuntime.activeThreads.filter(t => {
-      if (t.status === 'resolved' && currentRound - (t.sourceEndIndex || 0) > retention.archiveResolvedThreadsAfter) {
-        return false; // 移除，后续可移到 archiveCards
-      }
-      return true;
-    });
+    // 1. 归档已解决的 threads（超过 N 轮未更新），不再直接丢弃
+    const expiredThreads = state.memoryRuntime.activeThreads.filter(t => t.status === 'resolved' && currentRound - (t.sourceEndIndex || 0) > retention.archiveResolvedThreadsAfter);
+    const activeThreads = state.memoryRuntime.activeThreads.filter(t => !expiredThreads.includes(t));
+    const archivedThreads = expiredThreads.map(thread => ({
+      id: `thread_archive_${thread.id}`,
+      title: thread.title,
+      arcTitle: thread.title,
+      summary: thread.summary,
+      timeSpan: thread.sourceStartIndex != null ? `第${thread.sourceStartIndex}轮—第${thread.sourceEndIndex ?? currentRound}轮` : '',
+      keywords: [thread.title, ...(thread.relatedEntities || []), ...(thread.relatedLocations || [])].filter(Boolean),
+      entityRefs: [...(thread.relatedEntities || [])],
+      sourceStartIndex: thread.sourceStartIndex,
+      sourceEndIndex: thread.sourceEndIndex,
+      sourceEventIds: thread.sourceEventIds,
+      sourceType: thread.sourceType,
+      layer: 'summary' as const,
+      confidence: thread.confidence,
+      conflictStatus: 'none' as const,
+      createdAt: thread.createdAt || Date.now(),
+      archivedAt: Date.now(),
+    }));
+    const archiveCards = [...state.memoryRuntime.archiveCards];
+    for (const archived of archivedThreads) {
+      const index = archiveCards.findIndex(card => card.id === archived.id);
+      if (index >= 0) archiveCards[index] = { ...archiveCards[index], ...archived };
+      else archiveCards.push(archived);
+    }
 
     // 2. 限制 eventCards 数量（保留最新的）
     const eventCards = state.memoryRuntime.eventCards.length > retention.maxHotEventCards
@@ -639,6 +723,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const prunedRuntime = {
       ...state.memoryRuntime,
       activeThreads,
+      archiveCards: archiveCards.slice(-30),
       eventCards,
     };
 
@@ -650,6 +735,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       eventCount: prunedRuntime.eventCards.length,
       entityCount: prunedRuntime.entityCards.length,
       snapshot: JSON.parse(JSON.stringify(slimCheckpointSnapshot(prunedRuntime))),
+      vectorMemory: JSON.parse(JSON.stringify(state.vectorMemory)),
     };
 
     set((s) => {
@@ -672,8 +758,15 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const restored = normalizeMemoryRuntime(checkpoint.snapshot);
     restored.checkpoints = state.memoryRuntime.checkpoints;
 
-    // 清除向量记忆（checkpoint 不含 vectorMemory，保留会导致与 runtime 不一致）
-    set({ memoryRuntime: restored, vectorMemory: [], runtimeVersion: state.runtimeVersion + 1 });
+    // 新 checkpoint 带有独立的向量快照。旧 checkpoint 没有该字段时保留当前向量，
+    // 这是唯一不会静默丢失记忆的兼容行为；未来重新提取时仍可继续更新它。
+    const restoredVectorMemory = Array.isArray(checkpoint.vectorMemory)
+      ? checkpoint.vectorMemory
+          .map((item: unknown) => item && typeof item === 'object' ? normalizeProvenance(item as Record<string, unknown>) : null)
+          .filter((item): item is Record<string, unknown> => Boolean(item))
+          .map((item) => item as unknown as VectorMemoryItem)
+      : state.vectorMemory;
+    set({ memoryRuntime: restored, vectorMemory: restoredVectorMemory, runtimeVersion: state.runtimeVersion + 1 });
     return true;
   },
 
@@ -693,7 +786,6 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
   appendSummarySaveRecord: (record) => {
     set((state) => {
       if (!state.memoryRuntime) return state;
-      const MAX_SUMMARY_HISTORY = 10;
       // 写入时截断：防止 AI 产出过多条目导致存档膨胀
       const cappedRecord = record.summaryData ? {
         ...record,
@@ -703,12 +795,27 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
           itemMemories: (record.summaryData.itemMemories ?? []).slice(0, 3),
         },
       } : record;
-      const summarySaveHistory = [...state.memoryRuntime.summarySaveHistory, cappedRecord].slice(-MAX_SUMMARY_HISTORY);
+      const sourceIds = new Set(cappedRecord.sourceEventIds || []);
+      const conflicting = state.memoryRuntime.summarySaveHistory.filter(existing =>
+        existing.conflictStatus !== 'superseded'
+        && sourceIds.size > 0
+        && (existing.sourceEventIds || []).some(id => sourceIds.has(id))
+      );
+      const superseded = state.memoryRuntime.summarySaveHistory.map(existing => conflicting.includes(existing)
+        ? { ...existing, conflictStatus: 'superseded' as const, validUntilRound: cappedRecord.sourceStartIndex ?? null }
+        : existing);
+      const id = cappedRecord.id || `summary_${[...(sourceIds)].join('_') || cappedRecord.sourceStartIndex || Date.now()}_${Date.now()}`;
+      const nextRecord = {
+        ...cappedRecord,
+        id,
+        previousVersionId: conflicting.at(-1)?.id || cappedRecord.previousVersionId,
+      };
+      const summarySaveHistory = [...superseded, nextRecord].slice(-MAX_SUMMARY_HISTORY);
       return {
         memoryRuntime: {
           ...state.memoryRuntime,
           summarySaveHistory,
-          lastSummarySave: cappedRecord,
+          lastSummarySave: nextRecord,
         },
       };
     });
@@ -855,7 +962,10 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       : null;
 
     const vectorMemory = Array.isArray(data.vectorMemory)
-      ? data.vectorMemory as VectorMemoryItem[]
+      ? data.vectorMemory
+          .map((item: unknown) => item && typeof item === 'object' ? normalizeProvenance(item as Record<string, unknown>) : null)
+          .filter((item): item is Record<string, unknown> => Boolean(item))
+          .map((item) => item as unknown as VectorMemoryItem)
       : [];
 
     // 同时保存到 localStorage，避免刷新后丢失

@@ -397,7 +397,10 @@ registerNode({
   color: 'var(--node-effect)',
   inputs: [socket('flow_in', 'flow', '触发')],
   outputs: [socket('flow_out', 'flow', '继续')],
-  widgets: [widget('event_id', '事件 ID', 'event_id')],
+  widgets: [
+    widget('event_id', '事件 ID', 'event_id'),
+    widget('string', '事件包 ID', 'event_pack_id'),
+  ],
   searchTags: ['事件卡', '弹窗', '选择'],
 });
 

@@ -75,9 +75,20 @@ export class MacroEngine {
   private processPass(text: string): string {
     let result = text;
 
+    // 0. {{//...}} 注释宏 — 剥离（兼容 SillyTavern/双人成行注释，可能跨多行）。必须最先执行。
+    result = result.replace(/\{\{\/\/[\s\S]*?\}\}/gi, () => '');
+
     // 1. {{setvar::key::value}} — 写入变量
     result = result.replace(/\{\{setvar::([^:}]+)::([\s\S]*?)\}\}/gi, (_, key, value) => {
       this.setVar(key.trim(), value);
+      return '';
+    });
+
+    // 1b. {{addvar::key::value}} — 追加到现有变量（兼容 SillyTavern，字符串拼接）
+    result = result.replace(/\{\{addvar::([^:}]+)::([\s\S]*?)\}\}/gi, (_, key, value) => {
+      const k = key.trim();
+      const cur = this.getVar(k);
+      this.setVar(k, cur + value);
       return '';
     });
 
@@ -99,6 +110,13 @@ export class MacroEngine {
     result = result.replace(/\{\{getvar::([^}]+)\}\}/gi, (_, key) => {
       return this.getVar(key.trim());
     });
+
+    // 4b. {{trim}} — 清理宏（兼容双人成行，返回空字符串，由后续空行压缩清理残余）
+    result = result.replace(/\{\{trim\}\}/gi, () => '');
+
+    // 4c. {{user}} / {{lastUserMessage}} — 从上下文读取（由 AssemblerContext 注入）
+    result = result.replace(/\{\{user\}\}/gi, () => this.getVar('user'));
+    result = result.replace(/\{\{lastUserMessage\}\}/gi, () => this.getVar('lastUserMessage'));
 
     // 5. {{random::opt1::opt2::...}} 或 {{random::opt1,opt2,...}} — 随机选择
     result = result.replace(/\{\{random::([^}]+)\}\}/gi, (_, options) => {

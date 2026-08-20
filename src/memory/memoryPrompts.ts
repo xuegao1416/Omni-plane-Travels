@@ -89,6 +89,13 @@ export function getDefaultVectorExtractPrompt(): string {
 - "importance": 1-5 的整数，5 表示极重要
 - "timeScope": "short | mid | long"
 - "state": "active | resolved | expired | unknown"
+- "sourceType": "world_fact | plot_fact | system_state | player_statement | npc_statement | player_inference | summary | unknown"
+- "layer": "fact | state | inference | summary"（player_inference 必须使用 inference，推测不得写成已证实事实）
+- "confidence": 0-1 的证据置信度
+- "evidence": ["支持该事实的原文短语"]
+- "validFromRound": 起始剧情轮次（未知填 null）
+- "validUntilRound": 失效剧情轮次（当前仍有效填 null）
+- "supersedesId": 若本事实替代旧事实，填写旧事实 ID
 
 【推荐输出示例】
 推荐直接输出 JSON 数组，例如：
@@ -170,6 +177,8 @@ export function getDefaultNarrativeIngestPrompt(): string {
 - 每个字段都问自己"本批剧情有没有明确写到这个变化？"
 - 没有明确证据 → 留空或不写该条目。
 - 有明确证据 → 填写，但不扩写、不总结升华、不加括号解释。
+- 每条记忆都必须标记 sourceType/layer/confidence；角色猜测、玩家推测只能放在 player_inference/inference，不能进入 stableFacts 或世界事实层。
+- 若本批明确推翻旧状态，填写 supersedesId，并给旧事实 validUntilRound；不要删除旧版本，保留关系演变。
 
 ═══════════════════════════════════
 【字段写入规范】
@@ -279,9 +288,10 @@ export function getDefaultNarrativeSummaryPrompt(): string {
 3. 对 playerMemories，必须把本层所有关键推进合并为 1 条本层总摘要。
 4. 只允许记录文本里明确发生的事实；严禁进行阅读理解式的总结升华。
 5. 严禁使用括号解释。
-6. 每条 summary 都必须显式写出故事发生时间。
-7. title 采用"稳定命名 + 一眼可检索"的格式。
-8. 严格控制条数：otherCharacterMemories 最多 4 条，playerMemories 最多 1 条，itemMemories 最多 3 条。超出时合并同类条目，优先保留最重要的。
+6. 每条 summary 都必须显式写出故事发生时间，并填写结构化有效轮次或时间标签。
+7. 每条都必须填写 sourceType、layer、confidence、evidence；玩家推测只能标记为 player_inference/inference，不能伪装成事实。
+8. title 采用"稳定命名 + 一眼可检索"的格式。
+9. 严格控制条数：otherCharacterMemories 最多 4 条，playerMemories 最多 1 条，itemMemories 最多 3 条。超出时合并同类条目，优先保留最重要的。
 
 【三分类说明】
 - otherCharacterMemories：重要角色在本层的行为、态度变化、立场变化（最多 4 条）
@@ -291,9 +301,9 @@ export function getDefaultNarrativeSummaryPrompt(): string {
 【输出要求】
 只返回合法 JSON 对象：
 {
-  "otherCharacterMemories": [{ "id": "可选", "title": "稳定标题", "summary": "时间；摘要", "keywords": [] }],
-  "playerMemories": [{ "id": "可选", "title": "稳定标题", "summary": "时间；摘要", "keywords": [] }],
-  "itemMemories": [{ "id": "可选", "title": "稳定标题", "summary": "时间；摘要", "keywords": [] }]
+  "otherCharacterMemories": [{ "id": "可选", "title": "稳定标题", "summary": "时间；摘要", "keywords": [], "sourceType": "plot_fact|npc_statement|player_inference", "layer": "fact|state|inference|summary", "confidence": 0.0, "evidence": ["原文证据"], "validFromRound": null, "validUntilRound": null, "validFromLabel": "时间标签", "validUntilLabel": "" }],
+  "playerMemories": [{ "id": "可选", "title": "稳定标题", "summary": "时间；摘要", "keywords": [], "sourceType": "plot_fact|player_statement|player_inference", "layer": "fact|state|inference|summary", "confidence": 0.0, "evidence": ["原文证据"], "validFromRound": null, "validUntilRound": null, "validFromLabel": "时间标签", "validUntilLabel": "" }],
+  "itemMemories": [{ "id": "可选", "title": "稳定标题", "summary": "时间；摘要", "keywords": [], "sourceType": "plot_fact|system_state|player_inference", "layer": "fact|state|inference|summary", "confidence": 0.0, "evidence": ["原文证据"], "validFromRound": null, "validUntilRound": null, "validFromLabel": "时间标签", "validUntilLabel": "" }]
 }`;
 }
 
@@ -510,7 +520,7 @@ export function createDefaultNarrativePromptTemplates(): NarrativePromptTemplate
   };
 }
 
-const NARRATIVE_PROMPT_TEMPLATE_FORCE_RESET_VERSION = 24;
+const NARRATIVE_PROMPT_TEMPLATE_FORCE_RESET_VERSION = 25;
 
 export function normalizeNarrativePromptTemplates(templates: unknown): NarrativePromptTemplates {
   const defaults = createDefaultNarrativePromptTemplates();
