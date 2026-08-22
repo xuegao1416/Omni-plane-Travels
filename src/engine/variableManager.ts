@@ -4,7 +4,7 @@ import { createDefaultGameState } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
 import { cloneDeep, get, set, merge, unset } from 'lodash-es';
-import { formatWorldClock, normalizeWorldClockState, type WorldClockState } from '../time/worldClock';
+import { formatWorldClock, normalizeWorldClockState, reconcileEditedWorldClock, type WorldClockState } from '../time/worldClock';
 import { toDisplayText } from '../utils/displayText';
 
 /** 原型污染防护 — 过滤危险路径段 */
@@ -1206,6 +1206,21 @@ export class VariableManager {
     try {
       const parsed = JSON.parse(json);
       if (typeof parsed === 'object' && parsed !== null) {
+        const previousClock = this.captureAuthoritativeClock();
+        const incomingTimeSystem = (parsed as any)?.世界?.时间系统;
+        if (previousClock && isRecord(incomingTimeSystem)) {
+          const incomingClock = isRecord(incomingTimeSystem.时钟)
+            ? normalizeWorldClockState(incomingTimeSystem.时钟)
+            : previousClock;
+          const incomingDisplay = typeof incomingTimeSystem.当前时间 === 'string' ? incomingTimeSystem.当前时间.trim() : '';
+          // The variables editor exposes 当前时间 as the human-editable field.
+          // Reconcile it against the clock embedded in the same JSON every
+          // time, making repeated Apply operations deterministic and avoiding
+          // a stale hidden 时钟 object undoing the visible edit.
+          incomingTimeSystem.时钟 = incomingDisplay
+            ? reconcileEditedWorldClock(incomingClock, incomingDisplay)
+            : incomingClock;
+        }
         this.state = cloneDeep(parsed);
         this.normalizeState();
         return true;

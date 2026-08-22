@@ -2,6 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { VariableManager } from '../engine/variableManager';
 import { createDefaultGameState } from '../schema/variables';
 import type { ModuleEffects } from '../modules/schema';
+import { createWorldClock, formatWorldClock } from '../time/worldClock';
 
 function freshVM() {
   const vm = new VariableManager(createDefaultGameState());
@@ -149,5 +150,38 @@ describe('VariableManager.applyUpdateVariable atomicity', () => {
     vm.restoreSnapshot(snapshot);
 
     expect(vm.getState().人物档案).toEqual({});
+  });
+});
+
+describe('VariableManager manual time editing', () => {
+  it('persists a manually edited display time by reconciling the authoritative clock', () => {
+    const state = createDefaultGameState();
+    state.世界.时间系统.时钟 = createWorldClock({ mode: 'gregorian', start: { year: 2026, month: 8, day: 1, hour: 15, minute: 0 } });
+    state.世界.时间系统.当前时间 = formatWorldClock(state.世界.时间系统.时钟);
+    const vm = new VariableManager(state);
+    const edited = vm.getState();
+    edited.世界.时间系统.当前时间 = '2026年8月2日上午9点';
+
+    expect(vm.setStateFromJSON(JSON.stringify(edited))).toBe(true);
+    expect(vm.getState().世界.时间系统.时钟?.current).toMatchObject({ year: 2026, month: 8, day: 2, hour: 9, minute: 0 });
+  });
+
+  it('keeps a formatted display-time edit stable when the same JSON is applied again', () => {
+    const state = createDefaultGameState();
+    state.世界.时间系统.时钟 = createWorldClock({
+      mode: 'gregorian',
+      start: { year: 2026, month: 8, day: 1, hour: 15, minute: 0 },
+    });
+    state.世界.时间系统.当前时间 = formatWorldClock(state.世界.时间系统.时钟);
+    const vm = new VariableManager(state);
+    const edited = vm.getState();
+    edited.世界.时间系统.当前时间 = edited.世界.时间系统.当前时间.replace('15:00', '17:04');
+    const json = JSON.stringify(edited);
+
+    expect(vm.setStateFromJSON(json)).toBe(true);
+    expect(vm.setStateFromJSON(json)).toBe(true);
+    expect(vm.getState().世界.时间系统.时钟?.current).toMatchObject({
+      year: 2026, month: 8, day: 1, hour: 17, minute: 4,
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import {
-  ChevronDown, ChevronRight, RotateCcw, Save,
+  ChevronDown, ChevronRight, RotateCcw,
   ChevronLeft, ChevronRight as ChevronRightNav,
 } from 'lucide-react';
 import type { SnapshotLayer } from './types';
@@ -127,25 +127,17 @@ export function SnapshotList({
                     }}>已修改</span>
                   )}
 
-                  {/* 操作按钮 */}
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    {isLatest ? (
-                      <ToolBtn
-                        onClick={(e) => { e.stopPropagation(); onLoadLatest(layer); }}
-                        title="加载编辑后的状态"
-                        disabled={!isModified}
-                      >
-                        <Save size={12} />
-                      </ToolBtn>
-                    ) : (
+                  {/* 历史层只提供回滚；当前层在展开区一次完成应用和保存。 */}
+                  {!isLatest && (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                       <ToolBtn
                         onClick={(e) => { e.stopPropagation(); onRollbackRequest(layer); }}
                         title="回滚到此层"
                       >
                         <RotateCcw size={12} />
                       </ToolBtn>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 展开内容 */}

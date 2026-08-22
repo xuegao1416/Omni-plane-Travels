@@ -29,4 +29,9 @@ describe('responseExtractor.extractContentForPrompt — 剥标签', () => {
   it('无标签的纯文本原样返回', () => {
     expect(extractContentForPrompt('今天天气真好。')).toBe('今天天气真好。');
   });
+
+  it('服务商先返回空正文块时仍提取后续有效正文', () => {
+    const raw = '<contenttext></contenttext>\n<contenttext>战斗结束后，众人终于喘过气来。</contenttext>';
+    expect(extractContentForPrompt(raw)).toBe('战斗结束后，众人终于喘过气来。');
+  });
 });

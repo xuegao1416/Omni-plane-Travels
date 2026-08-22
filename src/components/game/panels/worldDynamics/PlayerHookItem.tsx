@@ -7,9 +7,10 @@ import { URGENCY_ICONS, URGENCY_LABELS } from './constants';
 
 interface PlayerHookItemProps {
   hook: PlayerHook;
+  onUseAction?: (text: string) => void;
 }
 
-export function PlayerHookItem({ hook }: PlayerHookItemProps) {
+export function PlayerHookItem({ hook, onUseAction }: PlayerHookItemProps) {
   return (
     <div style={{
       fontSize: 'var(--font-size-xs)', padding: '6px 8px', marginBottom: '4px',
@@ -28,12 +29,12 @@ export function PlayerHookItem({ hook }: PlayerHookItemProps) {
       {(hook.suggestedActions?.length ?? 0) > 0 && (
         <div style={{ marginTop: '4px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {(hook.suggestedActions ?? []).map((action, ai) => (
-            <span key={ai} style={{
+            <button type="button" key={ai} onClick={() => onUseAction?.(action)} disabled={!onUseAction} style={{
               fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: 'var(--radius-md)',
-              background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
+              border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', cursor: onUseAction ? 'pointer' : 'default',
             }}>
               {action}
-            </span>
+            </button>
           ))}
         </div>
       )}

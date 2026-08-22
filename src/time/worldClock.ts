@@ -59,7 +59,22 @@ export interface WorldClockState {
 export interface TimeAdvanceSuggestion {
   minutes: number;
   reason: string;
+  /** Optional semantic cross-check emitted by the main model. */
+  targetPhase?: NarrativeTimePhase;
+  /** Calendar-day offset from the beginning of this turn. */
+  dayOffset?: number;
+  evidence?: string;
 }
+
+export type NarrativeTimePhase =
+  | 'late_night'
+  | 'dawn'
+  | 'morning'
+  | 'noon'
+  | 'afternoon'
+  | 'dusk'
+  | 'evening'
+  | 'night';
 
 export interface WorldClockPeriodKeys {
   dayKey: string;
@@ -224,7 +239,7 @@ function parseDateText(text: string): Partial<WorldClockDate> {
   const yearMatch = text.match(/(?:公元前\s*)?(\d{1,6})\s*(?:年|[-/])/);
   const monthMatch = text.match(/(?:年|[-/])\s*(\d{1,2})\s*(?:月|[-/])/);
   const dayMatch = text.match(/(?:月|[-/])\s*(\d{1,2})\s*(?:日|号)?/);
-  const timeMatch = text.match(/(?:T|\s|午前|下午|上午|凌晨|清晨)(\d{1,2})\s*(?::|点|时)\s*(\d{0,2})/);
+  const timeMatch = text.match(/(?:^|T|\s|午前|下午|上午|凌晨|清晨)(\d{1,2})\s*(?::|点|时)\s*(\d{0,2})/);
   const hourOnlyMatch = text.match(/(?:凌晨|清晨|早上|上午|中午|下午|傍晚|晚上|夜里|深夜)\s*(\d{1,2})?\s*(?:点|时)?/);
   const result: Partial<WorldClockDate> = {};
   if (yearMatch) result.year = Number(yearMatch[1]);
@@ -271,23 +286,70 @@ export function inferWorldClockConfig(input: LegacyTimeInputs = {}): WorldClockC
   });
 }
 
-function parseLegacyCurrent(config: WorldClockConfig, text: string): WorldClockDate | null {
+function parseLegacyCurrent(
+  config: WorldClockConfig,
+  text: string,
+  fallbackInput: WorldClockDate = config.start,
+): WorldClockDate | null {
+  const fallback = normalizeDate(config, fallbackInput, config.start);
+  const parsedTime = parseDateText(text);
   if (config.mode === 'relative') {
     const relativeDay = text.match(/(?:第\s*)?(\d{1,9})\s*(?:天|日)/);
     if (relativeDay) {
       const dayOffset = Math.max(0, Number(relativeDay[1]) - 1);
-      const parsedTime = parseDateText(text);
       const date = addMinutesToDate(config, config.start, dayOffset * 1_440);
       return normalizeDate(config, {
         ...date,
-        hour: parsedTime.hour ?? date.hour,
-        minute: parsedTime.minute ?? date.minute,
+        hour: parsedTime.hour ?? fallback.hour,
+        minute: parsedTime.minute ?? fallback.minute,
       }, date);
     }
   }
-  const parsed = parseDateText(text);
-  if (parsed.year == null && parsed.month == null && parsed.day == null) return null;
-  return normalizeDate(config, parsed, config.start);
+
+  // formatWorldClock uses localized month names and "·第N日", which the
+  // legacy numeric parser cannot read. Match the clock's own display format so
+  // a player can edit only HH:mm without accidentally resetting the date.
+  const namedMonth = [...config.months]
+    .map((month, index) => ({ name: month.name.trim(), month: index + 1 }))
+    .filter(item => item.name)
+    .sort((a, b) => b.name.length - a.name.length)
+    .find(item => text.includes(item.name));
+  const formattedDay = text.match(/(?:^|[·・•|\s])第\s*(\d{1,3})\s*日/);
+  const parsed: Partial<WorldClockDate> = {
+    ...parsedTime,
+    month: namedMonth?.month ?? parsedTime.month,
+    day: formattedDay ? Number(formattedDay[1]) : parsedTime.day,
+  };
+  const hasDateOrTime = parsed.year != null || parsed.month != null || parsed.day != null
+    || parsed.hour != null || parsed.minute != null;
+  if (!hasDateOrTime) return null;
+  return normalizeDate(config, { ...fallback, ...parsed }, fallback);
+}
+
+function absoluteMinutes(config: WorldClockConfig, date: WorldClockDate): number {
+  return dateToDayNumber(config, date) * 1_440 + date.hour * 60 + date.minute;
+}
+
+/** 将变量面板中手动编辑的显示时间同步回权威结构化时钟。 */
+export function reconcileEditedWorldClock(raw: WorldClockState, displayText: string): WorldClockState {
+  const clock = normalizeWorldClockState(raw);
+  const target = parseLegacyCurrent(clock.calendar, displayText.trim(), clock.current);
+  if (!target) return clock;
+  const elapsedMinutes = Math.min(
+    maxElapsedMinutesForCalendar(clock.calendar),
+    Math.max(0, absoluteMinutes(clock.calendar, target) - absoluteMinutes(clock.calendar, clock.calendar.start)),
+  );
+  if (elapsedMinutes === clock.elapsedMinutes) return clock;
+  return {
+    ...clock,
+    current: addMinutesToDate(clock.calendar, clock.calendar.start, elapsedMinutes),
+    elapsedMinutes,
+    recentAdvance: {
+      minutes: Math.abs(elapsedMinutes - clock.elapsedMinutes),
+      reason: '玩家手动校正世界时间',
+      source: 'manual',
+    },
+  };
 }
 
 export function createWorldClock(configInput?: Partial<WorldClockConfig>): WorldClockState {
@@ -442,12 +504,23 @@ export function parseTimeAdvance(rawText: string): TimeAdvanceSuggestion | null 
   if (!match) return null;
   try {
     const parsed = JSON.parse(match[1].trim()) as Record<string, unknown>;
+    if (parsed.minutes == null || typeof parsed.minutes === 'boolean') return null;
     const minutes = Number(parsed.minutes);
-    if (!Number.isFinite(minutes) || minutes <= 0) return null;
-    return {
-      minutes: Math.min(MAX_TIME_ADVANCE_MINUTES, Math.max(1, Math.round(minutes))),
+    if (!Number.isFinite(minutes) || minutes < 0) return null;
+    const suggestion: TimeAdvanceSuggestion = {
+      minutes: Math.min(MAX_TIME_ADVANCE_MINUTES, Math.max(0, Math.round(minutes))),
       reason: typeof parsed.reason === 'string' && parsed.reason.trim() ? parsed.reason.trim().slice(0, 200) : '本轮行动',
     };
+    const targetPhase = normalizeNarrativeTimePhase(parsed.targetPhase);
+    if (targetPhase) suggestion.targetPhase = targetPhase;
+    if (parsed.dayOffset != null && typeof parsed.dayOffset !== 'boolean') {
+      const dayOffset = Number(parsed.dayOffset);
+      if (Number.isFinite(dayOffset) && dayOffset >= 0) suggestion.dayOffset = Math.min(3_650, Math.floor(dayOffset));
+    }
+    if (typeof parsed.evidence === 'string' && parsed.evidence.trim()) {
+      suggestion.evidence = parsed.evidence.trim().slice(0, 200);
+    }
+    return suggestion;
   } catch {
     return null;
   }
@@ -463,6 +536,392 @@ export function stripTimeAdvanceTags(rawText: string): string {
     .trim();
 }
 
+const NARRATIVE_PHASE_MINUTES: Record<NarrativeTimePhase, number> = {
+  late_night: 1 * 60,
+  dawn: 5 * 60,
+  morning: 8 * 60,
+  noon: 12 * 60,
+  afternoon: 14 * 60,
+  dusk: 18 * 60,
+  evening: 19 * 60,
+  night: 21 * 60,
+};
+
+const NARRATIVE_DAY_PART_PHASES: Record<string, NarrativeTimePhase> = {
+  凌晨: 'late_night',
+  黎明: 'dawn',
+  破晓: 'dawn',
+  清晨: 'dawn',
+  早晨: 'morning',
+  早上: 'morning',
+  上午: 'morning',
+  中午: 'noon',
+  正午: 'noon',
+  午后: 'afternoon',
+  下午: 'afternoon',
+  傍晚: 'dusk',
+  薄暮: 'dusk',
+  黄昏: 'dusk',
+  晚上: 'evening',
+  入夜: 'night',
+  夜晚: 'night',
+  深夜: 'late_night',
+  午夜: 'late_night',
+  子夜: 'late_night',
+};
+
+function normalizeNarrativeTimePhase(raw: unknown): NarrativeTimePhase | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const value = raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (value === 'late_night' || value === 'midnight' || value === 'deep_night') return 'late_night';
+  if (value === 'dawn' || value === 'daybreak' || value === 'sunrise') return 'dawn';
+  if (value === 'morning') return 'morning';
+  if (value === 'noon' || value === 'midday') return 'noon';
+  if (value === 'afternoon') return 'afternoon';
+  if (value === 'dusk' || value === 'sunset' || value === 'twilight') return 'dusk';
+  if (value === 'evening') return 'evening';
+  if (value === 'night') return 'night';
+  return NARRATIVE_DAY_PART_PHASES[raw.trim()];
+}
+
+function phaseMinute(phase: NarrativeTimePhase): number {
+  return NARRATIVE_PHASE_MINUTES[phase];
+}
+
+function parseNarrativeNumber(raw: string): number | null {
+  const value = raw.trim();
+  if (value === '半') return 0.5;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return numeric;
+  const digits: Record<string, number> = {
+    零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4,
+    五: 5, 六: 6, 七: 7, 八: 8, 九: 9,
+  };
+  let total = 0;
+  let pending = 0;
+  for (const character of value) {
+    if (character in digits) {
+      pending = digits[character];
+      continue;
+    }
+    const unit = character === '十' ? 10 : character === '百' ? 100 : character === '千' ? 1_000 : 0;
+    if (!unit) return null;
+    total += (pending || 1) * unit;
+    pending = 0;
+  }
+  return total + pending;
+}
+
+function replaceRangeWithSpaces(text: string, start: number, end: number): string {
+  return `${text.slice(0, start)}${' '.repeat(Math.max(0, end - start))}${text.slice(end)}`;
+}
+
+/** Remove dialogue, recollection and plans before looking for elapsed-time facts. */
+function maskNonCurrentTimeReferences(input: string): string {
+  let text = input;
+  const quotePattern = /“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』|\"[^\"\n]*\"/g;
+  for (const match of [...text.matchAll(quotePattern)].reverse()) {
+    if (match.index != null) text = replaceRangeWithSpaces(text, match.index, match.index + match[0].length);
+  }
+  const timeHint = /(?:凌晨|黎明|清晨|早晨|上午|中午|正午|午后|下午|傍晚|薄暮|黄昏|晚上|夜晚|深夜|午夜|今晚|昨夜|昨晚|明天|第二天|次日|翌日|隔天|\d+\s*(?:分钟|小时|天|日|周)后)/;
+  const clausePattern = /[^。！？!?；;\n]+[。！？!?；;\n]?/g;
+  for (const match of [...text.matchAll(clausePattern)].reverse()) {
+    if (match.index == null || !timeHint.test(match[0])) continue;
+    const isMemory = /(?:想起|回忆|回想|记得|梦见|梦到|曾经|从前|往昔|过去的|此前)/.test(match[0]);
+    const isPlan = /(?:说|约定|答应|承诺|通知|计划|打算|预计|预告|希望|提议|询问|说明|告诉|声称)/.test(match[0])
+      && !/(?:已经|终于|抵达|到达|过去|醒来|结束|降临|亮起|暗下|说到|聊到|谈到)/.test(match[0]);
+    if (isMemory || isPlan) text = replaceRangeWithSpaces(text, match.index, match.index + match[0].length);
+  }
+  return text;
+}
+
+type NarrativeEvidenceStrength = 'high' | 'soft';
+type NarrativeEventKind = 'duration' | 'phase' | 'next-day' | 'exact-date' | 'meal' | 'sleep';
+
+interface NarrativeTimeEvent {
+  index: number;
+  end: number;
+  kind: NarrativeEventKind;
+  strength: NarrativeEvidenceStrength;
+  label: string;
+  minutes?: number;
+  phase?: NarrativeTimePhase;
+  target?: WorldClockDate;
+  forceNextDay?: boolean;
+}
+
+interface NarrativeTimeInference extends TimeAdvanceSuggestion {
+  strength: NarrativeEvidenceStrength;
+}
+
+function addNarrativeEvent(events: NarrativeTimeEvent[], event: NarrativeTimeEvent): void {
+  const duplicate = events.some(existing => existing.index === event.index
+    && existing.end === event.end
+    && existing.kind === event.kind
+    && existing.phase === event.phase
+    && existing.minutes === event.minutes);
+  const overlappingDuration = event.kind === 'duration' && events.some(existing => existing.kind === 'duration'
+    && existing.minutes === event.minutes
+    && event.index < existing.end
+    && event.end > existing.index);
+  if (!duplicate && !overlappingDuration) events.push(event);
+}
+
+function resolveModelTimeAdvance(suggestion: TimeAdvanceSuggestion, rawClock: WorldClockState): TimeAdvanceSuggestion {
+  if (!suggestion.targetPhase) return suggestion;
+  const clock = normalizeWorldClockState(rawClock);
+  const currentMinute = clock.current.hour * 60 + clock.current.minute;
+  const explicitDayOffset = suggestion.dayOffset ?? 0;
+  let anchorMinutes = explicitDayOffset * 1_440 + phaseMinute(suggestion.targetPhase) - currentMinute;
+  if (
+    anchorMinutes < 0
+    && suggestion.dayOffset == null
+    && /(?:次日|翌日|第二天|隔天|过夜|一夜|醒来)/.test(`${suggestion.reason} ${suggestion.evidence || ''}`)
+  ) anchorMinutes += 1_440;
+  if (anchorMinutes <= suggestion.minutes || anchorMinutes < 0 || anchorMinutes > MAX_TIME_ADVANCE_MINUTES) return suggestion;
+  return {
+    ...suggestion,
+    minutes: anchorMinutes,
+    reason: suggestion.reason || '正文推进至新的时段',
+  };
+}
+
+/**
+ * Build a chronological mini-timeline from completed facts in the visible
+ * narrative. This is both a fallback for lightweight models and a guardrail
+ * against a mechanical `+1 hour` metadata guess. Dialogue, memories and plans
+ * are masked first so merely mentioning tomorrow or last night cannot move the
+ * authoritative clock.
+ */
+export function inferNarrativeTimeAdvance(rawText: string, rawClock: WorldClockState): NarrativeTimeInference | null {
+  const visibleText = stripTimeAdvanceTags(rawText).replace(/<[^>]+>/g, '').trim();
+  if (!visibleText) return null;
+  const clock = normalizeWorldClockState(rawClock);
+  const text = maskNonCurrentTimeReferences(visibleText);
+  if (!text.trim()) return null;
+  const events: NarrativeTimeEvent[] = [];
+
+  const exactDatePattern = /((?:\d{1,6}\s*年\s*)?\d{1,2}\s*月\s*\d{1,2}\s*(?:日|号)(?:\s*(?:凌晨|深夜|清晨|早上|上午|中午|正午|下午|傍晚|黄昏|晚上|夜晚)?\s*\d{1,2}\s*(?:点|时)(?:\s*\d{1,2}\s*分)?)?)/g;
+  for (const match of text.matchAll(exactDatePattern)) {
+    if (match.index == null) continue;
+    const target = parseLegacyCurrent(clock.calendar, match[1], clock.current);
+    if (target) addNarrativeEvent(events, {
+      index: match.index, end: match.index + match[0].length, kind: 'exact-date', strength: 'high',
+      label: '明确日期', target,
+    });
+  }
+
+  const dayPartWords = '凌晨|黎明|破晓|深夜|午夜|子夜|清晨|早晨|早上|上午|中午|正午|午后|下午|傍晚|薄暮|黄昏|晚上|入夜|夜晚';
+  const nextDayPattern = new RegExp(`(?:第二天|次日|翌日|隔日|隔天)(?:的)?\\s*(${dayPartWords})?`, 'g');
+  for (const match of text.matchAll(nextDayPattern)) {
+    if (match.index == null) continue;
+    addNarrativeEvent(events, {
+      index: match.index, end: match.index + match[0].length, kind: 'next-day', strength: 'high',
+      label: match[1] ? `次日${match[1]}` : '次日', phase: NARRATIVE_DAY_PART_PHASES[match[1] || '上午'] || 'morning',
+      forceNextDay: true,
+    });
+  }
+
+  const numberToken = '(?:\\d+(?:\\.\\d+)?|[零〇一二两三四五六七八九十百千]+|半)';
+  const unitToken = '(分钟|分|小时|小時|天|日|周|週|月)';
+  const durationPatterns = [
+    new RegExp(`(${numberToken})\\s*(?:个)?\\s*${unitToken}(?:之后|以后|后|过去)`, 'g'),
+    new RegExp(`(?:又|再|随后)?\\s*(?:过了|过去了|经过了?|经历了?|持续了?|耗费了?|花了?)\\s*(${numberToken})\\s*(?:个)?\\s*${unitToken}`, 'g'),
+  ];
+  for (const pattern of durationPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      if (match.index == null) continue;
+      const value = parseNarrativeNumber(match[1]);
+      if (value == null || value <= 0) continue;
+      addNarrativeEvent(events, {
+        index: match.index, end: match.index + match[0].length, kind: 'duration', strength: 'high',
+        label: match[0].trim(), minutes: durationToMinutes(value, match[2]),
+      });
+    }
+  }
+
+  const lexicalDurations: Record<string, number> = {
+    片刻: 5, 少顷: 5, 须臾: 5, 一会儿: 10, 不久: 15, 半晌: 30, 良久: 45, 许久: 60,
+  };
+  const lexicalPattern = /(?:又|再|随后)?(?:过了|等待了?|等了)?\s*(片刻|少顷|须臾|一会儿|不久|半晌|良久|许久)(?!以前|之前|前)(?:之后|以后|后|过去)?/g;
+  for (const match of text.matchAll(lexicalPattern)) {
+    if (match.index == null) continue;
+    addNarrativeEvent(events, {
+      index: match.index, end: match.index + match[0].length, kind: 'duration', strength: 'soft',
+      label: match[1], minutes: lexicalDurations[match[1]],
+    });
+  }
+
+  const phaseCues: Array<[NarrativeTimePhase, RegExp]> = [
+    ['dawn', /凌晨|清晨|破晓|黎明|晨曦(?:初露|浮现)|天边泛白|天色(?:渐渐|逐渐)?亮(?:了|起来)|鸡鸣/g],
+    ['morning', /早晨|一大早|晨光(?:照进|洒入|透入)|朝阳(?:升起|初升)/g],
+    ['noon', /正午|中午|晌午|日上中天|太阳(?:升至|悬在)头顶/g],
+    ['afternoon', /午后|下午/g],
+    ['dusk', /薄暮|黄昏|暮色(?:降临|四合|渐浓)|夕阳(?:渐渐)?(?:西斜|落下|沉入)|日落|天色(?:渐渐|逐渐)?暗(?:下|了|下来)|影子(?:渐渐)?拉长/g],
+    ['evening', /傍晚|华灯初上|街灯(?:逐一|陆续|纷纷)?亮起|灯火初上/g],
+    ['night', /入夜|夜幕(?:降临|低垂)|夜色(?:笼罩|降临|渐深)|繁星(?:出现|点点)|月亮(?:升起|爬上)|万家灯火/g],
+    ['late_night', /午夜|子夜|深夜|夜深(?:人静)?/g],
+  ];
+  for (const [phase, pattern] of phaseCues) {
+    for (const match of text.matchAll(pattern)) {
+      if (match.index == null) continue;
+      addNarrativeEvent(events, {
+        index: match.index, end: match.index + match[0].length, kind: 'phase', strength: 'high',
+        label: match[0], phase,
+      });
+    }
+  }
+
+  const mealPattern = /(?:(?:吃|用|享用)(?:完|过|罢)?(?:了)?\s*(早饭|早餐|午饭|午餐|中饭|晚饭|晚餐)|(?:早饭|早餐|午饭|午餐|中饭|晚饭|晚餐)\s*(?:已经)?(?:吃完|用完|用毕|结束))/g;
+  for (const match of text.matchAll(mealPattern)) {
+    if (match.index == null) continue;
+    const prefix = text.slice(Math.max(0, match.index - 6), match.index);
+    if (/(?:准备|打算|正要|想要|计划)/.test(prefix)) continue;
+    const meal = match[1] || match[0];
+    const isBreakfast = /早饭|早餐/.test(meal);
+    const isLunch = /午饭|午餐|中饭/.test(meal);
+    addNarrativeEvent(events, {
+      index: match.index, end: match.index + match[0].length, kind: 'meal', strength: 'soft',
+      label: isBreakfast ? '完成早餐' : isLunch ? '完成午餐' : '完成晚餐',
+      phase: isBreakfast ? 'morning' : isLunch ? 'noon' : 'evening',
+      minutes: isBreakfast ? 20 : isLunch ? 30 : 40,
+    });
+  }
+
+  const sleepPattern = /一夜(?:悄然)?过去|一觉(?:醒来|睡到)|睡醒(?:时|后)?|从睡梦中醒来|醒来时|睁开眼(?:时)?/g;
+  for (const match of text.matchAll(sleepPattern)) {
+    if (match.index == null) continue;
+    const nearbyNextDay = events.some(event => event.kind === 'next-day'
+      && event.index >= match.index && event.index - match.index < 40);
+    const nearbyExplicitDuration = events.some(event => event.kind === 'duration' && event.strength === 'high'
+      && Math.abs(event.index - match.index) < 40);
+    if (nearbyNextDay || nearbyExplicitDuration) continue;
+    const context = text.slice(Math.max(0, match.index - 32), Math.min(text.length, match.index + match[0].length + 32));
+    const isNap = /午睡|小憩|打盹/.test(context);
+    const isOvernight = !isNap && (/(?:一夜|天亮|晨光|黎明|清晨|早晨|翌日|第二天|晚饭|晚餐|睡下|入睡|就寝)/.test(context)
+      || clock.current.hour >= 18);
+    addNarrativeEvent(events, {
+      index: match.index, end: match.index + match[0].length, kind: 'sleep', strength: isOvernight ? 'high' : 'soft',
+      label: isNap ? '小憩后醒来' : isOvernight ? '过夜后醒来' : '睡眠后醒来',
+      minutes: isOvernight ? undefined : isNap ? 60 : 8 * 60,
+      phase: isOvernight ? 'morning' : undefined,
+      forceNextDay: isOvernight,
+    });
+  }
+
+  const priority: Record<NarrativeEventKind, number> = {
+    'exact-date': 0, 'next-day': 1, duration: 2, meal: 3, sleep: 4, phase: 5,
+  };
+  events.sort((a, b) => a.index - b.index || priority[a.kind] - priority[b.kind] || a.end - b.end);
+
+  let cursor = { ...clock.current };
+  let elapsed = 0;
+  let strongest: NarrativeEvidenceStrength = 'soft';
+  const appliedLabels: string[] = [];
+  const advanceCursor = (minutesInput: number, event: NarrativeTimeEvent): void => {
+    const minutes = Math.min(MAX_TIME_ADVANCE_MINUTES - elapsed, Math.max(0, Math.round(minutesInput)));
+    if (minutes <= 0) return;
+    cursor = addMinutesToDate(clock.calendar, cursor, minutes);
+    elapsed += minutes;
+    if (event.strength === 'high') strongest = 'high';
+    if (!appliedLabels.includes(event.label)) appliedLabels.push(event.label);
+  };
+  const moveToPhase = (phase: NarrativeTimePhase, event: NarrativeTimeEvent): void => {
+    const currentMinute = cursor.hour * 60 + cursor.minute;
+    const targetMinute = phaseMinute(phase);
+    let dayOffset = event.forceNextDay ? 1 : 0;
+    if (!event.forceNextDay && targetMinute < currentMinute) {
+      const isNewDayPhase = (phase === 'late_night' && currentMinute >= 5 * 60 && currentMinute < 21 * 60)
+        || (['dawn', 'morning', 'noon', 'afternoon'].includes(phase) && currentMinute >= 18 * 60);
+      if (isNewDayPhase) dayOffset = 1;
+      else return;
+    }
+    advanceCursor(dayOffset * 1_440 + targetMinute - currentMinute, event);
+  };
+
+  for (const event of events) {
+    if (elapsed >= MAX_TIME_ADVANCE_MINUTES) break;
+    if (event.kind === 'exact-date' && event.target) {
+      advanceCursor(absoluteMinutes(clock.calendar, event.target) - absoluteMinutes(clock.calendar, cursor), event);
+    } else if (event.kind === 'next-day' && event.phase) {
+      moveToPhase(event.phase, event);
+    } else if (event.kind === 'phase' && event.phase) {
+      moveToPhase(event.phase, event);
+    } else if (event.kind === 'meal' && event.phase) {
+      moveToPhase(event.phase, event);
+      advanceCursor(event.minutes || 0, event);
+    } else if (event.kind === 'sleep') {
+      if (event.phase) moveToPhase(event.phase, event);
+      else advanceCursor(event.minutes || 0, event);
+    } else if (event.kind === 'duration') {
+      advanceCursor(event.minutes || 0, event);
+    }
+  }
+
+  if (elapsed <= 0) return null;
+  return {
+    minutes: elapsed,
+    reason: `正文时间线：${appliedLabels.slice(-3).join('、') || '场景自然推进'}`,
+    strength: strongest,
+  };
+}
+
+export interface ResolvedTimeAdvance extends TimeAdvanceSuggestion {
+  source: 'ai' | 'narrative' | 'player-explicit';
+}
+
+function durationToMinutes(value: number, unit: string): number {
+  const multiplier = /小时|小時/.test(unit) ? 60
+    : /天|日/.test(unit) ? 1_440
+      : /周|週/.test(unit) ? 10_080
+        : /月/.test(unit) ? 43_200
+          : 1;
+  return Math.min(MAX_TIME_ADVANCE_MINUTES, Math.max(1, Math.round(value * multiplier)));
+}
+
+/**
+ * Last-resort fallback for a direct player command with an explicit duration.
+ * Intentional verb gating avoids treating questions or quoted durations as
+ * elapsed time. Ambiguous turns deliberately return null instead of ticking a
+ * world-default amount that may contradict the visible narrative.
+ */
+export function inferExplicitPlayerTimeAdvance(userText: string): TimeAdvanceSuggestion | null {
+  const text = (userText || '').trim();
+  if (!text) return null;
+  if (/[?？]/.test(text) || /(?:是否|会不会|要不要|能不能|多久|多少(?:分钟|小时|天)|够不够)/.test(text)) return null;
+  const match = text.match(/(?:等待?|休息|停留|跳过|快进|度过|耗时|花(?:上|费)?|训练|修炼|学习|工作|赶路|旅行|睡(?:眠|觉)?)[^。！？!?\n]{0,18}?(\d+(?:\.\d+)?)\s*(分钟|分|小时|小時|天|日|周|週|月)/i);
+  if (!match) return null;
+  return {
+    minutes: durationToMinutes(Number(match[1]), match[2]),
+    reason: '玩家明确要求经过这段时间',
+  };
+}
+
+/**
+ * Resolve one turn's clock delta by evidence strength. Explicit time written
+ * in the visible narrative wins over metadata, then model metadata, then a
+ * direct player duration command. With no evidence the clock stays put.
+ */
+export function resolveTurnTimeAdvance(input: {
+  rawResponse: string;
+  narrativeText: string;
+  userText: string;
+  clock: WorldClockState;
+}): ResolvedTimeAdvance | null {
+  const narrative = inferNarrativeTimeAdvance(input.narrativeText, input.clock);
+  if (narrative?.strength === 'high') {
+    return { minutes: narrative.minutes, reason: narrative.reason, source: 'narrative' };
+  }
+  const parsedAi = parseTimeAdvance(input.rawResponse);
+  const ai = parsedAi ? resolveModelTimeAdvance(parsedAi, input.clock) : null;
+  if (narrative && (!ai || narrative.minutes > ai.minutes)) {
+    return { minutes: narrative.minutes, reason: narrative.reason, source: 'narrative' };
+  }
+  if (ai) return { ...ai, source: 'ai' };
+  const explicitPlayer = inferExplicitPlayerTimeAdvance(input.userText);
+  return explicitPlayer ? { ...explicitPlayer, source: 'player-explicit' } : null;
+}
+
 export function estimateTurnMinutes(userText: string, configInput?: Partial<WorldClockConfig>): { minutes: number; reason: string } {
   const text = userText || '';
   const config = normalizeTimeSystemConfig(configInput);
@@ -470,8 +929,7 @@ export function estimateTurnMinutes(userText: string, configInput?: Partial<Worl
   if (explicit) {
     const value = Number(explicit[1]);
     const unit = explicit[2].toLowerCase();
-    const multiplier = /小时|小時/.test(unit) ? 60 : /天|日/.test(unit) ? 1_440 : /周|週/.test(unit) ? 10_080 : /月/.test(unit) ? 43_200 : 1;
-    return { minutes: Math.min(MAX_TIME_ADVANCE_MINUTES, Math.max(1, Math.round(value * multiplier))), reason: '用户明确说明的时长' };
+    return { minutes: durationToMinutes(value, unit), reason: '用户明确说明的时长' };
   }
   if (/睡觉|睡一觉|睡眠|休息|过夜|熬夜/.test(text)) return { minutes: 8 * 60, reason: '睡眠或长时间休息' };
   if (/旅行|旅途|赶路|乘车|乘船|飞行|跋涉|前往|返回/.test(text)) return { minutes: 120, reason: '旅行或移动' };

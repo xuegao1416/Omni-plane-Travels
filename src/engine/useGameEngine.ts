@@ -45,9 +45,8 @@ import { runCustomModulesForWorldAndCommit } from '../custom-modules/engineBridg
 import {
   advanceWorldClockForTurn,
   ensureWorldClockOnGameState,
-  estimateTurnMinutes,
   formatWorldClock,
-  parseTimeAdvance,
+  resolveTurnTimeAdvance,
 } from '../time/worldClock';
 import { settleProgressionAction } from './progressionSettlement';
 import {
@@ -731,6 +730,10 @@ export function useGameEngine(
         // main 任务：正文生成
         mainTask: async () => {
           // ── 构建系统提示词（v2.0 结构化预设 + 宏引擎） ──
+          const worldDefForPrompt = findWorldDef(selectedWorldRef.current);
+          const stateAtTurnStart = varMgrRef.current.getState();
+          ensureWorldClockOnGameState(stateAtTurnStart, worldDefForPrompt);
+          const turnStartClock = stateAtTurnStart.世界.时间系统.时钟!;
           const state = varMgrRef.current.createSafeSnapshotForPrompt();
           const varSnapshot = formatSnapshotForMainAI(state);
 
@@ -882,6 +885,7 @@ ${perspectiveInstruction}
           if (imageConfig.inlineImageEnabled) {
             systemPrompt += '\n\n【提醒】在 <contenttext> 正文中插入 image###英文提示词### 生图标签（1-2个）。';
           }
+          systemPrompt += `\n\n【权威时间裁决】本轮起始时间是“${formatWorldClock(turnStartClock)}”。完成正文与行动选项后，必须在整条回复最后单独追加 <TimeAdvance>{"minutes":本轮从起始到正文末尾实际经过的非负整数分钟,"reason":"简短原因","evidence":"正文中的时间依据"}</TimeAdvance>。末尾能确定时段时，再在 JSON 中增加 targetPhase 和 dayOffset：targetPhase 可选 late_night/dawn/morning/noon/afternoon/dusk/evening/night，dayOffset 是末尾相对本轮起始日期跨过的日数；无法确定时严禁猜测这两个字段。必须顺着整段正文判断连续时间线并累计所有转场：明确时长与日期、天色/光照变化、完成用餐、睡醒、抵达目的地、长谈或持续工作结束等，即使没有直接写“过了多久”，也要依情境自然估算；若正文从中午推进到入夜或跨过一晚，minutes 必须覆盖完整跨度，绝不能机械地每轮加一小时。只有一句对话、观察或即时反应且没有任何时间变化时才写 0。不得省略回执、不得写绝对日期、不得把标签放进正文。`;
 
           const chatHistory = sanitizeForContext(messagesRef.current, round);
           // 注入 atDepth 世界书条目 + 预设自带深度注入条目（双人成行 🔒丨文风 depth=2 等）到聊天历史
@@ -1005,18 +1009,24 @@ ${perspectiveInstruction}
         const worldDefForClock = findWorldDef(selectedWorldRef.current);
         ensureWorldClockOnGameState(stateBeforeClock, worldDefForClock);
         const currentClock = stateBeforeClock.世界.时间系统.时钟!;
-        const aiSuggestion = parseTimeAdvance(mainResult?.text || '');
-        const suggestion = aiSuggestion || estimateTurnMinutes(userText, currentClock.calendar);
-        const nextClock = advanceWorldClockForTurn(currentClock, suggestion.minutes, {
-          reason: suggestion.reason,
-          source: aiSuggestion ? 'ai' : 'local-estimate',
-          turnId: aiMsgId,
-          round,
+        const suggestion = resolveTurnTimeAdvance({
+          rawResponse: mainResult?.text || '',
+          narrativeText: mainContent,
+          userText,
+          clock: currentClock,
         });
-        if (nextClock.elapsedMinutes !== currentClock.elapsedMinutes) {
-          stateBeforeClock.世界.时间系统.时钟 = nextClock;
-          stateBeforeClock.世界.时间系统.当前时间 = formatWorldClock(nextClock);
-          varMgrRef.current.setState(stateBeforeClock);
+        if (suggestion && suggestion.minutes > 0) {
+          const nextClock = advanceWorldClockForTurn(currentClock, suggestion.minutes, {
+            reason: suggestion.reason,
+            source: suggestion.source === 'player-explicit' ? 'local-estimate' : 'ai',
+            turnId: aiMsgId,
+            round,
+          });
+          if (nextClock.elapsedMinutes !== currentClock.elapsedMinutes) {
+            stateBeforeClock.世界.时间系统.时钟 = nextClock;
+            stateBeforeClock.世界.时间系统.当前时间 = formatWorldClock(nextClock);
+            varMgrRef.current.setState(stateBeforeClock);
+          }
         }
       }
 

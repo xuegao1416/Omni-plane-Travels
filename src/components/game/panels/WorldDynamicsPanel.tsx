@@ -17,7 +17,7 @@ import { EffectLogTab } from './worldDynamics/EffectLogTab';
 
 type TabId = 'events' | 'storylines' | 'interactions' | 'effectlog' | 'settings';
 
-export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulating, worldDef, onRulesChange }: WorldDynamicsPanelProps) {
+export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulating, worldDef, onRulesChange, onUseAction }: WorldDynamicsPanelProps) {
   const { simState } = useSimulationStore();
   const [activeTab, setActiveTab] = useState<TabId>('events');
 
@@ -35,6 +35,16 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
 
   // 获取 effectLog
   const effectLog = gameState?.simulationRuntime?.effectLog ?? [];
+  const variableLabels: Record<string, string> = Object.fromEntries(
+    Object.entries(gameState?.玩家?.生存资源 ?? {}).map(([id, resource]) => [id, String((resource as any).name || (resource as any).名称 || id)]),
+  );
+  const statModule = worldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled)?.moduleConfig as Record<string, any> | undefined;
+  for (const key of ['attrA', 'attrB', 'dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6']) {
+    if (statModule?.[key]?.name) variableLabels[key] = String(statModule[key].name);
+  }
+  for (const special of Array.isArray(statModule?.special) ? statModule.special : []) {
+    if (special?.id && special?.name) variableLabels[String(special.id)] = String(special.name);
+  }
 
   const tabs: { id: TabId; label: string; badge?: number }[] = [
     { id: 'events', label: '事件' },
@@ -88,6 +98,7 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
             worldNewsSummary={simState.worldNewsSummary}
             onManualTick={onManualTick}
             isSimulating={isSimulating}
+            onUseAction={onUseAction}
           />
         )}
 
@@ -96,11 +107,11 @@ export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulati
         )}
 
         {activeTab === 'interactions' && (
-          <InteractionsTab interactions={simState.pendingInteractions ?? []} />
+          <InteractionsTab interactions={simState.pendingInteractions ?? []} onUseAction={onUseAction} />
         )}
 
         {activeTab === 'effectlog' && (
-          <EffectLogTab effectLog={effectLog} />
+          <EffectLogTab effectLog={effectLog} variableLabels={variableLabels} />
         )}
 
         {activeTab === 'settings' && (

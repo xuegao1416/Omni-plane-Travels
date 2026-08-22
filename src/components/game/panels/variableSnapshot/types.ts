@@ -11,6 +11,7 @@ export interface VariableSnapshotPanelProps {
   onRestoreSnapshot?: (snapshot: GameState) => void;
   onRollbackToSnapshot?: (msgIndex: number) => void;
   onSave?: () => void;
+  onCommitState?: () => Promise<void>;
 }
 
 // Re-export SnapshotLayer type for consumers

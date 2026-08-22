@@ -9,9 +9,10 @@ import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 
 interface NpcInteractionCardProps {
   interaction: NpcProactiveInteraction;
+  onUseAction?: (text: string) => void;
 }
 
-export function NpcInteractionCard({ interaction }: NpcInteractionCardProps) {
+export function NpcInteractionCard({ interaction, onUseAction }: NpcInteractionCardProps) {
   const [expanded, setExpanded] = useState(false);
   const priorityColor = interaction.priority <= 100 ? 'var(--danger)'
     : interaction.priority <= 300 ? 'var(--warning)'
@@ -93,6 +94,11 @@ export function NpcInteractionCard({ interaction }: NpcInteractionCardProps) {
           }}>
             💬 {interaction.reply}
           </div>
+          {onUseAction && (
+            <button type="button" className="btn-primary btn-xs" onClick={() => onUseAction(`回应${interaction.npcName}：`)} style={{ marginTop: 8 }}>
+              <MessageSquare size={12} />在正文中回应
+            </button>
+          )}
 
           {/* 变量变更 */}
           {interaction.variableChanges && interaction.variableChanges.length > 0 && (

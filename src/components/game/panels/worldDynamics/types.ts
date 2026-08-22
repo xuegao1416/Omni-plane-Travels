@@ -14,4 +14,6 @@ export interface WorldDynamicsPanelProps {
   worldDef?: WorldDef | null;
   /** 规则变更回调 */
   onRulesChange?: (rules: WorldDynamicsConfig) => void;
+  /** 将后台动态的建议行动填入主聊天输入框。 */
+  onUseAction?: (text: string) => void;
 }

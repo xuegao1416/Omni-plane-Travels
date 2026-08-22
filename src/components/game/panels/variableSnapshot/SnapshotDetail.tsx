@@ -42,10 +42,10 @@ export function SnapshotDetail({ layer, editText, isLatest, onEditTextChange, on
             onClick={onApply}
             className="btn-primary btn-sm"
           >
-            应用编辑
+            应用并保存
           </button>
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', lineHeight: '28px' }}>
-            编辑 JSON 后点击应用
+            编辑 JSON 后一次完成状态更新与存档
           </span>
         </div>
       )}

@@ -1838,3 +1838,30 @@
   border-radius: 0;
   box-shadow: -12px 0 38px color-mix(in srgb, var(--journey-glow, #c8e2d6) 30%, transparent);
 }
+
+/* Dice cards occupy the reading column, so their fill must follow the panel
+   frame inset instead of the compact badge geometry. */
+.game-journey-card--dice {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 10px 0 14px;
+}
+.game-journey-card--dice > .dawn-frame-v4__fill {
+  inset: 10px !important;
+  border-radius: 10px;
+}
+.game-journey-card--dice > .dawn-frame-v4__content {
+  width: 100%;
+  padding: 22px 28px !important;
+}
+.game-journey-card--dice .game-journey-card__content,
+.game-journey-card--dice .inline-dice-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+.game-journey-card--dice .game-journey-card__content { padding: 0; }
+
+@media (max-width: 640px) {
+  .game-journey-card--dice > .dawn-frame-v4__content { padding: 18px 16px !important; }
+}

@@ -28,21 +28,29 @@ interface Props {
   worldName?: string;
   worldSceneUrl?: string;
   mobileSummary?: React.ReactNode;
+  externalDraft?: { id: string; text: string };
 }
 
-export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, worldName, worldSceneUrl, mobileSummary }: Props) {
+export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, worldName, worldSceneUrl, mobileSummary, externalDraft }: Props) {
   const [showMonitor, setShowMonitor] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const [visibleStart, setVisibleStart] = useState(() => getInitialMessageStart(messages.length));
   const historyAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const messageHistoryRef = useRef({ firstId: messages[0]?.id, length: messages.length });
+  const lastDraftIdRef = useRef('');
   const { settings, t } = useUISettings();
 
   const previousHistory = messageHistoryRef.current;
   const historyWasReplaced = previousHistory.firstId !== messages[0]?.id || messages.length < previousHistory.length;
   const renderedStart = historyWasReplaced ? getInitialMessageStart(messages.length) : visibleStart;
   const visibleMessages = useMemo(() => messages.slice(renderedStart), [messages, renderedStart]);
+
+  useEffect(() => {
+    if (!externalDraft?.text || externalDraft.id === lastDraftIdRef.current) return;
+    lastDraftIdRef.current = externalDraft.id;
+    setInputText(externalDraft.text);
+  }, [externalDraft]);
 
   // A new/truncated save gets a fresh recent window. Appending turns keeps the current reading range.
   useEffect(() => {

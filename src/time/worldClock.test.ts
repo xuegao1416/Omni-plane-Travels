@@ -4,11 +4,15 @@ import {
   advanceWorldClockForTurn,
   createWorldClock,
   estimateTurnMinutes,
+  formatWorldClock,
   getWorldClockPeriodKeys,
+  inferNarrativeTimeAdvance,
   inferWorldClockConfig,
   normalizeTimeSystemConfig,
   normalizeWorldClockState,
   parseTimeAdvance,
+  reconcileEditedWorldClock,
+  resolveTurnTimeAdvance,
   stripTimeAdvanceTags,
 } from './worldClock';
 import { getBusinessSettlementPeriodKey } from './businessPeriod';
@@ -60,13 +64,123 @@ describe('authoritative world clock', () => {
     expect(relative.current).toMatchObject({ day: 12, hour: 18, minute: 30 });
   });
 
-  test('parses and strips TimeAdvance, with conservative local estimates', () => {
+  test('parses and strips TimeAdvance, including an explicit zero-minute turn', () => {
     expect(parseTimeAdvance('<TimeAdvance>{"minutes":90,"reason":"旅行"}</TimeAdvance>')).toEqual({ minutes: 90, reason: '旅行' });
+    expect(parseTimeAdvance('<TimeAdvance>{"minutes":0,"reason":"只是一瞬"}</TimeAdvance>')).toEqual({ minutes: 0, reason: '只是一瞬' });
     expect(parseTimeAdvance('<TimeAdvance>{"date":"2028-01-01"}</TimeAdvance>')).toBeNull();
     expect(stripTimeAdvanceTags('正文\n<TimeAdvance>{"minutes":20}</TimeAdvance>')).toBe('正文');
     expect(estimateTurnMinutes('睡一觉')).toMatchObject({ minutes: 480 });
     expect(estimateTurnMinutes('明确等待 2 小时')).toMatchObject({ minutes: 120 });
     expect(estimateTurnMinutes('普通行动', { defaultTurnMinutes: 17 })).toMatchObject({ minutes: 17 });
+  });
+
+  test('does not mechanically advance an ambiguous turn when the model omits time metadata', () => {
+    const clock = createWorldClock({ mode: 'relative', defaultTurnMinutes: 60 });
+    expect(resolveTurnTimeAdvance({
+      rawResponse: '<contenttext>你看向窗外，雨仍在下。</contenttext>',
+      narrativeText: '你看向窗外，雨仍在下。',
+      userText: '看看窗外',
+      clock,
+    })).toBeNull();
+    expect(resolveTurnTimeAdvance({
+      rawResponse: '<contenttext>你在门边等候。</contenttext>',
+      narrativeText: '你在门边等候。',
+      userText: '明确等待 2 小时',
+      clock,
+    })).toMatchObject({ minutes: 120, source: 'player-explicit' });
+    expect(resolveTurnTimeAdvance({
+      rawResponse: '<contenttext>他没有回答。</contenttext>',
+      narrativeText: '他没有回答。',
+      userText: '我们要不要等待 2 小时？',
+      clock,
+    })).toBeNull();
+  });
+
+  test('uses a semantic phase anchor from the model instead of a mechanical minute guess', () => {
+    const clock = createWorldClock({
+      mode: 'relative',
+      start: { year: 1, month: 1, day: 1, hour: 12, minute: 0 },
+    });
+    expect(resolveTurnTimeAdvance({
+      rawResponse: '<TimeAdvance>{"minutes":60,"targetPhase":"dusk","dayOffset":0,"reason":"暮色降临"}</TimeAdvance>',
+      narrativeText: '众人收拾好桌面，准备继续商议。',
+      userText: '继续',
+      clock,
+    })).toMatchObject({ minutes: 6 * 60, source: 'ai' });
+  });
+
+  test('follows environmental phase changes through the end of a multi-scene response', () => {
+    const clock = createWorldClock({
+      mode: 'relative',
+      start: { year: 1, month: 1, day: 1, hour: 12, minute: 0 },
+    });
+    expect(inferNarrativeTimeAdvance(
+      '吃完中饭后，众人继续赶路。夕阳渐渐西斜，街灯逐一亮起；等他们进城时，已经入夜。',
+      clock,
+    )).toMatchObject({ minutes: 9 * 60 });
+  });
+
+  test('carries a completed sleep scene into the following morning', () => {
+    const clock = createWorldClock({
+      mode: 'relative',
+      start: { year: 1, month: 1, day: 1, hour: 18, minute: 0 },
+    });
+    expect(inferNarrativeTimeAdvance('他们吃过晚饭便睡下。一觉醒来，晨光已经照进窗内。', clock)).toMatchObject({
+      minutes: 14 * 60,
+    });
+  });
+
+  test('accumulates multiple completed relative durations in narrative order', () => {
+    const clock = createWorldClock({
+      mode: 'relative',
+      start: { year: 1, month: 1, day: 1, hour: 8, minute: 0 },
+    });
+    expect(inferNarrativeTimeAdvance('两小时后，他们抵达山脚。又过了三小时，队伍终于翻过山口。', clock)).toMatchObject({
+      minutes: 5 * 60,
+    });
+  });
+
+  test('uses a completed meal as a soft fallback but ignores quoted or remembered time', () => {
+    const clock = createWorldClock({
+      mode: 'relative',
+      start: { year: 1, month: 1, day: 1, hour: 12, minute: 0 },
+    });
+    expect(inferNarrativeTimeAdvance('两人吃完中饭，结账走出餐馆。', clock)).toMatchObject({ minutes: 30 });
+    expect(inferNarrativeTimeAdvance('她说：“今晚再来吧。”他却想起昨夜的月色。', clock)).toBeNull();
+  });
+
+  test('infers a forward day-part jump when a lightweight model omits TimeAdvance', () => {
+    const clock = createWorldClock({
+      mode: 'relative',
+      start: { year: 1, month: 1, day: 1, hour: 15, minute: 0 },
+    });
+    expect(inferNarrativeTimeAdvance('一夜过去。第二天上午，你在门外醒来。', clock)).toMatchObject({
+      minutes: 17 * 60,
+    });
+    expect(inferNarrativeTimeAdvance('他说明第二天上午会再来，并没有离开。', clock)).toBeNull();
+  });
+
+  test('reconciles a manual display edit into the structured clock', () => {
+    const clock = createWorldClock({
+      mode: 'gregorian',
+      start: { year: 2026, month: 8, day: 1, hour: 15, minute: 0 },
+    });
+    const edited = reconcileEditedWorldClock(clock, '2026年8月2日上午9点');
+    expect(edited.current).toMatchObject({ year: 2026, month: 8, day: 2, hour: 9, minute: 0 });
+    expect(edited.elapsedMinutes).toBe(18 * 60);
+  });
+
+  test('round-trips the formatted clock text when a player edits only its time', () => {
+    const clock = advanceWorldClock(createWorldClock({
+      mode: 'gregorian',
+      start: { year: 2026, month: 8, day: 1, hour: 15, minute: 0 },
+    }), 18 * 60);
+    const editedDisplay = formatWorldClock(clock).replace('09:00', '17:04');
+    const edited = reconcileEditedWorldClock(clock, editedDisplay);
+    expect(edited.current).toMatchObject({ year: 2026, month: 8, day: 2, hour: 17, minute: 4 });
+    expect(reconcileEditedWorldClock(clock, '17:04').current).toMatchObject({
+      year: 2026, month: 8, day: 2, hour: 17, minute: 4,
+    });
   });
 
   test('advances a successful turn only once', () => {

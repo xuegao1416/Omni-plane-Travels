@@ -45,7 +45,7 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.7.5';
+const APP_VERSION = '2.7.6';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
@@ -924,7 +924,7 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
       description: `负责调度「${cardPack.name ?? world.name ?? world.id}」中的事件内容`,
       engine: 'opt-event',
       schemaVersion: 1,
-      minAppVersion: '2.7.5',
+      minAppVersion: '2.7.6',
       type: 'rule',
       coverColor: '#6366f1',
       icon: 'Zap',

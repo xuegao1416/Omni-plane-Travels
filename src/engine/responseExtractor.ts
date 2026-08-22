@@ -11,10 +11,13 @@ export function extractContentForPrompt(rawText: string): string {
   if (!rawText) return '';
   rawText = stripTimeAdvanceTags(rawText);
 
-  // 优先提取 <contenttext> 标签内的内容
-  const contentMatch = rawText.match(/<contenttext>([\s\S]*?)<\/contenttext>/i);
-  if (contentMatch) {
-    return stripInnerTags(contentMatch[1]).trim();
+  // 部分中转服务会先返回空占位块，再返回真正正文。
+  // 合并所有非空正文块，避免把有效回复误判成空回。
+  const contentBlocks = [...rawText.matchAll(/<contenttext>([\s\S]*?)<\/contenttext>/gi)]
+    .map(match => stripInnerTags(match[1]).trim())
+    .filter(Boolean);
+  if (contentBlocks.length > 0) {
+    return contentBlocks.join('\n\n');
   }
 
   // 兜底：剥掉所有已知标签，剩余当正文
@@ -43,7 +46,7 @@ function stripInnerTags(text: string): string {
 function stripAllTags(text: string): string {
   return text
     .replace(/<TimeAdvance\s*>[\s\S]*?<\/TimeAdvance>/gi, '')
-    .replace(/<contenttext>[\s\S]*?<\/contenttext>/gi, '')
+    .replace(/<\/?contenttext[^>]*>/gi, '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .replace(/<(?:action_)?options>[\s\S]*?<\/(?:action_)?options>/gi, '')
     .replace(/<(?:Update)?[Vv]ariable>[\s\S]*?<\/(?:Update)?[Vv]ariable>/gi, '')

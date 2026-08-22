@@ -14,9 +14,10 @@ interface EventsTabProps {
   worldNewsSummary?: string;
   onManualTick?: () => void;
   isSimulating?: boolean;
+  onUseAction?: (text: string) => void;
 }
 
-export function EventsTab({ activeEvents, tickCount, worldNewsSummary, onManualTick, isSimulating }: EventsTabProps) {
+export function EventsTab({ activeEvents, tickCount, worldNewsSummary, onManualTick, isSimulating, onUseAction }: EventsTabProps) {
   return (
     <>
       {worldNewsSummary && (
@@ -28,9 +29,10 @@ export function EventsTab({ activeEvents, tickCount, worldNewsSummary, onManualT
         }}>
           <div style={{ fontWeight: 600, color: 'var(--accent)', marginBottom: '4px', fontSize: 'var(--font-size-xs)' }}>
             <Zap size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-            世界新闻
+            后台世界动态
           </div>
           {worldNewsSummary}
+          <div style={{ marginTop: 5, opacity: .72 }}>这是后台推演摘要；最近正文与当前变量始终优先。</div>
         </div>
       )}
 
@@ -49,7 +51,7 @@ export function EventsTab({ activeEvents, tickCount, worldNewsSummary, onManualT
             </button>
           </div>
           {activeEvents.map(evt => (
-            <EventCard key={evt.id} event={evt} tickCount={tickCount} />
+            <EventCard key={evt.id} event={evt} tickCount={tickCount} onUseAction={onUseAction} />
           ))}
         </>
       )}
