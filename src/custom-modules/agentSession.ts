@@ -110,6 +110,20 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/** Restore one world's complete co-creation state without carrying it across worlds. */
+export function restoreCustomModuleAgentSessionForWorld(
+  saved: CustomModuleAgentSession | undefined,
+  world: CustomModuleAgentWorldContext,
+): CustomModuleAgentSession {
+  if (!saved || saved.world.id !== world.id) return createCustomModuleAgentSession(world);
+  const restored = clone(saved);
+  return {
+    ...restored,
+    world: { ...world },
+    conversation: restored.conversation.map((message) => ({ ...message })),
+  };
+}
+
 /** Pure session reducer. Invalid replacement drafts never erase the last valid draft. */
 export function applyCustomModuleAgentTurn(
   session: CustomModuleAgentSession,

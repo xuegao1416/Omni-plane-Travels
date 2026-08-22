@@ -1,7 +1,7 @@
 // NPC 管理工具
 import type { GameState, NPCData } from '../schema/variables';
 import { cloneDeep } from 'lodash-es';
-import { formatWorldClock } from '../time/worldClock';
+import { formatWorldClock, normalizeTimeSystemConfig, type WorldClockConfig } from '../time/worldClock';
 
 // ─── 常量 ───────────────────────────────────────────
 
@@ -455,22 +455,23 @@ function formatDepartedNpcCompact(npc: Record<string, unknown>, npcId: string): 
  * 将 GameState 格式化为主 AI 可读的紧凑文本快照
  * 只提取叙事需要的字段，避免浪费 token
  */
-export function formatSnapshotForMainAI(state: GameState): string {
+export function formatSnapshotForMainAI(state: GameState, configInput?: WorldClockConfig): string {
   const lines: string[] = [];
 
   // 世界状态
   const world = state.世界 ?? ({} as any);
   const time = world.时间系统?.当前时间 ?? '';
   const clock = world.时间系统?.时钟;
+  const clockConfig = normalizeTimeSystemConfig(configInput);
   const weather = world.时间系统?.当前天气 ?? '';
   const location = world.空间定位?.当前位置 ?? '';
   if (time || location || weather) {
     lines.push(`### 【世界状态】`);
     const parts = [];
     if (clock) {
-      parts.push(`权威时间:${formatWorldClock(clock)}`);
+      parts.push(`权威时间:${formatWorldClock(clock, clockConfig)}`);
       parts.push(`已流逝分钟:${clock.elapsedMinutes}`);
-      parts.push(`历法:${clock.calendar.calendarName}（${clock.calendar.mode}）`);
+      parts.push(`历法:${clockConfig.calendarName}（${clockConfig.mode}）`);
     } else if (time) {
       parts.push(`时间:${time}`);
     }

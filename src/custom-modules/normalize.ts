@@ -1,4 +1,4 @@
-import { customGameplayModuleSchema, customGameplayModuleV1Schema } from './manifestSchema';
+import { customGameplayModuleV1Schema, customGameplayModuleV2Schema } from './manifestSchema';
 import type {
   CustomGameplayModule,
   CustomGameplayModuleDefinition,
@@ -67,9 +67,22 @@ export function normalizeCustomGameplayModule(input: unknown): NormalizedModuleR
     candidate.view = { ...view, slot: view.slot ?? 'right-panel', components: view.components ?? [] };
   }
 
+  if (candidate.schemaVersion !== 1 && candidate.schemaVersion !== 2) {
+    return {
+      ok: false,
+      errors: [{
+        path: ['schemaVersion'], code: 'invalid-version', severity: 'error',
+        message: 'schemaVersion 必须是 1 或 2；新模块必须使用 2',
+      }],
+      warnings: [],
+    };
+  }
+  // Dispatch by the discriminator instead of asking a top-level union to
+  // explain the failure. Zod otherwise collapses useful V2 field errors into
+  // one root-level "Invalid input", leaving the repair model nothing to act on.
   const parsed = candidate.schemaVersion === 1
     ? customGameplayModuleV1Schema.safeParse(candidate)
-    : customGameplayModuleSchema.safeParse(candidate);
+    : customGameplayModuleV2Schema.safeParse(candidate);
   if (!parsed.success) {
     return {
       ok: false,

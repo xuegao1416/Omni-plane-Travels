@@ -36,6 +36,7 @@ import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { EntrySlicedButton } from './EntrySurface';
 import SaveArchiveView from './SaveArchiveView';
 import { playHallSound } from '../../utils/hallAudio';
+import { canAdvanceHallPage, getHallPageCount } from './worldHallPagination';
 
 const DEV_LAYOUT_SIGNAL = Boolean(
   (import.meta.env?.DEV as unknown) === true
@@ -372,7 +373,7 @@ export default function WorldHallView({
     [allWorlds],
   );
   const customWorlds = useMemo(() => allWorlds.filter(world => !BUILTIN_WORLD_SET.has(world.id)), [allWorlds]);
-  const pageCount = Math.max(2, Math.ceil(customWorlds.length / 6) + (customWorlds.length % 6 === 0 ? 1 : 0));
+  const pageCount = getHallPageCount(customWorlds.length);
   const [hallPage, setHallPage] = useState(0);
   const [emptySlotOpen, setEmptySlotOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -412,6 +413,7 @@ export default function WorldHallView({
   }, [pageCount]);
 
   const pageWorlds = hallPage === 0 ? worlds : customWorlds.slice((hallPage - 1) * 6, hallPage * 6);
+  const canGoToNextPage = canAdvanceHallPage(hallPage, pageWorlds.length);
   const activeWorld = pageWorlds.find(world => world.id === activeWorldId) ?? ({
     id: '__empty_hall_slot__',
     name: hallPage === 0 ? '请选择一枚世界晶体' : '空晶体等待编织',
@@ -566,7 +568,7 @@ export default function WorldHallView({
           <button type="button" onClick={() => { playHallSound('back'); setDetailOpen(false); setHallPage(page => Math.max(0, page - 1)); }} disabled={hallPage === 0} aria-label="上一页"><ArrowLeft size={15} /></button>
           <span>{hallPage === 0 ? '内置' : hallPage}</span>
           <span className="entry-hall-pagination__dots">{Array.from({ length: pageCount }, (_, index) => <i key={index} className={index === hallPage ? 'is-active' : ''} />)}</span>
-          <button type="button" onClick={() => { playHallSound('confirm'); setDetailOpen(false); setHallPage(page => Math.min(pageCount - 1, page + 1)); }} disabled={hallPage >= pageCount - 1} aria-label="下一页"><ArrowRight size={15} /></button>
+          <button type="button" onClick={() => { playHallSound('confirm'); setDetailOpen(false); setHallPage(page => page + 1); }} disabled={!canGoToNextPage} aria-label="下一页"><ArrowRight size={15} /></button>
         </nav>
         <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-27-v2.png" icon={ArrowLeft} onClick={() => { playHallSound('back'); onBackToHome(); }} data-layout-id="hall.back" data-layout-label="左下返回首页" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">返回首页</EntrySlicedButton>
         <span className="entry-hall-footer__selected"><span /> 当前共鸣：{activeWorld.name}</span>

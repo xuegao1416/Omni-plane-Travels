@@ -6,7 +6,8 @@ import type {
   SummaryMemoryItem,
 } from './types';
 
-function active(provenance: MemoryProvenance, currentRound: number): boolean {
+function active(provenance: MemoryProvenance | null | undefined, currentRound: number): boolean {
+  if (!provenance || typeof provenance !== 'object') return false;
   if (provenance.conflictStatus === 'superseded' || provenance.conflictStatus === 'rejected') return false;
   // validUntilRound 是失效轮次；到达该轮次后不再进入当前检索池。
   return provenance.validUntilRound == null || provenance.validUntilRound > currentRound;
@@ -38,18 +39,20 @@ function provenance(value: MemoryProvenance): MemoryProvenance {
 function entry(
   value: MemoryProvenance & { id: string },
   type: MemoryEntryType,
-  title: string,
-  summary: string,
-  keywords: string[],
+  title: unknown,
+  summary: unknown,
+  keywords: unknown,
   sourceFloor: number,
   savedAt: number,
 ): MemoryEntry {
+  const normalizedId = String(value.id ?? '').trim() || `${type}_${sourceFloor}_${savedAt}`;
+  const normalizedTitle = String(title ?? '').trim() || normalizedId;
   return {
     ...provenance(value),
-    id: value.id,
+    id: normalizedId,
     type,
-    title: title.trim() || value.id,
-    summary: summary.trim() || title.trim() || value.id,
+    title: normalizedTitle,
+    summary: String(summary ?? '').trim() || normalizedTitle,
     keywords: strings(keywords),
     sourceFloor: Math.max(0, Math.floor(sourceFloor || 0)),
     savedAt: Math.max(0, Math.floor(savedAt || 0)),

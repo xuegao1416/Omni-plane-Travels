@@ -14,6 +14,7 @@ import {
 import {
   applyCustomModuleAgentTurn,
   createCustomModuleAgentSession,
+  restoreCustomModuleAgentSessionForWorld,
   type CustomModuleAgentQuestion,
   type CustomModuleConversationMessage,
   type CustomModuleAgentSession,
@@ -60,6 +61,7 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
   const [lastRaw, setLastRaw] = useState('');
   const [revisionSummary, setRevisionSummary] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(true);
   const [notice, setNotice] = useState('');
   const [mobileTab, setMobileTab] = useState<'conversation' | 'blueprint'>('conversation');
   const abortRef = useRef<AbortController | null>(null);
@@ -68,25 +70,33 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
   const draftModule = session.lastValidDraft;
   const stateEntries = draftModule ? Object.entries(draftModule.state) : [];
   const activeRules = draftModule ? Object.entries(draftModule.logic).filter(([, rules]) => rules.length > 0) : [];
-  const workspaceStatus = busy ? '生成中' : notice ? '已保存' : requestError ? '本轮未应用' : draftModule ? (session.revision > 1 ? '修订中' : '草案就绪') : session.brief.goal ? '需求探索' : '等待描述';
+  const workspaceStatus = loadingSession ? '加载中' : busy ? '生成中' : notice ? '已保存' : requestError ? '本轮未应用' : draftModule ? (session.revision > 1 ? '修订中' : '草案就绪') : session.brief.goal ? '需求探索' : '等待描述';
 
   useEffect(() => {
     if (!selectedWorldId) return;
+    let cancelled = false;
     const worldContext = buildCustomModuleAgentWorldContext(world ?? {
       id: selectedWorldId, name: selectedWorldId, modules: [],
     });
-    setSession((current) => current.world.id === selectedWorldId
-      ? { ...current, world: worldContext }
-      : createCustomModuleAgentSession(worldContext));
+    const fresh = createCustomModuleAgentSession(worldContext);
+    setLoadingSession(true);
+    setSession(fresh);
+    setConversation([{ role: 'assistant', content: WELCOME_MESSAGE }]);
     setActiveQuestion(undefined);
+    setRequestError(null);
+    setLastRaw('');
+    setRevisionSummary([]);
+    void loadCustomModuleAgentSession(selectedWorldId)
+      .then((saved) => {
+        if (cancelled) return;
+        const restored = restoreCustomModuleAgentSessionForWorld(saved, worldContext);
+        setSession(restored);
+        setConversation(restored.conversation.length ? restored.conversation : [{ role: 'assistant', content: WELCOME_MESSAGE }]);
+      })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setLoadingSession(false); });
+    return () => { cancelled = true; };
   }, [selectedWorldId, world]);
-
-  useEffect(() => {
-    if (!selectedWorldId) return;
-    void loadCustomModuleAgentSession(selectedWorldId).then((saved) => {
-      if (saved) setConversation(saved.conversation.length ? saved.conversation : [{ role: 'assistant', content: WELCOME_MESSAGE }]);
-    }).catch(() => undefined);
-  }, [selectedWorldId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); abortRef.current?.abort(); onClose(); } };
@@ -101,8 +111,10 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
     sessionValue: CustomModuleAgentSession = session,
   ) => {
     const next = [...base, { role: 'assistant' as const, content: message }];
+    const nextSession = { ...sessionValue, conversation: next };
     setConversation(next);
-    void saveCustomModuleAgentSession({ ...sessionValue, conversation: next });
+    setSession(nextSession);
+    void saveCustomModuleAgentSession(nextSession);
     return next;
   };
 
@@ -134,7 +146,7 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || busy || !world) return;
+    if (!text || busy || loadingSession || !world) return;
     const userMessage: CustomModuleConversationMessage = { role: 'user', content: text };
     const nextConversation = [...conversation, userMessage];
     setConversation(nextConversation); setInput(''); setNotice(''); setRequestError(null); setActiveQuestion(undefined);
@@ -154,25 +166,23 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
     try {
       const result = await runCustomModuleAgentTurn(apiConfig, session, text, { signal: controller.signal, conversation: nextConversation, onText: setStreamingText });
       if (result.ok) {
-        if (result.session) {
-          updateRevisionSummary(session.lastValidDraft, result.session.lastValidDraft);
-          setSession(result.session);
-        }
+        if (result.session) updateRevisionSummary(session.lastValidDraft, result.session.lastValidDraft);
         setLastRaw(result.raw);
         setRequestError(null);
-        if (result.session) void saveCustomModuleAgentSession(result.session);
         const nextQuestion = result.phase === 'draft_ready' ? undefined : result.question;
         setActiveQuestion(nextQuestion);
         const questionText = nextQuestion?.text.trim();
         const sameText = questionText?.replace(/\s+/g, ' ') === result.message.trim().replace(/\s+/g, ' ');
         const assistantMessage = questionText && !sameText ? `${result.message}\n\n${questionText}` : result.message;
         const completedConversation = [...nextConversation, { role: 'assistant' as const, content: assistantMessage }];
+        const completedSession = { ...(result.session ?? session), conversation: completedConversation };
         setConversation(completedConversation);
-        void saveCustomModuleAgentSession({ ...(result.session ?? session), conversation: completedConversation });
+        setSession(completedSession);
+        void saveCustomModuleAgentSession(completedSession);
       } else {
         setActiveQuestion(undefined);
         setRequestError({ errors: result.errors, raw: result.raw });
-        appendAssistantMessage('这轮回复没有通过本地校验；上一份有效草案未应用。', nextConversation);
+        appendAssistantMessage('这轮回复没有通过本地校验；已保留当前需求和上一份有效草案。', nextConversation, result.session ?? session);
       }
     } catch (error) { if (error instanceof Error && error.name === 'AbortError') return; appendAssistantMessage(error instanceof Error ? error.message : String(error), nextConversation); }
     finally { setBusy(false); setStreamingText(''); abortRef.current = null; }
@@ -226,7 +236,7 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
           <header className="custom-module-workspace-header">
             <div className="custom-module-workspace-title"><Sparkles size={20} /><div><span>DAWN WORKSHOP · CUSTOM MODULES</span><h2>模块工坊</h2><p>和 Agent 一起把想法编织成可审查、可绑定的玩法模块</p></div></div>
             <div className="custom-module-workspace-header-actions">
-              <label className="custom-module-world-picker"><WorldIcon name={world?.icon || 'Globe'} size={18} /><span>绑定世界</span><select value={selectedWorldId} onChange={(event) => setSelectedWorldId(event.target.value)} disabled={busy}>{worlds.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              <label className="custom-module-world-picker"><WorldIcon name={world?.icon || 'Globe'} size={18} /><span>绑定世界</span><select value={selectedWorldId} onChange={(event) => setSelectedWorldId(event.target.value)} disabled={busy || loadingSession}>{worlds.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
               <button ref={closeButtonRef} type="button" className="custom-module-icon-button" onClick={onClose} aria-label="关闭模块工坊"><X size={19} /></button>
             </div>
           </header>
@@ -236,7 +246,7 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
           </div>
           <main className="custom-module-workspace-body">
             <section className={`custom-module-chat-column${mobileTab === 'blueprint' ? ' mobile-hidden' : ''}`} aria-label="共创对话">
-              <div className="custom-module-column-heading"><div><span className="custom-module-kicker">CO-CREATION</span><h3>共创对话</h3></div><span className={`custom-module-state custom-module-state--${busy ? 'busy' : draftModule ? 'ready' : requestError ? 'error' : 'idle'}`}>{workspaceStatus}</span></div>
+              <div className="custom-module-column-heading"><div><span className="custom-module-kicker">CO-CREATION</span><h3>共创对话</h3></div><span className={`custom-module-state custom-module-state--${busy || loadingSession ? 'busy' : draftModule ? 'ready' : requestError ? 'error' : 'idle'}`}>{workspaceStatus}</span></div>
               <div className="custom-module-suggestion-row" aria-label="建议提示"><button type="button" onClick={() => setInput('做一个记录每日目标的可视模块')}>每日目标</button><button type="button" onClick={() => setInput('做一个后台累计资源变化的模块')}>后台累计</button><button type="button" onClick={() => setInput('直接粘贴 JSON 草案进行校验')}>校验 JSON</button></div>
               <div className="custom-module-chat-history" aria-live="polite">
                 {!conversation.length && <div className="custom-module-chat-empty"><Sparkles size={22} /><strong>从一个玩法意图开始</strong><p>你可以描述目标、触发方式，或直接粘贴模块 JSON。</p></div>}
@@ -244,7 +254,7 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
                 {streamingText && <div className="custom-module-chat-message assistant"><div className="custom-module-chat-role">MODULE AGENT</div><div className="custom-module-chat-bubble streaming">{streamingText}<Loader2 size={13} className="spin" /></div></div>}
               </div>
               {activeQuestion?.choices && activeQuestion.choices.length > 0 && <div className="custom-module-suggestion-row custom-module-question-choices" aria-label="追问快捷选项">{activeQuestion.choices.map((choice) => <button type="button" key={choice} onClick={() => setInput(choice)}>{choice}</button>)}</div>}
-              <div className="custom-module-composer"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void handleSend(); } }} placeholder="告诉 Agent 你想做什么……也可以直接粘贴 JSON" rows={3} disabled={busy} aria-label="模块描述输入" /><div className="custom-module-composer-footer"><span>Ctrl/⌘ + Enter 发送 · 先追问，再生成</span><div>{busy && <button type="button" className="custom-module-ghost-button" onClick={() => abortRef.current?.abort()}><Square size={13} />停止</button>}<button type="button" className="custom-module-send-button" onClick={() => void handleSend()} disabled={busy || !input.trim() || !world}><Send size={14} />发送</button></div></div></div>
+              <div className="custom-module-composer"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void handleSend(); } }} placeholder="告诉 Agent 你想做什么……也可以直接粘贴 JSON" rows={3} disabled={busy || loadingSession} aria-label="模块描述输入" /><div className="custom-module-composer-footer"><span>Ctrl/⌘ + Enter 发送 · 先追问，再生成</span><div>{busy && <button type="button" className="custom-module-ghost-button" onClick={() => abortRef.current?.abort()}><Square size={13} />停止</button>}<button type="button" className="custom-module-send-button" onClick={() => void handleSend()} disabled={busy || loadingSession || !input.trim() || !world}><Send size={14} />发送</button></div></div></div>
             </section>
             <aside className={`custom-module-draft-column${mobileTab === 'conversation' ? ' mobile-hidden' : ''}`} aria-label="模块蓝图">
               <div className="custom-module-column-heading"><div><span className="custom-module-kicker">BLUEPRINT</span><h3>模块蓝图</h3></div>{draftModule && <span className="custom-module-draft-status"><Check size={13} /> 已通过校验</span>}</div>

@@ -6,6 +6,7 @@ import type { EffectLogEntry } from '../../../../modules/schema';
 
 interface EffectLogTabProps {
   effectLog: EffectLogEntry[];
+  variableLabels?: Record<string, string>;
 }
 
 /** 来源标签颜色 */
@@ -20,8 +21,8 @@ const SOURCE_COLORS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, string> = {
   rule: '规则',
   periodic: '周期',
-  ai: 'AI',
-  npc: 'NPC',
+  ai: '模型',
+  npc: '角色',
 };
 
 /** 模块标签颜色 */
@@ -33,7 +34,23 @@ const MODULE_COLORS: Record<string, string> = {
   worldState: '#6b7280',  // 灰色
 };
 
-export function EffectLogTab({ effectLog }: EffectLogTabProps) {
+const MODULE_LABELS: Record<string, string> = {
+  survival: '生存资源', business: '经营资产', stats: '数值属性',
+  progression: '成长体系', worldState: '世界状态',
+};
+
+const VARIABLE_LABELS: Record<string, string> = {
+  funds: '资金', xp: '经验', attrA: '生命', attrB: '能量',
+  dim1: '属性一', dim2: '属性二', dim3: '属性三', dim4: '属性四', dim5: '属性五', dim6: '属性六',
+  train: '训练进度', training: '训练进度', combat: '战斗进度', exploration: '探索进度',
+};
+
+function localizedToken(value: string, labels: Record<string, string>, fallback: string): string {
+  if (labels[value]) return labels[value];
+  return /[A-Za-z]/.test(value) ? fallback : value;
+}
+
+export function EffectLogTab({ effectLog, variableLabels = {} }: EffectLogTabProps) {
   // 过滤掉数据不完整的条目
   const validLog = effectLog.filter(e => e && e.source && e.module && e.variable);
 
@@ -44,7 +61,7 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
         justifyContent: 'center', height: '200px', color: 'var(--text-muted)',
       }}>
         <div style={{ fontSize: 'var(--font-size-lg)', marginBottom: '8px', fontWeight: 600 }}>
-          LOG
+          效果记录
         </div>
         <div style={{ fontSize: 'var(--font-size-sm)' }}>暂无效果日志</div>
         <div style={{ fontSize: 'var(--font-size-xs)', marginTop: '4px' }}>
@@ -66,9 +83,9 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
         borderBottom: '1px solid var(--border)', marginBottom: '8px',
       }}>
         <span>共 {validLog.length} 条记录</span>
-        <span>规则: {validLog.filter(l => l.source === 'rule').length}</span>
-        <span>周期: {validLog.filter(l => l.source === 'periodic').length}</span>
-        <span>AI: {validLog.filter(l => l.source === 'ai').length}</span>
+        <span>规则：{validLog.filter(l => l.source === 'rule').length}</span>
+        <span>周期：{validLog.filter(l => l.source === 'periodic').length}</span>
+        <span>模型：{validLog.filter(l => l.source === 'ai').length}</span>
       </div>
 
       {/* 日志列表 */}
@@ -92,7 +109,7 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
             background: SOURCE_COLORS[entry.source] ?? '#6b7280',
             color: '#fff', fontSize: '10px', fontWeight: 600,
           }}>
-            {SOURCE_LABELS[entry.source] ?? entry.source ?? '未知'}
+            {localizedToken(entry.source, SOURCE_LABELS, '其他来源')}
           </span>
 
           {/* 模块标签 */}
@@ -101,12 +118,12 @@ export function EffectLogTab({ effectLog }: EffectLogTabProps) {
             background: MODULE_COLORS[entry.module] ?? '#6b7280',
             color: '#fff', fontSize: '10px',
           }}>
-            {entry.module ?? '?'}
+            {localizedToken(entry.module, MODULE_LABELS, '其他模块')}
           </span>
 
           {/* 变量名 */}
           <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-            {entry.variable ?? '?'}
+            {localizedToken(entry.variable, { ...VARIABLE_LABELS, ...variableLabels }, '其他变量')}
           </span>
 
           {/* 变化 */}

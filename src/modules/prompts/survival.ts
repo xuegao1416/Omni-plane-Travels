@@ -199,6 +199,7 @@ ${params.playerRequest}
   （例如 木头+火石→木炭，前提是"木炭"也已在列表中）
 - amount 必须是正数
 - 材料消耗要合理（不能太贵也不能太便宜）
+- craftTimeMinutes 是完成本次制作实际经过的分钟数，必须是 1 到 1440 的整数
 
 输出JSON（单个配方对象，只输出 JSON，不要其他解释）：
 {
@@ -206,6 +207,7 @@ ${params.playerRequest}
   "name": "配方名称",
   "inputs": {"已有资源id": 数量},
   "output": {"resourceId": "产品id", "amount": 产品数量},
+  "craftTimeMinutes": 30,
   "description": "制作说明（一句话）"
 }`;
 }

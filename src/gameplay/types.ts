@@ -144,6 +144,8 @@ export interface GameplayExecutionContext {
   tick: number;
   enabledModules?: readonly string[];
   events?: readonly GameplayEventInput[];
+  /** Explicit calendar rules for gameplay clock writes. */
+  worldClockConfig?: import('../time/worldClock').WorldClockConfig;
 }
 
 export interface GameplayExecutionResult<TState extends GameplayStateRoot = GameplayStateRoot> {

@@ -3,6 +3,7 @@ import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
 import type { SurvivalRecipe } from '../../../../modules/schema';
+import { formatWorldClock, getTimeSystemFromWorld, writeWorldClock } from '../../../../time/worldClock';
 
 export function useSurvivalCraft(
   engine: GameEngine,
@@ -53,9 +54,22 @@ export function useSurvivalCraft(
       resources[outputId] = { 数量: outputAmount };
     }
 
+    const craftTimeMinutes = Math.min(1_440, Math.max(0, Math.trunc(Number(recipe.craftTimeMinutes) || 0)));
+    const clock = state.世界?.时间系统?.时钟;
+    if (clock && craftTimeMinutes > 0) {
+      const clockConfig = getTimeSystemFromWorld(worldDef);
+      const nextClock = writeWorldClock(clock, clockConfig, {
+        deltaMinutes: craftTimeMinutes,
+        source: 'manual',
+        reason: `制作${recipe.name}`,
+      });
+      state.世界.时间系统.时钟 = nextClock;
+      state.世界.时间系统.当前时间 = formatWorldClock(nextClock, clockConfig);
+    }
+
     engine.variableManager.setState(state);
     bumpVersion();
-  }, [engine, bumpVersion]);
+  }, [engine, worldDef, bumpVersion]);
 
   const handleSurvivalGenerateRecipe = useCallback(async (request: string) => {
     if (!apiConfig) return;
@@ -110,6 +124,7 @@ export function useSurvivalCraft(
         name: String(raw.name || '未知配方'),
         inputs: normalizeRecipeInputs(raw.inputs),
         output: normalizeRecipeOutput(raw.output),
+        craftTimeMinutes: Math.min(1_440, Math.max(1, Math.trunc(Number(raw.craftTimeMinutes) || 30))),
         description: String(raw.description || ''),
       };
 

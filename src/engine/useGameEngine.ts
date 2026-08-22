@@ -45,9 +45,9 @@ import { runCustomModulesForWorldAndCommit } from '../custom-modules/engineBridg
 import {
   advanceWorldClockForTurn,
   ensureWorldClockOnGameState,
-  estimateTurnMinutes,
   formatWorldClock,
-  parseTimeAdvance,
+  getTimeSystemFromWorld,
+  resolveTurnTimeAdvance,
 } from '../time/worldClock';
 import { settleProgressionAction } from './progressionSettlement';
 import {
@@ -201,7 +201,7 @@ export function useGameEngine(
   const [isGenerating, setIsGenerating] = useState(false);
   // 防止双击/同步多次触发 sendMessage 的 ref 守卫
   const generatingRef = useRef(false);
-  const varMgrRef = useRef(initialVarMgr || new VariableManager());
+  const varMgrRef = useRef(initialVarMgr || new VariableManager(undefined, getTimeSystemFromWorld(findWorldDef(selectedWorld))));
   const cancelRef = useRef<AbortController | null>(null);
   const roundRef = useRef(0);
   const seqRef = useRef(0);  // 消息序号，单调递增
@@ -223,7 +223,16 @@ export function useGameEngine(
   const characterHistoryRef = useRef(characterHistory ?? '');
   const onAutoSaveRef = useRef(onAutoSave);
   const selectedWorldRef = useRef(selectedWorld);
+  const activeWorldDefRef = useRef<WorldDef | undefined>(findWorldDef(selectedWorld));
+  const getActiveWorldDef = () => {
+    const worldId = selectedWorldRef.current;
+    return activeWorldDefRef.current?.id === worldId ? activeWorldDefRef.current : findWorldDef(worldId);
+  };
   useEffect(() => { selectedWorldRef.current = selectedWorld; }, [selectedWorld]);
+  useEffect(() => {
+    activeWorldDefRef.current = findWorldDef(selectedWorld);
+    varMgrRef.current.setWorldClockConfig(getTimeSystemFromWorld(findWorldDef(selectedWorld)));
+  }, [selectedWorld]);
   // 存储最后一轮管线执行器实例（用于单步重试）
   const lastExecutorRef = useRef<PipelineExecutor | null>(null);
   // 存储最后一轮管线执行上下文（用于重试管线）
@@ -303,7 +312,7 @@ export function useGameEngine(
     // Historical message snapshots may predate the structured clock. Rebuild it
     // from this save's world definition immediately, not only on the next turn.
     const restoredState = varMgrRef.current.getState();
-    ensureWorldClockOnGameState(restoredState, findWorldDef(selectedWorldRef.current));
+    ensureWorldClockOnGameState(restoredState, getActiveWorldDef());
     varMgrRef.current.setState(restoredState);
 
     // 2. 回滚记忆系统（带兜底：checkpoint 可能已被淘汰）
@@ -495,9 +504,20 @@ export function useGameEngine(
 
   const loadSave = useCallback((save: GameSave) => {
     setMessages(save.messages);
-    const saveWorldDef = findWorldDef(save.worldId) ?? save.customWorld as WorldDef | undefined;
+    const saveWorldDef = (save.customWorld as WorldDef | undefined) ?? findWorldDef(save.worldId);
+    activeWorldDefRef.current = saveWorldDef;
     const normalizedSaveState = ensureWorldClockOnGameState(save.gameState, saveWorldDef);
-    varMgrRef.current = VariableManager.fromJSON({ state: normalizedSaveState });
+    const saveClockConfig = getTimeSystemFromWorld(saveWorldDef);
+    if (save.customWorld) {
+      try {
+        const customs: Record<string, unknown>[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
+        const customIndex = customs.findIndex((world: any) => world?.id === save.worldId);
+        if (customIndex >= 0) customs[customIndex] = save.customWorld;
+        else customs.push(save.customWorld);
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(customs));
+      } catch { /* localStorage 不可用时仍保留本次存档内的迁移结果 */ }
+    }
+    varMgrRef.current = VariableManager.fromJSON({ state: normalizedSaveState }, saveClockConfig);
     // 恢复全局初始快照：优先从第一条消息的 snapshot 获取，否则用存档的 gameState
     const firstMsg = save.messages.find(m => m.snapshot);
     if (firstMsg?.snapshot) {
@@ -605,7 +625,7 @@ export function useGameEngine(
       // Guarantee the authority boundary even for old/injected managers that did
       // not pass through reset() or loadSave() before their first turn.
       const turnStartState = varMgrRef.current.getState();
-      ensureWorldClockOnGameState(turnStartState, findWorldDef(selectedWorldRef.current));
+      ensureWorldClockOnGameState(turnStartState, getActiveWorldDef());
       varMgrRef.current.setState(turnStartState);
 
       // 使用管线执行器运行执行链
@@ -638,7 +658,7 @@ export function useGameEngine(
 
         // 获取发送时的当前世界；sendMessage 的回调不能捕获创建时的旧世界。
         const activeWorldId = selectedWorldRef.current;
-        const currentWorldDef = findWorldDef(activeWorldId);
+        const currentWorldDef = getActiveWorldDef();
         const worldDesc = currentWorldDef?.description ?? currentWorldDef?.name ?? '未知世界';
 
         // 自定义玩法模块是独立于事件包的确定性层：每次玩家回合结束时，
@@ -731,8 +751,14 @@ export function useGameEngine(
         // main 任务：正文生成
         mainTask: async () => {
           // ── 构建系统提示词（v2.0 结构化预设 + 宏引擎） ──
+          const worldDefForPrompt = getActiveWorldDef();
+          const clockConfigForPrompt = getTimeSystemFromWorld(worldDefForPrompt);
+          const stateAtTurnStart = varMgrRef.current.getState();
+          varMgrRef.current.setWorldClockConfig(clockConfigForPrompt);
+          ensureWorldClockOnGameState(stateAtTurnStart, worldDefForPrompt);
+          const turnStartClock = stateAtTurnStart.世界.时间系统.时钟!;
           const state = varMgrRef.current.createSafeSnapshotForPrompt();
-          const varSnapshot = formatSnapshotForMainAI(state);
+          const varSnapshot = formatSnapshotForMainAI(state, clockConfigForPrompt);
 
           // 世界书注入（v2 扫描引擎：支持正则关键词、选择逻辑、递归扫描、分组互斥）
           let wbInjection = '';
@@ -882,6 +908,7 @@ ${perspectiveInstruction}
           if (imageConfig.inlineImageEnabled) {
             systemPrompt += '\n\n【提醒】在 <contenttext> 正文中插入 image###英文提示词### 生图标签（1-2个）。';
           }
+          systemPrompt += `\n\n【权威时间裁决】本轮起始时间是“${formatWorldClock(turnStartClock, clockConfigForPrompt)}”。完成正文与行动选项后，必须在整条回复最后单独追加 <TimeAdvance>{"minutes":本轮从起始到正文末尾实际经过的非负整数分钟,"reason":"简短原因","evidence":"正文中的时间依据"}</TimeAdvance>。请自然判断已完成的用餐、睡眠、旅行、工作和天色变化：整段正文只给出从起始到末尾的唯一总推进；多个线索只是同一终点的相互佐证，不能重复累计。targetPhase/dayOffset 只能描述同一个最终时间终点，不得与 minutes 叠加；没有可靠证据时写 0。计划、对白、回忆中的未来或过去时间不推进；跨两天以上必须有明确天数、绝对日期或连续场景证据。不得省略回执；TimeAdvance 内不得增加绝对日期字段；不得把标签放进正文。`;
 
           const chatHistory = sanitizeForContext(messagesRef.current, round);
           // 注入 atDepth 世界书条目 + 预设自带深度注入条目（双人成行 🔒丨文风 depth=2 等）到聊天历史
@@ -1002,25 +1029,34 @@ ${perspectiveInstruction}
       const mainContent = mainResult?.parsed.content?.trim() || extractContentForPrompt(mainResult?.text || '').trim();
       if (!controller.signal.aborted && pipelineResult.status.stages.main.status === 'success' && mainContent) {
         const stateBeforeClock = varMgrRef.current.getState();
-        const worldDefForClock = findWorldDef(selectedWorldRef.current);
+        const worldDefForClock = getActiveWorldDef();
+        const clockConfigForTurn = getTimeSystemFromWorld(worldDefForClock);
+        varMgrRef.current.setWorldClockConfig(clockConfigForTurn);
         ensureWorldClockOnGameState(stateBeforeClock, worldDefForClock);
         const currentClock = stateBeforeClock.世界.时间系统.时钟!;
-        const aiSuggestion = parseTimeAdvance(mainResult?.text || '');
-        const suggestion = aiSuggestion || estimateTurnMinutes(userText, currentClock.calendar);
-        const nextClock = advanceWorldClockForTurn(currentClock, suggestion.minutes, {
-          reason: suggestion.reason,
-          source: aiSuggestion ? 'ai' : 'local-estimate',
-          turnId: aiMsgId,
-          round,
+        const suggestion = resolveTurnTimeAdvance({
+          rawResponse: mainResult?.text || '',
+          narrativeText: mainContent,
+          userText,
+          clock: currentClock,
+          config: clockConfigForTurn,
         });
-        if (nextClock.elapsedMinutes !== currentClock.elapsedMinutes) {
-          stateBeforeClock.世界.时间系统.时钟 = nextClock;
-          stateBeforeClock.世界.时间系统.当前时间 = formatWorldClock(nextClock);
-          varMgrRef.current.setState(stateBeforeClock);
+        if (suggestion && suggestion.minutes > 0) {
+          const nextClock = advanceWorldClockForTurn(currentClock, clockConfigForTurn, suggestion.minutes, {
+            reason: suggestion.reason,
+            source: suggestion.source === 'player-explicit' ? 'local-estimate' : 'ai',
+            turnId: aiMsgId,
+            round,
+          });
+          if (nextClock.elapsedMinutes !== currentClock.elapsedMinutes) {
+            stateBeforeClock.世界.时间系统.时钟 = nextClock;
+            stateBeforeClock.世界.时间系统.当前时间 = formatWorldClock(nextClock, clockConfigForTurn);
+            varMgrRef.current.setState(stateBeforeClock);
+          }
         }
       }
 
-      const progressionModule = findWorldDef(selectedWorldRef.current)?.modules
+      const progressionModule = getActiveWorldDef()?.modules
         ?.find(m => m.moduleId === 'progression' && m.enabled);
       const progressionConfig = (
         progressionModule?.moduleConfig || progressionModule?.data
@@ -1234,7 +1270,7 @@ ${perspectiveInstruction}
     generatingRef.current = false;
     setIsGenerating(false);
     setMessages([]);
-    varMgrRef.current = new VariableManager();
+    varMgrRef.current = new VariableManager(undefined, getTimeSystemFromWorld(worldDef));
     varMgrRef.current.initializeWorldAndNotebook();
     const initialClockState = varMgrRef.current.getState();
     ensureWorldClockOnGameState(initialClockState, worldDef);

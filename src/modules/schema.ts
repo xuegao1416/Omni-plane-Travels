@@ -121,6 +121,9 @@ export interface SurvivalResource {
   max: number;            // 上限（生存资源必须有上限）
   scarce: boolean;        // 是否稀缺
   gatherRate?: string;    // 采集速率描述（AI参考，如"每天可采集3单位"）
+  gatherAmount?: number;  // 单次明确采集量
+  gatherTimeMinutes?: number; // 单次明确采集耗时
+  gatherStaminaCost?: number; // 单次采集体力消耗
   usage?: string;         // 消耗速率描述（AI参考，如"每天消耗1单位"）
   description: string;    // 获取方式与用途
 }
@@ -131,6 +134,8 @@ export interface SurvivalRecipe {
   name: string;           // 制作结果名称
   inputs: Record<string, number>;  // 输入资源 { "木材": 2, "石头": 1 }
   output: { resourceId: string; amount: number };
+  /** 明确的制作耗时；缺失的旧配方不会被机械加时。 */
+  craftTimeMinutes?: number;
   description: string;
 }
 

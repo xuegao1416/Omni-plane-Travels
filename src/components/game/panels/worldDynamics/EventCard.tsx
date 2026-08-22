@@ -13,9 +13,10 @@ interface EventCardProps {
   event: SimEvent;
   depth?: number;
   tickCount?: number;
+  onUseAction?: (text: string) => void;
 }
 
-export function EventCard({ event, depth = 0, tickCount }: EventCardProps) {
+export function EventCard({ event, depth = 0, tickCount, onUseAction }: EventCardProps) {
   const [expanded, setExpanded] = useState(false);
   const severityBar = Math.min(100, event.severity * 10);
   const severityColor = event.severity >= 7 ? 'var(--danger)' : event.severity >= 4 ? 'var(--warning)' : 'var(--text-muted)';
@@ -120,11 +121,12 @@ export function EventCard({ event, depth = 0, tickCount }: EventCardProps) {
             <div style={{ marginTop: 'var(--space-2)' }}>
               <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--accent)', marginBottom: '4px' }}>
                 <Target size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                玩家可介入
+                可在正文中介入
               </div>
               {event.playerHooks.map((hook, hi) => (
-                <PlayerHookItem key={hi} hook={hook} />
+                <PlayerHookItem key={hi} hook={hook} onUseAction={onUseAction} />
               ))}
+              <div style={{ marginTop: 4, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>点击建议只会填入主输入框，由下一轮正文决定是否真正发生。</div>
             </div>
           )}
         </div>

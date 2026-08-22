@@ -7,6 +7,7 @@ import { learnSkill, unlockTalent, useSkill, awakenAbility, respecAbilities, equ
 import { createDiceRoll, recordDiceRoll } from './dice';
 import { applySurvivalStatus, craftSurvivalRecipe, expireSurvivalStatuses, gatherSurvivalResource, settleSurvivalCycle, unlockSurvivalRecipe } from './survival';
 import { assignBusinessStaff, previewBusinessModule, purchaseBusinessAsset, settleBusinessCycle, upgradeBusinessAsset } from './business';
+import { normalizeTimeSystemConfig } from '../../time/worldClock';
 
 describe('six built-in gameplay modules', () => {
   test('allocates available attribute points atomically through the stat module', () => {
@@ -243,12 +244,18 @@ describe('six built-in gameplay modules', () => {
     const state = createDefaultGameState();
     state.玩家.当前目标 = '允许';
     state.玩家.生存资源 = { wood: { 数量: 2 }, axe: { 数量: 0 } };
+    state.世界.时间系统.时钟 = { schemaVersion: 2, elapsedMinutes: 0 };
     const recipe: SurvivalRecipe = { id: 'axe', name: '石斧', inputs: { wood: 1 }, output: { resourceId: 'axe', amount: 1 }, description: '', unlockConditions: [{ state: { path: '玩家.当前目标', op: '==', value: '允许' } }], craftTimeMinutes: 30 };
     const unlocked = unlockSurvivalRecipe(state, recipe, { tick: 1, enabledModules: ['survival'] });
     expect(unlocked.status).toBe('applied');
-    const crafted = craftSurvivalRecipe(unlocked.state, recipe, { tick: 2, enabledModules: ['survival'] });
+    const crafted = craftSurvivalRecipe(unlocked.state, recipe, {
+      tick: 2,
+      enabledModules: ['survival'],
+      worldClockConfig: normalizeTimeSystemConfig({ mode: 'relative' }),
+    });
     expect(crafted.status).toBe('applied');
     expect(crafted.state.玩家.生存资源?.axe.数量).toBe(1);
+    expect(crafted.state.世界.时间系统.时钟?.elapsedMinutes).toBe(30);
     const status = applySurvivalStatus(crafted.state, { id: 'fatigued', durationTicks: 1 }, { tick: 2, enabledModules: ['survival'] });
     expect(expireSurvivalStatuses(status.state, { tick: 4, enabledModules: ['survival'] }).status).toBe('applied');
   });
@@ -257,22 +264,16 @@ describe('six built-in gameplay modules', () => {
     const state = createDefaultGameState();
     state.玩家.生存状态.体力值 = 20;
     state.玩家.生存资源 = { wood: { 数量: 0, 最大值: 10 } };
-    state.世界.时间系统.时钟 = {
-      schemaVersion: 1,
-      calendar: {
-        mode: 'gregorian', calendarName: '公历', eraName: '',
-        start: { year: 2026, month: 1, day: 1, hour: 8, minute: 0 },
-        months: Array.from({ length: 12 }, (_, i) => ({ name: `${i + 1}月`, days: 30 })),
-        weekdays: ['日', '一', '二', '三', '四', '五', '六'], defaultTurnMinutes: 20,
-        timeOfDayLabels: [],
-      },
-      current: { year: 2026, month: 1, day: 1, hour: 8, minute: 0 }, elapsedMinutes: 0,
-    };
+    state.世界.时间系统.时钟 = { schemaVersion: 2, elapsedMinutes: 0 };
     const config = {
       description: '', resources: [{ id: 'wood', name: '木材', symbol: '', amount: 0, max: 10, scarce: false, description: '', gatherAmount: 2, gatherTimeMinutes: 45, gatherStaminaCost: 5 }],
       rules: { cycleName: '天', consumePerCycle: '', criticalThreshold: 1 },
     };
-    const result = gatherSurvivalResource(state, config, 'wood', { tick: 3, enabledModules: ['survival'] });
+    const result = gatherSurvivalResource(state, config, 'wood', {
+      tick: 3,
+      enabledModules: ['survival'],
+      worldClockConfig: normalizeTimeSystemConfig({ mode: 'relative' }),
+    });
     expect(result.status).toBe('applied');
     expect(result.state.玩家.生存资源?.wood.数量).toBe(2);
     expect(result.state.玩家.生存状态.体力值).toBe(15);

@@ -6,7 +6,7 @@ import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard 
 import { findWorldDef } from '../../../data/worldLoader';
 import { normalizeAssetStatus } from './businessOverlay/utils';
 import { CustomModulePanel } from './CustomModulePanel';
-import { formatWorldClock } from '../../../time/worldClock';
+import { formatWorldClock, getTimeSystemFromWorld } from '../../../time/worldClock';
 import { toDisplayText } from '../../../utils/displayText';
 
 interface Props {
@@ -64,15 +64,16 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
 export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onCustomModuleButton }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
+  const worldDef = worldId ? findWorldDef(worldId) : null;
+  const clockConfig = getTimeSystemFromWorld(worldDef || undefined);
   const displayWorldTime = world.时间系统.时钟
-    ? formatWorldClock(world.时间系统.时钟)
+    ? formatWorldClock(world.时间系统.时钟, clockConfig)
     : world.时间系统.当前时间;
 
   // 判断是否有数值模块（生存状态中有 dim1 等字段说明启用了数值模块）
   const hasStatModule = 'dim1' in (player.生存状态 || {});
 
   // 从世界定义获取成长体系配置（静态配置，不存入 GameState）
-  const worldDef = worldId ? findWorldDef(worldId) : null;
   const progMod = worldDef?.modules?.find(m => m.moduleId === 'progression' && m.enabled);
   const progressionConfig = progMod?.moduleConfig as ProgressionConfig | undefined;
 

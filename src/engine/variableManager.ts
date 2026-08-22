@@ -4,7 +4,7 @@ import { createDefaultGameState } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
 import { cloneDeep, get, set, merge, unset } from 'lodash-es';
-import { formatWorldClock, normalizeWorldClockState, type WorldClockState } from '../time/worldClock';
+import { formatWorldClock, normalizeTimeSystemConfig, normalizeWorldClockState, reconcileEditedWorldClock, type WorldClockConfig, type WorldClockState } from '../time/worldClock';
 import { toDisplayText } from '../utils/displayText';
 
 /** 原型污染防护 — 过滤危险路径段 */
@@ -54,9 +54,19 @@ function safeClamp(value: unknown, min: number, max: number, fallback: number): 
 
 export class VariableManager {
   private state: GameState;
+  private worldClockConfig: WorldClockConfig;
+  private hasExplicitWorldClockConfig = false;
 
-  constructor(initial?: GameState) {
+  constructor(initial?: GameState, worldClockConfig?: Partial<WorldClockConfig>) {
+    this.worldClockConfig = normalizeTimeSystemConfig(worldClockConfig);
+    this.hasExplicitWorldClockConfig = !!worldClockConfig;
     this.state = initial ? cloneDeep(initial) : createDefaultGameState();
+    this.normalizeState();
+  }
+
+  setWorldClockConfig(config: Partial<WorldClockConfig>): void {
+    this.worldClockConfig = normalizeTimeSystemConfig(config);
+    this.hasExplicitWorldClockConfig = true;
     this.normalizeState();
   }
 
@@ -103,10 +113,16 @@ export class VariableManager {
     this.repairCoreStateShape();
     const clock = (this.state.世界.时间系统 as any).时钟;
     if (clock && typeof clock === 'object') {
-      const normalizedClock = normalizeWorldClockState(clock);
+      const legacyConfig = isRecord(clock) && isRecord((clock as any).calendar)
+        ? (clock as any).calendar as Partial<WorldClockConfig>
+        : undefined;
+      if (legacyConfig && !this.hasExplicitWorldClockConfig) {
+        this.worldClockConfig = normalizeTimeSystemConfig(legacyConfig);
+      }
+      const normalizedClock = normalizeWorldClockState(clock, this.worldClockConfig);
       this.state.世界.时间系统.时钟 = normalizedClock;
       // AI may still write the legacy display field. The structured clock always wins.
-      this.state.世界.时间系统.当前时间 = formatWorldClock(normalizedClock);
+      this.state.世界.时间系统.当前时间 = formatWorldClock(normalizedClock, this.worldClockConfig);
     }
     ensureNpcCategoryDefaults(this.state);
     ensureNpcChronicleDefaults(this.state);
@@ -120,7 +136,7 @@ export class VariableManager {
 
   private captureAuthoritativeClock(): WorldClockState | undefined {
     const clock = (this.state as any)?.世界?.时间系统?.时钟;
-    return clock && typeof clock === 'object' ? cloneDeep(normalizeWorldClockState(clock)) : undefined;
+    return clock && typeof clock === 'object' ? cloneDeep(normalizeWorldClockState(clock, this.worldClockConfig)) : undefined;
   }
 
   private restoreAuthoritativeClock(clock: WorldClockState | undefined): void {
@@ -129,7 +145,7 @@ export class VariableManager {
     if (!isRecord(state.世界)) state.世界 = {};
     if (!isRecord(state.世界.时间系统)) state.世界.时间系统 = {};
     state.世界.时间系统.时钟 = cloneDeep(clock);
-    state.世界.时间系统.当前时间 = formatWorldClock(clock);
+    state.世界.时间系统.当前时间 = formatWorldClock(clock, this.worldClockConfig);
   }
 
   /** 修复旧存档或历史坏补丁留下的无效核心容器，避免后续轮次在构建快照时永久失败。 */
@@ -1206,6 +1222,21 @@ export class VariableManager {
     try {
       const parsed = JSON.parse(json);
       if (typeof parsed === 'object' && parsed !== null) {
+        const previousClock = this.captureAuthoritativeClock();
+        const incomingTimeSystem = (parsed as any)?.世界?.时间系统;
+        if (previousClock && isRecord(incomingTimeSystem)) {
+          const incomingClock = isRecord(incomingTimeSystem.时钟)
+            ? normalizeWorldClockState(incomingTimeSystem.时钟, this.worldClockConfig)
+            : previousClock;
+          const incomingDisplay = typeof incomingTimeSystem.当前时间 === 'string' ? incomingTimeSystem.当前时间.trim() : '';
+          // The variables editor exposes 当前时间 as the human-editable field.
+          // Reconcile it against the clock embedded in the same JSON every
+          // time, making repeated Apply operations deterministic and avoiding
+          // a stale hidden 时钟 object undoing the visible edit.
+          incomingTimeSystem.时钟 = incomingDisplay
+            ? reconcileEditedWorldClock(incomingClock, this.worldClockConfig, incomingDisplay)
+            : incomingClock;
+        }
         this.state = cloneDeep(parsed);
         this.normalizeState();
         return true;
@@ -1224,7 +1255,7 @@ export class VariableManager {
   }
 
   // 从JSON恢复
-  static fromJSON(data: { state: GameState }) {
-    return new VariableManager(data.state);
+  static fromJSON(data: { state: GameState }, worldClockConfig?: Partial<WorldClockConfig>) {
+    return new VariableManager(data.state, worldClockConfig);
   }
 }

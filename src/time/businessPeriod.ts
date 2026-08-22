@@ -1,4 +1,4 @@
-import type { WorldClockState } from './worldClock';
+import type { WorldClockConfig, WorldClockState } from './worldClock';
 import { getWorldClockPeriodKeys } from './worldClock';
 
 /** Returns a stable settlement key, preferring the authoritative clock. */
@@ -7,10 +7,12 @@ export function getBusinessSettlementPeriodKey(
   worldTime: string,
   turnId?: string,
   clock?: WorldClockState,
+  config?: WorldClockConfig,
 ): string | null {
   if (/回合|轮/.test(cycleName)) return `turn:${turnId || worldTime || 'unknown'}`;
   if (clock) {
-    const keys = getWorldClockPeriodKeys(clock);
+    if (!config) return null;
+    const keys = getWorldClockPeriodKeys(clock, config);
     if (/月/.test(cycleName)) return keys.monthKey;
     if (/周|星期/.test(cycleName)) return keys.weekKey;
     return keys.dayKey;

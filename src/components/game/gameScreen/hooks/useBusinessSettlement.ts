@@ -5,6 +5,7 @@ import type { WorldDef } from '../../../../data/worlds-schema';
 import type { BusinessModuleSchema } from '../../../../modules/schema';
 import { normalizeAssetStatus } from '../../panels/businessOverlay/utils';
 import { getBusinessSettlementPeriodKey } from '../../../../time/businessPeriod';
+import { getTimeSystemFromWorld } from '../../../../time/worldClock';
 
 type AssetStatus = 'active' | 'idle' | 'damaged' | 'destroyed';
 type TxType = 'income' | 'expense' | 'purchase' | 'sale' | 'upgrade' | 'event';
@@ -111,7 +112,7 @@ export function useBusinessSettlement(
 
       const cycleName = biz.cycleName || '天';
       const worldTime = state.世界?.时间系统?.当前时间 || '';
-      const periodKey = getBusinessSettlementPeriodKey(cycleName, worldTime, turnId, state.世界?.时间系统?.时钟);
+      const periodKey = getBusinessSettlementPeriodKey(cycleName, worldTime, turnId, state.世界?.时间系统?.时钟, getTimeSystemFromWorld(worldDef));
       if (!periodKey || runtimeBiz.上次结算周期 === periodKey) return;
 
       // 天/周/月以首次观察到的时间作为基线，不在读档或开局首轮凭空发放收益。

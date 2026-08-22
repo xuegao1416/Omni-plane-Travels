@@ -3,6 +3,7 @@ import {
   applyCustomModuleAgentTurn,
   createCustomModuleAgentSession,
   createEmptyCustomModuleDesignBrief,
+  restoreCustomModuleAgentSessionForWorld,
 } from './agentSession';
 import type { CustomGameplayModule } from './schema';
 
@@ -73,5 +74,31 @@ describe('custom module agent session', () => {
     expect(failed.accepted).toBe(false);
     expect(failed.session.revision).toBe(1);
     expect(failed.session.lastValidDraft?.id).toBe('session-draft');
+  });
+
+  test('restores the full structured session for the same world and refreshes its capabilities', () => {
+    const saved = applyCustomModuleAgentTurn(createCustomModuleAgentSession(world), {
+      message: '草案', phase: 'draft_ready', brief: { ...createEmptyCustomModuleDesignBrief(), goal: '记录声望' }, module: moduleDefinition,
+    }).session;
+    saved.conversation = [{ role: 'user', content: '记录声望' }, { role: 'assistant', content: '草案完成' }];
+    const restored = restoreCustomModuleAgentSessionForWorld(saved, {
+      ...world,
+      description: '更新后的世界说明',
+      availability: { stat: true, survival: false, business: false, currency: true },
+    });
+    expect(restored.brief.goal).toBe('记录声望');
+    expect(restored.lastValidDraft?.id).toBe('session-draft');
+    expect(restored.conversation).toHaveLength(2);
+    expect(restored.world.description).toBe('更新后的世界说明');
+  });
+
+  test('does not leak a persisted session into a different world', () => {
+    const saved = createCustomModuleAgentSession(world);
+    saved.brief.goal = '旧世界目标';
+    saved.conversation = [{ role: 'user', content: '旧世界对话' }];
+    const restored = restoreCustomModuleAgentSessionForWorld(saved, { id: 'world-b', name: 'World B' });
+    expect(restored.world.id).toBe('world-b');
+    expect(restored.brief.goal).toBe('');
+    expect(restored.conversation).toEqual([]);
   });
 });

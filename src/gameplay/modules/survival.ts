@@ -1,6 +1,6 @@
 import type { GameState } from '../../schema/variables';
 import type { SurvivalConsumption, SurvivalModuleSchema, SurvivalRecipe } from '../../modules/schema';
-import { advanceWorldClock, formatWorldClock, type WorldClockState } from '../../time/worldClock';
+import { formatWorldClock, writeWorldClock, type WorldClockState } from '../../time/worldClock';
 import {
   executeGameplayTransaction,
   ensureGameplayRuntime,
@@ -37,9 +37,10 @@ export function craftSurvivalRecipe(
     return blockedSurvival(state, context, `survival:recipe-locked:${recipe.id}:${context.tick}`);
   }
   const clock = state.世界.时间系统?.时钟 as WorldClockState | undefined;
+  const clockConfig = context.worldClockConfig;
   const craftTimeMinutes = Math.max(0, Math.trunc(Number(recipe.craftTimeMinutes) || 0));
-  const nextClock = clock && craftTimeMinutes > 0
-    ? advanceWorldClock(clock, craftTimeMinutes, { source: 'manual', reason: `制作${recipe.name}` })
+  const nextClock = clock && clockConfig && craftTimeMinutes > 0
+    ? writeWorldClock(clock, clockConfig, { deltaMinutes: craftTimeMinutes, source: 'manual', reason: `制作${recipe.name}` })
     : undefined;
   return executeGameplayTransaction(state, {
     id: `survival:craft:${recipe.id}:${context.tick}`,
@@ -56,7 +57,7 @@ export function craftSurvivalRecipe(
       { add: { path: `玩家.生存资源.${recipe.output.resourceId}.数量`, delta: Math.max(0, recipe.output.amount), min: 0 } },
       ...(nextClock ? [
         { set: { path: '世界.时间系统.时钟', value: { ...nextClock } as unknown as GameplayValue } } as GameplayEffect,
-        { set: { path: '世界.时间系统.当前时间', value: formatWorldClock(nextClock) } } as GameplayEffect,
+        { set: { path: '世界.时间系统.当前时间', value: formatWorldClock(nextClock, clockConfig!) } } as GameplayEffect,
       ] : []),
     ],
     events: [{ type: 'survival.crafted', payload: { recipeId: recipe.id, name: recipe.name, amount: recipe.output.amount } }],
@@ -130,8 +131,9 @@ export function gatherSurvivalResource(
   const timeMinutes = Math.max(1, Math.trunc(Number(resource.gatherTimeMinutes) || 30));
   const staminaCost = Math.max(0, Math.trunc(Number(resource.gatherStaminaCost) || 5));
   const clock = state.世界.时间系统?.时钟 as WorldClockState | undefined;
-  const nextClock = clock
-    ? advanceWorldClock(clock, timeMinutes, { source: 'manual', reason: `采集${resource.name}` })
+  const clockConfig = context.worldClockConfig;
+  const nextClock = clock && clockConfig
+    ? writeWorldClock(clock, clockConfig, { deltaMinutes: timeMinutes, source: 'manual', reason: `采集${resource.name}` })
     : undefined;
   const conditions = [{ state: { path: `玩家.生存资源.${resourceId}.数量`, op: '<' as const, value: max } }];
 
@@ -148,7 +150,7 @@ export function gatherSurvivalResource(
       { add: { path: `玩家.生存资源.${resourceId}.数量`, delta: amount, min: 0, max } },
       ...(nextClock ? [
         { set: { path: '世界.时间系统.时钟', value: { ...nextClock } as unknown as GameplayValue } } as GameplayEffect,
-        { set: { path: '世界.时间系统.当前时间', value: formatWorldClock(nextClock) } } as GameplayEffect,
+        { set: { path: '世界.时间系统.当前时间', value: formatWorldClock(nextClock, clockConfig!) } } as GameplayEffect,
       ] : []),
     ],
     events: [{

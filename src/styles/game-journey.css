@@ -1031,7 +1031,29 @@
 .game-journey-card > .dawn-frame-v4__border { opacity: .7; }
 .game-journey-card > .dawn-frame-v4__content { display: block; height: auto; padding: 0; }
 .game-journey-card__content { min-width: 0; padding: 6px 16px; }
-.game-journey-card--event { background: color-mix(in srgb, var(--journey-surface) 92%, transparent) !important; border-color: var(--journey-border) !important; color: var(--journey-text) !important; }
+.game-journey-card--event {
+  width: min(460px, calc(100vw - 48px));
+  max-width: 100%;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--journey-surface) 92%, transparent) !important;
+  border-color: var(--journey-border) !important;
+  color: var(--journey-text) !important;
+}
+.game-journey-card--event > .dawn-frame-v4__content,
+.game-journey-card--event > .dawn-frame-v4__content > .game-journey-card__content,
+.game-journey-card__event-content {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.game-journey-card--event > .dawn-frame-v4__content > .game-journey-card__content { padding: 0; }
+.game-journey-card__event-content {
+  max-height: 82vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-5);
+  color: var(--text-primary);
+}
 .game-journey .message-html-content .action-option-card { appearance: none; width: 100%; min-width: 0; border: 1px solid var(--journey-border); border-radius: 10px; background: color-mix(in srgb, var(--journey-surface) 78%, transparent); color: var(--journey-text); font: inherit; text-align: left; overflow-wrap: anywhere; }
 .game-journey .message-html-content .action-option-card:hover { border-color: var(--journey-accent); background: color-mix(in srgb, var(--journey-surface-muted) 88%, transparent); box-shadow: 0 8px 18px color-mix(in srgb, var(--journey-glow) 36%, transparent); }
 .game-journey .message-html-content .action-option-card.selected { border-color: var(--journey-accent); background: var(--journey-selected, var(--journey-surface-muted)); color: var(--journey-text); box-shadow: 0 0 0 1px var(--journey-accent); }
@@ -1837,4 +1859,31 @@
 .game-journey__nested-panel--side {
   border-radius: 0;
   box-shadow: -12px 0 38px color-mix(in srgb, var(--journey-glow, #c8e2d6) 30%, transparent);
+}
+
+/* Dice cards occupy the reading column, so their fill must follow the panel
+   frame inset instead of the compact badge geometry. */
+.game-journey-card--dice {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 10px 0 14px;
+}
+.game-journey-card--dice > .dawn-frame-v4__fill {
+  inset: 10px !important;
+  border-radius: 10px;
+}
+.game-journey-card--dice > .dawn-frame-v4__content {
+  width: 100%;
+  padding: 22px 28px !important;
+}
+.game-journey-card--dice .game-journey-card__content,
+.game-journey-card--dice .inline-dice-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+.game-journey-card--dice .game-journey-card__content { padding: 0; }
+
+@media (max-width: 640px) {
+  .game-journey-card--dice > .dawn-frame-v4__content { padding: 18px 16px !important; }
 }

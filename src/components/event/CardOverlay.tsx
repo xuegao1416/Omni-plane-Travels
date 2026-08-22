@@ -151,10 +151,6 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
         <div
           className="event-fade-in game-journey-card__event-content"
           onClick={(e) => e.stopPropagation()}
-          style={{
-            width: 'min(460px, 92vw)', maxHeight: '82vh', overflow: 'auto',
-            padding: 'var(--space-5)', color: 'var(--text-primary)',
-          }}
         >
         {/* 标题栏 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>

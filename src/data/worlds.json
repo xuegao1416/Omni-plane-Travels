@@ -717,7 +717,17 @@
           "priceLevel": "走廊自动贩卖机的罐装咖啡130日元，学生食堂的招牌猪排饭套餐500日元。",
           "calendar": "公历，采用日本学年制（分为三个学期，4月为学年起点）",
           "startTime": "高中二年级，第一学期开学典礼的早晨",
-          "timeSpeed": "与现实时间同步（1:1）"
+          "timeSpeed": "与现实时间同步（1:1）",
+          "timeSystem": {
+            "mode": "gregorian",
+            "calendarName": "公历",
+            "eraName": "",
+            "start": { "year": 2025, "month": 4, "day": 7, "hour": 8, "minute": 0 },
+            "months": [{ "name": "一月", "days": 31 }, { "name": "二月", "days": 28 }, { "name": "三月", "days": 31 }, { "name": "四月", "days": 30 }, { "name": "五月", "days": 31 }, { "name": "六月", "days": 30 }, { "name": "七月", "days": 31 }, { "name": "八月", "days": 31 }, { "name": "九月", "days": 30 }, { "name": "十月", "days": 31 }, { "name": "十一月", "days": 30 }, { "name": "十二月", "days": 31 }],
+            "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+            "defaultTurnMinutes": 20,
+            "timeOfDayLabels": [{ "name": "深夜", "startMinute": 0 }, { "name": "清晨", "startMinute": 300 }, { "name": "上午", "startMinute": 480 }, { "name": "正午", "startMinute": 720 }, { "name": "下午", "startMinute": 780 }, { "name": "黄昏", "startMinute": 1080 }, { "name": "夜晚", "startMinute": 1260 }]
+          }
         }
       },
       {
@@ -2703,7 +2713,17 @@
             "symbol": "¥",
             "description": "每月工资到账是最开心的一天"
           },
-          "priceLevel": "房租>聚餐>外卖>通勤>咖啡"
+          "priceLevel": "房租>聚餐>外卖>通勤>咖啡",
+          "timeSystem": {
+            "mode": "gregorian",
+            "calendarName": "公历",
+            "eraName": "",
+            "start": { "year": 2025, "month": 10, "day": 1, "hour": 8, "minute": 0 },
+            "months": [{ "name": "一月", "days": 31 }, { "name": "二月", "days": 28 }, { "name": "三月", "days": 31 }, { "name": "四月", "days": 30 }, { "name": "五月", "days": 31 }, { "name": "六月", "days": 30 }, { "name": "七月", "days": 31 }, { "name": "八月", "days": 31 }, { "name": "九月", "days": 30 }, { "name": "十月", "days": 31 }, { "name": "十一月", "days": 30 }, { "name": "十二月", "days": 31 }],
+            "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+            "defaultTurnMinutes": 30,
+            "timeOfDayLabels": [{ "name": "深夜", "startMinute": 0 }, { "name": "清晨", "startMinute": 300 }, { "name": "上午", "startMinute": 480 }, { "name": "正午", "startMinute": 720 }, { "name": "下午", "startMinute": 780 }, { "name": "黄昏", "startMinute": 1080 }, { "name": "夜晚", "startMinute": 1260 }]
+          }
         }
       },
       {
@@ -4599,7 +4619,17 @@
             "symbol": "两",
             "description": "江湖游侠多用碎银与铜钱，大宗交易或门派往来则使用银锭。"
           },
-          "priceLevel": "市井之间一两白银足供三口之家数月衣食；而江湖名器、秘籍往往有价无市。"
+          "priceLevel": "市井之间一两白银足供三口之家数月衣食；而江湖名器、秘籍往往有价无市。",
+          "timeSystem": {
+            "mode": "custom",
+            "calendarName": "江湖历",
+            "eraName": "江湖纪年",
+            "start": { "year": 1, "month": 1, "day": 1, "hour": 8, "minute": 0 },
+            "months": [{ "name": "1月", "days": 30 }, { "name": "2月", "days": 30 }, { "name": "3月", "days": 30 }, { "name": "4月", "days": 30 }, { "name": "5月", "days": 30 }, { "name": "6月", "days": 30 }, { "name": "7月", "days": 30 }, { "name": "8月", "days": 30 }, { "name": "9月", "days": 30 }, { "name": "10月", "days": 30 }, { "name": "11月", "days": 30 }, { "name": "12月", "days": 30 }],
+            "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+            "defaultTurnMinutes": 30,
+            "timeOfDayLabels": [{ "name": "深夜", "startMinute": 0 }, { "name": "清晨", "startMinute": 300 }, { "name": "上午", "startMinute": 480 }, { "name": "正午", "startMinute": 720 }, { "name": "下午", "startMinute": 780 }, { "name": "黄昏", "startMinute": 1080 }, { "name": "夜晚", "startMinute": 1260 }]
+          }
         }
       },
       {
@@ -6563,7 +6593,17 @@
           "priceLevel": "一壶净水5发，军粮8发，抗辐宁15发，旧手枪50发，防辐射斗篷20发",
           "calendar": "余烬历",
           "startTime": "余烬历 207 年秋",
-          "timeSpeed": "与现实同步（1:1）"
+          "timeSpeed": "与现实同步（1:1）",
+          "timeSystem": {
+            "mode": "custom",
+            "calendarName": "余烬历",
+            "eraName": "余烬纪年",
+            "start": { "year": 207, "month": 9, "day": 1, "hour": 6, "minute": 0 },
+            "months": [{ "name": "1月", "days": 30 }, { "name": "2月", "days": 30 }, { "name": "3月", "days": 30 }, { "name": "4月", "days": 30 }, { "name": "5月", "days": 30 }, { "name": "6月", "days": 30 }, { "name": "7月", "days": 30 }, { "name": "8月", "days": 30 }, { "name": "9月", "days": 30 }, { "name": "10月", "days": 30 }, { "name": "11月", "days": 30 }, { "name": "12月", "days": 30 }],
+            "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+            "defaultTurnMinutes": 45,
+            "timeOfDayLabels": [{ "name": "深夜", "startMinute": 0 }, { "name": "清晨", "startMinute": 300 }, { "name": "上午", "startMinute": 480 }, { "name": "正午", "startMinute": 720 }, { "name": "下午", "startMinute": 780 }, { "name": "黄昏", "startMinute": 1080 }, { "name": "夜晚", "startMinute": 1260 }]
+          }
         }
       },
       {
@@ -8172,7 +8212,17 @@
           "priceLevel": "淡水为基准价1.0；熟食0.8；草药0.9；石刀1.5；绷带1.2",
           "calendar": "生存日数",
           "startTime": "坠机第一日·清晨",
-          "timeSpeed": "分四时段，每日结算资源"
+          "timeSpeed": "分四时段，每日结算资源",
+          "timeSystem": {
+            "mode": "relative",
+            "calendarName": "生存日数",
+            "eraName": "",
+            "start": { "year": 1, "month": 1, "day": 1, "hour": 6, "minute": 0 },
+            "months": [{ "name": "生存月1", "days": 30 }, { "name": "生存月2", "days": 30 }, { "name": "生存月3", "days": 30 }, { "name": "生存月4", "days": 30 }, { "name": "生存月5", "days": 30 }, { "name": "生存月6", "days": 30 }, { "name": "生存月7", "days": 30 }, { "name": "生存月8", "days": 30 }, { "name": "生存月9", "days": 30 }, { "name": "生存月10", "days": 30 }, { "name": "生存月11", "days": 30 }, { "name": "生存月12", "days": 30 }],
+            "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+            "defaultTurnMinutes": 30,
+            "timeOfDayLabels": [{ "name": "深夜", "startMinute": 0 }, { "name": "清晨", "startMinute": 300 }, { "name": "上午", "startMinute": 480 }, { "name": "正午", "startMinute": 720 }, { "name": "下午", "startMinute": 780 }, { "name": "黄昏", "startMinute": 1080 }, { "name": "夜晚", "startMinute": 1260 }]
+          }
         }
       },
       {
@@ -10032,7 +10082,17 @@
             "symbol": "¥/₽",
             "description": "人民币是主要结算货币，卢布汇率波动大，精明的倒爷都把利润换成人民币。"
           },
-          "priceLevel": "普通倒爷一趟利润几千到几万，大老板能赚几十万。但亏本的人也不少，关键看眼光和运气。"
+          "priceLevel": "普通倒爷一趟利润几千到几万，大老板能赚几十万。但亏本的人也不少，关键看眼光和运气。",
+          "timeSystem": {
+            "mode": "gregorian",
+            "calendarName": "公历",
+            "eraName": "",
+            "start": { "year": 1993, "month": 12, "day": 1, "hour": 8, "minute": 0 },
+            "months": [{ "name": "一月", "days": 31 }, { "name": "二月", "days": 28 }, { "name": "三月", "days": 31 }, { "name": "四月", "days": 30 }, { "name": "五月", "days": 31 }, { "name": "六月", "days": 30 }, { "name": "七月", "days": 31 }, { "name": "八月", "days": 31 }, { "name": "九月", "days": 30 }, { "name": "十月", "days": 31 }, { "name": "十一月", "days": 30 }, { "name": "十二月", "days": 31 }],
+            "weekdays": ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+            "defaultTurnMinutes": 30,
+            "timeOfDayLabels": [{ "name": "深夜", "startMinute": 0 }, { "name": "清晨", "startMinute": 300 }, { "name": "上午", "startMinute": 480 }, { "name": "正午", "startMinute": 720 }, { "name": "下午", "startMinute": 780 }, { "name": "黄昏", "startMinute": 1080 }, { "name": "夜晚", "startMinute": 1260 }]
+          }
         }
       },
       {

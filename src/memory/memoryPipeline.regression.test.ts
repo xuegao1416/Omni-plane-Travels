@@ -116,6 +116,29 @@ describe('long-running narrative memory regression', () => {
 
 
 describe('memory integrity invariants', () => {
+  test('normalizes incomplete legacy summary cards before retrieval planning', () => {
+    const runtime = useMemoryStore.getState().getMemoryRuntime();
+    runtime.summarySaveHistory.push({
+      savedAt: 1,
+      status: 'success',
+      sourceStartIndex: 1,
+      sourceEndIndex: 1,
+      summaryData: {
+        otherCharacterMemories: [],
+        playerMemories: [{ id: 'legacy-null-fields', title: undefined, summary: undefined, keywords: null }],
+        itemMemories: [],
+      },
+    } as unknown as typeof runtime.summarySaveHistory[number]);
+
+    expect(() => collectAllMemoriesFromRuntime(runtime)).not.toThrow();
+    expect(collectAllMemoriesFromRuntime(runtime)[0]).toMatchObject({
+      id: 'legacy-null-fields',
+      title: 'legacy-null-fields',
+      summary: 'legacy-null-fields',
+      keywords: [],
+    });
+  });
+
   test('keeps the immutable source-event ledger without silently dropping old evidence', () => {
     const store = useMemoryStore.getState();
     store.setConfig({ retention: { ...store.config.retention, maxSourceEvents: 2 } });

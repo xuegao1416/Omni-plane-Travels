@@ -441,7 +441,7 @@ const v2LogicSchema = z.object({
   onButton: z.array(v2LifecycleRuleSchema).max(64).default([]),
 }).strict().default({ onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [] });
 
-const customGameplayModuleV2Schema = z.object({
+export const customGameplayModuleV2Schema = z.object({
   kind: z.literal('custom-gameplay-module'),
   schemaVersion: z.literal(2),
   id: z.string().regex(ID_RE, 'id 必须匹配 ^[a-z0-9][a-z0-9_:-]{2,63}$'),

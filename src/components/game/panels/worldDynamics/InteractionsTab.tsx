@@ -9,11 +9,15 @@ import { NpcInteractionCard } from './NpcInteractionCard';
 
 interface InteractionsTabProps {
   interactions: NpcProactiveInteraction[];
+  onUseAction?: (text: string) => void;
 }
 
-export function InteractionsTab({ interactions }: InteractionsTabProps) {
+export function InteractionsTab({ interactions, onUseAction }: InteractionsTabProps) {
   return (
     <>
+      <div style={{ padding: '6px 8px', marginBottom: 8, color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', lineHeight: 1.5 }}>
+        这里是后台角色提出的联系候选。只有放入主输入框并由正文承接后，才算旅程中真正发生的交互。
+      </div>
       {interactions.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
           <button
@@ -40,7 +44,7 @@ export function InteractionsTab({ interactions }: InteractionsTabProps) {
         </div>
       ) : (
         interactions.map(interaction => (
-          <NpcInteractionCard key={interaction.id} interaction={interaction} />
+          <NpcInteractionCard key={interaction.id} interaction={interaction} onUseAction={onUseAction} />
         ))
       )}
     </>

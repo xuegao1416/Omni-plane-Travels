@@ -2,7 +2,6 @@
 import type { WorldDef, WorldBookEntryDef } from './worlds-schema';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { normalizeModules } from '../modules/normalizeModule';
-import { BUILTIN_WORLD_CLOCKS } from './builtinWorldClocks';
 
 // ── 从 worlds.json 导入内置世界定义 ──
 import worldsData from './worlds.json';
@@ -19,14 +18,6 @@ export type {
 
 /** 全部内置世界定义（从 worlds.json 加载） */
 export const WORLDS: WorldDef[] = worldsData as WorldDef[];
-
-// Keep the large legacy worlds.json payload intact while making the six shipped worlds explicit.
-for (const world of WORLDS) {
-  const clock = BUILTIN_WORLD_CLOCKS[world.id];
-  if (!clock) continue;
-  const economy = world.worldBookEntries?.find(entry => entry.entryType === 'economy');
-  if (economy) economy.meta = { ...(economy.meta || {}), timeSystem: clock };
-}
 
 /** 按 id 查找世界（仅内置） */
 export function getWorldById(id: string): WorldDef | undefined {

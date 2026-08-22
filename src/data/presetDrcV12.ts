@@ -2409,7 +2409,7 @@ const DRC_V12_SOURCE_PROMPTS: PresetPromptEntry[] = [
     identifier: "drc_host_world_clock_protocol",
     name: "【宿主协议】权威时间与运行时边界",
     role: "system",
-    content: "<WorldTravelGuideHostContract>\n本预设同时受《世界漫游指南》的运行时协议约束，以下规则优先于原预设中的酒馆专用输出模块：\n\n1. 世界时间唯一以宿主注入的世界.时间系统.时钟为准。不要在正文中自行编造或覆盖绝对日期、年份、月份、时刻，也不要输出 time_format、meow_FM、status_top、char_date 等酒馆状态栏。\n2. 如果本轮剧情确实经过了时间，只在所有正文与行动选项之后追加一个宿主时间建议，严格使用：<TimeAdvance>{\"minutes\":整数,\"reason\":\"简短原因\"}</TimeAdvance>。只给经过的分钟数，不得写 date、time 或替换纪年；没有明确经过时间时不要输出该标签。\n3. 正文中不要输出 UpdateVariable、变量快照 JSON 或其他内部状态块。世界状态、NPC 与经营数据由宿主的辅助管线处理；即使不输出这些标签，也必须继续完成正文与行动选项。\n4. 不要输出酒馆专用的 aftertalk、parallel_world、branches、Audio、Prism 等内部标签；不得把它们当成玩家可见正文。\n5. 最终回复必须完成上方宿主协议要求的 <contenttext> 正文与 [OPTION_START]...[OPTION_END] 行动选项；内容风格仍遵循双人成行原始创作指令。\n</WorldTravelGuideHostContract>",
+    content: "<WorldTravelGuideHostContract>\n本预设同时受《世界漫游指南》的运行时协议约束，以下规则优先于原预设中的酒馆专用输出模块：\n\n1. 世界时间唯一以宿主注入的世界.时间系统.时钟为准。不要在正文中自行编造或覆盖绝对日期、年份、月份、时刻，也不要输出 time_format、meow_FM、status_top、char_date 等酒馆状态栏。\n2. 在所有正文与行动选项之后追加宿主时间回执：<TimeAdvance>{\"minutes\":非负整数,\"reason\":\"简短原因\"}</TimeAdvance>。minutes 必须覆盖从本轮起始时钟到正文末尾的完整连续时间线，并结合明确时长、天色光照、用餐、睡醒、抵达和持续活动结束等自然判断；不能按默认时长机械递增。末尾时段明确时可附加 targetPhase（late_night/dawn/morning/noon/afternoon/dusk/evening/night）与相对起始日期的 dayOffset 供宿主校验；只有即时反应且没有时间变化时写 0，不得写绝对 date/time 或替换纪年。\n3. 正文中不要输出 UpdateVariable、变量快照 JSON 或其他内部状态块。世界状态、NPC 与经营数据由宿主的辅助管线处理；即使不输出这些标签，也必须继续完成正文与行动选项。\n4. 不要输出酒馆专用的 aftertalk、parallel_world、branches、Audio、Prism 等内部标签；不得把它们当成玩家可见正文。\n5. 最终回复必须完成上方宿主协议要求的 <contenttext> 正文与 [OPTION_START]...[OPTION_END] 行动选项；内容风格仍遵循双人成行原始创作指令。\n</WorldTravelGuideHostContract>",
     enabled: true,
     order: 99991,
     triggerMode: "blue",

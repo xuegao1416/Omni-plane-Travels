@@ -9,7 +9,7 @@ import { RollbackConfirm } from './variableSnapshot/RollbackConfirm';
 import { STORAGE_KEYS } from '../../../config/storageKeys';
 
 export default function VariableSnapshotPanel({
-  messages, varMgr, onRestoreSnapshot, onRollbackToSnapshot, onSave,
+  messages, varMgr, onRestoreSnapshot, onRollbackToSnapshot, onSave, onCommitState,
 }: VariableSnapshotPanelProps) {
   const { DialogUI, alert: dlgAlert } = useDialog();
   const [layerEditTexts, setLayerEditTexts] = useState<Record<string, string>>({});
@@ -59,18 +59,28 @@ export default function VariableSnapshotPanel({
     setLayerModified(prev => new Set(prev).add(layerId));
   }, []);
 
-  const handleLoadLatest = useCallback((layer: SnapshotLayer) => {
+  const handleLoadLatest = useCallback(async (layer: SnapshotLayer) => {
     const text = getLayerEditText(layer);
     try {
       JSON.parse(text);
-      if (varMgr.setStateFromJSON(text)) {
-        setLayerModified(prev => { const next = new Set(prev); next.delete(layer.id); return next; });
-        onSave?.();
-      }
     } catch {
       dlgAlert('JSON 格式错误，请检查后重试', { title: '格式错误' });
+      return;
     }
-  }, [varMgr, getLayerEditText, onSave, dlgAlert]);
+    if (!varMgr.setStateFromJSON(text)) {
+      dlgAlert('状态内容无法应用，请检查数据后重试', { title: '应用失败' });
+      return;
+    }
+    try {
+      if (onCommitState) await onCommitState();
+      else onSave?.();
+      const canonicalText = JSON.stringify(varMgr.getState(), null, 2);
+      setLayerEditTexts(prev => ({ ...prev, [layer.id]: canonicalText }));
+      setLayerModified(prev => { const next = new Set(prev); next.delete(layer.id); return next; });
+    } catch {
+      dlgAlert('编辑已经应用到当前游戏，但立即存档失败。请保留页面并重试。', { title: '保存失败' });
+    }
+  }, [varMgr, getLayerEditText, onSave, onCommitState, dlgAlert]);
 
   const handleRollback = useCallback(() => {
     if (!confirmRollback) return;

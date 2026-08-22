@@ -58,6 +58,7 @@ export default function GameScreen() {
   const [mobileActivePanel, setMobileActivePanel] = useState<OverlayPanel>(null);
   const [stateVersion, setStateVersion] = useState(0);
   const [notification, setNotification] = useState<string | null>(null);
+  const [chatDraft, setChatDraft] = useState<{ id: string; text: string } | null>(null);
   // ── Fullscreen ──
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -345,6 +346,11 @@ export default function GameScreen() {
     }
     bumpVersion();
   }, [worldDef, bumpVersion]);
+  const handleUseWorldDynamicsAction = useCallback((text: string) => {
+    const draft = text.trim();
+    if (!draft) return;
+    setChatDraft({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: draft });
+  }, []);
   // ── Panel rendering (shared between desktop and mobile) ──
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
     const content = (() => {
@@ -353,10 +359,10 @@ export default function GameScreen() {
         case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
         case 'tasks': return <TaskPanel gameState={gameState} />;
         case 'notebook': return <NotebookPanel gameState={gameState} />;
-        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onRollbackToSnapshot={(msgIndex) => { engine.rollbackToSnapshot(msgIndex); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
+        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onRollbackToSnapshot={(msgIndex) => { engine.rollbackToSnapshot(msgIndex); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onCommitState={async () => { bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} />;
         case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
         case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => useSaveStore.getState().scheduleAutoSave()} messages={engine.messages} mode="inline" />;
-        case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} />;
+        case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} onUseAction={(text) => { handleUseWorldDynamicsAction(text); onClose(); }} />;
         case 'modules': return <EventConfigPanel onClose={onClose} worldDef={worldDef} />;
         default: return null;
       }
@@ -432,6 +438,7 @@ export default function GameScreen() {
       onResend={engine.resendFromMessage} onResendFromHere={engine.resendFromAssistantMessage}
       pipelineStatus={engine.pipelineStatus} worldSystem={worldSystem}
       onDiceRoll={handleDiceRoll} onRetrySingleStage={engine.retrySingleStage}
+      externalDraft={chatDraft ?? undefined}
     />
   );
   // 生存资源数据（供 SurvivalOverlay 使用）

@@ -75,7 +75,7 @@ export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDic
     : undefined;
 
   return (
-    <JourneyCardShell className="game-journey-card--dice" label="骰子检定">
+    <JourneyCardShell className="game-journey-card--dice" label="骰子检定" mode="panel">
       <div className="inline-dice-card">
       {/* 头部 */}
       <div className="inline-dice-header">
