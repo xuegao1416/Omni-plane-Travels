@@ -72,7 +72,7 @@ export function breakthroughProgression(
   const professionRuntime = abilityState?.职业状态;
   const points = config.pointsPerTier ?? {};
   const professionPoints = professionRuntime?.职业ID
-    ? Math.max(0, Number(rewardPolicy.professionAbilityPointsPerTier) || 0)
+    ? Math.max(0, Number(rewardPolicy.professionAbilityPointsPerTier ?? points.skill) || 0)
     : 0;
   return executeGameplayTransaction(state, {
     id: `progression:breakthrough:${targetTier}:${context.tick}`, moduleId: 'progression', source: 'player',
@@ -153,7 +153,7 @@ export function settleProgressionActivity(
     if (professionRuntime) {
       effects.push({ set: { path: '玩家.能力系统.职业状态.职业等级', value: Math.max(1, tierAfter + 1) } });
       const professionPoints = professionRuntime.职业ID
-        ? Math.max(0, Number(rewardPolicy.professionAbilityPointsPerTier) || 0)
+        ? Math.max(0, Number(rewardPolicy.professionAbilityPointsPerTier ?? points.skill) || 0)
         : 0;
       if (professionPoints) effects.push({ add: { path: '玩家.能力系统.职业状态.能力点', delta: professionPoints * promoted, min: 0 } });
     } else if (abilityState) {

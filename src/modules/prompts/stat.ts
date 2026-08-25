@@ -66,12 +66,13 @@ export function buildStatGenPrompt(params: {
    - current: 初始值（60%上限）
 
 3. 六维属性（每个都要设定value和range）：
-   - ${params.dim1Name}: value(初始值), range[最小,最大]
-   - ${params.dim2Name}: value(初始值), range[最小,最大]
-   - ${params.dim3Name}: value(初始值), range[最小,最大]
-   - ${params.dim4Name}: value(初始值), range[最小,最大]
-   - ${params.dim5Name}: value(初始值), range[最小,最大]
-   - ${params.dim6Name}: value(初始值), range[最小,最大]
+   - ${params.dim1Name}: 力量・攻击类，semanticRole="power"
+   - ${params.dim2Name}: 体魄・防护类，semanticRole="guard"
+   - ${params.dim3Name}: 灵巧・速度类，semanticRole="agility"
+   - ${params.dim4Name}: 智识・技术类，semanticRole="intellect"
+   - ${params.dim5Name}: 意志・交涉类，semanticRole="social"
+   - ${params.dim6Name}: 感知・机运类，semanticRole="perception"
+   每项都必须包含 value、range、semanticRole 和一句 description。
 
    【数值尺度指南 — 根据世界类型选择合适的尺度】
 
@@ -105,28 +106,27 @@ export function buildStatGenPrompt(params: {
 {
   "attrA": { "name": "${params.attrAName}", "current": <按世界上限的80%>, "max": <按世界上限> },
   "attrB": { "name": "${params.attrBName}", "current": <按世界上限的60%>, "max": <按世界上限> },
-  "dim1": { "name": "${params.dim1Name}", "value": <按尺度波动>, "range": [<最小>, <最大>] },
-  "dim2": { "name": "${params.dim2Name}", "value": <按尺度波动>, "range": [<最小>, <最大>] },
-  "dim3": { "name": "${params.dim3Name}", "value": <按尺度波动>, "range": [<最小>, <最大>] },
-  "dim4": { "name": "${params.dim4Name}", "value": <按尺度波动>, "range": [<最小>, <最大>] },
-  "dim5": { "name": "${params.dim5Name}", "value": <按尺度波动>, "range": [<最小>, <最大>] },
-  "dim6": { "name": "${params.dim6Name}", "value": <按尺度波动>, "range": [<最小>, <最大>] },
+  "dim1": { "name": "${params.dim1Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"power", "description":"..." },
+  "dim2": { "name": "${params.dim2Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"guard", "description":"..." },
+  "dim3": { "name": "${params.dim3Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"agility", "description":"..." },
+  "dim4": { "name": "${params.dim4Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"intellect", "description":"..." },
+  "dim5": { "name": "${params.dim5Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"social", "description":"..." },
+  "dim6": { "name": "${params.dim6Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"perception", "description":"..." },
   "special": [
     { "id": "...", "name": "...", "value": <按尺度>, "range": [<最小>, <最大>], "description": "..." }
   ]
 }`;
 }
 
-/** 运行时UpdateVariable规则 */
+/** 运行时统一玩法事务契约 */
 export const STAT_UPDATE_RULES = `【数值属性更新规则】
 
-当角色受到伤害/恢复/消耗/提升时，更新对应属性：
-{"玩家":{"生存状态":{"血量":75}}}  // 生命类变化
-{"玩家":{"生存状态":{"体力值":55}}}  // 能量类变化
-{"玩家":{"生存状态":{"dim1":47}}}  // 六维变化
-{"玩家":{"生存状态":{"str":8}}}  // 特色属性变化
+所有机械变量更新都必须是 GameplayTransaction JSON，并放在现有更新标签中传输；禁止直接输出状态对象或 RFC 补丁。
+格式：{"id":"ai:stat:唯一标识","source":"ai","moduleId":"stat","effects":[{"add":{"path":"玩家.生存状态.血量","delta":-5,"min":0}}]}
 
 注意：
-- 只输出发生变化的属性，未变化的不要输出
+- 只提交发生变化的属性，未变化的不要输出
+- 优先使用 add 表达变化，只有明确给出最终值时才使用 set
 - 属性值不能超过当前段位上限（如果有成长体系模块）
-- 属性值不能低于range[0]`;
+- 属性值不能低于对应 range[0]
+- 每次更新必须是一个完整事务，不能在正文中自行扣除点数或绕过其他模块结算`;

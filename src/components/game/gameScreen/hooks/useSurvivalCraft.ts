@@ -3,7 +3,9 @@ import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
 import type { SurvivalRecipe } from '../../../../modules/schema';
-import { formatWorldClock, getTimeSystemFromWorld, writeWorldClock } from '../../../../time/worldClock';
+import { craftSurvivalRecipe, gatherSurvivalResource, unlockSurvivalRecipe } from '../../../../gameplay/modules/survival';
+import { useSaveStore } from '../../../../stores/saveStore';
+import { getTimeSystemFromWorld } from '../../../../time/worldClock';
 
 export function useSurvivalCraft(
   engine: GameEngine,
@@ -29,47 +31,55 @@ export function useSurvivalCraft(
 
   const handleSurvivalCraft = useCallback((recipe: SurvivalRecipe) => {
     const state = engine.variableManager.getState();
-    const resources = state.玩家?.生存资源;
-    if (!resources) return;
-
-    // 检查资源是否足够
-    for (const [resId, need] of Object.entries(recipe.inputs)) {
-      const res = resources[resId];
-      if (!res || res.数量 < need) return;
+    const result = craftSurvivalRecipe(state, recipe, {
+      tick: state.simulationRuntime?.tick ?? 0,
+      enabledModules: ['survival'],
+      worldClockConfig: getTimeSystemFromWorld(worldDef),
+    });
+    if (result.status !== 'applied') {
+      setNotification(result.reason ?? '材料不足，无法制作');
+      return;
     }
-
-    // 消耗材料
-    for (const [resId, need] of Object.entries(recipe.inputs)) {
-      const res = resources[resId];
-      if (res) res.数量 -= need;
-    }
-
-    // 产出产品
-    const outputId = recipe.output.resourceId;
-    const outputAmount = recipe.output.amount;
-    const outputRes = resources[outputId];
-    if (outputRes) {
-      outputRes.数量 += outputAmount;
-    } else {
-      resources[outputId] = { 数量: outputAmount };
-    }
-
-    const craftTimeMinutes = Math.min(1_440, Math.max(0, Math.trunc(Number(recipe.craftTimeMinutes) || 0)));
-    const clock = state.世界?.时间系统?.时钟;
-    if (clock && craftTimeMinutes > 0) {
-      const clockConfig = getTimeSystemFromWorld(worldDef);
-      const nextClock = writeWorldClock(clock, clockConfig, {
-        deltaMinutes: craftTimeMinutes,
-        source: 'manual',
-        reason: `制作${recipe.name}`,
-      });
-      state.世界.时间系统.时钟 = nextClock;
-      state.世界.时间系统.当前时间 = formatWorldClock(nextClock, clockConfig);
-    }
-
-    engine.variableManager.setState(state);
+    engine.variableManager.setState(result.state);
     bumpVersion();
-  }, [engine, worldDef, bumpVersion]);
+    useSaveStore.getState().scheduleAutoSave();
+  }, [engine, worldDef, bumpVersion, setNotification]);
+
+  const handleSurvivalUnlockRecipe = useCallback((recipe: SurvivalRecipe) => {
+    const state = engine.variableManager.getState();
+    const result = unlockSurvivalRecipe(state, recipe, {
+      tick: state.simulationRuntime?.tick ?? 0,
+      enabledModules: ['survival'],
+    });
+    if (result.status !== 'applied') {
+      setNotification(result.reason ?? '当前条件不满足，无法解锁配方');
+      return;
+    }
+    engine.variableManager.setState(result.state);
+    bumpVersion();
+    useSaveStore.getState().scheduleAutoSave();
+    setNotification(`配方「${recipe.name}」已解锁`);
+  }, [engine, bumpVersion, setNotification]);
+
+  const handleSurvivalGather = useCallback((resourceId: string) => {
+    const state = engine.variableManager.getState();
+    const survivalConfig = worldDef?.modules?.find(module => module.moduleId === 'survival' && module.enabled)?.moduleConfig as
+      | import('../../../../modules/schema').SurvivalModuleSchema | undefined;
+    if (!survivalConfig) return;
+    const result = gatherSurvivalResource(state, survivalConfig, resourceId, {
+      tick: state.simulationRuntime?.tick ?? 0,
+      enabledModules: ['survival'],
+      worldClockConfig: getTimeSystemFromWorld(worldDef),
+    });
+    if (result.status !== 'applied') {
+      setNotification(result.reason ?? '无法采集：资源已满或体力不足');
+      return;
+    }
+    engine.variableManager.setState(result.state);
+    bumpVersion();
+    useSaveStore.getState().scheduleAutoSave();
+    setNotification(`已采集「${survivalConfig.resources.find(resource => resource.id === resourceId)?.name ?? resourceId}」`);
+  }, [engine, worldDef, bumpVersion, setNotification]);
 
   const handleSurvivalGenerateRecipe = useCallback(async (request: string) => {
     if (!apiConfig) return;
@@ -182,6 +192,8 @@ export function useSurvivalCraft(
     runtimeRecipes,
     isGeneratingRecipe,
     handleSurvivalCraft,
+    handleSurvivalUnlockRecipe,
+    handleSurvivalGather,
     handleSurvivalGenerateRecipe,
     handleSurvivalDeleteRecipe,
   };

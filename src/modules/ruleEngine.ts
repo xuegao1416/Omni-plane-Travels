@@ -9,12 +9,17 @@ import type {
   Condition,
   Action,
   ActionKind,
-  Comparator,
   Literal,
   Permission,
   EventRuntimeState,
   WorldContext,
 } from './schema';
+import {
+  evaluateGameplayCondition,
+  getGameplayPath,
+  setGameplayPath,
+  type GameplayStateRoot,
+} from '../gameplay/kernel';
 
 export interface EvaluateLimits {
   maxRulesPerMod: number;
@@ -68,6 +73,7 @@ export interface EvaluateResult {
 const ACTION_KINDS: ActionKind[] = [
   'set',
   'addEvent',
+  'requestCombat',
   'modifyResource',
   'scheduleTick',
 ];
@@ -76,6 +82,7 @@ const ACTION_KINDS: ActionKind[] = [
 const ACTION_PERMISSION: Record<ActionKind, Permission> = {
   set: 'modify_world_state',
   addEvent: 'add_card',
+  requestCombat: 'emit_world_event',
   modifyResource: 'modify_world_state',
   scheduleTick: 'register_tick',
 };
@@ -88,62 +95,6 @@ function clone<T>(v: T): T {
   // 确定性深拷贝（仅内存，无 IO）；context 不含函数/undefined 语义
   if (typeof structuredClone === 'function') return structuredClone(v);
   return JSON.parse(JSON.stringify(v)) as T;
-}
-
-function getPath(ctx: WorldContext, path: string): unknown {
-  const parts = path.split('.');
-  let cur: unknown = ctx;
-  for (const p of parts) {
-    if (cur == null || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[p];
-  }
-  return cur;
-}
-
-function setPath(ctx: WorldContext, path: string, value: unknown): void {
-  const parts = path.split('.');
-  if (parts.length === 0) return;
-  let cur: Record<string, unknown> = ctx as Record<string, unknown>;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const p = parts[i];
-    if (cur[p] == null || typeof cur[p] !== 'object') cur[p] = {};
-    cur = cur[p] as Record<string, unknown>;
-  }
-  cur[parts[parts.length - 1]] = value;
-}
-
-function compare(op: Comparator, left: unknown, right: Literal): boolean {
-  switch (op) {
-    case '==':
-      return left === right;
-    case '!=':
-      return left !== right;
-    case '>':
-      return Number(left) > Number(right);
-    case '>=':
-      return Number(left) >= Number(right);
-    case '<':
-      return Number(left) < Number(right);
-    case '<=':
-      return Number(left) <= Number(right);
-    case 'in':
-      return Array.isArray(right) && (right as unknown[]).includes(left);
-    case 'contains':
-      if (typeof left === 'string' && typeof right === 'string') return left.includes(right);
-      if (Array.isArray(left)) return (left as unknown[]).includes(right);
-      return false;
-    default:
-      return false;
-  }
-}
-
-function matchWhere(actual: Record<string, Literal> | undefined, expected: Record<string, Literal> | undefined): boolean {
-  if (!expected) return true;
-  if (!actual) return false;
-  for (const k of Object.keys(expected)) {
-    if (actual[k] !== expected[k]) return false;
-  }
-  return true;
 }
 
 interface StepRef {
@@ -181,11 +132,17 @@ export function evalCondition(
   }
   if ('state' in cond) {
     stepRef.steps++;
-    return compare(cond.state.op, getPath(ctx, cond.state.path), cond.state.value);
+    return evaluateGameplayCondition(cond, ctx as GameplayStateRoot, events.map(event => ({
+      type: event.type,
+      payload: event.where,
+    })));
   }
   if ('event' in cond) {
     stepRef.steps++;
-    return events.some((e) => e.type === cond.event.type && matchWhere(e.where, cond.event.where));
+    return evaluateGameplayCondition(cond, ctx as GameplayStateRoot, events.map(event => ({
+      type: event.type,
+      payload: event.where,
+    })));
   }
   return false;
 }
@@ -193,6 +150,7 @@ export function evalCondition(
 function actionKindOf(a: Action): ActionKind | null {
   if ('set' in a) return 'set';
   if ('addEvent' in a) return 'addEvent';
+  if ('requestCombat' in a) return 'requestCombat';
   if ('modifyResource' in a) return 'modifyResource';
   if ('scheduleTick' in a) return 'scheduleTick';
   return null;
@@ -205,23 +163,28 @@ export function applyAction(
   ruleId: string,
 ): void {
   if ('set' in action) {
-    setPath(ctx, action.set.path, action.set.value);
-    applied.push({ ruleId, kind: 'set', detail: action.set });
+    if (setGameplayPath(ctx as GameplayStateRoot, action.set.path, action.set.value)) {
+      applied.push({ ruleId, kind: 'set', detail: action.set });
+    }
   } else if ('addEvent' in action) {
     applied.push({ ruleId, kind: 'addEvent', detail: { eventId: action.addEvent.eventId, eventPackId: action.addEvent.eventPackId } });
+  } else if ('requestCombat' in action) {
+    applied.push({ ruleId, kind: 'requestCombat', detail: clone(action.requestCombat) });
   } else if ('modifyResource' in action) {
     const key = action.modifyResource.key;
     // 主路径：ctx.玩家.生存资源[key].数量（运行时游戏状态）
     const playerRes = (ctx as Record<string, any>).玩家?.生存资源 as Record<string, { 数量: number }> | undefined;
     if (playerRes && playerRes[key] != null) {
-      const cur = Number(playerRes[key].数量 ?? 0);
-      playerRes[key].数量 = Math.max(0, cur + action.modifyResource.delta);
+      const path = `玩家.生存资源.${key}.数量`;
+      const cur = Number(getGameplayPath(ctx as GameplayStateRoot, path) ?? 0);
+      setGameplayPath(ctx as GameplayStateRoot, path, Math.max(0, cur + action.modifyResource.delta), false);
     } else {
       // 回退路径：ctx.resources[key].amount（兼容已有英文 mock 测试）
       const res = (ctx as Record<string, any>).resources as Record<string, { amount: number }> | undefined;
       if (res && res[key]) {
-        const cur = Number(res[key].amount ?? 0);
-        res[key].amount = Math.max(0, cur + action.modifyResource.delta);
+        const path = `resources.${key}.amount`;
+        const cur = Number(getGameplayPath(ctx as GameplayStateRoot, path) ?? 0);
+        setGameplayPath(ctx as GameplayStateRoot, path, Math.max(0, cur + action.modifyResource.delta), false);
       }
     }
     applied.push({ ruleId, kind: 'modifyResource', detail: action.modifyResource });

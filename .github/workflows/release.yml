@@ -52,3 +52,56 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  build-android:
+    name: build Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: install Rust Android target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: install Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: install Android packages
+        shell: bash
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: initialize Android project
+        run: bun run tauri:android:init
+
+      - name: build installable Android APK
+        run: bun run tauri:android:build:debug
+
+      - name: upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: omni-plane-travels-android-arm64-debug
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

@@ -27,6 +27,7 @@ export default function SettingsScreen() {
   const isMobile = useIsPhone();
   const apiConfig = useConfigStore(s => s.apiConfig);
   const setApiConfig = useConfigStore(s => s.setApiConfig);
+  const enableTrial = useConfigStore(s => s.enableTrial);
   const [tab, setTab] = useState<SettingsTab>('general');
 
   useEffect(() => {
@@ -102,7 +103,7 @@ export default function SettingsScreen() {
           <main className="settings-screen__scroll">
             <div className="settings-screen__content">
               {tab === 'general' && <GeneralSettingsTab />}
-              {tab === 'api' && <ApiSettingsTab ref={apiRef} initialConfig={apiConfig} t={t} onSave={handleSave} onBack={goBack} />}
+              {tab === 'api' && <ApiSettingsTab ref={apiRef} initialConfig={apiConfig} t={t} onSave={handleSave} onBack={goBack} onSelectTrial={enableTrial} />}
               {tab === 'image' && <ImageGenSettingsTab />}
               {tab === 'preset' && <PresetSettingsTab />}
             </div>

@@ -4,6 +4,8 @@ import type { WorldBookManager } from '../worldbook/index';
 import type { GameSave, PlayerProfile, CustomNpc } from '../storage/db';
 import type { PipelineStatus, PipelineTaskId } from './pipelineTypes';
 import type { WorldDef } from '../data/worlds-schema';
+import type { GameState } from '../schema/variables';
+import type { CombatCheckpointRestore } from '../gameplay/combatV2';
 
 export interface ChatMessage {
   id: string;
@@ -27,9 +29,25 @@ export interface ChatMessage {
   seq?: number;
 }
 
+export interface SendMessageOutcome {
+  success: boolean;
+  /** Normalized narrative actually written to the assistant message. */
+  content?: string;
+  error?: string;
+}
+
+export interface SendMessageOptions {
+  /** Internal continuation text is sent to the model without a visible user bubble. */
+  displayUserMessage?: boolean;
+  /** Combat-owned state is restored after variable extraction/normal narration stages. */
+  combatContinuation?: { protectedState: GameState; fallbackText?: string };
+  onComplete?: (outcome: SendMessageOutcome) => void;
+}
+
 export interface GameEngine {
-  sendMessage: (userText: string) => Promise<void>;
+  sendMessage: (userText: string, options?: SendMessageOptions) => Promise<void>;
   cancel: () => void;
+  readonly isReadOnly: boolean;
   isGenerating: boolean;
   messages: ChatMessage[];
   variableManager: VariableManager;
@@ -41,6 +59,7 @@ export interface GameEngine {
   resendFromAssistantMessage: (id: string) => Promise<void>;
   rollbackToSnapshot: (msgIndex: number) => void;
   loadSave: (save: GameSave) => void;
+  restoreCombatCheckpoint: (restore: CombatCheckpointRestore, saveId?: string) => void;
   reset: (worldDef?: WorldDef) => void;
   setPlayerProfile: (profile: PlayerProfile) => void;
   applyModuleInitData: (moduleInitData: Record<string, unknown>) => void;

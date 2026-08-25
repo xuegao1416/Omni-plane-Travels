@@ -28,6 +28,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   stream?: boolean;
   responseFormat?: 'json' | 'text';
+  /** 体验模式只允许主对话请求消耗额度。 */
+  trialPurpose?: 'conversation';
 }
 
 export interface StreamOptions extends RequestOptions {

@@ -42,7 +42,9 @@ describe('Dawn V4 production migration', () => {
     expect(entryStyles).toContain('html[data-theme="dark"] .entry-default-theme.entry-hall .entry-hall-shade');
     expect(entryStyles).toContain('html[data-theme="dark"] .entry-default-theme.entry-hall .entry-world-crystal__glow');
     expect(entryStyles).toContain('html[data-theme="dark"] .entry-default-theme.entry-hall .entry-hall-portal__firelight');
-    expect(entryStyles).not.toContain('hall-background-16x9-nocturne');
+    for (const layout of ['21x9', '16x9', '40x29', '1x1', '9x16']) {
+      expect(entryStyles).toContain(`hall-background-${layout}-nocturne`);
+    }
   });
 
   test('compact actions do not render the V4 decorative frame tree', () => {
@@ -123,7 +125,8 @@ test('hall navigation remains a content-sized transparent group', () => {
     expect(wizardShell).toContain("import { EntrySlicedButton } from './EntrySurface'");
     expect(wizardShell).not.toContain('<button type="button" className="btn-secondary"');
     expect(wizardShell).not.toContain('<button type="button" className="btn-primary"');
-    expect(wizardShell).toContain('creation-ritual-shell__footer${modalOpen');
+    expect(wizardShell).toContain('creation-ritual-shell__footer${currentStep === historyStep');
+    expect(wizardShell).toContain("${modalOpen ? ' is-modal-blocked' : ''}");
     expect(wizardShell).toContain('disabled={modalOpen}');
   });
 

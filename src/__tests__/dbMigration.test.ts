@@ -12,6 +12,8 @@ import {
 } from '../storage/db';
 import type { GameSave } from '../storage/db';
 import { getDefaultPortraitSource, getPortraitSource } from '../components/start/PortraitEditor';
+import { getModuleStates } from '../storage/moduleStateDb';
+import { createDefaultGameState } from '../schema/variables';
 
 describe('portrait persistence round-trip', () => {
   it('preserves a custom data URL through the compact save head and restores default gender assets', async () => {
@@ -120,6 +122,33 @@ describe('imported save metadata', () => {
       await saveAllSaveMeta([legacyMeta]);
       const repaired = await getAllSaveMeta();
       expect(repaired[0]?.messageCount).toBe(3);
+    } finally {
+      await deleteSave(meta.id);
+      await saveAllSaveMeta((await getAllSaveMeta()).filter(item => item.id !== meta.id));
+    }
+  });
+
+  it('moves legacy module fields into independent records and restores them on load', async () => {
+    const state = createDefaultGameState();
+    state.玩家.生存资源 = { water: { 数量: 4 } };
+    const meta = await importSaveFromData({
+      save: {
+        id: `import-module-state-${Date.now()}`,
+        name: '导入模块分区测试',
+        timestamp: Date.now(),
+        worldId: 'default',
+        gameState: state,
+        messages: [],
+      },
+    });
+
+    try {
+      const loaded = await loadGame(meta.id);
+      expect((loaded?.gameState as any).玩家.生存资源).toBeUndefined();
+      expect(loaded?.moduleStates?.find(item => item.moduleId === 'survival')?.state).toMatchObject({
+        resources: { water: { 数量: 4 } },
+      });
+      expect((await getModuleStates(meta.id)).length).toBeGreaterThan(0);
     } finally {
       await deleteSave(meta.id);
       await saveAllSaveMeta((await getAllSaveMeta()).filter(item => item.id !== meta.id));

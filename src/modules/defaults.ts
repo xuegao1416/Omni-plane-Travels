@@ -10,9 +10,15 @@ import type {
   BusinessModuleSchema,
   DiceModuleSchema,
   TalentModuleSchema,
+  ProfessionModuleSchema,
+  ProfessionWorldBinding,
+  CombatModuleSchema,
+  CombatRulesetBinding,
   WorldSystemData,
   WorldDynamics,
 } from './schema';
+import { resolveProfessionBinding } from '../data/professions';
+import { createDefaultCombatBinding as createCombatBinding, resolveCombatRuleset } from '../gameplay/combatRulesets';
 
 /** 数值属性模块默认值 */
 export const STAT_DEFAULTS = {
@@ -60,12 +66,12 @@ export function createDefaultStatModule(): StatModuleSchema {
   return {
     attrA: { name: '生命', current: STAT_DEFAULTS.attrACurrent, max: STAT_DEFAULTS.attrAMax },
     attrB: { name: '能量', current: STAT_DEFAULTS.attrBCurrent, max: STAT_DEFAULTS.attrBMax },
-    dim1: { name: '攻击', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange] },
-    dim2: { name: '防御', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange] },
-    dim3: { name: '速度', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange] },
-    dim4: { name: '智力', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange] },
-    dim5: { name: '魅力', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange] },
-    dim6: { name: '幸运', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange] },
+    dim1: { name: '攻击', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange], semanticRole: 'power', description: '力量、外攻与直接破坏能力。' },
+    dim2: { name: '防御', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange], semanticRole: 'guard', description: '体魄、耐力与承受伤害能力。' },
+    dim3: { name: '速度', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange], semanticRole: 'agility', description: '灵巧、反应与行动速度。' },
+    dim4: { name: '智力', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange], semanticRole: 'intellect', description: '智识、学习、技术与施法能力。' },
+    dim5: { name: '魅力', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange], semanticRole: 'social', description: '意志、交涉、领导与影响能力。' },
+    dim6: { name: '幸运', value: STAT_DEFAULTS.dimInitial, range: [...STAT_DEFAULTS.dimRange], semanticRole: 'perception', description: '感知、直觉、机运与发现能力。' },
     special: [],
   };
 }
@@ -107,6 +113,7 @@ export function createDefaultBusinessModule(): BusinessModuleSchema {
     assets: [],
     market: { items: [] },
     transactionLog: [],
+    economy: { marketWeight: 0.35, autoIdleOnDeficit: true, logLimit: 50 },
   };
 }
 
@@ -114,6 +121,13 @@ export function createDefaultBusinessModule(): BusinessModuleSchema {
 export function createDefaultDiceModule(): DiceModuleSchema {
   return {
     history: [],
+    sides: 20,
+    defaultDC: DICE_DEFAULTS.defaultDC,
+    historyLimit: 10,
+    modifierBase: 10,
+    modifierStep: 2,
+    criticalSuccess: 20,
+    criticalFailure: 1,
   };
 }
 
@@ -121,7 +135,32 @@ export function createDefaultDiceModule(): DiceModuleSchema {
 export function createDefaultTalentModule(): TalentModuleSchema {
   return {
     categories: [],
+    skills: [],
+    pointRules: {
+      initialTalentPoints: 1,
+      initialSkillPoints: 1,
+      talentPointsPerTier: 1,
+      skillPointsPerTier: 1,
+    },
   };
+}
+
+export function createDefaultProfessionModule(): ProfessionModuleSchema {
+  return resolveProfessionBinding(createDefaultProfessionBinding());
+}
+
+/** 新世界只保存职业包引用，不再复制五棵树。 */
+export function createDefaultProfessionBinding(): ProfessionWorldBinding {
+  return { packIds: ['fantasy-core'] };
+}
+
+/** 创建默认的独立战斗规则域；不配置遭遇时运行时完全不启用。 */
+export function createDefaultCombatModule(): CombatModuleSchema {
+  return resolveCombatRuleset(createDefaultCombatBinding());
+}
+
+export function createDefaultCombatBinding(): CombatRulesetBinding {
+  return createCombatBinding();
 }
 
 /** 创建默认的世界动态配置（通用兜底规则，不含周期事件） */
@@ -193,6 +232,10 @@ export function createFallbackModule(moduleId: string, name: string): import('..
       return { ...base, moduleConfig: createDefaultDiceModule() as unknown as Record<string, unknown> };
     case 'talent':
       return { ...base, moduleConfig: createDefaultTalentModule() as unknown as Record<string, unknown> };
+    case 'profession':
+      return { ...base, moduleConfig: createDefaultProfessionBinding() as unknown as Record<string, unknown> };
+    case 'combat':
+      return { ...base, moduleConfig: createDefaultCombatBinding() as unknown as Record<string, unknown> };
     case 'simulation':
       return { ...base, moduleConfig: createDefaultWorldDynamics() as unknown as Record<string, unknown> };
     default:

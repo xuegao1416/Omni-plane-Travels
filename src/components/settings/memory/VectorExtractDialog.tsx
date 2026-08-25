@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { fetchEmbeddingBatch } from '../../../api/client';
 import { extractContentForPrompt } from '../../../engine/responseExtractor';
 import type { ChatMessage } from '../../../engine/types';
 import { useMemoryStore } from '../../../memory/memoryStore';
 import type { MemorySystemConfig, VectorMemoryItem } from '../../../memory/types';
+import { createEmbeddingClient, resolveEmbeddingEndpoint } from '../../../memory/embeddingRuntime';
 import { Button } from '../SettingsUIComponents';
 
 interface Props {
@@ -71,25 +71,22 @@ export function VectorExtractDialog({ onClose, onComplete, messages, config }: P
     setResult(null);
     setProgress('');
     try {
-      if (!config.vectorApiUrl.trim() || !config.vectorApiModel.trim()) {
-        throw new Error('请先在向量化设置中填写 Embedding API 地址和模型。');
+      const embeddingEndpoint = resolveEmbeddingEndpoint(config);
+      if (config.vectorRuntime !== 'local' && (!embeddingEndpoint || !config.vectorApiModel.trim())) {
+        throw new Error('请先在向量化设置中选择 Embedding 运行方式并填写模型。');
       }
       const from = Math.max(availableRange.min, Math.min(start, end));
       const to = Math.min(availableRange.max, Math.max(start, end));
       const documents = buildRoundDocuments(messages, from, to);
       if (documents.length === 0) throw new Error('所选范围内没有可重建的对话。');
 
-      const embeddingConfig = {
-        baseUrl: config.vectorApiUrl.trim(),
-        apiKey: config.vectorApiKey.trim(),
-        model: config.vectorApiModel.trim(),
-      };
+      const embeddingClient = createEmbeddingClient(config);
       const rebuilt: VectorMemoryItem[] = [];
       const batchSize = 32;
       for (let offset = 0; offset < documents.length; offset += batchSize) {
         const chunk = documents.slice(offset, offset + batchSize);
         setProgress(`正在重建 ${Math.min(offset + chunk.length, documents.length)} / ${documents.length} 轮…`);
-        const embeddings = await fetchEmbeddingBatch(embeddingConfig, chunk.map(item => item.text));
+        const embeddings = await embeddingClient.embed(chunk.map(item => item.text));
         if (embeddings.length !== chunk.length) throw new Error('Embedding 返回数量与对话数量不一致。');
         const createdAt = Date.now();
         chunk.forEach((document, index) => {

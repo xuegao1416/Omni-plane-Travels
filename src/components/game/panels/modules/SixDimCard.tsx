@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { BarChart3 } from 'lucide-react';
 import type { StatModuleSchema } from '../../../../modules/schema';
 import { Collapsible } from '../../../shared/Collapsible';
+import { getSixDimSemantic } from '../../../../modules/xpAlgorithm';
 
 interface SixDimCardProps {
   data: StatModuleSchema;
@@ -13,7 +14,7 @@ interface SixDimCardProps {
 const DIM_KEYS = ['dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'] as const;
 
 export default memo(function SixDimCard({ data, title }: SixDimCardProps) {
-  const dims = DIM_KEYS.map(k => data[k]).filter((d): d is NonNullable<typeof d> => !!d);
+  const dims = DIM_KEYS.flatMap(key => data[key] ? [{ key, data: data[key]! }] : []);
   const hasDims = dims.length > 0;
   const specials = Array.isArray(data.special) ? data.special : [];
   const hasSpecials = specials.length > 0;
@@ -24,11 +25,11 @@ export default memo(function SixDimCard({ data, title }: SixDimCardProps) {
     <Collapsible icon={<BarChart3 size={15} />} title={title || '六维属性'} defaultOpen={true}>
       {hasDims && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
-          {dims.map((dim, i) => {
+          {dims.map(({ key, data: dim }) => {
             const safeValue = typeof dim.value === 'number' && !isNaN(dim.value) ? dim.value : 0;
             return (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{dim.name}</span>
+              <div key={key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 4, alignItems: 'center' }} title={dim.description || getSixDimSemantic(key, dim).label}>
+                <span style={{ minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{dim.name}<small style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 9, opacity: .72 }}>{getSixDimSemantic(key, dim).label}</small></span>
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--text-primary)' }}>{safeValue}</span>
               </div>
             );

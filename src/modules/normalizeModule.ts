@@ -4,23 +4,31 @@
 // ============================================================
 
 import type { WorldModule } from '@/data/worlds-schema';
+import type { ProgressionModuleSchema } from './schema';
+import { normalizeProgressionConfig } from './xpAlgorithm';
 
 /**
  * 将 WorldModule 统一为新格式（moduleConfig + initialState）
  *
  * - 已有 moduleConfig 且无 data → 原样返回
- - 有 data 但无 moduleConfig → 拆分为 moduleConfig + initialState
+ * - 有 data 但无 moduleConfig → 拆分为 moduleConfig + initialState
  * - 两者都有 → 以 moduleConfig 为准，删除 data
  */
 export function normalizeModule(mod: WorldModule): WorldModule {
   // 已经是新格式，无需转换
-  if (mod.moduleConfig && !mod.data) return mod;
+  if (mod.moduleConfig && !mod.data) {
+    return mod.moduleId === 'progression'
+      ? { ...mod, moduleConfig: normalizeProgressionConfig(mod.moduleConfig as unknown as ProgressionModuleSchema) as unknown as Record<string, unknown> }
+      : mod;
+  }
 
   const data = mod.data as Record<string, unknown> | undefined;
   if (!data || Object.keys(data).length === 0) {
     // data 为空，直接删除
     const { data: _, ...rest } = mod;
-    return rest;
+    return rest.moduleId === 'progression' && rest.moduleConfig
+      ? { ...rest, moduleConfig: normalizeProgressionConfig(rest.moduleConfig as unknown as ProgressionModuleSchema) as unknown as Record<string, unknown> }
+      : rest;
   }
 
   switch (mod.moduleId) {
@@ -48,11 +56,17 @@ function normalizeStatModule(mod: WorldModule, data: Record<string, unknown>): W
   }
 
   // 六维 dim1~dim6：拆 name+range → config，value → state
+  const semanticRoles = ['power', 'guard', 'agility', 'intellect', 'social', 'perception'] as const;
   for (let i = 1; i <= 6; i++) {
     const dimKey = `dim${i}`;
     const dim = data[dimKey] as Record<string, unknown> | undefined;
     if (dim && typeof dim === 'object') {
-      config[dimKey] = { name: dim.name, range: dim.range };
+      config[dimKey] = {
+        name: dim.name,
+        range: dim.range,
+        semanticRole: semanticRoles[i - 1],
+        description: dim.description,
+      };
       if (dim.value != null) state[`${dimKey}Value`] = dim.value;
     }
   }
@@ -94,7 +108,7 @@ function normalizeProgressionModule(mod: WorldModule, data: Record<string, unkno
 
   return {
     ...mod,
-    moduleConfig: mod.moduleConfig || config,
+    moduleConfig: normalizeProgressionConfig((mod.moduleConfig || config) as unknown as ProgressionModuleSchema) as unknown as Record<string, unknown>,
     initialState: mod.initialState || (Object.keys(state).length > 0 ? state : undefined),
     data: undefined,
   };

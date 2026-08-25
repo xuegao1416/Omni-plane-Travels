@@ -1,5 +1,6 @@
 import type { PlayerProfile } from '../../storage/db';
 import type { GameState } from '../../schema/variables';
+import type { CombatRiskMode } from '../../gameplay/protocols';
 import type { SegmentDef } from './StepCharacterHistory';
 import {
   ShieldCheck, User, Users, ScrollText,
@@ -16,13 +17,17 @@ interface StepConfirmProps {
   onStartGame: () => void;
   onPrev: () => void;
   showNavigation?: boolean;
+  hasProfession?: boolean;
+  hasCombat?: boolean;
+  combatRiskMode?: CombatRiskMode;
+  onCombatRiskModeChange?: (mode: CombatRiskMode) => void;
 }
 
 export default function StepConfirm({
-  personalInfo, segmentDefs, segments, buildInitialState, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true,
+  personalInfo, segmentDefs, segments, buildInitialState, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true, hasProfession = false, hasCombat = false, combatRiskMode = 'normal', onCombatRiskModeChange,
 }: StepConfirmProps) {
   const npcCount = personalInfo.customNpcs.length;
-  const skillCount = Object.keys(personalInfo.initialSkills).length;
+  const skillCount = hasProfession ? 0 : Object.keys(personalInfo.initialSkills).length;
   const itemCount = Object.keys(personalInfo.initialItems).length;
   const hasSegments = Object.values(segments).some(v => v.trim());
 
@@ -50,6 +55,7 @@ export default function StepConfirm({
             <ConfirmRow label="年龄" value={personalInfo.age} />
             <ConfirmRow label="视角" value={personalInfo.perspective} />
             <ConfirmRow label="职业" value={personalInfo.career} />
+            {hasProfession && <ConfirmRow label="先天天赋" value={`${personalInfo.innateTalentIds?.length ?? 0}个`} ok />}
             {skillCount > 0 && <ConfirmRow label="初始技能" value={`${skillCount}个`} ok />}
             {itemCount > 0 && <ConfirmRow label="初始物品" value={`${itemCount}个`} ok />}
           </div>
@@ -106,6 +112,32 @@ export default function StepConfirm({
           <div className="confirm-card confirm-empty">
             <ScrollText size={32} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
             <p>暂无开局内容</p>
+          </div>
+        )}
+        {hasCombat && (
+          <div className="confirm-card" aria-labelledby="combat-risk-title">
+            <div className="confirm-card-header">
+              <ShieldCheck size={16} />
+              <span id="combat-risk-title">战斗风险（开始后不可修改）</span>
+            </div>
+            <div className="confirm-card-body" role="radiogroup" aria-label="战斗风险">
+              {([
+                ['normal', '普通', '可在战前恢复检查点重打，归零后失去战力但可继续。'],
+                ['hard', '困难', '可重打；战斗可能造成重伤或死亡。'],
+                ['inferno', '炼狱', '不可重打或历史回滚；玩家死亡后存档封存为只读。'],
+              ] as Array<[CombatRiskMode, string, string]>).map(([mode, label, description]) => (
+                <label key={mode} className="confirm-risk-option">
+                  <input
+                    type="radio"
+                    name="combat-risk-mode"
+                    value={mode}
+                    checked={combatRiskMode === mode}
+                    onChange={() => onCombatRiskModeChange?.(mode)}
+                  />
+                  <span><strong>{label}</strong><small>{description}</small></span>
+                </label>
+              ))}
+            </div>
           </div>
         )}
       </div>

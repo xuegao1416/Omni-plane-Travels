@@ -3,20 +3,22 @@
 //  管线执行过程中传递的上下文数据
 // ============================================================
 
-import type { StatModuleSchema, ProgressionModuleSchema, SurvivalModuleSchema, BusinessModuleSchema, TalentModuleSchema } from './schema';
+import type { StatModuleSchema, ProgressionModuleSchema, SurvivalModuleSchema, BusinessModuleSchema, TalentModuleSchema, ProfessionModuleSchema, CombatModuleSchema, DerivedStatDefinition, StatModifierDefinition, SurvivalRecipe, SurvivalConsumption, SixDimSemanticRole } from './schema';
 import type { WorldBookEntryDef } from '../data/worlds-schema';
 
 /** 数值属性配置（静态，存入世界定义/世界书） */
 export interface StatConfig {
   attrA: { name: string; max: number };
   attrB: { name: string; max: number };
-  dim1: { name: string; range: [number, number] };
-  dim2: { name: string; range: [number, number] };
-  dim3: { name: string; range: [number, number] };
-  dim4: { name: string; range: [number, number] };
-  dim5: { name: string; range: [number, number] };
-  dim6: { name: string; range: [number, number] };
+  dim1: { name: string; range: [number, number]; semanticRole?: SixDimSemanticRole; description?: string };
+  dim2: { name: string; range: [number, number]; semanticRole?: SixDimSemanticRole; description?: string };
+  dim3: { name: string; range: [number, number]; semanticRole?: SixDimSemanticRole; description?: string };
+  dim4: { name: string; range: [number, number]; semanticRole?: SixDimSemanticRole; description?: string };
+  dim5: { name: string; range: [number, number]; semanticRole?: SixDimSemanticRole; description?: string };
+  dim6: { name: string; range: [number, number]; semanticRole?: SixDimSemanticRole; description?: string };
   special: Array<{ id: string; name: string; range: [number, number]; description: string }>;
+  derived?: DerivedStatDefinition[];
+  modifiers?: StatModifierDefinition[];
 }
 
 /** 数值属性状态（动态，存入变量系统） */
@@ -54,6 +56,9 @@ export interface ProgressionConfig {
     growthPerLevel: StatBonuses;
   };
   xpFormula: { baseXP: number; exponent: number; scaleFactor: number };
+  activityRewards?: ProgressionModuleSchema['activityRewards'];
+  pointsPerTier?: ProgressionModuleSchema['pointsPerTier'];
+  breakthroughs?: ProgressionModuleSchema['breakthroughs'];
 }
 
 /** 资源演化蓝图条目（静态配置） */
@@ -87,6 +92,8 @@ export interface SurvivalConfig {
   };
   /** 资源演化蓝图 */
   resourceEvolution?: ResourceEvolutionConfig[];
+  recipes?: SurvivalRecipe[];
+  consumption?: SurvivalConsumption;
 }
 
 /** 经营资产配置（静态，存入世界定义/世界书） */
@@ -105,6 +112,8 @@ export interface BusinessConfig {
     status: string;
   }>;
   market?: { items: Array<{ name: string; basePrice: number; trend: string; changePercent: number }> };
+  inventory?: Record<string, number>;
+  economy?: BusinessModuleSchema['economy'];
 }
 
 /** 世界创建管线的上下文数据 */
@@ -137,6 +146,10 @@ export interface BuildContext {
   businessData?: BusinessModuleSchema;
   /** 阶段3生成的天赋数据 */
   talentData?: TalentModuleSchema;
+  /** 阶段2生成的职业、先天天赋与自由技能数据 */
+  professionData?: ProfessionModuleSchema;
+  /** 阶段2生成的独立战斗规则域 */
+  combatData?: CombatModuleSchema;
   /** 阶段4生成的世界书条目 */
   worldBookEntries?: WorldBookEntryDef[];
 

@@ -17,12 +17,12 @@ export interface CanonicalStatOption {
 const FIXED_OPTIONS: CanonicalStatOption[] = [
   { value: 'attrA', label: '生命 (attrA)' },
   { value: 'attrB', label: '能量 (attrB)' },
-  { value: 'dim1', label: '六维 dim1' },
-  { value: 'dim2', label: '六维 dim2' },
-  { value: 'dim3', label: '六维 dim3' },
-  { value: 'dim4', label: '六维 dim4' },
-  { value: 'dim5', label: '六维 dim5' },
-  { value: 'dim6', label: '六维 dim6' },
+  { value: 'dim1', label: '力量・攻击类 (dim1)' },
+  { value: 'dim2', label: '体魄・防护类 (dim2)' },
+  { value: 'dim3', label: '灵巧・速度类 (dim3)' },
+  { value: 'dim4', label: '智识・技术类 (dim4)' },
+  { value: 'dim5', label: '意志・交涉类 (dim5)' },
+  { value: 'dim6', label: '感知・机运类 (dim6)' },
 ];
 
 /** 固定规范键(不依赖任何存档) */

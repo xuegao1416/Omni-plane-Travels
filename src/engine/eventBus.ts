@@ -47,4 +47,6 @@ export const EVENTS = {
   EVENT_CARD: 'mod:card',
   /** addEvent 触发的覆盖卡片：携带 { cardId, patch, eventPackId } */
   EVENT_CARD_OVERRIDE: 'mod:card:override',
+  /** Typed event-card action requesting the local combat domain to start an encounter. */
+  COMBAT_ENCOUNTER_REQUESTED: 'combat.encounter.requested',
 } as const;

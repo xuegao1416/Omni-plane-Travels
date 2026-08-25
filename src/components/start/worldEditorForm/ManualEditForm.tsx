@@ -7,6 +7,9 @@ import { ProgressionModuleEditor } from '../moduleEditors/ProgressionModuleEdito
 import { SurvivalModuleEditor } from '../moduleEditors/SurvivalModuleEditor';
 import { BusinessModuleEditor } from '../moduleEditors/BusinessModuleEditor';
 import { TalentModuleEditor } from '../moduleEditors/TalentModuleEditor';
+import { ProfessionModuleEditor } from '../moduleEditors/ProfessionModuleEditor';
+import CombatModuleEditor from '../moduleEditors/CombatModuleEditor';
+import { DiceModuleEditor } from '../moduleEditors/DiceModuleEditor';
 import {
   X, ScrollText, Swords, DollarSign, Flag, User, Sparkles, BarChart3, Map, BookMarked, Loader, CalendarDays,
 } from 'lucide-react';
@@ -24,6 +27,7 @@ interface ManualEditFormProps {
   isGeneratingTalent: boolean;
   onModuleAiFill: (moduleId: string) => void;
   generatingModule: string | null;
+  onOpenProfessionLibrary?: () => void;
   addFaction: () => void;
   removeFaction: (i: number) => void;
   updateFaction: (i: number, patch: Partial<FormState['factions'][0]>) => void;
@@ -38,7 +42,7 @@ interface ManualEditFormProps {
 
 export function ManualEditForm({
   form, update, selectedModules, onToggleModule, disabledByConflict,
-  updateModuleData, onTalentAiGenerate, isGeneratingTalent, onModuleAiFill, generatingModule,
+  updateModuleData, onTalentAiGenerate, isGeneratingTalent, onModuleAiFill, generatingModule, onOpenProfessionLibrary,
   addFaction, removeFaction, updateFaction, addNPC, removeNPC, updateNPC, addLocation, removeLocation, updateLocation,
   sections,
 }: ManualEditFormProps) {
@@ -226,14 +230,16 @@ export function ManualEditForm({
             const modData = mod.moduleConfig;
             return (
               <div key={mod.moduleId} style={{ marginBottom: 16, padding: '10px', background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 8, color: 'var(--accent)' }}>{mod.name} ({mod.moduleId})</div>
+                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 8, color: 'var(--accent)' }}>{mod.name}</div>
                 {mod.moduleId === 'stat' && modData && <StatModuleEditor data={modData as any} onChange={(d) => updateModuleData(modIdx, d as unknown as Record<string, unknown>)} />}
                 {mod.moduleId === 'progression' && modData && <ProgressionModuleEditor data={modData as any} onChange={(d) => updateModuleData(modIdx, d as unknown as Record<string, unknown>)} />}
                 {mod.moduleId === 'survival' && modData && <SurvivalModuleEditor data={modData as any} onChange={(d) => updateModuleData(modIdx, d)} />}
                 {mod.moduleId === 'business' && modData && <BusinessModuleEditor data={modData as any} onChange={(d) => updateModuleData(modIdx, d)} />}
-                {mod.moduleId === 'dice' && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>骰子检定无需初始数据，运行时自动计算</div>}
+                {mod.moduleId === 'dice' && <DiceModuleEditor data={(modData as any) || {}} onChange={(d) => updateModuleData(modIdx, d as unknown as Record<string, unknown>)} />}
                 {mod.moduleId === 'talent' && <TalentModuleEditor data={(modData as any) || { categories: [] }} onChange={(d) => updateModuleData(modIdx, d)} onAiGenerate={onTalentAiGenerate} isGenerating={isGeneratingTalent} />}
-                {!modData && mod.moduleId !== 'dice' && mod.moduleId !== 'talent' && (
+                {mod.moduleId === 'profession' && <ProfessionModuleEditor data={(modData as any) || { packIds: [] }} onChange={(d) => updateModuleData(modIdx, d)} onOpenLibrary={onOpenProfessionLibrary} />}
+                {mod.moduleId === 'combat' && <CombatModuleEditor data={(modData as any) || { rulesetId: 'narrative' }} onChange={(d) => updateModuleData(modIdx, d as unknown as Record<string, unknown>)} />}
+                {!modData && mod.moduleId !== 'dice' && mod.moduleId !== 'talent' && mod.moduleId !== 'profession' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>暂无数据</span>
                     <button className="btn-ghost" onClick={() => onModuleAiFill(mod.moduleId)} disabled={generatingModule === mod.moduleId} style={{ fontSize: 'var(--font-size-xs)', padding: '3px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>

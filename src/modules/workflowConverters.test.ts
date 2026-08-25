@@ -30,3 +30,27 @@ test('rule workflow preserves the explicit card event pack binding', () => {
     event_pack_id: 'pack-e2e',
   });
 });
+
+test('visual workflow preserves a typed semantic combat request', () => {
+  const workflow: WorkflowDefinition = {
+    version: 1,
+    id: 'wf-combat',
+    name: '结构化战斗工作流',
+    nodes: [
+      { id: 'trigger', typeId: 'triggers.periodic', position: { x: 0, y: 0 }, widgetValues: { interval: 1 } },
+      {
+        id: 'combat', typeId: 'actions.request_combat', position: { x: 240, y: 0 },
+        widgetValues: {
+          proposal_id: 'workflow-encounter', context: '敌人已经发动袭击', threat_band: 'dangerous',
+          allies_json: [], enemies_json: [{ id: 'enemy', identity: '敌人', temporary: false }], neutrals_json: [],
+        },
+      },
+    ],
+    connections: [{ id: 'flow', sourceNodeId: 'trigger', sourceSocketKey: 'flow_out', targetNodeId: 'combat', targetSocketKey: 'flow_in' }],
+  };
+  const ruleFile = workflowToRuleFile(workflow);
+  const action = ruleFile.periodicRules?.[0]?.actions?.[0];
+  expect(action).toMatchObject({ requestCombat: { source: 'event-workflow', proposal: { id: 'workflow-encounter', threatBand: 'dangerous' } } });
+  const restored = ruleFileToWorkflow(ruleFile, 'wf-combat-restored');
+  expect(restored.nodes.find(node => node.typeId === 'actions.request_combat')?.widgetValues).toMatchObject({ proposal_id: 'workflow-encounter', threat_band: 'dangerous' });
+});

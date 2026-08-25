@@ -30,6 +30,7 @@ ${userBlock}
      - 修仙/玄幻：50~200（灵石/仙玉等）
 4. 可选生成 market（3~5个商品行情，有 basePrice 和 trend）
 5. assets 数组留空（[]）
+6. economy 使用确定性结算：市场影响权重建议 0.2~0.5，资金不足时自动暂停亏损资产
 
 【输出JSON】
 {
@@ -43,25 +44,28 @@ ${userBlock}
       { "name": "粮食", "basePrice": 20, "trend": "up", "changePercent": 10 }
     ]
   },
+  "economy": { "marketWeight": 0.35, "autoIdleOnDeficit": true, "logLimit": 50 },
   "transactionLog": []
 }`;
 }
 
-/** 运行时 UpdateVariable 规则 */
+/** 运行时统一玩法事务契约 */
 export const BUSINESS_UPDATE_RULES = `【经营资产更新规则】
-- 经营数据通过 UpdateVariable 更新到 玩家.经营资产
+- 经营数据必须使用 GameplayTransaction JSON（通过现有更新标签传输），禁止直接合并 玩家.经营资产 或发送 RFC 补丁
 - 初始状态下玩家没有经营资产，需要通过角色行动获取
 - 收购资产：当玩家在叙事中明确表达要购买/承包/开设经营项目时，将新资产添加到资产列表，同时扣除资金
   - 收购前必须检查资金是否充足
-  - 示例：{"玩家":{"经营资产":{"资金":扣款后余额,"资产列表":[{"id":"tavern","名称":"酒馆","类型":"餐饮","等级":1,"最高等级":3,"描述":"一家小酒馆","状态":"active","基础收益":10,"每级收益":5,"维护费":3}]}}}
+  - 资产必须填写基础收益、每级收益、维护费、员工效率、市场标签、风险等级和升级费用
+- 示例：{"id":"ai:business:purchase","source":"ai","moduleId":"business","costs":[{"path":"玩家.经营资产.资金","amount":50}],"effects":[{"append":{"path":"玩家.经营资产.资产列表","value":{"id":"tavern","名称":"酒馆","类型":"餐饮","等级":1,"最高等级":3,"状态":"active"},"create":true}}]}
 - 升级资产：修改对应资产的等级（不能超过最高等级），扣除升级费用
-  - 示例：{"玩家":{"经营资产":{"资金":扣款后余额,"资产列表":[{"id":"tavern","等级":2}]}}}
+  - 使用 costs 扣除升级费用，并用 effects.set 修改对应资产等级
 - 出售资产：从资产列表中移除，增加资金（售价约为升级费用 * 0.5）
 - 资产状态变化：受损时状态改为 "damaged"（收入减半），被毁时改为 "destroyed"（收入归零）
 - 每个资产的净收益（基础收益 + 每级收益*(等级-1) - 维护费）应为正数
 - 资金不能为负数
 - 经营日志：重大事件添加到交易日志数组
-- 只输出发生变化的字段，未变化的不要输出`;
+- 只输出发生变化的字段，未变化的不要输出
+- 资金、材料、资产和交易日志的变化必须在同一个 GameplayTransaction 中提交`;
 
 /**
  * 经营资产独立提取提示词
@@ -110,18 +114,17 @@ ${aiContent}
 ═══════════════════════════════════════
 【规则】
 1. 只提取经营相关变更
-2. 用 <UpdateVariable></UpdateVariable> 包裹 JSON
+2. 用 <UpdateVariable>...</UpdateVariable> 作为传输标签，标签内必须是 GameplayTransaction JSON，不能是状态合并对象或 RFC 补丁
 3. 只输出变化的字段
 
 【收购】新资产需填全部字段：
-<UpdateVariable>{"玩家":{"经营资产":{"资金":扣款后余额,"资产列表":[{"id":"英文id","名称":"中文名","类型":"类别","等级":1,"最高等级":3,"描述":"描述","状态":"active","基础收益":数值,"每级收益":数值,"维护费":数值}]}}}</UpdateVariable>
+<UpdateVariable>{"id":"ai:business:purchase","source":"ai","moduleId":"business","costs":[{"path":"玩家.经营资产.资金","amount":购买费用}],"effects":[{"append":{"path":"玩家.经营资产.资产列表","value":{"id":"英文id","名称":"中文名","类型":"类别","等级":1,"最高等级":3,"状态":"active"},"create":true}}]}</UpdateVariable>
 
-【升级】<UpdateVariable>{"玩家":{"经营资产":{"资金":扣款后余额,"资产列表":[{"id":"原id","等级":新等级}]}}}</UpdateVariable>
+【升级】使用 costs + effects.set 的 GameplayTransaction
 
-【出售】RFC 6902 remove：
-<UpdateVariable>[{"op":"remove","path":"/玩家/经营资产/资产列表/0"},{"op":"replace","path":"/玩家/经营资产/资金","value":新资金}]</UpdateVariable>
+【出售】使用 effects.remove + effects.add 的 GameplayTransaction
 
-【资金变更】<UpdateVariable>{"玩家":{"经营资产":{"资金":新余额}}}</UpdateVariable>
+【资金变更】使用 effects.add 的 GameplayTransaction
 
-【无变更】<UpdateVariable>{}</UpdateVariable>`;
+【无变更】不要输出事务`;
 }

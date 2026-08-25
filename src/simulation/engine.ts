@@ -22,11 +22,12 @@ import type {
   WorldDynamics, ModuleEffects, EffectLogEntry,
   SimulationRuntimeState, ResourceEvolutionStep, Literal,
 } from '../modules/schema';
+import { advanceGameplayEvents, consumeGameplayEvents } from '../gameplay/kernel';
 import { createEmptySimState, createDefaultWorldContext } from './types';
 import type { GameState, NPCData } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
-import { eventWorldEvolution, collectAddEventEvents, collectScheduledTickEntries, getPeriodicRules } from '../modules/eventIntegration';
+import { eventWorldEvolution, collectAddEventEvents, collectCombatEncounterRequests, collectScheduledTickEntries, getPeriodicRules } from '../modules/eventIntegration';
 import { getWebEvent } from '../modules/eventDb';
 import { readCanonicalEventPack } from '../modules/eventPackFormat';
 import { checkCondition, applyAction } from '../modules/ruleEngine';
@@ -415,6 +416,16 @@ export class WorldSimulationEngine {
       const runtime = gameState.simulationRuntime;
       const tickEvents: Array<{ type: string; where?: Record<string, Literal> }> = [];
 
+      const advancedGameplay = advanceGameplayEvents(gameState, tick);
+      gameState.gameplay = advancedGameplay.state.gameplay;
+      const gameplayEvents = gameState.gameplay?.pendingEvents ?? [];
+      for (const event of gameplayEvents) {
+        tickEvents.push({
+          type: event.type,
+          where: event.payload as Record<string, Literal> | undefined,
+        });
+      }
+
       if (runtime?.scheduledTicks?.length) {
         const due = runtime.scheduledTicks.filter(e => e.scheduledAt <= tick);
         runtime.scheduledTicks = runtime.scheduledTicks.filter(e => e.scheduledAt > tick);
@@ -435,6 +446,10 @@ export class WorldSimulationEngine {
       for (const key of Object.keys(ctx)) {
         live[key] = (ctx as Record<string, unknown>)[key];
       }
+      if (gameplayEvents.length > 0) {
+        const consumed = consumeGameplayEvents(gameState, event => gameplayEvents.some(item => item.id === event.id));
+        gameState.gameplay = consumed.state.gameplay;
+      }
 
       if (packRuntimes && runtime) {
         runtime.eventRuntimes = packRuntimes;
@@ -453,6 +468,9 @@ export class WorldSimulationEngine {
             packsToSearch.push(...eventWorldEvolution.list().map(pack => pack.eventPackId));
           }
           await emitCanonicalEventCard(event.eventId, packsToSearch);
+        }
+        for (const request of collectCombatEncounterRequests(results)) {
+          eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, request);
         }
       } catch (addEventErr) {
         console.warn('[WorldSim] Mod 事件广播失败（已忽略）:', addEventErr);
@@ -1004,6 +1022,8 @@ export class WorldSimulationEngine {
                   if (!runtime.scheduledTicks) runtime.scheduledTicks = [];
                   runtime.scheduledTicks.push({ scheduledAt: currentTick + d.after, ruleId: a.ruleId, payload: d.payload });
                 }
+              } else if (a.kind === 'requestCombat') {
+                eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, a.detail);
               }
             } catch { /* 逐条隔离 */ }
           }

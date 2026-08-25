@@ -62,7 +62,13 @@ ${chronicleLines}`;
   const levelDescriptions = buildLevelDescriptions(worldContext);
 
   // 组合最终 prompt
-  return `## 世界设定
+  return `## 权威边界（必须先遵守）
+- 最近可见正文与当前变量快照是已经发生的权威事实；若旧事件、旧暗线或背景摘要与它们冲突，以最近正文和当前变量为准。
+- 你只推演镜头外的候选发展，不得改写玩家已经完成的行动，不得让同一角色同时出现在矛盾地点，不得把失败或撤销的情节重新写成既成事实。
+- playerHooks 只是供玩家选择的介入建议，不是已经发生的剧情；npcInteractions 只是待玩家回应的联系候选，也不是已经生效的正文或变量更新。
+- 无法确认是否冲突时，保留为“可能、传闻、迹象”，不要写成确定事实。
+
+## 世界设定
 ${context.worldSetting}
 
 ## 当前游戏时间

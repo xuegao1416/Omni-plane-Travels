@@ -15,6 +15,27 @@ function freshVM() {
 }
 
 describe('VariableManager.applyModuleEffects — 资源更新与元数据', () => {
+  it('把同一次跨模块机械结算作为一个玩法事务提交', () => {
+    const vm = freshVM();
+    const state = vm.getState();
+    state.玩家.经营资产 = { 资金: 20, 资产列表: [] };
+    state.玩家.当前经验值 = 4;
+    vm.setState(state);
+
+    vm.applyModuleEffects({
+      survival: { resources: { water: { delta: -2, min: 0 } } },
+      business: { fundsDelta: 5 },
+      progression: { xpDelta: 3 },
+    }, 'periodic', ['survival', 'business', 'progression']);
+
+    const next = vm.getState();
+    expect(next.玩家.生存资源?.water.数量).toBe(8);
+    expect(next.玩家.经营资产?.资金).toBe(25);
+    expect(next.玩家.当前经验值).toBe(7);
+    expect(next.gameplay?.logs.at(-1)?.moduleId).toBe('system');
+    expect(next.gameplay?.logs.at(-1)?.changes).toHaveLength(3);
+  });
+
   it('应用 delta 并在下限钳制，保留已有元数据', () => {
     const vm = freshVM();
     const effects = { survival: { resources: { water: { delta: -3, min: 0 } } } } as any as ModuleEffects;
@@ -91,7 +112,94 @@ describe('VariableManager.addResources 元数据', () => {
   });
 });
 
+describe('VariableManager module partitions', () => {
+  it('stores only module revision references in message snapshots and restores them', () => {
+    const state = createDefaultGameState();
+    state.玩家.生存资源 = { water: { 数量: 3 } };
+    const vm = new VariableManager(state);
+
+    const before = vm.createSnapshot();
+    vm.setVar('玩家.生存资源.water.数量', 1, true);
+    vm.createSnapshot();
+    vm.restoreSnapshot(before);
+
+    expect((before as any).玩家.生存状态).toBeUndefined();
+    expect((before as any).玩家.生存资源).toBeUndefined();
+    expect((before as any).moduleRevisions.survival).toBe(0);
+    expect(vm.getState().玩家.生存资源?.water.数量).toBe(3);
+  });
+
+  it('exports a core state plus independently revisioned module records', () => {
+    const state = createDefaultGameState();
+    state.玩家.经营资产 = { 资金: 200, 资产列表: [] };
+    const vm = new VariableManager(state);
+    vm.createSnapshot();
+    vm.setVar('玩家.经营资产.资金', 250, true);
+
+    const bundle = vm.createModulePersistenceBundle('save-a');
+    expect((bundle.coreState as any).玩家.经营资产).toBeUndefined();
+    expect(bundle.current.find(record => record.moduleId === 'business')?.state).toMatchObject({
+      assets: { 资金: 250 },
+    });
+    expect(bundle.checkpoints.some(record => record.moduleId === 'business')).toBe(true);
+  });
+
+  it('does not duplicate unchanged module bodies across 600 message snapshots', () => {
+    const state = createDefaultGameState();
+    state.玩家.生存资源 = { water: { 数量: 3 } };
+    const vm = new VariableManager(state);
+    const snapshots = Array.from({ length: 600 }, () => vm.createSnapshot());
+    const bundle = vm.createModulePersistenceBundle('save-long');
+    expect(snapshots.every(snapshot => !(snapshot as any).玩家.生存资源 && snapshot.moduleRevisions?.survival === 0)).toBe(true);
+    expect(bundle.checkpoints.filter(record => record.moduleId === 'survival')).toHaveLength(1);
+  });
+});
+
 describe('VariableManager.applyUpdateVariable atomicity', () => {
+  it('applies gameplay transactions through the shared kernel log', () => {
+    const vm = freshVM();
+    const state = vm.getState();
+    state.玩家.经营资产 = { 资金: 20, 资产列表: [], 交易日志: [] };
+    state.玩家.当前经验值 = 4;
+    vm.setState(state);
+
+    const applied = vm.applyUpdateVariable(JSON.stringify({
+      id: 'ai-reward',
+      moduleId: 'progression',
+      source: 'ai',
+      label: '任务奖励',
+      costs: [{ path: '玩家.经营资产.资金', amount: 3 }],
+      effects: [{ add: { path: '玩家.当前经验值', delta: 5 } }],
+      events: [{ type: 'progression.rewarded' }],
+    }));
+
+    expect(applied).toBe(true);
+    expect(vm.getState().玩家.经营资产?.资金).toBe(17);
+    expect(vm.getState().玩家.当前经验值).toBe(9);
+    expect(vm.getState().gameplay?.logs.at(-1)).toMatchObject({
+      transactionId: 'ai-reward', status: 'applied', source: 'ai',
+    });
+  });
+
+  it('does not commit an AI transaction when a later effect fails', () => {
+    const vm = freshVM();
+    const state = vm.getState();
+    state.玩家.经营资产 = { 资金: 20, 资产列表: [], 交易日志: [] };
+    vm.setState(state);
+
+    const applied = vm.applyUpdateVariable(JSON.stringify({
+      id: 'ai-broken', source: 'ai',
+      costs: [{ path: '玩家.经营资产.资金', amount: 3 }],
+      effects: [{ add: { path: '不存在的数值路径', delta: 1 } }],
+    }));
+
+    expect(applied).toBe(false);
+    expect(vm.getState().玩家.经营资产?.资金).toBe(20);
+    expect(vm.getState().gameplay?.logs.at(-1)).toMatchObject({
+      transactionId: 'ai-broken', status: 'failed',
+    });
+  });
+
   it('prevents cross-round poisoning and repairs the same damage in old saves', () => {
     const vm = freshVM();
     const before = vm.createSafeSnapshotForPrompt().人物档案;
@@ -102,6 +210,7 @@ describe('VariableManager.applyUpdateVariable atomicity', () => {
 
     expect(applied).toBe(false);
     expect(vm.createSafeSnapshotForPrompt().人物档案).toEqual(before);
+    expect(vm.getState().gameplay?.logs.at(-1)).toBeUndefined();
 
     const damagedSave = createDefaultGameState();
     (damagedSave as any).人物档案 = null;
@@ -151,19 +260,39 @@ describe('VariableManager.applyUpdateVariable atomicity', () => {
 
     expect(vm.getState().人物档案).toEqual({});
   });
+
+  it('keeps legacy merge and RFC patch payloads compatible while logging the commit', () => {
+    const vm = freshVM();
+    const merged = vm.applyUpdateVariable(JSON.stringify({
+      玩家: { 生存资源: { water: { 数量: 8 } } },
+    }));
+    expect(merged).toBe(true);
+    expect(vm.getState().玩家.生存资源?.water.数量).toBe(8);
+
+    const patched = vm.applyUpdateVariable(JSON.stringify([
+      { op: 'replace', path: '/玩家/生存资源/water/数量', value: 6 },
+    ]));
+    expect(patched).toBe(true);
+    expect(vm.getState().玩家.生存资源?.water.数量).toBe(6);
+    expect(vm.getState().gameplay?.logs.at(-1)?.status).toBe('applied');
+  });
 });
 
 describe('VariableManager manual time editing', () => {
   it('persists a manually edited display time by reconciling the authoritative clock', () => {
     const state = createDefaultGameState();
-    const config = normalizeTimeSystemConfig({ mode: 'gregorian', start: { year: 2026, month: 8, day: 1, hour: 15, minute: 0 } });
+    const config = normalizeTimeSystemConfig({
+      mode: 'gregorian',
+      start: { year: 2026, month: 8, day: 1, hour: 15, minute: 0 },
+    });
     state.世界.时间系统.时钟 = createWorldClock(config);
     state.世界.时间系统.当前时间 = formatWorldClock(state.世界.时间系统.时钟, config);
-    const vm = new VariableManager(state, config);
+    const vm = new VariableManager(state, undefined, config);
     const edited = vm.getState();
     edited.世界.时间系统.当前时间 = '2026年8月2日上午9点';
 
     expect(vm.setStateFromJSON(JSON.stringify(edited))).toBe(true);
+    expect(vm.getState().世界.时间系统.时钟?.elapsedMinutes).toBe(18 * 60);
     expect(vm.getState().世界.时间系统.当前时间).toContain('2026年·八月·第2日 09:00');
   });
 
@@ -175,13 +304,14 @@ describe('VariableManager manual time editing', () => {
     });
     state.世界.时间系统.时钟 = createWorldClock(config);
     state.世界.时间系统.当前时间 = formatWorldClock(state.世界.时间系统.时钟, config);
-    const vm = new VariableManager(state, config);
+    const vm = new VariableManager(state, undefined, config);
     const edited = vm.getState();
     edited.世界.时间系统.当前时间 = edited.世界.时间系统.当前时间.replace('15:00', '17:04');
     const json = JSON.stringify(edited);
 
     expect(vm.setStateFromJSON(json)).toBe(true);
     expect(vm.setStateFromJSON(json)).toBe(true);
+    expect(vm.getState().世界.时间系统.时钟?.elapsedMinutes).toBe(124);
     expect(vm.getState().世界.时间系统.当前时间).toContain('2026年·八月·第1日 17:04');
   });
 });

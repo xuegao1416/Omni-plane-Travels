@@ -10,3 +10,10 @@ BREVO_API_KEY=xkeysib-xxxxxxxxxxxx
 
 # 可选：允许跨域的桌面端 Origin（逗号分隔）
 # ALLOWED_ORIGINS=tauri://localhost,http://localhost:8788
+
+# 可选：免费体验上游（服务端转发，密钥不会下发到浏览器）。
+# TRIAL_LLM_BASE_URL=https://api.openai.com
+# TRIAL_LLM_API_KEY=sk-...
+# TRIAL_LLM_MODEL=gpt-4o-mini
+# TRIAL_MAX_REQUESTS=3
+# TRIAL_ID_SECRET=replace_with_a_second_long_random_secret

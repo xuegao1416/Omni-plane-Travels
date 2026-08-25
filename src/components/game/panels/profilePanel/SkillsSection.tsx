@@ -16,7 +16,8 @@ export function SkillsSection({ skills }: Props) {
 
   return (
     <>
-      <Collapsible icon={<Swords size={15} />} title="技能系统">
+      <Collapsible icon={<Swords size={15} />} title="自由技能" defaultOpen={false}>
+        <p style={{ margin: '0 0 6px', color: 'var(--text-muted)', fontSize: '10px' }}>剧情中学习的生活技艺与通用技能；它们独立于职业树，不会重复占用职业能力点。</p>
         {Object.entries(skills).filter(([_, s]) => s != null).map(([name, skill]) => {
           const qColor = getQualityColor(skill?.品质 ?? '普通');
           return (

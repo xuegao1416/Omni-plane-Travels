@@ -12,9 +12,10 @@ interface Props {
   onOpenMonitor?: () => void;
   externalText?: string;
   onExternalTextChange?: () => void;
+  readOnly?: boolean;
 }
 
-export default function InputArea({ onSend, onCancel, isGenerating, pipelineStatus, onOpenMonitor, externalText, onExternalTextChange }: Props) {
+export default function InputArea({ onSend, onCancel, isGenerating, pipelineStatus, onOpenMonitor, externalText, onExternalTextChange, readOnly = false }: Props) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useUISettings();
@@ -33,11 +34,11 @@ export default function InputArea({ onSend, onCancel, isGenerating, pipelineStat
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
-    if (!trimmed || isGenerating) return;
+    if (!trimmed || isGenerating || readOnly) return;
     onSend(trimmed);
     setText('');
     inputRef.current?.focus();
-  }, [text, isGenerating, onSend]);
+  }, [text, isGenerating, readOnly, onSend]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -57,9 +58,9 @@ export default function InputArea({ onSend, onCancel, isGenerating, pipelineStat
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t('input.placeholder')}
-          disabled={isGenerating}
-          aria-label={isGenerating ? '生成中，输入已暂停' : '旅程输入'}
+          placeholder={readOnly ? '封存存档仅供回顾，不能继续旅程' : t('input.placeholder')}
+          disabled={isGenerating || readOnly}
+          aria-label={readOnly ? '封存存档只读输入区' : isGenerating ? '生成中，输入已暂停' : '旅程输入'}
           rows={isMobile ? 2 : 3}
         />
         {/* 管线监控按钮 */}
@@ -73,7 +74,7 @@ export default function InputArea({ onSend, onCancel, isGenerating, pipelineStat
             <span className="game-journey__monitor-dot" />
           )}
         </button>
-        {isGenerating ? (
+        {isGenerating && !readOnly ? (
           <button
             className="btn-ghost game-journey__cancel-button"
             onClick={onCancel}
@@ -85,11 +86,11 @@ export default function InputArea({ onSend, onCancel, isGenerating, pipelineStat
           <button
             className="btn-primary game-journey__send-button"
             onClick={handleSend}
-            disabled={!text.trim()}
-            title={!text.trim() ? '请输入内容后发送' : '发送'}
+            disabled={readOnly || !text.trim()}
+            title={readOnly ? '封存存档不能继续旅程' : !text.trim() ? '请输入内容后发送' : '发送'}
           >
             <Send size={16} />
-            {t('input.send')}
+            {readOnly ? '只读' : t('input.send')}
           </button>
         )}
       </div>

@@ -86,11 +86,12 @@ export class PipelineExecutor {
     worldBook: WorldBookManager | null;
     userText: string;
     mainApiConfig: ApiConfig;
+    worldId?: string;
     signal: AbortSignal;
     /** 记忆系统任务集（可选，由外部注入） */
     memoryTasks?: MemoryTasks;
   }): Promise<PipelineResult> {
-    const { config, mainTask, varMgr, worldBook, userText, mainApiConfig, signal, memoryTasks } = params;
+    const { config, mainTask, varMgr, worldBook, userText, mainApiConfig, worldId = 'default', signal, memoryTasks } = params;
     let mainResult: { text: string; parsed: ParsedResponse } | null = null;
 
     for (const step of config.executionOrder) {
@@ -114,13 +115,13 @@ export class PipelineExecutor {
         if (otherTasks.length > 0 && !signal.aborted) {
           await waitForRateLimit();
           await Promise.all(otherTasks.map(taskId =>
-            this.executeTask(taskId, config, mainResult!, varMgr, worldBook, userText, mainApiConfig, signal, memoryTasks)
+            this.executeTask(taskId, config, mainResult!, varMgr, worldBook, userText, mainApiConfig, worldId, signal, memoryTasks)
           ));
         }
       } else {
         // 整层并行
         await Promise.all(step.map(taskId =>
-          this.executeTask(taskId, config, mainResult, varMgr, worldBook, userText, mainApiConfig, signal, memoryTasks)
+          this.executeTask(taskId, config, mainResult, varMgr, worldBook, userText, mainApiConfig, worldId, signal, memoryTasks)
         ));
       }
     }
@@ -165,12 +166,13 @@ export class PipelineExecutor {
     worldBook: WorldBookManager | null,
     userText: string,
     mainApiConfig: ApiConfig,
+    worldId: string,
     signal: AbortSignal,
     memoryTasks?: MemoryTasks,
   ): Promise<void> {
     switch (taskId) {
       case 'variable':
-        return this.executeVariable(config, varMgr, mainResult, userText, mainApiConfig, worldBook);
+        return this.executeVariable(config, varMgr, mainResult, userText, mainApiConfig, worldBook, worldId);
       case 'memory_write':
         return this.executeMemoryTask('memory_write', config.memoryEnabled, memoryTasks?.write, memoryTasks?.debugLogger);
       case 'memory_summary':
@@ -236,6 +238,7 @@ export class PipelineExecutor {
     userText: string,
     mainApiConfig: ApiConfig,
     worldBook: WorldBookManager | null,
+    worldId: string,
   ): Promise<void> {
     if (!config.variableEnabled || !mainResult) {
       this.updateStage('variable', { status: 'skipped', skipped: true });
@@ -253,6 +256,7 @@ export class PipelineExecutor {
         userText,
         mainApiConfig,
         worldBook,
+        worldId,
         delayMs: config.variableDelayMs,
         maxRetries: config.variableMaxRetries,
       });

@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
   workshop: {
     list: `${API_BASE_URL}/api/workshop`,
     get: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}`,
+    installPlan: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}/install-plan`,
     download: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}/download`,
     create: `${API_BASE_URL}/api/workshop`,
     update: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}`,

@@ -133,7 +133,7 @@ export default function AuthSettingsTab() {
         }}>
           <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: '600', marginBottom: '12px' }}>已解锁功能</h4>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {['云存档 - 跨设备同步存档', '创意工坊 - 分享和下载世界包', '创意工坊 - 分享和下载人物预设'].map((text) => (
+            {['云存档 - 跨设备同步存档', '创意工坊 - 分享世界、NPC、玩法模块与事件内容', '人物预设 - 仅保存在本地，避免泄露私人投射'].map((text) => (
               <li key={text} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-size-sm)' }}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>{text}
               </li>

@@ -8,17 +8,34 @@ import { useAuthStore } from './authStore';
 export interface WorkshopItem {
   id: string;
   ownerId: string;
-  type: 'world_package' | 'character_preset' | 'npc_template' | 'history_preset';
+  type: 'world_package' | 'character_preset' | 'npc_template' | 'history_preset' | 'gameplay_module' | 'event_pack' | 'workflow_pack' | 'adventure_pack' | 'visual_theme';
+  contentType?: string;
   title: string;
   description: string | null;
   tags: string[];
   downloadCount: number;
   createdAt: number;
   updatedAt: number;
+  category?: string | null;
+  dependencies?: Array<{ id: string; version?: string; optional?: boolean }>;
+  minAppVersion?: string | null;
+  compatibility?: Record<string, unknown>;
+  featured?: boolean;
+  screenshots?: string[];
+  version: string;
+  recommendations?: Array<{ id: string; type?: WorkshopItem['type']; version?: string; optional?: boolean; reason?: string }>;
 }
 
 export interface WorkshopItemDetail extends WorkshopItem {
   data: any;  // 完整数据
+}
+
+export interface WorkshopInstallPlan {
+  ok: boolean;
+  rootId: string;
+  items: WorkshopItem[];
+  recommendations: Array<{ id: string; type?: WorkshopItem['type']; version?: string; optional?: boolean; reason?: string }>;
+  errors: Array<{ code: 'MISSING' | 'INCOMPATIBLE' | 'CYCLE'; id: string; requiredBy?: string; requiredVersion?: string; actualVersion?: string; path: string[] }>;
 }
 
 interface WorkshopState {
@@ -30,17 +47,27 @@ interface WorkshopState {
   error: string | null;
 
   // Actions
-  fetchItems: (params?: { type?: string; tag?: string; page?: number }) => Promise<void>;
+  fetchItems: (params?: { type?: string; tag?: string; page?: number; sort?: 'latest' | 'popular' | 'featured'; category?: string }) => Promise<void>;
   fetchItem: (itemId: string) => Promise<WorkshopItemDetail | null>;
   downloadItem: (itemId: string) => Promise<any>;
   createItem: (input: {
     type: string;
+    contentType?: string;
     title: string;
     description?: string;
     tags?: string[];
     data: any;
+    version?: string;
+    category?: string;
+    dependencies?: Array<{ id: string; version?: string; optional?: boolean }>;
+    minAppVersion?: string;
+    compatibility?: Record<string, unknown>;
+    screenshots?: string[];
+    recommendations?: Array<{ id: string; type?: WorkshopItem['type']; version?: string; optional?: boolean; reason?: string }>;
   }) => Promise<string>;
   deleteItem: (itemId: string) => Promise<void>;
+  checkInstall: (itemId: string, installed?: Record<string, string>) => Promise<{ ok: boolean; missing: Array<{ id: string; version?: string; optional?: boolean }>; incompatible: Array<{ id: string; version?: string; optional?: boolean }> } | null>;
+  getInstallPlan: (itemId: string) => Promise<WorkshopInstallPlan | null>;
 }
 
 export const useWorkshopStore = create<WorkshopState>((set, get) => ({
@@ -58,6 +85,8 @@ export const useWorkshopStore = create<WorkshopState>((set, get) => ({
       if (params.type) queryParams.set('type', params.type);
       if (params.tag) queryParams.set('tag', params.tag);
       if (params.page) queryParams.set('page', String(params.page));
+      if ((params as { sort?: string }).sort) queryParams.set('sort', (params as { sort: string }).sort);
+      if ((params as { category?: string }).category) queryParams.set('category', (params as { category: string }).category);
 
       const url = `${API_ENDPOINTS.workshop.list}?${queryParams.toString()}`;
       const response = await fetch(url, {
@@ -163,6 +192,26 @@ export const useWorkshopStore = create<WorkshopState>((set, get) => ({
     } catch (error) {
       console.error('删除工坊条目失败:', error);
       set({ error: '删除失败', isLoading: false });
+    }
+  },
+
+  checkInstall: async (itemId, installed = {}) => {
+    try {
+      const encoded = Object.entries(installed).map(([id, version]) => `${id}@${version}`).join(',');
+      const response = await fetch(`${API_ENDPOINTS.workshop.get(itemId)}/install-check?installed=${encodeURIComponent(encoded)}`, { credentials: 'include' });
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
+  },
+
+  getInstallPlan: async (itemId) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.workshop.installPlan(itemId), { credentials: 'include' });
+      const data = await response.json();
+      return data && typeof data.rootId === 'string' ? data as WorkshopInstallPlan : null;
+    } catch {
+      return null;
     }
   },
 }));

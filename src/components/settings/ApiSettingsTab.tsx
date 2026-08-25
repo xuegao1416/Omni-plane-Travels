@@ -4,6 +4,8 @@ import type { ApiConfig, ApiProvider } from '../../api/types';
 import { type ApiPreset, loadPresets } from './apiPresetUtils';
 import { ProviderForm, ConnectionTest, PROVIDERS } from './apiSettings';
 import type { ApiSettingsRef, ApiSettingsTabProps } from './apiSettings';
+import TrialAccessPanel from './apiSettings/TrialAccessPanel';
+import { TRIAL_API_CONFIG } from '../../api/trial';
 export type { ApiSettingsRef };
 
 const DEFAULT_CONFIG: ApiConfig = {
@@ -13,7 +15,7 @@ const DEFAULT_CONFIG: ApiConfig = {
 };
 
 const ApiSettingsTab = forwardRef<ApiSettingsRef, ApiSettingsTabProps>(
-  ({ initialConfig, t, onSave, onBack }, ref) => {
+    ({ initialConfig, t, onSave, onBack, onSelectTrial }, ref) => {
     const [config, setConfig] = useState<ApiConfig>(initialConfig || DEFAULT_CONFIG);
     const [models, setModels] = useState<string[]>([]);
     const [testing, setTesting] = useState(false);
@@ -59,6 +61,7 @@ const ApiSettingsTab = forwardRef<ApiSettingsRef, ApiSettingsTabProps>(
 
     return (
       <div className="settings-tab-panel settings-tab-panel--api">
+        <TrialAccessPanel onSelect={() => { setConfig({ ...TRIAL_API_CONFIG }); onSelectTrial?.(); }} />
         <div style={{ marginBottom: '18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <span style={{ fontWeight: '600', fontSize: 'var(--font-size-md)' }}>参数配置</span>

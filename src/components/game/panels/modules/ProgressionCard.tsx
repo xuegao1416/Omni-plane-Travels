@@ -27,9 +27,11 @@ interface ProgressionCardProps {
   data?: ProgressionModuleSchema;
   /** 属性名称映射（用于显示中文名称） */
   statNames?: StatNames;
+  breakthroughFailureReason?: string;
+  onBreakthrough?: (targetTier: number) => void;
 }
 
-export default memo(function ProgressionCard({ config, state, title, data, statNames }: ProgressionCardProps) {
+export default memo(function ProgressionCard({ config, state, title, data, statNames, breakthroughFailureReason, onBreakthrough }: ProgressionCardProps) {
   const defaultTitle = config.mode === 'tiered' ? '段位体系' : '等级体系';
   const displayTitle = title || defaultTitle;
 
@@ -62,7 +64,7 @@ export default memo(function ProgressionCard({ config, state, title, data, statN
           {/* 当前等级 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--accent)' }}>
-              Lv.{currentTierIndex}
+              等级 {currentTierIndex}
             </span>
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
               / {ld.maxLevel}
@@ -93,6 +95,16 @@ export default memo(function ProgressionCard({ config, state, title, data, statN
             {caps.dim5Max > 0 && <span>{statNames?.dim5 || '属性5'}上限: {caps.dim5Max}</span>}
             {caps.dim6Max > 0 && <span>{statNames?.dim6 || '属性6'}上限: {caps.dim6Max}</span>}
           </div>
+
+          {breakthroughFailureReason && (
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--danger)', padding: '5px 7px', borderRadius: '5px', background: 'var(--danger-bg-soft)' }}>突破未完成：{breakthroughFailureReason}</div>
+          )}
+
+          {onBreakthrough && !isMax && config.breakthroughs?.some(item => item.tierIndex === currentTierIndex + 1) && (
+            <button type="button" className="btn-ghost" onClick={() => onBreakthrough(currentTierIndex + 1)} style={{ alignSelf: 'flex-start', fontSize: 'var(--font-size-xs)', padding: '3px 8px' }}>
+              尝试突破至等级 {currentTierIndex + 1}
+            </button>
+          )}
 
           {/* 已满级 */}
           {isMax && (
@@ -155,6 +167,16 @@ export default memo(function ProgressionCard({ config, state, title, data, statN
           <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
             → 下一段位：{nextTier.name || '未知'}
           </div>
+        )}
+
+        {breakthroughFailureReason && (
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--danger)', padding: '5px 7px', borderRadius: '5px', background: 'var(--danger-bg-soft)' }}>突破未完成：{breakthroughFailureReason}</div>
+        )}
+
+        {onBreakthrough && nextTier && config.breakthroughs?.some(item => item.tierIndex === currentTierIndex + 1) && (
+          <button type="button" className="btn-ghost" onClick={() => onBreakthrough(currentTierIndex + 1)} style={{ alignSelf: 'flex-start', fontSize: 'var(--font-size-xs)', padding: '3px 8px' }}>
+            尝试突破至「{nextTier.name}」
+          </button>
         )}
 
         {!nextTier && (

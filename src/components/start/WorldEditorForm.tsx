@@ -3,11 +3,14 @@ import type { ChangeEvent } from 'react';
 import type { WorldDef, WorldBookEntryDef } from '../../data/worlds-schema';
 import { createPresetArtwork, getDefaultArtworkPreset, processWorldArtworkFile, resolveWorldArtwork, WORLD_ARTWORK_PRESETS } from '../../data/worldArtwork';
 import { requestStreamWithRetry } from '../../api/client';
-import ModuleSelector, { getDefaultSelectedModules } from './ModuleSelector';
+import ModuleSelector, { expandModuleDependencies, getDefaultSelectedModules } from './ModuleSelector';
 import { useConfigStore } from '../../stores/configStore';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import type { TalentModuleSchema } from '../../modules/schema';
+import type { ProfessionModuleSchema, ProfessionPack, ProfessionWorldBinding, TalentModuleSchema } from '../../modules/schema';
 import { buildStatGenPrompt, buildProgressionGenPrompt, buildSurvivalGenPrompt, buildBusinessGenPrompt } from '../../modules/prompts';
+import { normalizeProgressionConfig } from '../../modules/xpAlgorithm';
+import { buildProfessionPackGenerationPrompt, extractLegacyProfessionPack, isProfessionBinding, parseGeneratedProfessionPack } from '../../data/professions';
+import ProfessionLibraryWorkspace from '../profession/ProfessionLibraryWorkspace';
 import GuidedChoiceOverlay from './GuidedChoiceOverlay';
 import { ManualEditForm, type ManualEditSection } from './worldEditorForm/ManualEditForm';
 import {
@@ -56,11 +59,12 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   const [artworkError, setArtworkError] = useState('');
   const [isProcessingArtwork, setIsProcessingArtwork] = useState(false);
   const [selectedModules, setSelectedModules] = useState<Set<string>>(() => {
-    if (initialWorld?.modules) return new Set(initialWorld.modules.filter(m => m.enabled).map(m => m.moduleId));
+    if (initialWorld?.modules) return expandModuleDependencies(initialWorld.modules.filter(m => m.enabled).map(m => m.moduleId));
     return getDefaultSelectedModules();
   });
   const aiAbortRef = useRef<AbortController | null>(null);
   const [showGuidedChoice, setShowGuidedChoice] = useState(false);
+  const [professionLibraryOpen, setProfessionLibraryOpen] = useState(false);
   const [weaveStep, setWeaveStep] = useState(() => clampWeaveStep(initialStep ?? 1));
   const [weaveValidation, setWeaveValidation] = useState('');
 
@@ -78,7 +82,10 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   const toggleModule = (moduleId: string) => {
     setSelectedModules(prev => {
       const next = new Set(prev); const adding = !next.has(moduleId);
-      if (adding) { next.add(moduleId); for (const conflict of (MUTEX[moduleId] || [])) next.delete(conflict); } else next.delete(moduleId);
+      if (adding) {
+        for (const id of expandModuleDependencies([moduleId])) next.add(id);
+        for (const conflict of (MUTEX[moduleId] || [])) next.delete(conflict);
+      } else next.delete(moduleId);
       return next;
     });
     setForm(f => {
@@ -86,10 +93,12 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       if (moduleId) {
         if (!selectedModules.has(moduleId)) {
           for (const conflict of (MUTEX[moduleId] || [])) modules = modules.filter(m => m.moduleId !== conflict);
-          if (!modules.find(m => m.moduleId === moduleId)) {
-            const data = DEFAULT_MODULE_FACTORIES[moduleId]?.();
-            modules.push({ moduleId, name: MODULE_NAME_MAP[moduleId] || moduleId, description: '', enabled: true, ...(data ? { data: data as Record<string, unknown> } : {}) });
-          } else modules = modules.map(m => m.moduleId === moduleId ? { ...m, enabled: true } : m);
+          for (const id of expandModuleDependencies([moduleId])) {
+            if (!modules.find(m => m.moduleId === id)) {
+              const data = DEFAULT_MODULE_FACTORIES[id]?.();
+              modules.push({ moduleId: id, name: MODULE_NAME_MAP[id] || id, description: '', enabled: true, ...(data ? { moduleConfig: data as Record<string, unknown> } : {}) });
+            } else modules = modules.map(m => m.moduleId === id ? { ...m, enabled: true } : m);
+          }
         } else modules = modules.filter(m => m.moduleId !== moduleId);
       }
       return { ...f, modules };
@@ -130,6 +139,41 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   const talentData = form.modules?.find(m => m.moduleId === 'talent')?.moduleConfig as TalentModuleSchema | undefined;
 
+  const normalizeSelectedWorldModules = (modules: WorldDef['modules']): NonNullable<WorldDef['modules']> => {
+    const generated = new globalThis.Map((modules ?? []).map(module => [module.moduleId, module] as const));
+    const existing = new globalThis.Map((form.modules ?? []).map(module => [module.moduleId, module] as const));
+    return [...selectedModules].map(moduleId => {
+      const source = generated.get(moduleId) ?? existing.get(moduleId);
+      let moduleConfig = source?.moduleConfig ?? source?.data ?? DEFAULT_MODULE_FACTORIES[moduleId]?.();
+      // 世界 AI 的返回不能覆盖独立资产引用。职业与战斗只采用编辑器已有绑定或稳定默认值。
+      if (moduleId === 'profession') {
+        const existingConfig = existing.get(moduleId)?.moduleConfig ?? existing.get(moduleId)?.data;
+        if (isProfessionBinding(existingConfig)) moduleConfig = existingConfig;
+        else if (existingConfig && Array.isArray((existingConfig as unknown as ProfessionModuleSchema).professions)) {
+          moduleConfig = extractLegacyProfessionPack(existingConfig as unknown as ProfessionModuleSchema, `${form.name || initialWorld?.name || '旧世界'} · 职业包`);
+        } else moduleConfig = DEFAULT_MODULE_FACTORIES.profession?.();
+      }
+      if (moduleId === 'combat') {
+        const existingConfig = existing.get(moduleId)?.moduleConfig ?? existing.get(moduleId)?.data;
+        moduleConfig = existingConfig && typeof (existingConfig as Record<string, unknown>).rulesetId === 'string'
+          ? existingConfig
+          : DEFAULT_MODULE_FACTORIES.combat?.();
+      }
+      if (moduleId === 'progression' && moduleConfig) {
+        moduleConfig = normalizeProgressionConfig(moduleConfig as unknown as import('../../modules/schema').ProgressionModuleSchema);
+      }
+      return {
+        ...source,
+        moduleId,
+        name: source?.name || MODULE_NAME_MAP[moduleId] || moduleId,
+        description: source?.description || '',
+        enabled: true,
+        moduleConfig: moduleConfig as Record<string, unknown> | undefined,
+        data: undefined,
+      };
+    });
+  };
+
   const handleAIGenerate = async () => {
     const promptText = isWeave ? worldIntentPrompt : aiGenName;
     if (!promptText.trim()) { setGenError('请输入世界描述'); return; }
@@ -143,6 +187,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   };
 
   const applyGeneratedWorld = (worldDef: WorldDef) => {
+    worldDef = { ...worldDef, modules: normalizeSelectedWorldModules(worldDef.modules) };
     const entries = worldDef.worldBookEntries || [];
     const find = (type: string) => entries.find(e => e.entryType === type);
     update({
@@ -177,7 +222,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     const ctrl = new AbortController(); aiAbortRef.current = ctrl;
     try {
       const selected = enabledModules.map(module => module.id).join(', ');
-      const prompt = `你是世界编织助手。请根据以下世界意图和已选法则，一次生成可编辑的 WorldDef JSON。\n世界意图：${worldIntentPrompt.trim()}\n可选名称：${form.name.trim() || '请生成一个简洁名称'}\n题材/标签：${form.tags || '未指定'}\n氛围基调：${form.atmosphere || '未指定'}\n初始场景偏好：${form.location || '未指定'}\n已选模块：${selected || '无额外模块'}\n\n输出必须是 JSON，不要 Markdown。字段至少包含 name、description、tags、difficulty、worldBookEntries、modules；worldBookEntries 使用真实 entryType（setting、rules、factions、npcs、lore、culture、economy、highlights），modules 只包含已选模块。economy 条目的 meta 必须包含完整 timeSystem：mode、calendarName、eraName、start（年月日时分）、months（全部月份名称和天数）、weekdays、defaultTurnMinutes；无法确定时使用 relative 旅历安全默认值。`;
+      const prompt = `你是世界编织助手。请根据以下世界意图和已选法则，一次生成可编辑的 WorldDef JSON。\n世界意图：${worldIntentPrompt.trim()}\n可选名称：${form.name.trim() || '请生成一个简洁名称'}\n题材/标签：${form.tags || '未指定'}\n氛围基调：${form.atmosphere || '未指定'}\n初始场景偏好：${form.location || '未指定'}\n已选模块：${selected || '无额外模块'}\n\n输出必须是 JSON，不要 Markdown。字段至少包含 name、description、tags、difficulty、worldBookEntries、modules；worldBookEntries 使用真实 entryType（setting、rules、factions、npcs、lore、culture、economy、highlights），modules 只包含已选模块。职业典藏与战斗规则是独立资产，禁止生成 professions、abilities、innateTalents、combat encounters 或 Combat 字段；它们由编辑器保留稳定引用。economy 条目的 meta 必须包含完整 timeSystem：mode、calendarName、eraName、start（年月日时分）、months（全部月份名称和天数）、weekdays、defaultTurnMinutes；无法确定时使用 relative 旅历安全默认值。`;
       const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompt }], { signal: ctrl.signal, onDelta: text => { if (text.length > 80) setPipelineStage('编织法则'); } });
       setPipelineStage('生成编年');
       const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);
@@ -185,7 +230,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       const parsed = JSON.parse(jsonMatch[1].trim()) as WorldDef;
       if (!parsed.name || !parsed.description) throw new Error('AI 返回的数据缺少世界名称或简介');
       setPipelineStage('校验');
-      const normalized: WorldDef = { ...parsed, id: initialWorld?.id || parsed.id || `custom_${Date.now()}`, entryId: null, source: undefined, modules: parsed.modules?.filter(module => selectedModules.has(module.moduleId)).map(module => ({ ...module, enabled: true })) };
+      const normalized: WorldDef = { ...parsed, id: initialWorld?.id || parsed.id || `custom_${Date.now()}`, entryId: null, source: undefined, modules: normalizeSelectedWorldModules(parsed.modules) };
       applyGeneratedWorld(normalized);
       setGenError('');
       setWeaveStep(3);
@@ -234,20 +279,49 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       if (!prompts[moduleId]) return;
       const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompts[moduleId] }], { signal: new AbortController().signal, onDelta: () => {} });
       const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);
-      if (jsonMatch) { const fixed = jsonMatch[1].trim().replace(/[""]/g, '"').replace(/['']/g, "'"); updateModuleDataByModuleId(moduleId, JSON.parse(fixed)); }
+      if (jsonMatch) {
+        const fixed = jsonMatch[1].trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+        const parsed = JSON.parse(fixed);
+        const normalized = moduleId === 'progression'
+          ? normalizeProgressionConfig(parsed as import('../../modules/schema').ProgressionModuleSchema)
+          : moduleId === 'stat'
+            ? { ...parsed, special: Array.isArray(parsed.special) ? parsed.special : [] }
+            : parsed;
+        updateModuleDataByModuleId(moduleId, normalized as any);
+      }
     } catch (err: unknown) { console.warn(`[模块AI补全] ${moduleId} 失败:`, err instanceof Error ? err.message : String(err)); }
     finally { setGeneratingModule(null); }
+  };
+
+  const professionModuleConfig = form.modules?.find(module => module.moduleId === 'profession')?.moduleConfig;
+  const professionBinding: ProfessionWorldBinding = isProfessionBinding(professionModuleConfig)
+    ? professionModuleConfig
+    : { packIds: [] };
+
+  const openProfessionLibrary = () => {
+    if (professionModuleConfig && !isProfessionBinding(professionModuleConfig) && Array.isArray((professionModuleConfig as unknown as ProfessionModuleSchema).professions)) {
+      updateModuleDataByModuleId('profession', extractLegacyProfessionPack(professionModuleConfig as unknown as ProfessionModuleSchema, `${form.name || initialWorld?.name || '旧世界'} · 职业包`) as unknown as Record<string, unknown>);
+    }
+    setProfessionLibraryOpen(true);
+  };
+
+  const generateProfessionPack = async (intent: string, basePack?: ProfessionPack) => {
+    if (!apiConfig) throw new Error('请先在设置中配置 API');
+    const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: buildProfessionPackGenerationPrompt(intent, basePack) }], { signal: new AbortController().signal, onDelta: () => {} });
+    return parseGeneratedProfessionPack(result.text);
   };
 
   const handleSave = () => {
     if (!form.name.trim()) return;
     const world = formToWorldDef(form, initialWorld, refinedEntries);
+    world.modules = normalizeSelectedWorldModules(world.modules);
     injectModuleRuleEntries(world, form, refinedEntries);
     onSave(world);
   };
 
   const handleExport = () => {
     const world = formToWorldDef(form, initialWorld, refinedEntries);
+    world.modules = normalizeSelectedWorldModules(world.modules);
     injectModuleRuleEntries(world, form, refinedEntries);
     const blob = new Blob([JSON.stringify(world, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -285,6 +359,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       form={form} update={update} selectedModules={selectedModules} onToggleModule={toggleModule} disabledByConflict={disabledByConflict}
       updateModuleData={updateModuleData} onTalentAiGenerate={handleTalentAiGenerate} isGeneratingTalent={isGeneratingTalent}
       onModuleAiFill={handleModuleAiFill} generatingModule={generatingModule}
+      onOpenProfessionLibrary={openProfessionLibrary}
       addFaction={addFaction} removeFaction={removeFaction} updateFaction={updateFaction}
       addNPC={addNPC} removeNPC={removeNPC} updateNPC={updateNPC}
       addLocation={addLocation} removeLocation={removeLocation} updateLocation={updateLocation}
@@ -497,6 +572,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
                 form={form} update={update} selectedModules={selectedModules} onToggleModule={toggleModule} disabledByConflict={disabledByConflict}
                 updateModuleData={updateModuleData} onTalentAiGenerate={handleTalentAiGenerate} isGeneratingTalent={isGeneratingTalent}
                 onModuleAiFill={handleModuleAiFill} generatingModule={generatingModule}
+                onOpenProfessionLibrary={openProfessionLibrary}
                 addFaction={addFaction} removeFaction={removeFaction} updateFaction={updateFaction}
                 addNPC={addNPC} removeNPC={removeNPC} updateNPC={updateNPC}
                 addLocation={addLocation} removeLocation={removeLocation} updateLocation={updateLocation}
@@ -520,6 +596,14 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
           </DawnFrameV4>
         </div>
       </div>
+      {professionLibraryOpen && (
+        <ProfessionLibraryWorkspace
+          binding={professionBinding}
+          onBindingChange={next => updateModuleDataByModuleId('profession', next as unknown as Record<string, unknown>)}
+          onGenerate={generateProfessionPack}
+          onClose={() => setProfessionLibraryOpen(false)}
+        />
+      )}
     </>
   );
 }

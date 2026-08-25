@@ -8,8 +8,9 @@
  * - 演化蓝图进度（当前阶段 + 下一阶段触发条件）
  */
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, X, Leaf, ScrollText, AlertTriangle, Clock, Zap } from 'lucide-react';
-import type { SurvivalModuleSchema, ResourceEvolutionStep } from '../../../modules/schema';
+import { ArrowLeft, X, Leaf, ScrollText, AlertTriangle, Clock, Zap, Backpack, Hammer, Sparkle, Trash2 } from 'lucide-react';
+import type { InventoryItem } from '../../../schema/variables';
+import type { SurvivalModuleSchema, ResourceEvolutionStep, SurvivalRecipe } from '../../../modules/schema';
 import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
 
 interface SurvivalOverlayProps {
@@ -30,10 +31,21 @@ interface SurvivalOverlayProps {
   }>;
   /** 资源变更日志 */
   changeLog?: ResourceChangeLog[];
+  /** 玩家物品栏（与生存资源共用同一个存档状态） */
+  inventory?: Record<string, InventoryItem>;
+  /** 静态配方 + 运行时配方，显示在覆盖层工作台 */
+  recipes?: SurvivalRecipe[];
+  stamina?: number;
+  worldTime?: string;
+  onGather?: (resourceId: string) => void;
+  onCraft?: (recipe: SurvivalRecipe) => void;
+  onUnlock?: (recipe: SurvivalRecipe) => void;
+  unlockedRecipeIds?: string[];
+  onDeleteRecipe?: (recipeId: string) => void;
 }
 
 export default function SurvivalOverlay({
-  open, data, title, onClose, runtimeResources, changeLog,
+  open, data, title, onClose, runtimeResources, changeLog, inventory, recipes, stamina, worldTime, onGather, onCraft, onUnlock, unlockedRecipeIds = [], onDeleteRecipe,
 }: SurvivalOverlayProps) {
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
@@ -61,6 +73,8 @@ export default function SurvivalOverlay({
   if (!visible) return null;
 
   const threshold = data.rules?.criticalThreshold ?? 2;
+  const safeRecipes = recipes ?? data.recipes ?? [];
+  const inventoryEntries = Object.entries(inventory ?? {});
 
   // 合并静态资源定义和运行时数量
   const mergedResources = (data.resources ?? []).map(res => ({
@@ -162,15 +176,21 @@ export default function SurvivalOverlay({
             </div>
           )}
 
-          {/* ── 资源详情列表 ── */}
+          {/* ── 资源与采集 ── */}
           <div>
             <div style={{
               fontSize: 'var(--font-size-sm)', fontWeight: 600,
               color: 'var(--text-muted)', marginBottom: 'var(--space-2)',
               textTransform: 'uppercase', letterSpacing: '0.05em',
             }}>
-              资源详情 ({mergedResources.length})
+              资源与采集 ({mergedResources.length})
             </div>
+            {(worldTime || stamina != null) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-2)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                {worldTime && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Clock size={11} /> {worldTime}</span>}
+                {stamina != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Zap size={11} /> 体力 {Math.max(0, Number(stamina) || 0)}</span>}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {mergedResources.map(res => {
                 const pct = res.max > 0 ? Math.round((res.amount / res.max) * 100) : 0;
@@ -230,6 +250,25 @@ export default function SurvivalOverlay({
                       }} />
                     </div>
 
+                    {onGather && data.resources?.some(resource => resource.id === res.id) && (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); onGather(res.id); }}
+                        disabled={res.amount >= res.max}
+                        style={{
+                          marginTop: '6px', width: '100%', minHeight: '32px',
+                          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                          background: res.amount >= res.max ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                          color: res.amount >= res.max ? 'var(--text-muted)' : 'var(--accent)',
+                          cursor: res.amount >= res.max ? 'not-allowed' : 'pointer',
+                          fontSize: 'var(--font-size-xs)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                        }}
+                      >
+                        <Sparkle size={12} />
+                        {res.amount >= res.max ? '容量已满' : `采集 +${res.gatherAmount ?? 1} · ${res.gatherTimeMinutes ?? 30} 分钟 · -${res.gatherStaminaCost ?? 5} 体力`}
+                      </button>
+                    )}
+
                     {/* 展开详情 */}
                     {isExpanded && (
                       <div style={{
@@ -261,6 +300,67 @@ export default function SurvivalOverlay({
                 );
               })}
             </div>
+          </div>
+
+          {/* ── 背包 ── */}
+          <div className="surface-card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+              <Backpack size={14} /> 背包 ({inventoryEntries.length})
+            </div>
+            {inventoryEntries.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>背包是空的。资源会显示在上方，物品会在这里保留。</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px' }}>
+                {inventoryEntries.map(([id, item]) => (
+                  <div key={id} style={{ minWidth: 0, padding: '7px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-secondary)' }}>
+                    <div style={{ overflowWrap: 'anywhere', color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{id}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginTop: '2px' }}>数量 {Number(item.数量) || 0} · {item.品质 || '普通'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── 制作台 ── */}
+          <div className="surface-card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+              <Hammer size={14} /> 制作台 ({safeRecipes.length})
+            </div>
+            {safeRecipes.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>暂无配方，可在生存卡片中让 AI 根据当前资源创建配方。</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {safeRecipes.map(recipe => {
+                  const requirements = Object.entries(recipe.inputs).map(([resourceId, amount]) => {
+                    const current = runtimeResources?.[resourceId]?.数量 ?? mergedResources.find(resource => resource.id === resourceId)?.amount ?? 0;
+                    return { resourceId, amount, current, enough: current >= amount };
+                  });
+                  const requiresUnlock = Boolean(recipe.unlockConditions?.length || recipe.unlockCost?.length);
+                  const unlocked = !requiresUnlock || unlockedRecipeIds.includes(recipe.id);
+                  const craftable = unlocked && requirements.every(item => item.enough) && Boolean(runtimeResources?.[recipe.output.resourceId] || mergedResources.some(resource => resource.id === recipe.output.resourceId));
+                  return (
+                    <div key={recipe.id} style={{ padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ minWidth: 0, overflowWrap: 'anywhere', fontWeight: 600, fontSize: 'var(--font-size-xs)' }}>{recipe.name}</span>
+                        <span style={{ flexShrink: 0, color: 'var(--accent)', fontSize: '10px' }}>→ {recipe.output.resourceId} ×{recipe.output.amount}</span>
+                      </div>
+                      <div style={{ marginTop: '4px', color: 'var(--text-muted)', fontSize: '10px', overflowWrap: 'anywhere' }}>
+                        {requirements.map(item => `${item.resourceId} ${item.current}/${item.amount}`).join(' · ')}
+                      </div>
+                      {requiresUnlock && !unlocked && (
+                        <div style={{ marginTop: '3px', color: 'var(--warning)', fontSize: '10px' }}>
+                          🔒 需要解锁{recipe.unlockCost?.length ? ` · ${recipe.unlockCost.map(cost => `${cost.label || cost.id || cost.path}×${cost.amount}`).join('、')}` : ' · 满足前置条件'}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '5px', marginTop: '6px' }}>
+                        {requiresUnlock && !unlocked && onUnlock ? <button type="button" onClick={() => onUnlock(recipe)} style={{ flex: 1, minHeight: '30px', border: 'none', borderRadius: 'var(--radius-sm)', background: 'var(--warning)', color: '#fff', cursor: 'pointer', fontSize: 'var(--font-size-xs)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Hammer size={11} /> 解锁</button> : onCraft && <button type="button" onClick={() => onCraft(recipe)} disabled={!craftable} style={{ flex: 1, minHeight: '30px', border: 'none', borderRadius: 'var(--radius-sm)', background: craftable ? 'var(--accent)' : 'var(--bg-tertiary)', color: craftable ? '#fff' : 'var(--text-muted)', cursor: craftable ? 'pointer' : 'not-allowed', fontSize: 'var(--font-size-xs)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}><Hammer size={11} /> 制作</button>}
+                        {onDeleteRecipe && <button type="button" onClick={() => onDeleteRecipe(recipe.id)} title="删除配方" style={{ width: '34px', minHeight: '30px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={12} /></button>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* ── 演化蓝图 ── */}

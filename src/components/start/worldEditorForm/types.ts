@@ -2,11 +2,13 @@ import type { WorldArtwork, WorldDef, WorldBookEntryDef } from '../../../data/wo
 import {
   createDefaultStatModule, createDefaultProgressionModule, createDefaultSurvivalModule,
   createDefaultBusinessModule, createDefaultDiceModule, createDefaultTalentModule,
+  createDefaultProfessionBinding, createDefaultCombatBinding,
 } from '../../../modules/defaults';
 import { createBuildContext } from '../../../modules/buildContext';
 import { generateWorldBookEntries } from '../../../modules/buildPipeline';
 import type { WorldClockConfig } from '../../../time/worldClock';
 import { inferWorldClockConfig } from '../../../time/worldClock';
+import { resolveProfessionBinding } from '../../../data/professions';
 
 export type FormState = {
   name: string; description: string; icon: string; coverColor: string; tags: string; difficulty: string;
@@ -38,19 +40,19 @@ export const DEFAULT_MODULE_FACTORIES: Record<string, () => unknown> = {
   stat: createDefaultStatModule, progression: createDefaultProgressionModule,
   survival: createDefaultSurvivalModule, business: createDefaultBusinessModule,
   dice: createDefaultDiceModule, talent: createDefaultTalentModule,
+  profession: createDefaultProfessionBinding,
+  combat: createDefaultCombatBinding,
 };
 
 export const MODULE_NAME_MAP: Record<string, string> = {
-  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系',
+  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', profession: '职业体系', combat: '战斗系统',
 };
 
-export const MUTEX: Record<string, string[]> = {
-  survival: ['stat', 'progression', 'talent', 'business'],
-  stat: ['survival', 'business'],
-  progression: ['survival', 'business'],
-  talent: ['survival'],
-  business: ['stat', 'progression', 'survival'],
-};
+/**
+ * 六个内置玩法模块都落在统一事务内核上，可以按世界需求组合。
+ * 保留空表是为了兼容编辑器原有的依赖计算入口。
+ */
+export const MUTEX: Record<string, string[]> = {};
 
 function findMeta(entries: WorldBookEntryDef[] | undefined, type: string) {
   return entries?.find(e => e.entryType === type)?.meta;
@@ -189,6 +191,7 @@ export function injectModuleRuleEntries(world: WorldDef, form: FormState, refine
       if (mod.moduleId === 'survival') buildCtx.survivalData = mc;
       if (mod.moduleId === 'business') buildCtx.businessData = mc;
       if (mod.moduleId === 'talent') buildCtx.talentData = mc;
+      if (mod.moduleId === 'profession') buildCtx.professionData = resolveProfessionBinding(mc);
     }
     buildCtx.worldBookEntries = generateWorldBookEntries(buildCtx);
     if (buildCtx.worldBookEntries?.length) {

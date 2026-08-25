@@ -34,7 +34,12 @@ function RegistryPresentation({ goBack, isAuthenticated, isLoading, user }: Regi
   const signedIn = isAuthenticated;
   const loading = isLoading;
   const effectiveUser = user;
-  const [tab, setTab] = useState<UserTab>('profile');
+  const [tab, setTab] = useState<UserTab>(() => {
+    if (typeof window === 'undefined') return 'profile';
+    const requested = sessionStorage.getItem('omni.user-center.initial-tab');
+    sessionStorage.removeItem('omni.user-center.initial-tab');
+    return requested === 'workshop' ? 'workshop' : 'profile';
+  });
 
   return (
     <div className="entry-default-theme traveler-registry-screen">

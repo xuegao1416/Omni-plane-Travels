@@ -41,6 +41,7 @@ export function useAiFill({
 
     const worldData = allWorlds.find(w => w.id === selectedWorld);
     const worldSetting = worldEntry?.content || worldData?.description || '自由穿越模式';
+    const hasProfessionSystem = Boolean(worldData?.modules?.some(module => module.moduleId === 'profession' && module.enabled));
 
     // 提取世界的数值属性模块配置（用于生成角色初始属性）
     const statMod = worldData?.modules?.find(m => m.moduleId === 'stat' && m.enabled);
@@ -64,6 +65,7 @@ export function useAiFill({
       playerAge: personalInfo.age || '',
       playerBackground: personalInfo.background || '',
       statModule,
+      hasProfessionSystem,
     });
 
     const messages = [
@@ -137,11 +139,11 @@ export function useAiFill({
         personality: data.personality || prev.personality,
         appearance: data.appearance || prev.appearance,
         background: data.background || prev.background,
-        career: data.career || prev.career,
+        career: hasProfessionSystem ? prev.career : (data.career || prev.career),
         socialClass: data.socialClass || prev.socialClass,
         organization: data.organization || prev.organization,
         specialIdentity: data.specialIdentity || prev.specialIdentity,
-        initialSkills: { ...prev.initialSkills, ...filledSkills },
+        initialSkills: hasProfessionSystem ? {} : { ...prev.initialSkills, ...filledSkills },
         initialItems: { ...prev.initialItems, ...filledItems },
         moduleInitData,
       }));

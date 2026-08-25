@@ -122,6 +122,7 @@ export default function StartScreen() {
             onOpenCustomModules={() => setCustomModuleOpen(true)}
             onOpenSettings={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('settings'); }}
             onOpenUserCenter={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('user-center'); }}
+            onOpenWorkshop={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); sessionStorage.setItem('omni.user-center.initial-tab', 'workshop'); h.navigate('user-center'); }}
               onOpenEditor={(world, step = 1) => { h.setEditingWorld(world); h.setWorldEditorInitialStep(step); h.setWorldEditorOpen(true); }}
             onDeleteWorld={h.handleDeleteWorld}
             onImportWorld={h.handleImportWorld}

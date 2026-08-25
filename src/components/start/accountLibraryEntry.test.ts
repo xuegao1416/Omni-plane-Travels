@@ -15,6 +15,9 @@ describe('hall account and library entry contract', () => {
     expect(hall).toContain('onOpenSettings: () => void;');
     expect(hall).toContain('onClick={onOpenSettings}');
     expect(hall).toContain('onClick={onOpenUserCenter}');
+    expect(startScreen).toContain("omni.user-center.initial-tab', 'workshop'");
+    expect(hall).toContain('onOpenWorkshop: () => void;');
+    expect(startScreen).toContain('onOpenWorkshop={() =>');
     expect(app).toContain("case 'user-center': return <UserCenterPage />;");
     expect(hall).toContain('setArchiveOpen(true)');
   });

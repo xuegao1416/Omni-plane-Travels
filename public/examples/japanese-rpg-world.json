@@ -1,0 +1,158 @@
+{
+  "id": "example_jrpg_crystal_academy",
+  "name": "星晶学园：回响之塔",
+  "description": "一份可导入的日式 RPG 玩法样板，展示数值、成长、分支天赋、主动技能与骰子检定的完整联动。",
+  "entryId": null,
+  "icon": "Sparkles",
+  "coverColor": "#4f8f7a",
+  "tags": ["日式RPG", "天赋树", "成长", "样板世界"],
+  "difficulty": "medium",
+  "author": "Omniplane Travels",
+  "modules": [
+    {
+      "moduleId": "stat",
+      "name": "冒险者能力",
+      "enabled": true,
+      "moduleConfig": {
+        "attrA": { "name": "生命", "max": 120 },
+        "attrB": { "name": "星能", "max": 80 },
+        "dim1": { "name": "力量", "range": [0, 100] },
+        "dim2": { "name": "守护", "range": [0, 100] },
+        "dim3": { "name": "敏捷", "range": [0, 100] },
+        "dim4": { "name": "术式", "range": [0, 100] },
+        "dim5": { "name": "意志", "range": [0, 100] },
+        "dim6": { "name": "幸运", "range": [0, 100] },
+        "special": []
+      },
+      "initialState": { "attrA": 100, "attrB": 40, "dim1": 12, "dim2": 12, "dim3": 12, "dim4": 12, "dim5": 12, "dim6": 12, "special": {} }
+    },
+    {
+      "moduleId": "progression",
+      "name": "冒险者阶级",
+      "enabled": true,
+      "moduleConfig": {
+        "mode": "tiered",
+        "xpFormula": { "baseXP": 100, "exponent": 1.35, "scaleFactor": 1 },
+        "tiers": [
+          { "name": "见习", "description": "刚刚完成星晶共鸣。", "xpRequired": 0, "statBonuses": { "attrAMax": 120, "attrBMax": 80, "dim1Max": 30, "dim2Max": 30, "dim3Max": 30, "dim4Max": 30, "dim5Max": 30, "dim6Max": 30 } },
+          { "name": "青铜", "description": "能够独立完成低阶委托。", "xpRequired": 100, "statBonuses": { "attrAMax": 150, "attrBMax": 110, "dim1Max": 45, "dim2Max": 45, "dim3Max": 45, "dim4Max": 45, "dim5Max": 45, "dim6Max": 45 } },
+          { "name": "白银", "description": "形成稳定的战斗流派。", "xpRequired": 235, "statBonuses": { "attrAMax": 190, "attrBMax": 150, "dim1Max": 65, "dim2Max": 65, "dim3Max": 65, "dim4Max": 65, "dim5Max": 65, "dim6Max": 65 } },
+          { "name": "黄金", "description": "足以挑战回响之塔深层。", "xpRequired": 420, "statBonuses": { "attrAMax": 240, "attrBMax": 200, "dim1Max": 85, "dim2Max": 85, "dim3Max": 85, "dim4Max": 85, "dim5Max": 85, "dim6Max": 85 } }
+        ],
+        "activityRewards": [
+          { "id": "quest", "label": "完成委托", "keywords": ["委托", "任务", "讨伐"], "rate": 0.2 },
+          { "id": "explore", "label": "发现区域", "keywords": ["探索", "发现", "遗迹"], "rate": 0.12 }
+        ],
+        "pointsPerTier": { "attribute": 2, "talent": 1, "skill": 1 }
+      },
+      "initialState": { "currentTierIndex": 0, "currentXP": 0 }
+    },
+    {
+      "moduleId": "talent",
+      "name": "星晶天赋盘",
+      "enabled": true,
+      "moduleConfig": {
+        "pointRules": { "initialTalentPoints": 2, "initialSkillPoints": 2, "talentPointsPerTier": 1, "skillPointsPerTier": 1 },
+        "equipmentSlots": [
+          { "id": "core", "name": "核心技", "capacity": 1 },
+          { "id": "support", "name": "辅助技", "capacity": 2 }
+        ],
+        "respec": { "enabled": true },
+        "categories": [
+          {
+            "id": "echo_path",
+            "name": "回响之路",
+            "description": "从基础共鸣出发，选择强袭或守护分支。",
+            "talents": [
+              { "id": "resonance", "name": "初始共鸣", "description": "掌握星晶力量的基本循环。", "rarity": "普通", "effects": ["星能运转更加稳定"], "maxRank": 1, "pointCost": 1, "graph": { "x": 50, "y": 10 }, "mechanics": { "onUnlock": [{ "add": { "path": "玩家.生存状态.dim5", "delta": 2, "max": 100 } }] } },
+              { "id": "assault_echo", "name": "赤曜强袭", "description": "把回响压缩为瞬间爆发。", "rarity": "稀有", "effects": ["强化力量相关行动"], "maxRank": 3, "rankCosts": [1, 2, 3], "prerequisites": ["resonance"], "exclusiveGroup": "primary_path", "graph": { "x": 25, "y": 45 }, "mechanics": { "onUnlock": [{ "add": { "path": "玩家.生存状态.dim1", "delta": 2, "max": 100 } }] }, "awakening": { "name": "赤曜超载", "description": "让压缩回响越过安全阈值，换取决定性爆发。", "pointCost": 2, "conditions": [{ "state": { "path": "玩家.当前段位索引", "op": ">=", "value": 2 } }], "effects": [{ "add": { "path": "玩家.生存状态.dim1", "delta": 5, "max": 100 } }] } },
+              { "id": "guardian_echo", "name": "苍穹守护", "description": "让回响在队伍之间形成护壁。", "rarity": "稀有", "effects": ["强化防御相关行动"], "maxRank": 3, "rankCosts": [1, 2, 3], "prerequisites": ["resonance"], "exclusiveGroup": "primary_path", "graph": { "x": 75, "y": 45 }, "mechanics": { "onUnlock": [{ "add": { "path": "玩家.生存状态.dim2", "delta": 2, "max": 100 } }] } },
+              { "id": "star_compass", "name": "星路罗盘", "description": "在危险中察觉最有利的路线。", "rarity": "史诗", "effects": ["探索检定获得更可靠的线索"], "maxRank": 1, "pointCost": 2, "prerequisites": ["assault_echo"], "graph": { "x": 25, "y": 80 }, "mechanics": { "onUnlock": [{ "add": { "path": "玩家.生存状态.dim6", "delta": 4, "max": 100 } }] } },
+              { "id": "shared_barrier", "name": "共鸣结界", "description": "把个人防护扩展为团队结界。", "rarity": "史诗", "effects": ["保护同伴时更稳定"], "maxRank": 1, "pointCost": 2, "prerequisites": ["guardian_echo"], "graph": { "x": 75, "y": 80 }, "mechanics": { "onUnlock": [{ "add": { "path": "玩家.生存状态.attrA", "delta": 10, "max": 120 } }] } }
+            ]
+          }
+        ],
+        "skills": [
+          { "id": "echo_slash", "name": "回响斩", "description": "释放短距离星能斩击。", "categoryId": "echo_path", "rarity": "普通", "maxRank": 3, "pointCost": 1, "prerequisites": ["resonance"], "cooldownTicks": 1, "equipmentSlot": "core", "proficiency": { "gainPerUse": 2, "thresholdPerRank": 10, "maxRank": 3 }, "activation": { "costs": [{ "path": "玩家.生存状态.attrB", "amount": 5, "label": "星能" }], "effects": [{ "emit": { "type": "combat.echo_slash" } }] } },
+          { "id": "field_mend", "name": "星屑修复", "description": "用星屑修补伤势。", "categoryId": "echo_path", "rarity": "精良", "maxRank": 2, "pointCost": 1, "prerequisites": ["guardian_echo"], "cooldownTicks": 2, "equipmentSlot": "support", "proficiency": { "gainPerUse": 1, "thresholdPerRank": 8, "maxRank": 2 }, "activation": { "costs": [{ "path": "玩家.生存状态.attrB", "amount": 8, "label": "星能" }], "effects": [{ "add": { "path": "玩家.生存状态.attrA", "delta": 12, "max": 120 } }] } }
+        ]
+      }
+    },
+    {
+      "moduleId": "dice",
+      "name": "命运检定",
+      "enabled": true,
+      "moduleConfig": { "sides": 20, "defaultDC": 12, "historyLimit": 20, "modifierBase": 10, "modifierStep": 2, "criticalSuccess": 20, "criticalFailure": 1 }
+    },
+    {
+      "moduleId": "survival",
+      "name": "星野补给",
+      "enabled": true,
+      "moduleConfig": {
+        "description": "探索塔外星野、采集材料并制作补给。",
+        "resources": [
+          { "id": "ration", "name": "星果干粮", "symbol": "◆", "amount": 3, "max": 12, "scarce": false, "description": "每周期消耗，维持冒险者体力。", "gatherAmount": 1, "gatherTimeMinutes": 30, "gatherStaminaCost": 2 },
+          { "id": "crystal_shard", "name": "星晶碎片", "symbol": "◇", "amount": 1, "max": 20, "scarce": true, "description": "制作星晶装备的材料。", "gatherAmount": 1, "gatherTimeMinutes": 60, "gatherStaminaCost": 5 }
+        ],
+        "rules": { "cycleName": "一天", "consumePerCycle": "每日消耗1份星果干粮", "criticalThreshold": 1 },
+        "consumption": { "perCycle": { "ration": 1 }, "exhaustionPenalty": { "attrA": 5 } },
+        "recipes": [{ "id": "focus_charm", "name": "专注护符", "inputs": { "crystal_shard": 2 }, "output": { "resourceId": "focus_charm", "amount": 1 }, "description": "提升检定时的专注感。", "craftTimeMinutes": 60 }],
+        "resourceEvolution": [{ "id": "tower_core", "trigger": { "keywords": ["回响之塔"] }, "afterRounds": 8, "add": [{ "id": "tower_core", "name": "塔心残片", "symbol": "✦", "amount": 0, "max": 5, "scarce": true, "description": "深层遗迹中的稀有材料。" }], "narrateHint": "发现塔心残片的新矿脉。" }]
+      }
+    },
+    {
+      "moduleId": "business",
+      "name": "学园工坊",
+      "enabled": true,
+      "moduleConfig": {
+        "description": "经营学园里的星晶工坊，把探索材料转化为补给和资金。",
+        "funds": 80,
+        "cycleName": "一天",
+        "inventory": { "crystal_shard": 2 },
+        "assets": [{ "id": "academy_workshop", "name": "星晶工坊", "type": "制造", "level": 1, "maxLevel": 3, "description": "将星晶材料加工为冒险用品。", "initiallyOwned": true, "income": { "base": 8, "perLevel": 4, "cycle": "一天", "inputs": { "crystal_shard": 1 }, "outputs": { "ration": 2 } }, "maintenance": 2, "upgradeCost": 25, "purchaseCost": 0, "purchaseMaterials": {}, "upgradeMaterials": { "crystal_shard": 1 }, "staff": { "current": 1, "max": 2, "efficiency": 1.1 }, "risk": { "level": "low", "description": "学园有基本防护。" }, "marketTags": ["冒险用品"], "status": "active" }],
+        "economy": { "marketWeight": 0.25, "autoIdleOnDeficit": true, "production": [{ "id": "ration_line", "name": "补给生产线", "inputs": { "crystal_shard": 1 }, "outputs": { "ration": 2 }, "cycles": 1, "unlockConditions": [] }] }
+      }
+    },
+    {
+      "moduleId": "combat",
+      "name": "回响战斗",
+      "enabled": true,
+      "moduleConfig": {
+        "description": "在回响之塔中以行动点、属性修正和状态效果解决遭遇。胜利会发放成长经验。",
+        "actionPointsPerTurn": 2,
+        "playerHpPath": "玩家.生存状态.血量",
+        "playerMaxHp": 120,
+        "playerAttackPath": "玩家.生存状态.dim1",
+        "playerArmor": 1,
+        "playerInitiative": 3,
+        "playerActions": [
+          { "id": "echo_slash", "name": "回响斩", "description": "力量越高，斩击越稳定；可与星晶天赋和星能技能叙事联动。", "target": "enemy", "actionCost": 1, "accuracy": 10, "damage": 14, "cooldownRounds": 0 },
+          { "id": "field_mend", "name": "星屑修复", "description": "消耗行动点恢复自身生命。", "target": "self", "actionCost": 1, "healing": 18, "cooldownRounds": 2 },
+          { "id": "crystal_burst", "name": "晶爆检定", "description": "高风险的爆发行动，适合先掷骰确认优势再使用。", "target": "enemy", "actionCost": 2, "accuracy": 12, "damage": 28, "appliesStatus": { "id": "fracture", "name": "晶痕", "durationRounds": 2, "damagePerRound": 4 } }
+        ],
+        "encounters": [
+          {
+            "id": "echo_guardian",
+            "name": "回响守卫",
+            "description": "塔门前的失控守卫会用晶刃压迫冒险者，但它的护甲无法抵挡持续的晶痕。",
+            "roundLimit": 12,
+            "rewards": [
+              { "add": { "path": "玩家.当前经验值", "delta": 80, "create": true } },
+              { "add": { "path": "玩家.生存状态.attrB", "delta": 10, "min": 0, "max": 80, "create": true } }
+            ],
+            "enemies": [
+              { "id": "tower_guardian", "name": "塔门守卫", "description": "被星晶噪声驱动的守卫。", "maxHp": 70, "armor": 2, "initiative": 5, "actions": [
+                { "id": "crystal_edge", "name": "晶刃", "target": "enemy", "accuracy": 10, "damage": 8 },
+                { "id": "guard_repair", "name": "晶体修复", "target": "self", "accuracy": 10, "healing": 5, "damage": 0, "cooldownRounds": 2 }
+              ] }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "worldBookEntries": [
+    { "uid": 1, "key": [], "comment": "星晶学园", "content": "玩家是星晶学园的新晋冒险者。学园围绕回响之塔建立，学生通过委托、探索和战斗提升阶级，并在星晶天赋盘上形成自己的流派。", "constant": true, "order": 1000, "entryType": "setting", "meta": { "genre": "日式奇幻 RPG", "location": "星晶学园与回响之塔", "timePeriod": "星历 428 年", "atmosphere": "明亮冒险与未知遗迹", "recommendedFor": ["喜欢角色构筑", "喜欢成长与检定"], "estimatedPlaytime": "2-8小时" } },
+    { "uid": 2, "key": [], "comment": "玩法契约", "content": "等级、点数、技能消耗、冷却和骰子结果由本地玩法内核结算。叙事必须承认结算结果，不得自行绕过前置节点、互斥分支或资源消耗。", "constant": true, "order": 990, "entryType": "module_rule" }
+  ]
+}

@@ -405,6 +405,29 @@ registerNode({
 });
 
 registerNode({
+  typeId: 'actions.request_combat',
+  category: 'actions',
+  name: '发起战斗遭遇',
+  description: '向 v3 战斗系统发出结构化遭遇请求；只描述身份、语境和威胁档位',
+  icon: 'ShieldAlert',
+  color: 'var(--node-effect)',
+  inputs: [socket('flow_in', 'flow', '触发')],
+  outputs: [socket('flow_out', 'flow', '继续')],
+  widgets: [
+    widget('string', '提案 ID', 'proposal_id', { placeholder: 'stable-encounter-id' }),
+    widget('string', '遭遇语境', 'context', { multiline: true, placeholder: '已经发生的敌对行动' }),
+    widget('select', '威胁档位', 'threat_band', { options: [
+      { label: '弱小', value: 'weak' }, { label: '匹敌', value: 'matched' }, { label: '危险', value: 'dangerous' },
+      { label: '首领', value: 'boss' }, { label: '压倒性', value: 'overwhelming' },
+    ] }),
+    widget('json', '友方身份 JSON', 'allies_json', { multiline: true, placeholder: '[{"id":"ally","identity":"同伴","temporary":false}]' }),
+    widget('json', '敌方身份 JSON', 'enemies_json', { multiline: true, placeholder: '[{"id":"enemy","identity":"敌人","temporary":false}]' }),
+    widget('json', '中立身份 JSON', 'neutrals_json', { multiline: true, placeholder: '[]' }),
+  ],
+  searchTags: ['战斗', '遭遇', '迎战', 'combat'],
+});
+
+registerNode({
   typeId: 'actions.schedule_tick',
   category: 'actions',
   name: '延迟触发',

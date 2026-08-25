@@ -5,11 +5,11 @@
 //  依赖关系：
 //  - 数值系统：独立存在
 //  - 成长系统：依赖数值系统（需要知道属性名称、范围）
-//  - 生存系统：与数值/成长/天赋互斥
+//  - 天赋与技能：通用能力层，可与数值、经营和事件效果组合
 //  - 经营系统：可与任何模块共存
 // ============================================================
 
-import type { BuildContext, StatConfig, StatState, ProgressionConfig, SurvivalConfig, BusinessConfig } from './buildContext';
+import type { BuildContext, StatConfig, StatState, SurvivalConfig, BusinessConfig } from './buildContext';
 import type { WorldBookEntryDef } from '../data/worlds-schema';
 import type { StatModuleSchema, ProgressionModuleSchema, SurvivalModuleSchema, BusinessModuleSchema, TalentModuleSchema } from './schema';
 import {
@@ -26,9 +26,14 @@ import {
   DICE_UPDATE_RULES,
   TALENT_RULES_PROMPT,
   TALENT_UPDATE_RULES,
+  COMBAT_RULES_PROMPT,
+  COMBAT_TEXT_FALLBACK_PROMPT,
+  GAMEPLAY_TEXT_FALLBACK_PROMPT,
 } from './prompts';
 import { waitForRateLimit } from '../api/rateLimiter';
 import { buildSpecialConfig } from './normalizeModule';
+import { normalizeProgressionConfig } from './xpAlgorithm';
+export { normalizeProgressionConfig } from './xpAlgorithm';
 
 export interface PipelineConfig {
   /** AI 调用函数（由外部注入，解耦API层） */
@@ -136,7 +141,7 @@ export async function executeBuildPipeline(
       const progRaw = await callAI([{ role: 'user', content: progPrompt }]);
       ctx.progressionData = JSON.parse(extractJSON(progRaw)) as ProgressionModuleSchema;
       if (ctx.progressionData) {
-        ctx.progressionConfig = extractProgressionConfig(ctx.progressionData);
+        ctx.progressionConfig = normalizeProgressionConfig(ctx.progressionData);
       }
     } catch (err: unknown) {
       console.error('[BuildPipeline] 成长体系生成失败:', err instanceof Error ? err.message : String(err));
@@ -200,10 +205,20 @@ export async function executeBuildPipeline(
     try {
       const talentRaw = await callAI([{ role: 'user', content: talentPrompt }]);
       ctx.talentData = JSON.parse(extractJSON(talentRaw)) as TalentModuleSchema;
+      if (ctx.progressionData && ctx.talentData?.pointRules) {
+        ctx.progressionData.pointsPerTier = {
+          ...ctx.progressionData.pointsPerTier,
+          talent: Math.max(0, Number(ctx.talentData.pointRules.talentPointsPerTier) || 0),
+          skill: Math.max(0, Number(ctx.talentData.pointRules.skillPointsPerTier) || 0),
+        };
+      }
     } catch (err: unknown) {
       console.error('[BuildPipeline] 天赋体系生成失败:', err instanceof Error ? err.message : String(err));
     }
   }
+
+  // 职业包与战斗规则不属于世界一键生成内容。
+  // 世界只保存对独立职业典藏和内置战斗规则模板的引用，由各自工作区维护。
 
   // ─── 阶段3：生成世界书条目（蓝灯/绿灯） ───
   onProgress?.('阶段3', '生成世界书条目...');
@@ -292,25 +307,24 @@ function safeNum(value: unknown, fallback: number): number {
  * 从数值属性原始数据中提取配置（静态部分）
  */
 function extractStatConfig(statData: StatModuleSchema): StatConfig {
-  const dimDefaults = [
-    { name: '属性1', range: [0, 100] as [number, number] },
-    { name: '属性2', range: [0, 100] as [number, number] },
-    { name: '属性3', range: [0, 100] as [number, number] },
-    { name: '属性4', range: [0, 100] as [number, number] },
-    { name: '属性5', range: [0, 100] as [number, number] },
-    { name: '属性6', range: [0, 100] as [number, number] },
-  ];
+  const semanticRoles = ['power', 'guard', 'agility', 'intellect', 'social', 'perception'] as const;
+  const dimDefaults = semanticRoles.map((semanticRole, index) => ({ name: `属性${index + 1}`, range: [0, 100] as [number, number], semanticRole }));
   const dims = [statData.dim1, statData.dim2, statData.dim3, statData.dim4, statData.dim5, statData.dim6];
+  const dim = (index: number) => dims[index]
+    ? { name: dims[index]!.name, range: dims[index]!.range, semanticRole: semanticRoles[index], description: dims[index]!.description }
+    : dimDefaults[index];
   return {
     attrA: { name: statData.attrA?.name || '生命', max: safeNum(statData.attrA?.max, 100) },
     attrB: { name: statData.attrB?.name || '能量', max: safeNum(statData.attrB?.max, 100) },
-    dim1: dims[0] ? { name: dims[0].name, range: dims[0].range } : dimDefaults[0],
-    dim2: dims[1] ? { name: dims[1].name, range: dims[1].range } : dimDefaults[1],
-    dim3: dims[2] ? { name: dims[2].name, range: dims[2].range } : dimDefaults[2],
-    dim4: dims[3] ? { name: dims[3].name, range: dims[3].range } : dimDefaults[3],
-    dim5: dims[4] ? { name: dims[4].name, range: dims[4].range } : dimDefaults[4],
-    dim6: dims[5] ? { name: dims[5].name, range: dims[5].range } : dimDefaults[5],
+    dim1: dim(0),
+    dim2: dim(1),
+    dim3: dim(2),
+    dim4: dim(3),
+    dim5: dim(4),
+    dim6: dim(5),
     special: buildSpecialConfig(statData.special),
+    derived: statData.derived,
+    modifiers: statData.modifiers,
   };
 }
 
@@ -338,39 +352,6 @@ function extractStatState(statData: StatModuleSchema): StatState {
     dim6: dims[5] ? safeNum(dims[5].value, 50) : 50,
     special: specialState,
   };
-}
-
-/**
- * 从成长体系原始数据中提取配置（静态部分）
- * 注意：状态（当前段位索引、当前经验值）不在这里，存放在变量系统
- */
-function extractProgressionConfig(progData: ProgressionModuleSchema): ProgressionConfig {
-  const config: ProgressionConfig = {
-    mode: progData.mode,
-    xpFormula: progData.xpFormula,
-  };
-
-  if (progData.mode === 'tiered' && progData.tiers) {
-    config.tiers = progData.tiers.map(t => ({
-      name: t.name,
-      description: t.description,
-    }));
-  }
-
-  if (progData.mode === 'level' && progData.levelData) {
-    config.levelData = {
-      maxLevel: progData.levelData.maxLevel,
-      baseStats: progData.levelData.baseStats,
-      growthPerLevel: progData.levelData.growthPerLevel,
-    };
-  }
-
-  // 叙事风格（可选）
-  if (progData.narrativeStyle) {
-    (config as any).narrativeStyle = progData.narrativeStyle;
-  }
-
-  return config;
 }
 
 /**
@@ -402,6 +383,8 @@ function extractSurvivalConfig(survData: SurvivalModuleSchema): SurvivalConfig {
       remove: evo.remove,
       narrateHint: evo.narrateHint,
     })) : undefined,
+    recipes: survData.recipes,
+    consumption: survData.consumption,
   };
 }
 
@@ -423,10 +406,14 @@ function extractBusinessConfig(bizData: BusinessModuleSchema): BusinessConfig {
       income: a.income || { base: 0, perLevel: 0, cycle: '天' },
       maintenance: a.maintenance ?? 0,
       upgradeCost: a.upgradeCost,
+      purchaseCost: a.purchaseCost,
+      purchaseMaterials: a.purchaseMaterials,
       staff: a.staff,
       risk: a.risk ? { level: a.risk.level, description: a.risk.description } : undefined,
       status: a.status || 'active',
     })) : [],
+    inventory: bizData.inventory,
+    economy: bizData.economy,
     market: bizData.market ? {
       items: bizData.market.items.map(i => ({
         name: i.name,
@@ -485,6 +472,12 @@ function synthesizeResult(ctx: BuildContext): Record<string, unknown> {
   if (ctx.talentData) {
     result.天赋体系 = { config: ctx.talentData };
   }
+  if (ctx.professionData) {
+    result.职业体系 = { config: ctx.professionData };
+  }
+  if (ctx.combatData) {
+    result.战斗系统 = { config: ctx.combatData };
+  }
 
   // 世界书条目
   if (ctx.worldBookEntries && ctx.worldBookEntries.length > 0) {
@@ -504,6 +497,18 @@ function synthesizeResult(ctx: BuildContext): Record<string, unknown> {
 export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[] {
   const entries: WorldBookEntryDef[] = [];
 
+  if (ctx.selectedModules.some(module => ['stat', 'progression', 'talent', 'profession', 'dice', 'survival', 'business'].includes(module))) {
+    entries.push({
+      uid: -5000,
+      comment: '[模块] 图形化不可用时的文本降级契约',
+      content: GAMEPLAY_TEXT_FALLBACK_PROMPT,
+      constant: false,
+      key: ['属性', '等级', '段位', '天赋', '技能', '骰子', '资源', '采集', '制作', '经营', '资产', '生产'],
+      order: 55,
+      position: 'after_char',
+    });
+  }
+
   // ─── 数值属性模块（绿灯：关键词触发）───
   if (ctx.statData) {
     const statData = ctx.statData;
@@ -517,7 +522,8 @@ export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[]
     ].filter((k): k is string => !!k && k.length > 0);
 
     // 把 AI 生成的属性名称写入内容
-    const dimNames = dims.filter(Boolean).map(d => d!.name).join('、');
+    const dimRoleLabels = ['力量・攻击类', '体魄・防护类', '灵巧・速度类', '智识・技术类', '意志・交涉类', '感知・机运类'];
+    const dimNames = dims.map((dim, index) => dim ? `dim${index + 1}=${dim.name}（${dimRoleLabels[index]}）` : '').filter(Boolean).join('、');
     const specialNames = buildSpecialConfig(statData.special)
       .map(s => `${s.name}（${s.description || ''}）`).join('、');
     const statContent = `${STAT_UPDATE_RULES}\n\n─── 属性体系 ───\n生命类：${statData.attrA?.name || '生命'}（上限${statData.attrA?.max || 100}）\n能量类：${statData.attrB?.name || '能量'}（上限${statData.attrB?.max || 100}）\n六维属性：${dimNames}${specialNames ? `\n特色属性：${specialNames}` : ''}`;
@@ -564,7 +570,7 @@ export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[]
         uid: -5004,
         comment: '[模块] 成长体系 - 规则',
         content: progressionContent,
-        constant: true,
+        constant: false,
         key: progressionKeywords.filter(k => k && k.length > 0),
         order: 53,
         position: 'after_char',
@@ -681,11 +687,13 @@ ${assetLines}${marketLines}
   if (ctx.selectedModules.includes('talent') && ctx.talentData?.categories?.length) {
     const cats = ctx.talentData.categories;
     const allTalents = cats.flatMap(c => c.talents || []);
+    const allSkills = ctx.talentData.skills ?? [];
 
     // 从 AI 生成的天赋中提取关键词
     const talentKeywords = [
       ...cats.map(c => c.name),           // 大类名（如"灵根"、"体质"）
       ...allTalents.slice(0, 10).map(t => t.name),  // 前10个天赋名
+      ...allSkills.slice(0, 10).map(skill => skill.name),
       '天赋', '技能', '觉醒', '能力',
     ].filter(k => k && k.length > 0);
 
@@ -696,14 +704,54 @@ ${assetLines}${marketLines}
       ).join('\n');
       return `【${c.name}】${c.description ? ` ${c.description}` : ''}\n${talents}`;
     }).join('\n\n');
+    const skillList = allSkills.length > 0
+      ? allSkills.map(skill => `- ${skill.name}（${skill.rarity}）：${skill.description}`).join('\n')
+      : '（本世界未配置主动技能）';
 
     entries.push({
       uid: -5008,
       comment: '[模块] 天赋体系 - 规则',
-      content: `${TALENT_RULES_PROMPT}\n\n${TALENT_UPDATE_RULES}\n\n─── 已知天赋 ───\n${talentList}`,
+      content: `${TALENT_RULES_PROMPT}\n\n${TALENT_UPDATE_RULES}\n\n─── 已知天赋 ───\n${talentList}\n\n─── 可学习技能 ───\n${skillList}`,
       constant: false,
       key: [...new Set(talentKeywords)],
       order: 57,
+      position: 'after_char',
+    });
+  }
+
+  // ─── 职业体系（绿灯：只给主 AI 规则与目录；完整能力树按需由上下文路由提供）───
+  if (ctx.selectedModules.includes('profession') && ctx.professionData?.professions?.length) {
+    const professionNames = ctx.professionData.professions.map(item => item.name);
+    const talentNames = ctx.professionData.innateTalents.map(item => item.name);
+    const freeSkillNames = (ctx.professionData.freeSkillCatalog ?? []).map(item => item.name);
+    entries.push({
+      uid: -5011,
+      comment: '[模块] 职业体系 - 规则',
+      content: `【职业体系】\n可选职业：${professionNames.join('、')}\n创建时先天天赋：${talentNames.join('、') || '无'}\n自由技能目录：${freeSkillNames.join('、') || '无'}\n规则：职业能力只来自玩家当前职业的能力树；先天天赋只在创建角色时选择；后天觉醒与自由技能不得写入职业树。玩家当前职业、职业等级、已解锁能力和能力点以动态变量为唯一事实来源，不得依据静态目录擅自授予。主动能力的基础值、规范属性倍率、行动点与冷却，以及被动/专精/先天天赋的战斗与检定修正，均由动态职业上下文给出，是唯一机械事实；AI 只负责叙述结果，不得自行发明第二套数值。dim1~dim6 是跨世界固定语义键：dim1力量攻击、dim2体魄防护、dim3灵巧速度、dim4智识技术、dim5意志交涉、dim6感知机运；世界只能改显示名，不能改变含义。`,
+      constant: false,
+      key: [...new Set([...professionNames, ...talentNames, ...freeSkillNames, '职业', '能力树', '专精', '先天天赋'])],
+      order: 57,
+      position: 'after_char',
+    });
+  }
+
+  // ─── 战斗规则域（绿灯：战斗关键词触发）───
+  if (ctx.selectedModules.includes('combat') && ctx.combatData?.encounters?.length) {
+    const combatKeywords = ['战斗', '攻击', '敌人', '命中', '伤害', '回合', '行动点', '状态', '遭遇'];
+    const encounters = ctx.combatData.encounters.map(encounter => {
+      const enemies = encounter.enemies.map(enemy => {
+        const actions = (enemy.actions ?? []).map(action => `${action.name}（${action.target ?? 'enemy'}，伤害${action.damage ?? 0}，治疗${action.healing ?? 0}）`).join('、');
+        return `- ${enemy.name}：生命 ${enemy.maxHp}，护甲 ${enemy.armor ?? 0}${actions ? `，行动：${actions}` : ''}`;
+      }).join('\n');
+      return `【${encounter.name}】${encounter.description || ''}\n${enemies}`;
+    }).join('\n\n');
+    entries.push({
+      uid: -5010,
+      comment: '[模块] 战斗系统 - 规则',
+      content: `${COMBAT_RULES_PROMPT}\n${COMBAT_TEXT_FALLBACK_PROMPT}\n\n─── 已知遭遇 ───\n${encounters}`,
+      constant: false,
+      key: combatKeywords,
+      order: 59,
       position: 'after_char',
     });
   }

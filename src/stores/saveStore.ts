@@ -18,6 +18,7 @@ import {
   ACTIVE_SAVE_KEY,
   SAVE_SCHEMA_VERSION,
 } from '@/storage/db';
+import { pruneModuleCheckpoints } from '@/storage/moduleStateDb';
 
 /** 校验 saveId 格式：save_<timestamp>_<random>，过滤 localStorage 脏数据 */
 function validateSaveId(raw: string | null): string | null {
@@ -60,7 +61,7 @@ interface SaveState {
 
   // Debounce 自动存档
   scheduleAutoSave: () => void;
-  flushAutoSave: (buildSaveData: () => GameSave | null) => Promise<void>;
+  flushAutoSave: () => Promise<void>;
 }
 
 let _savePromise: Promise<void> | null = null;
@@ -220,9 +221,37 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       await deleteMessages(saveData.id);
     }
 
-    const newMessages = needsFullRewrite
+    let newMessages = needsFullRewrite
       ? allMessages  // 全量重写：所有消息都是"新"的
       : allMessages.filter(m => (m.seq ?? 0) > lastSeq);
+
+    // 随窗口前移，刚离开“最近10条”的旧消息可能被 optimizeSnapshots 去掉快照。
+    // 只重写这些刚发生变化的消息，避免整份长存档反复全量写入，也避免数据库残留悬空快照引用。
+    if (!needsFullRewrite && allMessages.length > dbMessageCount) {
+      const firstLeavingIndex = Math.max(0, dbMessageCount - 10);
+      const afterLeavingIndex = Math.max(firstLeavingIndex, allMessages.length - 10);
+      const leavingRecentWindow = allMessages.slice(firstLeavingIndex, afterLeavingIndex)
+        .filter(message => !message.snapshot && (message.seq ?? 0) <= lastSeq);
+      const bySeq = new Map(newMessages.map(message => [message.seq ?? 0, message]));
+      for (const message of leavingRecentWindow) bySeq.set(message.seq ?? 0, message);
+      newMessages = [...bySeq.values()];
+    }
+
+    // 快照只保存模块修订号；持久层也只保留当前修订和仍可回滚到的修订正文。
+    const keptModuleRevisions = new Set<string>();
+    for (const record of saveData.moduleStates ?? []) {
+      keptModuleRevisions.add(`${record.moduleId}#${record.revision}`);
+    }
+    for (const message of allMessages) {
+      const revisions = (message.snapshot as { moduleRevisions?: Record<string, number> } | undefined)?.moduleRevisions;
+      if (!revisions) continue;
+      for (const [moduleId, revision] of Object.entries(revisions)) {
+        if (Number.isFinite(revision)) keptModuleRevisions.add(`${moduleId}#${revision}`);
+      }
+    }
+    const moduleCheckpoints = (saveData.moduleCheckpoints ?? []).filter(record => (
+      keptModuleRevisions.has(`${record.moduleId}#${record.revision}`)
+    ));
 
     // 构建紧凑头部（不含 messages）
     const compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'> = {
@@ -241,11 +270,21 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       variableConfig: saveData.variableConfig,
       customWorld: saveData.customWorld,
       simulationState: saveData.simulationState,
+      lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
+      endedAt: saveData.endedAt,
+      endReason: saveData.endReason,
     };
 
     // 关键写入：存档数据（失败则导出兜底）
     try {
-      await saveGameIncremental(saveData.id, compactHead, newMessages);
+      await saveGameIncremental(
+        saveData.id,
+        compactHead,
+        newMessages,
+        saveData.moduleStates,
+        moduleCheckpoints,
+      );
+      await pruneModuleCheckpoints(saveData.id, keptModuleRevisions);
     } catch (err) {
       console.error('[存档] 存档数据写入失败:', err);
       // 尝试兜底导出
@@ -262,6 +301,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
             personalInfo: saveData.personalInfo, characterHistory: saveData.characterHistory,
             memoryRuntime: saveData.memoryRuntime, memoryConfig: saveData.memoryConfig,
             vectorMemory: saveData.vectorMemory, simulationState: saveData.simulationState,
+            lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active', endedAt: saveData.endedAt, endReason: saveData.endReason,
           },
         };
         const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
@@ -284,6 +324,9 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       preview: buildPreview(saveData),
       estBytes: allMessages.length * 500,
       messageCount: allMessages.length,
+      lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
+      endedAt: saveData.endedAt,
+      endReason: saveData.endReason,
     };
 
     const { savesMeta } = get();
@@ -343,12 +386,15 @@ export const useSaveStore = create<SaveState>((set, get) => ({
     }, 500);
   },
 
-  flushAutoSave: async (buildSaveData) => {
+  flushAutoSave: async () => {
     if (_saveTimer) {
       clearTimeout(_saveTimer);
       _saveTimer = null;
     }
-    await get().saveGame(buildSaveData);
+    if (!_autoSaveBuilder) {
+      throw new Error('[auto-save] _autoSaveBuilder 未注入，无法立即存档');
+    }
+    await get().saveGame(_autoSaveBuilder);
   },
 
   setSessionActivePacks: (packs) => {

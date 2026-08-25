@@ -303,7 +303,7 @@ interface VectorFact {
 
 **触发条件**：`config.vectorEnabled === true`
 
-**API 调用**：temperature 0.3
+**事实提取调用**：temperature 0.3。向量计算可使用远程 API、应用内端侧模型或外部 OpenAI-compatible 本地服务。
 
 **AI 返回 JSON**：`VectorFact[]` 数组
 
@@ -459,7 +459,7 @@ const response = await callAI(chatApiConfig, promptMessages, null, null);
 
 1. 记忆管线错误需要在 UI 中可见（已添加调试日志写入）
 2. 首轮对话时记忆为空，检索跳过是正常行为
-3. 向量提取需要单独的 embedding API，当前未配置
+3. Embedding 是可选增强；未配置或端侧模型不可用时自动保留关键词召回，不阻断记忆写入与游玩
 
 ---
 

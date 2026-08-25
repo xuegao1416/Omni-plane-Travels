@@ -68,7 +68,7 @@ export function parsePlayPingBody(input: unknown, now = Date.now()): ParseResult
   };
 }
 
-function isSameOrigin(c: Context<{ Bindings: Bindings }>): boolean {
+function isSameOrigin(c: Context<any>): boolean {
   const origin = c.req.header('Origin');
   if (!origin) return false;
   try {
@@ -78,7 +78,7 @@ function isSameOrigin(c: Context<{ Bindings: Bindings }>): boolean {
   }
 }
 
-export async function handlePostPlayStat(c: Context<{ Bindings: Bindings }>): Promise<Response> {
+export async function handlePostPlayStat(c: Context<any>): Promise<Response> {
   if (!isSameOrigin(c)) return c.json({ error: 'FORBIDDEN_ORIGIN' }, 403);
   const contentLength = Number(c.req.header('Content-Length') || 0);
   if (!Number.isFinite(contentLength) || contentLength > MAX_PAYLOAD_BYTES) {

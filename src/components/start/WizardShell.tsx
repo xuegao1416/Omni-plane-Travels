@@ -14,8 +14,14 @@ import StepCharacterHistory, { buildSegmentDefs } from './StepCharacterHistory';
 import StepConfirm from './StepConfirm';
 import { EntrySlicedButton } from './EntrySurface';
 import PortraitEditor, { getPortraitSource } from './PortraitEditor';
+import StepProfessionTalents from './StepProfessionTalents';
+import type { ProfessionModuleSchema } from '../../modules/schema';
+import { validateProfessionSelection } from '../../gameplay/profession';
+import { getCreationStepLayout } from './creationStepLayout';
+import { resolveProfessionBinding } from '../../data/professions';
+import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
+import type { CombatRiskMode } from '../../gameplay/protocols';
 
-const STEP_LABELS = ['降临身份', '天赋与行囊', '前尘编年', '启程契约'];
 const RITUAL_ANCHORS: Record<number, string> = {
   1: '/art/theme/ui-kit/dawn-v4/ritual/identity-mirror-v1.png',
   2: '/art/theme/ui-kit/dawn-v4/ritual/talent-astrolabe-v1.png',
@@ -87,17 +93,32 @@ export default function WizardShell({
     [personalInfo.age, includeAgeStages],
   );
 
-  const currentStep = Math.min(Math.max(step, 1), STEP_LABELS.length);
   const [modalOpen, setModalOpen] = useState(false);
   const selectedWorldName = allWorlds.find(world => world.id === selectedWorld)?.name || selectedWorld || '未选择世界';
   const selectedWorldDef = allWorlds.find(world => world.id === selectedWorld);
+  const professionModule = isProfessionModuleEnabled(selectedWorldDef) ? selectedWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
+  const combatModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'combat' && module.enabled);
+  const resolvedProfessionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;
+  const professionConfig: ProfessionModuleSchema | undefined = resolvedProfessionConfig?.professions.length ? resolvedProfessionConfig : undefined;
+  const stepLayout = getCreationStepLayout(Boolean(professionConfig));
+  const stepLabels = stepLayout.labels;
+  const currentStep = Math.min(Math.max(step, 1), stepLabels.length);
+  const { professionStep, loadoutStep, historyStep, confirmStep } = stepLayout;
   const selectedWorldScene = selectedWorldDef ? resolveWorldArtwork(selectedWorldDef).src : undefined;
   // World selection/editor actions are owned by the hall. Kept as inert shims for the disabled legacy block.
   const setSelectedWorld = (_id: string) => undefined;
   const onOpenEditor = (_world: WorldDef | null) => undefined;
   const identityReady = Boolean(personalInfo.name.trim() && personalInfo.gender && personalInfo.age.trim());
   const historyReady = segmentDefs.every(def => segments[def.id]?.trim().length > 0);
-  const canAdvance = currentStep === 1 ? identityReady : currentStep === 3 ? historyReady : true;
+  const professionReady = !professionConfig || validateProfessionSelection(
+    professionConfig,
+    personalInfo.professionId ?? null,
+    personalInfo.innateTalentIds ?? [],
+  ).ok;
+  const canAdvance = currentStep === 1 ? identityReady
+    : currentStep === professionStep ? professionReady
+      : currentStep === historyStep ? historyReady
+        : true;
 
   const handleBack = () => {
     if (modalOpen) return;
@@ -111,7 +132,7 @@ export default function WizardShell({
   const handleNext = () => {
     if (modalOpen) return;
     if (!canAdvance) return;
-    if (currentStep === 4) {
+    if (currentStep === confirmStep) {
       onStartGame();
       return;
     }
@@ -130,7 +151,7 @@ export default function WizardShell({
 
       <div className="creation-ritual-shell__body">
         <aside className="creation-ritual-shell__steps" aria-label="创建步骤">
-          {STEP_LABELS.map((label, index) => {
+          {stepLabels.map((label, index) => {
             const stepNum = index + 1;
             const isActive = currentStep === stepNum;
             const isCompleted = currentStep > stepNum;
@@ -148,9 +169,9 @@ export default function WizardShell({
         <section className="creation-ritual-shell__paper">
           <DawnFrameV4 mode="panel" className="creation-ritual-shell__paper-frame" ariaLabel="世界降临仪式主纸面">
             <AmbientParticleLayer />
-            <section className={`creation-ritual-shell__stage is-step-${currentStep}`}>
+            <section className={`creation-ritual-shell__stage is-step-${currentStep === historyStep ? 3 : currentStep === confirmStep ? 4 : currentStep === 1 ? 1 : 2}`}>
           <div className="creation-ritual-shell__anchor">
-            {currentStep === 1 ? null : currentStep === 3 ? null : currentStep === 4 ? (
+            {currentStep === 1 ? null : currentStep === historyStep ? null : currentStep === confirmStep ? (
               <div className="departure-gate-preview">
                 <div className="departure-gate-preview__scene" style={selectedWorldScene ? { backgroundImage: `url("${selectedWorldScene}")` } : undefined} aria-hidden="true" />
                 <img src={RITUAL_ANCHORS[4]} alt="启程门" draggable={false} />
@@ -158,7 +179,7 @@ export default function WizardShell({
               </div>
             ) : (
               <>
-                <img className={currentStep === 2 ? 'is-astrolabe' : undefined} src={RITUAL_ANCHORS[currentStep]} alt="" draggable={false} />
+                <img className="is-astrolabe" src={RITUAL_ANCHORS[2]} alt="" draggable={false} />
                 <span>{selectedWorldName}</span>
               </>
             )}
@@ -208,12 +229,19 @@ export default function WizardShell({
                 allWorlds={allWorlds}
                 worldEntry={worldEntry}
                 onModalStateChange={setModalOpen}
-                onNext={() => setStep(2)} onPrev={() => setStep(1)}
+                onNext={() => setStep(professionConfig ? professionStep : loadoutStep)} onPrev={() => setStep(1)}
                 />
                 </div>
               </div>
             )}
-            {currentStep === 2 && (
+            {professionConfig && currentStep === professionStep && (
+              <StepProfessionTalents
+                config={professionConfig}
+                personalInfo={personalInfo}
+                setPersonalInfo={setPersonalInfo}
+              />
+            )}
+            {currentStep === loadoutStep && (
               <StepPersonalInfo
                 phase="loadout"
                 showNavigation={false}
@@ -226,10 +254,10 @@ export default function WizardShell({
                 allWorlds={allWorlds}
                 worldEntry={worldEntry}
                 onModalStateChange={setModalOpen}
-                onNext={() => setStep(3)} onPrev={() => setStep(1)}
+                onNext={() => setStep(historyStep)} onPrev={() => setStep(professionConfig ? professionStep : 1)}
               />
             )}
-            {currentStep === 3 && (
+            {currentStep === historyStep && (
               <StepCharacterHistory
                 showNavigation={false}
                 segmentDefs={segmentDefs} segments={segments} setSegments={setSegments}
@@ -239,11 +267,11 @@ export default function WizardShell({
                 onGenerateAll={onGenerateAll} onRegenerateSegment={onRegenerateSegment}
                 onLoadPreset={onLoadPreset}
                 onModalStateChange={setModalOpen}
-                onStartGame={() => setStep(4)}
-                onPrev={() => setStep(2)}
+                onStartGame={() => setStep(confirmStep)}
+                onPrev={() => setStep(loadoutStep)}
               />
             )}
-            {currentStep === 4 && (
+            {currentStep === confirmStep && (
               <StepConfirm
                 showNavigation={false}
                 personalInfo={personalInfo}
@@ -252,23 +280,27 @@ export default function WizardShell({
                 selectedWorldName={selectedWorldName}
                 worldSummary={selectedWorldDef?.description}
                 portraitSource={getPortraitSource(personalInfo)}
+                hasProfession={Boolean(professionConfig)}
+                hasCombat={Boolean(combatModule)}
+                combatRiskMode={personalInfo.combatRiskMode ?? 'normal'}
+                onCombatRiskModeChange={(mode: CombatRiskMode) => setPersonalInfo({ ...personalInfo, combatRiskMode: mode })}
                 onStartGame={onStartGame}
-                onPrev={() => setStep(3)}
+                onPrev={() => setStep(historyStep)}
               />
             )}
           </main>
         </section>
           </DawnFrameV4>
 
-          <footer className={`creation-ritual-shell__footer${currentStep === 3 ? ' is-step-3' : ''}${modalOpen ? ' is-modal-blocked' : ''}`} aria-disabled={modalOpen}>
+          <footer className={`creation-ritual-shell__footer${currentStep === historyStep ? ' is-step-3' : ''}${modalOpen ? ' is-modal-blocked' : ''}`} aria-disabled={modalOpen}>
             <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-secondary" onClick={handleBack} disabled={modalOpen}>
               {currentStep === 1 ? '返回大厅' : '← 上一步'}
             </EntrySlicedButton>
             <div>
-              <span>{currentStep} / {STEP_LABELS.length}</span>
-              {currentStep === 3 && !historyReady && <span className="creation-ritual-shell__next-reason" role="status">请完成当前/全部编年阶段后继续</span>}
+              <span>{currentStep} / {stepLabels.length}</span>
+              {currentStep === historyStep && !historyReady && <span className="creation-ritual-shell__next-reason" role="status">请完成当前/全部编年阶段后继续</span>}
               <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-primary" onClick={handleNext} disabled={modalOpen || !canAdvance}>
-                {currentStep === 4 ? '开始冒险' : '下一步'} →
+                {currentStep === confirmStep ? '开始冒险' : '下一步'} →
               </EntrySlicedButton>
             </div>
           </footer>

@@ -2,6 +2,9 @@
 
 import type { DiceRoll, SurvivalRecipe } from '../modules/schema';
 import type { WorldClockState } from '../time/worldClock';
+import type { CombatRuntimeState } from '../gameplay/combat';
+import type { NarrativeDecisionRecord } from '../gameplay/narrativeDecision';
+import type { V3GameStateRuntime } from '../gameplay/protocols';
 
 export interface WorldModuleRuntime {
   moduleId: string;
@@ -44,6 +47,14 @@ export interface InventoryItem {
   类型: string;
   品质: '普通' | '精良' | '稀有' | '史诗' | '传说';
   备注: string;
+  /**
+   * Optional semantic-only v3 combat use. Local balancing owns all numbers;
+   * saves never accept arbitrary damage/healing values from narrative output.
+   */
+  战斗用途?: {
+    类型: 'heal' | 'resource' | 'damage' | 'cleanse' | 'buff';
+    目标?: 'self' | 'ally' | 'enemy';
+  };
 }
 
 // ═══════════════════════════════════════════
@@ -111,6 +122,8 @@ export interface TaskResourceRequirement {
 
 /** 技能需求 */
 export interface TaskSkillRequirement {
+  /** 新职业体系优先使用稳定 ID；旧任务只有名称时继续兼容。 */
+  技能ID?: string;
   技能名: string;
   最低品质?: '普通' | '精良' | '稀有' | '史诗' | '传说';
 }
@@ -207,6 +220,8 @@ export interface TaskSystem {
 
 export interface PlayerState {
   生存状态: SurvivalStats;
+  /** 战斗结算写回的本地状态，不参与叙事文本猜测。 */
+  战斗状态?: '正常' | '失去战力' | '重伤' | '死亡';
   姓名: string;
   年龄: string | number;
   性别: string;
@@ -219,6 +234,48 @@ export interface PlayerState {
   性格: string;
   外貌: string;
   技能系统: Record<string, SkillData>;
+  /**
+   * 统一天赋与技能运行态。技能内容仍由 `技能系统` 保存，避免破坏旧存档；
+   * 此处只保存可复用的点数、等级、使用次数与冷却等机械状态。
+   */
+  能力系统?: {
+    天赋点: number;
+    技能点: number;
+    已解锁天赋: Record<string, {
+      等级: number;
+      解锁轮次: number;
+    }>;
+    已掌握技能: Record<string, {
+      等级: number;
+      使用次数: number;
+      /** 技能熟练度，旧存档缺省为 0。 */
+      熟练度?: number;
+      冷却至轮次?: number;
+    }>;
+    /** 已觉醒的天赋/技能，键为定义 ID。 */
+    已觉醒?: Record<string, { 轮次: number; 名称?: string }>;
+    /** 装备槽 -> 能力 ID；槽容量由世界模块定义。 */
+    装备槽?: Record<string, string[]>;
+    /** 新职业体系；旧天赋字段继续保留，仅用于兼容旧世界。 */
+    职业状态?: {
+      职业ID: string | null;
+      职业名称: string;
+      职业等级: number;
+      能力点: number;
+      已解锁能力: Record<string, {
+        名称?: string;
+        类型?: import('../modules/schema').ProfessionAbilityType;
+        等级: number;
+        解锁轮次: number;
+        使用次数?: number;
+        冷却至轮次?: number;
+      }>;
+    };
+    /** 创建角色时确定，游戏内不消耗点数购买。 */
+    先天天赋?: Record<string, { 选择时间: 'creation'; 名称: string }>;
+    /** 剧情中觉醒所得，与创建时先天天赋分开。 */
+    后天天赋?: Record<string, { 觉醒轮次: number; 名称: string; 描述?: string }>;
+  };
   货币资源: {
     主货币: { 名称: string; 数量: number };
   };
@@ -267,7 +324,13 @@ export interface PlayerState {
       基础收益: number;
       每级收益: number;
       维护费: number;
+      员工人数?: number;
+      员工效率?: number;
+      市场标签?: string[];
+      风险等级?: 'low' | 'medium' | 'high';
+      升级费用?: number;
     }>;
+    库存?: Record<string, number>;
     交易日志?: Array<{
       类型: 'income' | 'expense' | 'purchase' | 'sale' | 'upgrade' | 'event';
       描述: string;
@@ -285,6 +348,8 @@ export interface NPCData {
   年龄: string | number;
   背景?: string;
   生存状态: SurvivalStats;
+  /** 战斗结算写回的本地状态。 */
+  战斗状态?: '正常' | '失去战力' | '重伤' | '死亡';
   社会身份: { 职业: string; 社会地位: string };
   关系数据: {
     好感度: number;
@@ -344,6 +409,16 @@ export interface GameState {
   };
   /** 自定义玩法模块的运行时状态；与事件包/工作流完全分离。 */
   customModules?: Record<string, import('../custom-modules/stateStore').CustomModuleRuntimeState>;
+  /** 六大内置模块共用的事务、事件、日志与迁移运行态。 */
+  gameplay?: import('../gameplay/types').GameplayRuntimeState;
+  /** Independent combat-domain runtime; absent in worlds without combat. */
+  combat?: CombatRuntimeState;
+  /** Save-scoped event decisions; pending records survive failed narrative retries. */
+  narrativeDecisions?: NarrativeDecisionRecord[];
+  /** Additive v3 protocol state; absent means all optional v3 modules are off. */
+  v3?: V3GameStateRuntime;
+  /** 六模块独立运行态的修订引用；快照只保存引用，不再复制模块正文。 */
+  moduleRevisions?: import('../gameplay/moduleRuntime/types').ModuleRevisionCheckpoint;
 }
 
 // 默认空状态

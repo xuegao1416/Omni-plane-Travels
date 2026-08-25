@@ -1,5 +1,6 @@
 import type { GameState } from '../../schema/variables';
 import type { TalentDef, SkillDef, TalentModuleSchema } from '../../modules/schema';
+import { abilityDefinitionFromSkill, abilityDefinitionFromTalent, abilityRankCost } from '../abilitySystem';
 import { executeGameplayTransaction, evaluateGameplayCondition, type GameplayExecutionContext, type GameplayExecutionResult, type GameplayStateRoot } from '../kernel';
 
 type AbilityState = NonNullable<GameState['玩家']['能力系统']>;
@@ -16,39 +17,46 @@ function hasConflict(state: GameState, group: string | undefined, id: string, co
   if (!group) return false;
   return config.categories.flatMap(c => c.talents ?? []).some(t => t.id !== id && t.exclusiveGroup === group && talentOwned(state, t.id)) || (config.skills ?? []).some(s => s.id !== id && s.exclusiveGroup === group && skillOwned(state, s.id));
 }
-function rankCost(def: { pointCost?: number; rankCosts?: number[] }, rank: number): number { return Math.max(0, def.rankCosts?.[rank - 1] ?? def.pointCost ?? 1); }
+function rankCost(def: TalentDef | SkillDef, rank: number): number {
+  const definition = 'mechanics' in def ? abilityDefinitionFromTalent(def) : abilityDefinitionFromSkill(def);
+  return abilityRankCost(definition, rank);
+}
 
 export function canUnlockTalent(state: GameState, config: TalentModuleSchema, id: string, context: GameplayExecutionContext): { ok: boolean; reason?: string } {
   const def = findTalent(config, id), current = getAbility(state)?.已解锁天赋[id]?.等级 ?? 0;
   if (!def) return { ok: false, reason: '天赋不存在' }; if (current >= Math.max(1, def.maxRank ?? 1)) return { ok: false, reason: '已达到最高等级' };
   if (!prerequisitesMet(state, def.prerequisites)) return { ok: false, reason: '前置节点未完成' }; if (hasConflict(state, def.exclusiveGroup, id, config)) return { ok: false, reason: '互斥分支已选择' }; if (!allConditionsMet(state, def.unlockConditions, context)) return { ok: false, reason: '条件未满足' };
-  return (getAbility(state)?.天赋点 ?? 0) >= rankCost(def, current + 1) ? { ok: true } : { ok: false, reason: '天赋点不足' };
+  return (getAbility(state)?.天赋点 ?? 0) >= abilityRankCost(abilityDefinitionFromTalent(def), current + 1) ? { ok: true } : { ok: false, reason: '天赋点不足' };
 }
 export function unlockTalent(state: GameState, config: TalentModuleSchema, id: string, context: GameplayExecutionContext): AbilityResult {
   const def = findTalent(config, id), ability = getAbility(state), current = ability?.已解锁天赋[id]?.等级 ?? 0, check = canUnlockTalent(state, config, id, context);
   if (!def || !ability || !check.ok) return blockedTalent(state, context, `talent:blocked:${id}:${context.tick}`);
+  const definition = abilityDefinitionFromTalent(def);
+  const cost = abilityRankCost(definition, current + 1);
   const unlocked = { ...ability.已解锁天赋, [id]: { 等级: current + 1, 解锁轮次: ability.已解锁天赋[id]?.解锁轮次 ?? context.tick } };
-  return executeGameplayTransaction(state, { id: `talent:unlock:${id}:${context.tick}`, moduleId: 'talent', source: 'player', label: `${current ? '提升' : '解锁'}天赋「${def.name}」`, conditions: def.unlockConditions, costs: [{ path: '玩家.能力系统.天赋点', amount: rankCost(def, current + 1), label: '天赋点' }], effects: [{ set: { path: '玩家.能力系统.已解锁天赋', value: unlocked } }, ...(def.mechanics?.passive ?? []), ...(def.mechanics?.onUnlock ?? [])], events: [{ type: 'talent.unlocked', payload: { talentId: id, name: def.name, rank: current + 1 } }] }, context);
+  return executeGameplayTransaction(state, { id: `talent:unlock:${id}:${context.tick}`, moduleId: 'talent', source: 'player', label: `${current ? '提升' : '解锁'}天赋「${def.name}」`, conditions: def.unlockConditions, costs: [{ path: '玩家.能力系统.天赋点', amount: cost, label: '天赋点' }], effects: [{ set: { path: '玩家.能力系统.已解锁天赋', value: unlocked } }, ...(definition.mechanics?.passiveEffects ?? []), ...(definition.mechanics?.effects ?? [])], events: [{ type: 'talent.unlocked', payload: { talentId: id, name: def.name, rank: current + 1 } }] }, context);
 }
 
 export function canLearnSkill(state: GameState, config: TalentModuleSchema, id: string, context: GameplayExecutionContext): { ok: boolean; reason?: string } {
   const def = findSkill(config, id), current = getAbility(state)?.已掌握技能[id]?.等级 ?? 0;
   if (!def) return { ok: false, reason: '技能不存在' }; if (current >= Math.max(1, def.maxRank ?? 1)) return { ok: false, reason: '已达到最高等级' }; if (!prerequisitesMet(state, def.prerequisites)) return { ok: false, reason: '前置能力未完成' }; if (hasConflict(state, def.exclusiveGroup, id, config)) return { ok: false, reason: '互斥分支已选择' }; if (!allConditionsMet(state, def.unlockConditions, context)) return { ok: false, reason: '条件未满足' };
-  return (getAbility(state)?.技能点 ?? 0) >= rankCost(def, current + 1) ? { ok: true } : { ok: false, reason: '技能点不足' };
+  return (getAbility(state)?.技能点 ?? 0) >= abilityRankCost(abilityDefinitionFromSkill(def), current + 1) ? { ok: true } : { ok: false, reason: '技能点不足' };
 }
 export function learnSkill(state: GameState, config: TalentModuleSchema, id: string, context: GameplayExecutionContext): AbilityResult {
   const def = findSkill(config, id), ability = getAbility(state), current = ability?.已掌握技能[id]?.等级 ?? 0, check = canLearnSkill(state, config, id, context);
   if (!def || !ability || !check.ok) return blockedTalent(state, context, `skill:blocked:${id}:${context.tick}`);
+  const definition = abilityDefinitionFromSkill(def);
   const old = ability.已掌握技能[id], learned = { ...ability.已掌握技能, [id]: { 等级: current + 1, 使用次数: old?.使用次数 ?? 0, 熟练度: old?.熟练度 ?? 0, ...(old?.冷却至轮次 === undefined ? {} : { 冷却至轮次: old.冷却至轮次 }) } };
   const content = { ...state.玩家.技能系统, [def.name]: { 品质: def.rarity, 描述: def.description, 类型: def.tags?.join('、') || def.categoryId || '通用技能' } };
-  return executeGameplayTransaction(state, { id: `skill:learn:${id}:${context.tick}`, moduleId: 'talent', source: 'player', label: `${current ? '提升' : '学习'}技能「${def.name}」`, conditions: def.unlockConditions, costs: [{ path: '玩家.能力系统.技能点', amount: rankCost(def, current + 1), label: '技能点' }], effects: [{ set: { path: '玩家.能力系统.已掌握技能', value: learned } }, { set: { path: '玩家.技能系统', value: content as unknown as Record<string, never> } }], events: [{ type: 'skill.learned', payload: { skillId: id, name: def.name, rank: current + 1 } }] }, context);
+  return executeGameplayTransaction(state, { id: `skill:learn:${id}:${context.tick}`, moduleId: 'talent', source: 'player', label: `${current ? '提升' : '学习'}技能「${def.name}」`, conditions: def.unlockConditions, costs: [{ path: '玩家.能力系统.技能点', amount: abilityRankCost(definition, current + 1), label: '技能点' }], effects: [{ set: { path: '玩家.能力系统.已掌握技能', value: learned } }, { set: { path: '玩家.技能系统', value: content as unknown as Record<string, never> } }], events: [{ type: 'skill.learned', payload: { skillId: id, name: def.name, rank: current + 1 } }] }, context);
 }
 export function useSkill(state: GameState, config: TalentModuleSchema, id: string, context: GameplayExecutionContext): AbilityResult {
   const def = findSkill(config, id), ability = getAbility(state), learned = ability?.已掌握技能[id];
   if (!def || !ability || !learned) return blockedTalent(state, context, `skill:not-learned:${id}:${context.tick}`); if ((learned.冷却至轮次 ?? 0) > context.tick) return blockedTalent(state, context, `skill:cooldown:${id}:${context.tick}`);
-  const gain = Math.max(0, def.proficiency?.gainPerUse ?? 1), threshold = Math.max(1, def.proficiency?.thresholdPerRank ?? 10), maxRank = Math.max(1, def.proficiency?.maxRank ?? def.maxRank ?? 1), proficiency = Math.max(0, learned.熟练度 ?? 0) + gain, rankGain = Math.min(maxRank - learned.等级, Math.floor(proficiency / threshold));
-  const next = { ...ability.已掌握技能, [id]: { ...learned, 使用次数: learned.使用次数 + 1, 熟练度: proficiency - rankGain * threshold, 等级: learned.等级 + rankGain, ...(def.cooldownTicks && def.cooldownTicks > 0 ? { 冷却至轮次: context.tick + Math.trunc(def.cooldownTicks) } : {}) } };
-  return executeGameplayTransaction(state, { id: `skill:use:${id}:${context.tick}`, moduleId: 'talent', source: 'player', label: `使用技能「${def.name}」`, costs: def.activation?.costs, effects: [{ set: { path: '玩家.能力系统.已掌握技能', value: next } }, ...(def.activation?.effects ?? [])], rewards: def.activation?.rewards, events: [{ type: 'skill.used', payload: { skillId: id, name: def.name, rank: next[id].等级, proficiency: next[id].熟练度 ?? 0 } }] }, context);
+  const definition = abilityDefinitionFromSkill(def);
+  const gain = Math.max(0, definition.mechanics?.proficiency?.gainPerUse ?? 1), threshold = Math.max(1, definition.mechanics?.proficiency?.thresholdPerRank ?? 10), maxRank = Math.max(1, definition.mechanics?.proficiency?.maxRank ?? definition.maxRank), proficiency = Math.max(0, learned.熟练度 ?? 0) + gain, rankGain = Math.min(maxRank - learned.等级, Math.floor(proficiency / threshold));
+  const next = { ...ability.已掌握技能, [id]: { ...learned, 使用次数: learned.使用次数 + 1, 熟练度: proficiency - rankGain * threshold, 等级: learned.等级 + rankGain, ...(definition.mechanics?.cooldownRounds && definition.mechanics.cooldownRounds > 0 ? { 冷却至轮次: context.tick + Math.trunc(definition.mechanics.cooldownRounds) } : {}) } };
+  return executeGameplayTransaction(state, { id: `skill:use:${id}:${context.tick}`, moduleId: 'talent', source: 'player', label: `使用技能「${def.name}」`, costs: definition.mechanics?.costs, effects: [{ set: { path: '玩家.能力系统.已掌握技能', value: next } }, ...(definition.mechanics?.effects ?? [])], rewards: definition.mechanics?.rewards, events: [{ type: 'skill.used', payload: { skillId: id, name: def.name, rank: next[id].等级, proficiency: next[id].熟练度 ?? 0 } }] }, context);
 }
 
 export function awakenAbility(state: GameState, config: TalentModuleSchema, id: string, context: GameplayExecutionContext): AbilityResult {

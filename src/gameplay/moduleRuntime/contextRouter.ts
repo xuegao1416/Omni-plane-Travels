@@ -3,6 +3,7 @@ import type { CombatScalingStatId, ProfessionAbilityDef, ProfessionModuleSchema,
 import { resolveProfessionBinding } from '../../data/professions';
 import type { GameState, Task } from '../../schema/variables';
 import { describeProfessionAbilityMechanics, describeProfessionMechanics } from '../profession';
+import { isProfessionModuleEnabled } from '../profession/featureGate';
 import { getSixDimSemantic } from '../../modules/xpAlgorithm';
 import type { ModuleRuntimeId } from './types';
 
@@ -75,6 +76,7 @@ function enabledModules(worldDef?: WorldDef): Set<ModuleRuntimeId> {
   const enabled = new Set<ModuleRuntimeId>();
   for (const module of worldDef?.modules ?? []) {
     if (!module.enabled) continue;
+    if (module.moduleId === 'profession' && !isProfessionModuleEnabled(worldDef)) continue;
     const canonical = MODULE_ALIASES[module.moduleId];
     if (canonical) enabled.add(canonical);
   }

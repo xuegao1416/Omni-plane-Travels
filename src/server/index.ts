@@ -21,6 +21,9 @@ import {
   updateItem,
   deleteItem,
   incrementDownloadCount,
+  toPublic,
+  checkDependencies,
+  resolveInstallPlan,
 } from './workshop';
 
 type AppEnv = {
@@ -42,7 +45,7 @@ app.use('*', async (c: Context<AppEnv>, next: Next) => {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Credentials', 'true');
     c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version, X-Trial-Client-Id, X-Trial-Purpose');
     c.header('Vary', 'Origin');
   }
   if (c.req.method === 'OPTIONS') return c.body(null, 204);
@@ -151,6 +154,8 @@ app.get('/api/workshop', async (c) => {
     tag: c.req.query('tag'),
     page: Number(c.req.query('page') || '1'),
     pageSize: Number(c.req.query('pageSize') || '20'),
+    sort: (c.req.query('sort') as 'latest' | 'popular' | 'featured' | undefined) || undefined,
+    category: c.req.query('category'),
   });
   return c.json({
     items: result.items,
@@ -160,10 +165,31 @@ app.get('/api/workshop', async (c) => {
   });
 });
 
+app.get('/api/workshop/:itemId/install-check', async (c) => {
+  const item = await getItem(c.env, c.req.param('itemId')!);
+  if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
+  let installed: Record<string, string> = {};
+  try {
+    const raw = c.req.query('installed');
+    if (raw) installed = Object.fromEntries(raw.split(',').map((entry) => {
+      const [id, version] = entry.split('@');
+      return [id, version || '0.0.0'];
+    }).filter(([id]) => Boolean(id)));
+  } catch { installed = {}; }
+  return c.json(checkDependencies(item, installed));
+});
+
+app.get('/api/workshop/:itemId/install-plan', async (c) => {
+  const plan = await resolveInstallPlan(c.req.param('itemId')!, async id => getItem(c.env, id));
+  return c.json(plan, plan.ok ? 200 : 409);
+});
+
 app.get('/api/workshop/:itemId', async (c) => {
   const item = await getItem(c.env, c.req.param('itemId')!);
   if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
-  return c.json({ item });
+  let data: unknown;
+  try { data = JSON.parse(item.data_json); } catch { data = null; }
+  return c.json({ item: { ...toPublic(item), data } });
 });
 
 app.get('/api/workshop/:itemId/download', async (c) => {
@@ -183,7 +209,8 @@ app.get('/api/workshop/:itemId/download', async (c) => {
 
     return c.json({
       id: item.id,
-      type: item.type,
+      type: item.content_type || item.type,
+      version: item.version || '1.0.0',
       title: item.title,
       description: item.description,
       tags,
@@ -191,6 +218,11 @@ app.get('/api/workshop/:itemId/download', async (c) => {
       download_count: item.download_count + 1,
       created_at: item.created_at,
       updated_at: item.updated_at,
+      dependencies: item.dependencies_json ? JSON.parse(item.dependencies_json) : [],
+      recommendations: item.recommendations_json ? JSON.parse(item.recommendations_json) : [],
+      min_app_version: item.min_app_version || null,
+      compatibility: item.compatibility_json ? JSON.parse(item.compatibility_json) : {},
+      screenshots: item.screenshots_json ? JSON.parse(item.screenshots_json) : [],
     });
   } catch (err) {
     return c.json({ error: 'DOWNLOAD_FAILED', message: String(err) }, 500);
@@ -206,6 +238,15 @@ app.post('/api/workshop', requireAuth, async (c) => {
     type: body.type,
     tags: body.tags,
     data: body.data,
+    contentType: body.contentType,
+    version: body.version,
+    category: body.category,
+    dependencies: body.dependencies,
+    recommendations: body.recommendations,
+    screenshots: body.screenshots,
+    minAppVersion: body.minAppVersion,
+    compatibility: body.compatibility,
+    featured: body.featured,
   };
   const res = await createItem(c.env, s.userId, input);
   return c.json(res.body, res.status as 201 | 400 | 413);
@@ -220,6 +261,15 @@ app.put('/api/workshop/:itemId', requireAuth, async (c) => {
     type: body.type,
     tags: body.tags,
     data: body.data,
+    contentType: body.contentType,
+    version: body.version,
+    category: body.category,
+    dependencies: body.dependencies,
+    recommendations: body.recommendations,
+    screenshots: body.screenshots,
+    minAppVersion: body.minAppVersion,
+    compatibility: body.compatibility,
+    featured: body.featured,
   };
   const res = await updateItem(c.env, s.userId, c.req.param('itemId')!, input);
   return c.json(res.body, res.status as 200 | 400 | 403 | 404 | 413);
@@ -232,8 +282,14 @@ app.delete('/api/workshop/:itemId', requireAuth, async (c) => {
 });
 
 
+
 // ——— 匿名游玩统计（无需鉴权；数据完全匿名）———
 import { handlePostPlayStat } from './playStats';
+import { handleTrialCompletion, handleTrialStatus } from './trial';
 
 app.post('/api/stats/play', (c) => handlePostPlayStat(c));
+
+// —— 免费体验（上游地址和密钥只存在 Worker 环境变量）——
+app.get('/api/trial/status', (c) => handleTrialStatus(c));
+app.post('/api/trial/chat/completions', (c) => handleTrialCompletion(c));
 export default app;

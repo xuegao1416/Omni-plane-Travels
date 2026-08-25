@@ -182,7 +182,7 @@ export const DEFAULT_LIMITS: EvaluateLimits = {
 // ─── 执行结果 ───
 
 export interface PendingAction {
-  kind: 'set' | 'addEvent' | 'modifyResource' | 'scheduleTick' | 'narrateHint';
+  kind: 'set' | 'addEvent' | 'requestCombat' | 'modifyResource' | 'scheduleTick' | 'narrateHint';
   payload: Record<string, unknown>;
 }
 

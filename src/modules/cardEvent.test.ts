@@ -7,6 +7,7 @@ import type { EventRule } from './schema';
 import {
   eventWorldEvolution,
   collectAddEventEvents,
+  collectCombatEncounterRequests,
 } from './eventIntegration';
 import { eventBus, EVENTS } from '../engine/eventBus';
 
@@ -48,5 +49,27 @@ test('含 addEvent 的 rule → 收集到 { eventId, eventPackId } 并经 eventB
   const { results: r2 } = eventWorldEvolution.evaluateTick({}, 2, []);
   expect(collectAddEventEvents(r2).length).toBe(0);
 
+  eventWorldEvolution.clear();
+});
+
+test('事件工作流以类型化动作发出战斗遭遇请求', () => {
+  eventWorldEvolution.clear();
+  const request = {
+    schemaVersion: 2 as const,
+    source: 'event-workflow' as const,
+    proposal: {
+      schemaVersion: 2 as const,
+      id: 'rule-combat', context: '敌对行动已经发生', threatBand: 'matched' as const,
+      allies: [], enemies: [{ id: 'enemy', identity: '敌人', temporary: true }], neutrals: [],
+    },
+  };
+  eventWorldEvolution.registerPack({
+    eventPackId: 'combat-rule-pack',
+    rules: [{ id: 'combat-rule', when: { all: [] }, then: [{ requestCombat: request }] }],
+    permissions: ['emit_world_event'],
+    runtime: { onceFired: {}, cooldownRemaining: {} },
+  });
+  const { results } = eventWorldEvolution.evaluateTick({}, 1, []);
+  expect(collectCombatEncounterRequests(results)).toEqual([request]);
   eventWorldEvolution.clear();
 });

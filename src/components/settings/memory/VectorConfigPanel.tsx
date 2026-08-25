@@ -2,12 +2,21 @@
 // 向量化设置面板 — 使用共享组件重写
 // ============================================================
 
-import { useState, useCallback } from 'react';
-import { RefreshCw, AlertTriangle, Database } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { RefreshCw, AlertTriangle, Database, Download, CheckCircle2, Trash2 } from 'lucide-react';
 import type { MemorySystemConfig } from '../../../memory/types';
 import type { ApiPreset } from '../apiPresetUtils';
 import { fetchModels } from '../../../api/client';
 import { Section, FieldGrid, Field, Select, Toggle } from '../SettingsUIComponents';
+import {
+  DEFAULT_LOCAL_EMBEDDING_MODEL,
+  clearAllLocalEmbeddingModels,
+  deleteLocalEmbeddingModel,
+  getInstalledLocalEmbeddingModels,
+  isLocalEmbeddingModelLoaded,
+  warmLocalEmbeddingModel,
+  type LocalEmbeddingModelMetadata,
+} from '../../../memory/embeddingRuntime';
 
 interface Props {
   config: MemorySystemConfig;
@@ -47,6 +56,59 @@ export function VectorConfigPanel({ config, apiPresets, onUpdate }: Props) {
   const [fetchingRerank, setFetchingRerank] = useState(false);
   const [rerankModels, setRerankModels] = useState<string[]>([]);
   const [rerankError, setRerankError] = useState('');
+  const [localError, setLocalError] = useState('');
+  const [localDownloading, setLocalDownloading] = useState(false);
+  const [localReady, setLocalReady] = useState(() => isLocalEmbeddingModelLoaded(config.localEmbeddingModelId ?? DEFAULT_LOCAL_EMBEDDING_MODEL));
+  const [localProgress, setLocalProgress] = useState(0);
+  const [localModels, setLocalModels] = useState<LocalEmbeddingModelMetadata[]>(() => getInstalledLocalEmbeddingModels());
+
+  useEffect(() => {
+    setLocalReady(isLocalEmbeddingModelLoaded(config.localEmbeddingModelId ?? DEFAULT_LOCAL_EMBEDDING_MODEL));
+    setLocalModels(getInstalledLocalEmbeddingModels());
+  }, [config.localEmbeddingModelId]);
+
+  const handlePrepareLocalModel = useCallback(async () => {
+    setLocalError('');
+    setLocalDownloading(true);
+    setLocalProgress(0);
+    try {
+      const model = config.localEmbeddingModelId?.trim() || DEFAULT_LOCAL_EMBEDDING_MODEL;
+      await warmLocalEmbeddingModel(model, {}, progress => setLocalProgress(Math.max(0, Math.min(100, progress.progress ?? 0))));
+      onUpdate({ localEmbeddingModelId: model });
+      setLocalReady(true);
+      setLocalModels(getInstalledLocalEmbeddingModels());
+      setLocalError('');
+    } catch (e) {
+      setLocalReady(false);
+      setLocalError(e instanceof Error ? e.message : '端侧模型初始化失败');
+    } finally {
+      setLocalDownloading(false);
+    }
+  }, [config.localEmbeddingModelId, onUpdate]);
+
+  const handleDeleteLocalModel = useCallback(async (model: string) => {
+    try {
+      await deleteLocalEmbeddingModel(model);
+      setLocalModels(getInstalledLocalEmbeddingModels());
+      if (model === config.localEmbeddingModelId) {
+        onUpdate({ localEmbeddingModelId: DEFAULT_LOCAL_EMBEDDING_MODEL });
+        setLocalReady(false);
+      }
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : '删除本地模型失败');
+    }
+  }, [config.localEmbeddingModelId, onUpdate]);
+
+  const handleClearLocalModels = useCallback(async () => {
+    try {
+      await clearAllLocalEmbeddingModels();
+      setLocalModels([]);
+      setLocalReady(false);
+      setLocalError('');
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : '清理本地模型缓存失败');
+    }
+  }, []);
 
   const handleFetchEmbedding = useCallback(async () => {
     setFetchingEmbedding(true);
@@ -99,6 +161,18 @@ export function VectorConfigPanel({ config, apiPresets, onUpdate }: Props) {
         向量事实库与语义检索仅作为检索记忆层的长程补充。
       </div>
       <FieldGrid>
+        <Field label="Embedding 运行方式" span={2} hint="端侧模式在当前设备内用 WASM 推理；模型首次使用时下载并缓存，之后可离线运行。">
+          <Select
+            options={[
+              { label: '远程 API', value: 'remote' },
+              { label: '端侧模型（Web / 桌面 / Android）', value: 'local' },
+              { label: '外部本地服务', value: 'local_endpoint' },
+            ]}
+            value={config.vectorRuntime}
+            onChange={v => onUpdate({ vectorRuntime: v })}
+            width="100%"
+          />
+        </Field>
         {/* 启用向量事实库 */}
         <Field label="启用向量事实库" hint="作为检索记忆层的长程补充，不再承担旧摘要链职责。" span={2}>
           <Toggle value={config.vectorEnabled} onChange={v => onUpdate({ vectorEnabled: v })} />
@@ -157,7 +231,8 @@ export function VectorConfigPanel({ config, apiPresets, onUpdate }: Props) {
             onChange={e => onUpdate({ vectorScoreThreshold: Number(e.target.value) })} />
         </Field>
 
-        {/* Embedding API */}
+        {/* Embedding API：Web 与远程运行方式保留；Web 不显示本地下载动作。 */}
+        {config.vectorRuntime === 'remote' && <>
         <Field label="Embedding API 地址" span={2}>
           <StyledInput value={config.vectorApiUrl}
             placeholder="例如：https://api.openai.com/v1"
@@ -202,6 +277,58 @@ export function VectorConfigPanel({ config, apiPresets, onUpdate }: Props) {
             </span>
           )}
         </Field>
+        </>}
+
+        {config.vectorRuntime === 'local' && (
+          <>
+            <Field label="端侧 Embedding 模型" span={2} hint="推荐的中文小模型使用量化 ONNX 权重；首次初始化需要联网，模型由当前设备缓存。">
+              <StyledInput
+                value={config.localEmbeddingModelId ?? DEFAULT_LOCAL_EMBEDDING_MODEL}
+                placeholder={DEFAULT_LOCAL_EMBEDDING_MODEL}
+                onChange={e => onUpdate({ localEmbeddingModelId: e.target.value || DEFAULT_LOCAL_EMBEDDING_MODEL })}
+              />
+            </Field>
+            <Field label="端侧模型状态" span={2}>
+              <button type="button" disabled={localDownloading} onClick={() => void handlePrepareLocalModel()} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 11px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: localDownloading ? 'wait' : 'pointer' }}>
+                {localReady ? <CheckCircle2 size={14} /> : <Download size={14} />}
+                {localDownloading ? `正在下载并初始化… ${Math.round(localProgress)}%` : localReady ? '模型已在本次运行中就绪' : '下载并初始化模型'}
+              </button>
+              <div style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 12 }}>
+                模型下载后由浏览器或 WebView 缓存；清理站点数据会移除缓存。
+              </div>
+            </Field>
+            <Field label="已安装模型" span={2}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {localModels.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>暂无已登记的端侧模型。</span>}
+                {localModels.map(model => (
+                  <div key={model.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: model.id === (config.localEmbeddingModelId ?? DEFAULT_LOCAL_EMBEDDING_MODEL) ? 'var(--accent-dim)' : 'var(--bg-secondary)' }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', fontSize: 12 }} title={model.id}>{model.id}{model.id === (config.localEmbeddingModelId ?? DEFAULT_LOCAL_EMBEDDING_MODEL) ? '（当前）' : ''}</span>
+                    <button type="button" title={`删除 ${model.id}`} aria-label={`删除 ${model.id}`} onClick={() => void handleDeleteLocalModel(model.id)} style={{ border: 0, background: 'transparent', color: 'var(--danger)', cursor: 'pointer', display: 'inline-flex' }}><Trash2 size={13} /></button>
+                  </div>
+                ))}
+                {localModels.length > 0 && <button type="button" onClick={() => void handleClearLocalModels()} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, border: 0, background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: 12 }}><Trash2 size={12} /> 清理全部本地模型缓存</button>}
+              </div>
+            </Field>
+            {localError && (
+              <Field label="本地模型状态" span={2}>
+                <span style={{ color: 'var(--danger)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <AlertTriangle size={12} />{localError}
+                </span>
+              </Field>
+            )}
+          </>
+        )}
+
+        {config.vectorRuntime === 'local_endpoint' && (
+          <>
+            <Field label="本地 Embedding 服务地址" span={2} hint="仅接受当前设备运行的 OpenAI-compatible /v1/embeddings 服务。">
+              <StyledInput value={config.localEmbeddingEndpoint} placeholder="http://127.0.0.1:8080/v1" onChange={e => onUpdate({ localEmbeddingEndpoint: e.target.value })} />
+            </Field>
+            <Field label="本地服务模型" span={2}>
+              <StyledInput value={config.localEmbeddingModelId ?? ''} placeholder="bge-small-zh-v1.5" onChange={e => onUpdate({ localEmbeddingModelId: e.target.value || null })} />
+            </Field>
+          </>
+        )}
 
         {/* Rerank API */}
         {(config.vectorRetrieveMode === 'cross_encoder' || config.vectorRetrieveMode === 'hybrid') && (

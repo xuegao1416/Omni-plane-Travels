@@ -39,6 +39,7 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
     name: '', gender: '', age: '', background: '', personality: '', appearance: '',
     career: '', socialClass: '', organization: '', specialIdentity: '',
     perspective: '第三人称', initialSkills: {}, initialItems: {}, customNpcs: [],
+    combatRiskMode: 'normal',
   };
 
   // ─── 角色信息 ───

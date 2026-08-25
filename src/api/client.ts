@@ -2,6 +2,7 @@ import type { ApiConfig, Message, RequestOptions, StreamOptions, CompletionResul
 import { nativeFetch } from '../utils/nativeFetch';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { notifyRateLimited, bucketKeyForConfig } from './rateLimiter';
+import { fetchTrialStatus, getTrialClientId, isTrialApiConfig } from './trial';
 
 // 获取代理 URL（校验协议安全性）
 export function getProxyUrl(): string | null {
@@ -31,7 +32,9 @@ export function getProxyUrl(): string | null {
 
 /** 统一准备请求 URL 和 Headers（处理代理逻辑） */
 export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>): { url: string; headers: Record<string, string> } {
-  const proxyUrl = getProxyUrl();
+  // 体验路由是本项目固定的同源服务端入口，不能被用户配置的任意代理改写。
+  const isTrialEndpoint = endpoint.includes('/api/trial/');
+  const proxyUrl = isTrialEndpoint ? null : getProxyUrl();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...extraHeaders,
@@ -65,6 +68,7 @@ export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHead
 // URL拼接 - 支持多种provider
 export function buildEndpoint(config: ApiConfig): string {
   const base = config.baseUrl.replace(/\/+$/, '');
+  if (isTrialApiConfig(config)) return `${base}/chat/completions`;
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
@@ -242,7 +246,11 @@ export async function requestCompletion(
   const body = buildRequestBody(config, normalized, { ...options, stream: false });
   console.log(`🚀 [API] 发起请求 → ${endpoint} (${messages.length} 条消息)`);
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
+  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
+    endpoint,
+    isTrialApiConfig(config) ? undefined : config.apiKey,
+    isTrialApiConfig(config) ? { 'X-Trial-Client-Id': getTrialClientId(), ...(options.trialPurpose ? { 'X-Trial-Purpose': options.trialPurpose } : {}) } : undefined,
+  );
 
   const res = await nativeFetch(fetchUrl, {
     method: 'POST',
@@ -303,7 +311,11 @@ export async function requestCompletionStream(
   const normalized = normalizeMessages(config.provider, messages);
   const body = buildRequestBody(config, normalized, { ...options, stream: true });
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
+  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
+    endpoint,
+    isTrialApiConfig(config) ? undefined : config.apiKey,
+    isTrialApiConfig(config) ? { 'X-Trial-Client-Id': getTrialClientId(), ...(options.trialPurpose ? { 'X-Trial-Purpose': options.trialPurpose } : {}) } : undefined,
+  );
 
   const res = await fetch(fetchUrl, {
     method: 'POST',

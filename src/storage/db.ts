@@ -6,6 +6,9 @@ import { STORAGE_KEYS } from '@/config/storageKeys';
 import { slimMemoryRuntimeForSave } from '@/memory/memoryStore';
 import type { SimulationState } from '@/simulation/types';
 import { findWorldDef } from '@/data/worldLoader';
+import type { ModuleStateRecord } from '@/gameplay/moduleRuntime/types';
+import { extractModulePartitions } from '@/gameplay/moduleRuntime/facade';
+import type { CombatRiskMode } from '../gameplay/protocols';
 
 // ─── 类型定义 ─────────────────────────────────────────
 
@@ -97,7 +100,15 @@ interface PlayerProfile {
 
   // 模块初始数据（角色创建时玩家设定的初始属性值）
   moduleInitData?: Record<string, unknown>;
+  /** 职业模块启用时由条件第五步写入。 */
+  professionId?: string | null;
+  /** 创建角色时消耗固定预算选择；进入游戏后不可购买。 */
+  innateTalentIds?: string[];
+  /** v3 combat risk is chosen once during creation and is immutable after start. */
+  combatRiskMode?: CombatRiskMode;
 }
+
+export type SaveLifecycle = 'active' | 'ended';
 
 /** 完整存档记录（写入 IndexedDB saves store） */
 interface GameSave {
@@ -123,6 +134,24 @@ interface GameSave {
   simulationState?: SimulationState;
   /** 按存档绑定的启用事件包列表（内置世界无 customWorld，绑定落在此处） */
   enabledMods?: string[]; // TODO: 下次存档格式升级时改名为 enabledEventPacks
+  /** 六模块当前运行态；仅作为加载/导出传输载体，实际存于独立 object store。 */
+  moduleStates?: ModuleStateRecord[];
+  /** 消息快照引用的模块历史修订；实际存于独立 object store。 */
+  moduleCheckpoints?: ModuleStateRecord[];
+  /** v3 inferno death seals the save without deleting it. */
+  lifecycle?: SaveLifecycle;
+  endedAt?: number;
+  endReason?: string;
+}
+
+/** Additive lifecycle migration: legacy saves remain active and retryable by default. */
+export function normalizeSaveLifecycle(save: GameSave): GameSave {
+  return {
+    ...save,
+    lifecycle: save.lifecycle === 'ended' ? 'ended' : 'active',
+    ...(save.lifecycle === 'ended' && Number.isFinite(save.endedAt) ? { endedAt: save.endedAt } : {}),
+    ...(save.lifecycle === 'ended' && save.endReason ? { endReason: save.endReason } : {}),
+  };
 }
 
 /** 轻量元数据（写入 global store，运行时缓存用于列表展示） */
@@ -135,22 +164,27 @@ export interface SaveMeta {
   estBytes?: number;
   /** 消息数量 */
   messageCount?: number;
+  lifecycle?: SaveLifecycle;
+  endedAt?: number;
+  endReason?: string;
 }
 
 // ─── DB 常量 ──────────────────────────────────────────
 
 const DB_NAME = 'omni-plane-travels';
-const DB_VERSION = 4;  // v4: 消息分片存储
+const DB_VERSION = 5;  // v5: 独立模块状态与回滚检查点
 const SAVES_STORE = 'saves';
 const GLOBAL_STORE = 'global';
 const MESSAGES_STORE = 'messages';  // 新增：消息分片 store
+export const MODULE_STATES_STORE = 'module_states';
+export const MODULE_CHECKPOINTS_STORE = 'module_checkpoints';
 
 /** localStorage key：当前活跃存档 ID（F5 恢复用） */
 export const ACTIVE_SAVE_KEY = STORAGE_KEYS.ACTIVE_SAVE;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
-function getDB() {
+export function getDB() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion, newVersion, transaction) {
@@ -168,6 +202,20 @@ function getDB() {
           const msgStore = db.createObjectStore(MESSAGES_STORE, { keyPath: 'key' });
           msgStore.createIndex('saveId', 'saveId');
           msgStore.createIndex('saveId_seq', ['saveId', 'seq']);
+        }
+
+        // v5: module runtime partitions are persisted separately from GameState.
+        if (oldVersion < 5) {
+          if (!db.objectStoreNames.contains(MODULE_STATES_STORE)) {
+            const moduleStore = db.createObjectStore(MODULE_STATES_STORE, { keyPath: 'key' });
+            moduleStore.createIndex('saveId', 'saveId');
+            moduleStore.createIndex('saveId_moduleId', ['saveId', 'moduleId'], { unique: true });
+          }
+          if (!db.objectStoreNames.contains(MODULE_CHECKPOINTS_STORE)) {
+            const checkpointStore = db.createObjectStore(MODULE_CHECKPOINTS_STORE, { keyPath: 'key' });
+            checkpointStore.createIndex('saveId', 'saveId');
+            checkpointStore.createIndex('saveId_module_revision', ['saveId', 'moduleId', 'revision'], { unique: true });
+          }
         }
       },
     });
@@ -504,6 +552,9 @@ export async function remigrateSave(saveId: string): Promise<boolean> {
       customWorld: oldSave.customWorld,
       simulationState: oldSave.simulationState,
       enabledMods: oldSave.enabledMods,
+      lifecycle: oldSave.lifecycle === 'ended' ? 'ended' : 'active',
+      endedAt: oldSave.endedAt,
+      endReason: oldSave.endReason,
       messageCount: messages.length,
       lastMessageSeq: messages.length - 1,
     };
@@ -655,6 +706,9 @@ export interface CompactSaveRecord {
   messageCount: number;
   lastMessageSeq: number;
   estBytes?: number;
+  lifecycle?: SaveLifecycle;
+  endedAt?: number;
+  endReason?: string;
 }
 
 /**
@@ -692,6 +746,9 @@ export function planV2ToV3Migration(oldSave: GameSave): {
     customWorld: oldSave.customWorld,
     simulationState: oldSave.simulationState,
     enabledMods: oldSave.enabledMods,
+    lifecycle: oldSave.lifecycle === 'ended' ? 'ended' : 'active',
+    endedAt: oldSave.endedAt,
+    endReason: oldSave.endReason,
     messageCount: messages.length,
     lastMessageSeq: messages.length > 0 ? messages.length - 1 : -1,
   };
@@ -760,14 +817,15 @@ export async function loadSaveWithMigration(saveId: string): Promise<GameSave | 
     const migrated = await migrateV2ToV3(oldSave);
     if (migrated) {
       // 迁移成功，重新读取（现在是紧凑头部）
-      return await db.get(SAVES_STORE, saveId) as any;
+      const migratedRecord = await db.get(SAVES_STORE, saveId) as GameSave | undefined;
+      return migratedRecord ? normalizeSaveLifecycle(migratedRecord) : null;
     }
     // 迁移失败，返回原记录（兼容回退）
-    return oldSave;
+    return normalizeSaveLifecycle(oldSave);
   }
 
   // 新格式，直接返回
-  return record as any;
+  return normalizeSaveLifecycle(record as GameSave);
 }
 
 // ─── 存档 CRUD ────────────────────────────────────────
@@ -783,6 +841,8 @@ export async function saveGameIncremental(
   saveId: string,
   compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'>,
   newMessages: ChatMessage[],
+  moduleStates: readonly ModuleStateRecord[] = [],
+  moduleCheckpoints: readonly ModuleStateRecord[] = [],
 ): Promise<void> {
   const db = await getDB();
 
@@ -806,7 +866,8 @@ export async function saveGameIncremental(
 
   // 2) 写紧凑头部（无 messages，体积稳定）
   // 计算最后 seq：取 maxSeq 和当前头部中的 lastMessageSeq 的较大值
-  const currentLastSeq = (compactHead as any).lastMessageSeq ?? -1;
+  const existingHead = await db.get(SAVES_STORE, saveId) as CompactSaveRecord | undefined;
+  const currentLastSeq = (compactHead as any).lastMessageSeq ?? existingHead?.lastMessageSeq ?? -1;
   const newLastSeq = Math.max(currentLastSeq, maxSeq);
   const fullHead: CompactSaveRecord = {
     ...compactHead,
@@ -814,7 +875,29 @@ export async function saveGameIncremental(
     messageCount: newLastSeq + 1,
     lastMessageSeq: newLastSeq,
   };
-  await db.put(SAVES_STORE, fullHead as any);
+  const tx = db.transaction(
+    [SAVES_STORE, MODULE_STATES_STORE, MODULE_CHECKPOINTS_STORE],
+    'readwrite',
+  );
+  await tx.objectStore(SAVES_STORE).put(fullHead as any);
+  const stateStore = tx.objectStore(MODULE_STATES_STORE);
+  for (const record of moduleStates) {
+    const key = `${saveId}#${record.moduleId}`;
+    const persisted = await stateStore.get(key) as ModuleStateRecord | undefined;
+    if (persisted?.revision === record.revision) continue;
+    await stateStore.put({ ...record, saveId, key });
+  }
+  const checkpointStore = tx.objectStore(MODULE_CHECKPOINTS_STORE);
+  for (const record of moduleCheckpoints) {
+    const key = `${saveId}#${record.moduleId}#${record.revision}`;
+    if (await checkpointStore.get(key)) continue;
+    await checkpointStore.put({
+      ...record,
+      saveId,
+      key,
+    });
+  }
+  await tx.done;
 }
 
 /**
@@ -860,6 +943,11 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
         customWorld: compactHead.customWorld,
         simulationState: compactHead.simulationState,
         enabledMods: compactHead.enabledMods,
+        lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
+        endedAt: compactHead.endedAt,
+        endReason: compactHead.endReason,
+        moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
+        moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
       };
     }
 
@@ -892,12 +980,17 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
             customWorld: compactHead.customWorld,
             simulationState: compactHead.simulationState,
             enabledMods: compactHead.enabledMods,
+            lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
+            endedAt: compactHead.endedAt,
+            endReason: compactHead.endReason,
+            moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
+            moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
           };
         }
       }
       // 迁移失败，返回原记录（兼容回退）
       console.warn(`[DB] 存档 ${id} 迁移失败，使用原格式加载`);
-      return oldSave;
+      return normalizeSaveLifecycle(oldSave);
     }
 
     // 其他情况直接返回
@@ -916,7 +1009,7 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
       }
     }
 
-    return result;
+    return normalizeSaveLifecycle(result);
   } catch (err) {
     console.error('[DB] 加载失败:', err);
     throw new Error('存档加载失败');
@@ -929,7 +1022,10 @@ export async function deleteSave(id: string): Promise<void> {
     const db = await getDB();
 
     // 同一事务删除 saves 记录 + messages 分片
-    const tx = db.transaction([SAVES_STORE, MESSAGES_STORE], 'readwrite');
+    const tx = db.transaction(
+      [SAVES_STORE, MESSAGES_STORE, MODULE_STATES_STORE, MODULE_CHECKPOINTS_STORE],
+      'readwrite',
+    );
 
     // 删除 saves 记录
     await tx.objectStore(SAVES_STORE).delete(id);
@@ -940,6 +1036,15 @@ export async function deleteSave(id: string): Promise<void> {
     while (cursor) {
       await cursor.delete();
       cursor = await cursor.continue();
+    }
+
+    for (const storeName of [MODULE_STATES_STORE, MODULE_CHECKPOINTS_STORE]) {
+      const index = tx.objectStore(storeName).index('saveId');
+      let moduleCursor = await index.openCursor(IDBKeyRange.only(id));
+      while (moduleCursor) {
+        await moduleCursor.delete();
+        moduleCursor = await moduleCursor.continue();
+      }
     }
 
     await tx.done;
@@ -954,7 +1059,7 @@ export async function deleteSave(id: string): Promise<void> {
 export async function forceDeleteSave(id: string): Promise<void> {
   try {
     const db = await getDB();
-    await db.delete(SAVES_STORE, id);
+    await deleteSave(id);
     // 同时清理元数据中的对应条目
     const metas = await getAllSaveMeta();
     const filtered = metas.filter(s => s.id !== id);
@@ -1062,7 +1167,12 @@ export async function exportSave(saveId: string): Promise<Blob> {
       customWorld: record.customWorld,
       simulationState: record.simulationState,
       enabledMods: record.enabledMods, // 兼容旧版
+      lifecycle: record.lifecycle === 'ended' ? 'ended' : 'active',
+      endedAt: record.endedAt,
+      endReason: record.endReason,
       eventPacks, // 新版：事件包完整内容
+      moduleStates: await (await import('./moduleStateDb')).getModuleStates(saveId),
+      moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(saveId),
     },
   };
 
@@ -1116,12 +1226,23 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
 
   const finalTimestamp = Number(save.timestamp) || Date.now();
 
+  const importedModuleStates = Array.isArray(save.moduleStates)
+    ? (save.moduleStates as ModuleStateRecord[]).map(record => ({ ...record, saveId: finalId }))
+    : undefined;
+  const importedModuleCheckpoints = Array.isArray(save.moduleCheckpoints)
+    ? (save.moduleCheckpoints as ModuleStateRecord[]).map(record => ({ ...record, saveId: finalId }))
+    : undefined;
+  const canPartitionLegacyState = save.gameState?.玩家 && save.gameState?.世界;
+  const migratedPartitions = importedModuleStates || !canPartitionLegacyState
+    ? undefined
+    : extractModulePartitions(save.gameState, finalId);
+
   const saveData: GameSave = {
     id: finalId,
     name: finalName,
     timestamp: finalTimestamp,
     messages: Array.isArray(save.messages) ? save.messages : [],
-    gameState: save.gameState || {},
+    gameState: migratedPartitions?.coreState ?? (save.gameState || {}),
     worldId: save.worldId || 'default',
     personalInfo: save.personalInfo || undefined,
     characterHistory: save.characterHistory || undefined,
@@ -1132,6 +1253,11 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     customWorld: save.customWorld || undefined,
     simulationState: save.simulationState || undefined,
     enabledMods: save.enabledMods || undefined, // 兼容旧版
+    lifecycle: save.lifecycle === 'ended' ? 'ended' : 'active',
+    endedAt: save.endedAt,
+    endReason: save.endReason,
+    moduleStates: importedModuleStates ?? migratedPartitions?.records,
+    moduleCheckpoints: importedModuleCheckpoints ?? migratedPartitions?.records,
   };
 
   // 如果导入的存档包含自建世界，注册到 localStorage 以便 findWorldDef 能找到
@@ -1169,9 +1295,18 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     variableConfig: saveData.variableConfig,
     customWorld: saveData.customWorld,
     simulationState: saveData.simulationState,
+    lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
+    endedAt: saveData.endedAt,
+    endReason: saveData.endReason,
   };
 
-  await saveGameIncremental(finalId, compactHead, messages);
+  await saveGameIncremental(
+    finalId,
+    compactHead,
+    messages,
+    saveData.moduleStates,
+    saveData.moduleCheckpoints,
+  );
 
   const meta: SaveMeta = {
     id: finalId,
@@ -1180,6 +1315,9 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     preview: buildPreview(saveData),
     estBytes: messages.length * 500,
     messageCount: messages.length,
+    lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
+    endedAt: saveData.endedAt,
+    endReason: saveData.endReason,
   };
 
   const updated = [...metas, meta];

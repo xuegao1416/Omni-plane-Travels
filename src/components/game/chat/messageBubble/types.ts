@@ -9,6 +9,7 @@ export interface Props {
   onResendFromHere: (id: string) => void;
   onCopy: (text: string) => void;
   onOptionClick?: (optionText: string) => void;
+  readOnly?: boolean;
   /** 世界系统数据（用于内联骰子卡片） */
   worldSystem?: WorldSystemData | null;
   /** 骰子掷骰结果回调 */

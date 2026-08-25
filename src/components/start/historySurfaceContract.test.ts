@@ -18,7 +18,7 @@ describe('character history ritual surface contract', () => {
     expect(styles).toContain('.history-ritual-surface__nav');
     expect(styles).toContain('scroll-padding-inline');
     expect(styles).toMatch(/\.creation-ritual-shell__footer\.is-step-3[\s\S]*grid-template-columns/);
-    expect(wizard).toContain("currentStep === 3 ? ' is-step-3' : ''");
+    expect(wizard).toContain("currentStep === historyStep ? ' is-step-3' : ''");
     expect(styles).toContain('@media (max-width: 640px)');
   });
 });

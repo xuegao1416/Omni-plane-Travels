@@ -22,8 +22,9 @@ export default function StepPersonalInfo({
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const presetMenuRef = useRef<HTMLDivElement>(null);
   const isIdentityPhase = phase === 'identity';
+  const hasProfessionModule = Boolean(worldModules?.some(module => module.moduleId === 'profession' && module.enabled));
   const hasLoadoutContent = Object.keys(personalInfo.moduleInitData ?? {}).length > 0
-    || Object.keys(personalInfo.initialSkills ?? {}).length > 0
+    || (!hasProfessionModule && Object.keys(personalInfo.initialSkills ?? {}).length > 0)
     || Object.keys(personalInfo.initialItems ?? {}).length > 0
     || personalInfo.customNpcs.length > 0;
 
@@ -118,7 +119,7 @@ export default function StepPersonalInfo({
   const renderLoadout = () => (
     <div className={`ritual-loadout-box${hasLoadoutContent ? ' has-content' : ' is-empty'}`}>
       <div className="ritual-loadout-heading">
-        <div><span className="ritual-section-kicker">第二步 · 世界法则下的个人负载</span><strong>天赋与行囊</strong></div>
+        <div><span className="ritual-section-kicker">行囊卷 · 世界法则下的个人负载</span><strong>{hasProfessionModule ? '行囊与同行者' : '能力与行囊'}</strong></div>
         <small>{hasLoadoutContent ? '已配置内容可继续编辑' : '当前世界没有额外行囊限制'}</small>
       </div>
       <div className="ritual-loadout-intro">沿用当前世界已启用的模块；没有模块的分组会保持轻量，不制造空白数据。</div>
@@ -127,7 +128,11 @@ export default function StepPersonalInfo({
           <summary><span>属性与世界模块</span><small>{Object.keys(personalInfo.moduleInitData ?? {}).length} 项</small></summary>
           <div className="ritual-loadout-group__body"><StatsTab worldModules={worldModules} personalInfo={personalInfo} setPersonalInfo={setPersonalInfo} /></div>
         </details>
-        <details className="ritual-loadout-group"><summary><span>天赋与技能</span><small>{Object.keys(personalInfo.initialSkills ?? {}).length} 项</small></summary><div className="ritual-loadout-group__body"><SkillsTab personalInfo={personalInfo} set={set} /></div></details>
+        {hasProfessionModule ? (
+          <div className="ritual-loadout-intro">职业、先天天赋与职业能力已在上一卷确定；自由技能只会在旅途中学习，不在这里再选一次。</div>
+        ) : (
+          <details className="ritual-loadout-group"><summary><span>初始自由技能</span><small>{Object.keys(personalInfo.initialSkills ?? {}).length} 项</small></summary><div className="ritual-loadout-group__body"><SkillsTab personalInfo={personalInfo} set={set} /></div></details>
+        )}
         <details className="ritual-loadout-group"><summary><span>行囊与物品</span><small>{Object.keys(personalInfo.initialItems ?? {}).length} 项</small></summary><div className="ritual-loadout-group__body"><ItemsTab personalInfo={personalInfo} set={set} /></div></details>
         <details className="ritual-loadout-group"><summary><span>预设人物与 NPC</span><small>{personalInfo.customNpcs.length} 项</small></summary><div className="ritual-loadout-group__body"><NpcsTab personalInfo={personalInfo} set={set} onEditNpc={npc => { setEditingNpc(npc); setNpcEditorOpen(true); }} onOpenPicker={() => setNpcPickerOpen(true)} /></div></details>
       </div>
@@ -145,8 +150,12 @@ export default function StepPersonalInfo({
           <div className="personal-info-box personal-info-identity-box">
             <div className="pi-box-header"><Briefcase size={16} /><span>身份与叙事</span></div>
             <div className="pi-box-body">
-              <div className="ritual-form-section__heading"><span>职业与叙事视角</span><small>决定旅者如何被书写</small></div>
-              <label className="form-group"><span>职业</span><input type="text" value={personalInfo.career} onChange={event => set('career', event.target.value)} placeholder="学生、佣兵、学者……" /></label>
+              <div className="ritual-form-section__heading"><span>{hasProfessionModule ? '道路与叙事视角' : '职业与叙事视角'}</span><small>决定旅者如何被书写</small></div>
+              {hasProfessionModule ? (
+                <div className="ritual-identity-note">当前世界启用了职业典藏，职业将在下一步从完整职业树中选择，不能在这里用自由文本绕过规则。</div>
+              ) : (
+                <label className="form-group"><span>职业</span><input type="text" value={personalInfo.career} onChange={event => set('career', event.target.value)} placeholder="学生、佣兵、学者……" /></label>
+              )}
               <div className="form-group"><span>叙事视角</span><div className="gender-radio-group ritual-perspective-options">{PERSPECTIVE_OPTIONS.map(option => <button type="button" key={option.value} className={`gender-radio${personalInfo.perspective === option.value ? ' selected' : ''}`} onClick={() => set('perspective', option.value)} aria-pressed={personalInfo.perspective === option.value}><strong>{option.label}</strong><small>{option.desc}</small></button>)}</div></div>
               <div className="ritual-identity-note">填写姓名、性别与年龄后即可继续。</div>
             </div>

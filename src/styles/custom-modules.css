@@ -10,13 +10,18 @@
 }
 
 .custom-module-view h4,
-.custom-module-section h5 {
+.custom-module-section h5,
+.custom-module-card h5 {
   margin: 0 0 0.25rem;
   color: var(--text-primary);
 }
 
 .custom-module-view h4 { font-size: var(--font-size-sm); }
 .custom-module-section h5 { font-size: var(--font-size-xs); }
+.custom-module-card { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem; border: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); border-radius: 0.55rem; background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent); }
+.custom-module-card h5 { font-size: var(--font-size-sm); }
+.custom-module-card-body { margin: 0; color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.5; white-space: pre-wrap; }
+.custom-module-card-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .custom-module-field { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
 .custom-module-label { color: var(--text-muted); font-size: var(--font-size-xs); }
 .custom-module-text, .custom-module-number { color: var(--text-primary); font-size: var(--font-size-sm); }
@@ -151,6 +156,7 @@
 
 /* The mobile view switcher uses the workshop-tabs hook from the presentation component. */
 .custom-module-workshop-tabs { display: none; }
+.custom-module-action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
 
 @media (max-width: 640px) {
   .custom-module-workshop-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }

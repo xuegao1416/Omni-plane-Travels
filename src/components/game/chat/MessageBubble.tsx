@@ -8,7 +8,7 @@ import EditMode from './messageBubble/EditMode';
 import { useMenuItems } from './messageBubble/useMenuItems';
 import BubbleContent from './messageBubble/BubbleContent';
 
-export default memo(function MessageBubble({ message, onDelete, onEdit, onResend, onResendFromHere, onCopy, onOptionClick, worldSystem, onDiceRoll }: Props) {
+export default memo(function MessageBubble({ message, onDelete, onEdit, onResend, onResendFromHere, onCopy, onOptionClick, worldSystem, onDiceRoll, readOnly = false }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -88,7 +88,7 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
   // 菜单项
   const menuItems = useMenuItems({
     message, isUser, displayScripts,
-    onEdit: handleEdit, onCopy, onResend, onResendFromHere, onDelete,
+    onEdit: handleEdit, onCopy, onResend, onResendFromHere, onDelete, readOnly,
   });
 
   return (
@@ -116,7 +116,7 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
             renderedContent={renderedContent}
             iframeRef={iframeRef}
             messageHtmlRef={messageHtmlRef}
-            onOptionClick={onOptionClick}
+            onOptionClick={readOnly ? undefined : onOptionClick}
           />
         )}
       </div>

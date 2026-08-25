@@ -13,6 +13,10 @@ import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
 import { resetSimulationEngine } from '../../simulation/SimulationApi';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
+import { initializeProfessionSelection } from '../../gameplay/profession';
+import { resolveProfessionBinding } from '../../data/professions';
+import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
+import { migrateGameStateToV3 } from '../../gameplay/protocols';
 
 import { v4 as uuid } from 'uuid';
 
@@ -130,6 +134,7 @@ export function useStartScreen() {
 
     // 经营模块启用时，删除默认的货币资源（资金由经营资产统一管理）
     const hasBusinessModule = selectedWorldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
+    const professionModule = isProfessionModuleEnabled(selectedWorldDef) ? selectedWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
     if (hasBusinessModule) {
       delete (gs.玩家 as any).货币资源;
     }
@@ -141,7 +146,7 @@ export function useStartScreen() {
     gs.玩家.性格 = pi.personality || '';
     gs.玩家.外貌 = pi.appearance || '';
     gs.玩家.身份信息.职业 = pi.career || '';
-    if (pi.initialSkills) gs.玩家.技能系统 = { ...gs.玩家.技能系统, ...pi.initialSkills };
+    if (!professionModule && pi.initialSkills) gs.玩家.技能系统 = { ...gs.玩家.技能系统, ...pi.initialSkills };
     if (pi.initialItems) {
       for (const [k, v] of Object.entries(pi.initialItems)) {
         gs.玩家.物品栏[k] = { ...v };
@@ -189,7 +194,18 @@ export function useStartScreen() {
         物品列表: npc.itemsList || {},
       };
     }
-    return gs;
+    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;
+    const initialized = professionConfig?.professions.length
+      ? initializeProfessionSelection(gs, professionConfig, pi.professionId ?? null, pi.innateTalentIds ?? [])
+      : gs;
+    const migrated = migrateGameStateToV3(initialized);
+    migrated.v3!.featureFlags = {
+      ...migrated.v3!.featureFlags,
+      professionsEnabled: Boolean(professionConfig?.professions.length),
+      combatEnabled: Boolean(selectedWorldDef?.modules?.some(module => module.moduleId === 'combat' && module.enabled)),
+      combatRiskMode: pi.combatRiskMode ?? 'normal',
+    };
+    return migrated;
   };
 
   // ─── 开始游戏 ───
@@ -232,12 +248,33 @@ export function useStartScreen() {
 
     const currentWorldDef = wizard.allWorlds.find(w => w.id === wizard.selectedWorld);
     engine.reset(currentWorldDef);
-    engine.setPlayerProfile(wizard.personalInfo);
+    const professionModule = isProfessionModuleEnabled(currentWorldDef) ? currentWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
+    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;
+    engine.setPlayerProfile(professionConfig?.professions.length ? { ...wizard.personalInfo, initialSkills: {} } : wizard.personalInfo);
+    if (professionConfig?.professions.length) {
+      engine.variableManager.setState(initializeProfessionSelection(
+        engine.variableManager.getState(),
+        professionConfig,
+        wizard.personalInfo.professionId ?? null,
+        wizard.personalInfo.innateTalentIds ?? [],
+      ));
+    }
 
     // 应用 AI 生成的模块初始化数据（覆盖世界定义的默认值）
     if (wizard.personalInfo.moduleInitData && Object.keys(wizard.personalInfo.moduleInitData).length > 0) {
       engine.applyModuleInitData(wizard.personalInfo.moduleInitData);
     }
+
+    // Optional v3 modules are explicitly selected by the world and risk choice;
+    // the world difficulty field is intentionally not consulted here.
+    const startedState = migrateGameStateToV3(engine.variableManager.getState());
+    startedState.v3!.featureFlags = {
+      ...startedState.v3!.featureFlags,
+      professionsEnabled: Boolean(professionConfig?.professions.length),
+      combatEnabled: Boolean(currentWorldDef?.modules?.some(module => module.moduleId === 'combat' && module.enabled)),
+      combatRiskMode: wizard.personalInfo.combatRiskMode ?? 'normal',
+    };
+    engine.variableManager.setState(startedState);
 
     if (wizard.personalInfo.customNpcs.length > 0) {
       engine.setInitialNPCs(wizard.personalInfo.customNpcs);
@@ -269,9 +306,12 @@ export function useStartScreen() {
 
     const saveId = await createNewGame(saveName);
 
+    const moduleBundle = engine.variableManager.createModulePersistenceBundle(saveId);
     const save: GameSave = {
       id: saveId, name: saveName, timestamp: Date.now(),
-      messages: initialMessages, gameState: engine.variableManager.getState(),
+      messages: initialMessages, gameState: moduleBundle.coreState,
+      moduleStates: moduleBundle.current,
+      moduleCheckpoints: moduleBundle.checkpoints,
       worldId: wizard.selectedWorld, personalInfo: wizard.personalInfo, characterHistory,
     };
     // 使用 performSave 保存存档（会同时更新 savesMeta 列表）

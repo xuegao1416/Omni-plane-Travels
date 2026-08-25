@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 import {
-  BarChart3, TrendingUp, Leaf, Briefcase, Dice6, Star,
+  BarChart3, TrendingUp, Leaf, Briefcase, Dice6, Star, Swords,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -40,7 +40,7 @@ export const MODULE_OPTIONS: ModuleOption[] = [
   {
     id: 'survival',
     name: '生存资源',
-    description: '荒岛求生/末日生存类，资源采集、制作、消耗（与数值属性/成长/天赋互斥）',
+    description: '资源采集、制作、消耗与周期压力，可与其他模块组合',
     icon: Leaf,
   },
   {
@@ -56,11 +56,16 @@ export const MODULE_OPTIONS: ModuleOption[] = [
     icon: Dice6,
   },
   {
-    id: 'talent',
-    name: '天赋体系',
-    description: '天赋大类与具体天赋，角色固有特质与觉醒机制',
+    id: 'profession',
+    name: '职业典藏',
+    description: '挂载独立职业包；自动配套数值与成长体系，职业树在专用工作区维护',
     icon: Star,
-    aiInstruction: '生成天赋体系，包含天赋大类和具体天赋，品质分为普通/精良/稀有/史诗/传说五档，天赋效果为纯文本描述',
+  },
+  {
+    id: 'combat',
+    name: '战斗规则',
+    description: '选择稳定的内置规则模板；战斗行动会读取已解锁职业能力',
+    icon: Swords,
   },
 ];
 
@@ -76,9 +81,24 @@ interface ModuleSelectorProps {
 }
 
 /** 模块依赖关系：选了 key 模块时，value 模块会被自动启用 */
-const MODULE_DEPENDENCIES: Record<string, string[]> = {
+export const MODULE_DEPENDENCIES: Record<string, string[]> = {
   'progression': ['stat'],  // 成长体系依赖数值属性
+  'profession': ['stat', 'progression'], // 职业等级、能力点与公式属性需要完整成长底座
 };
+
+export function expandModuleDependencies(source: Iterable<string>): Set<string> {
+  const expanded = new Set(source);
+  const queue = [...expanded];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const dependency of MODULE_DEPENDENCIES[id] ?? []) {
+      if (expanded.has(dependency)) continue;
+      expanded.add(dependency);
+      queue.push(dependency);
+    }
+  }
+  return expanded;
+}
 
 export default function ModuleSelector({ selected, onToggle, compact, disabledByConflict }: ModuleSelectorProps) {
   // 计算被依赖自动启用的模块集合

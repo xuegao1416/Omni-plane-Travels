@@ -68,9 +68,11 @@ export function useInlinePortals(
     const mountDiceCards = async () => {
       const { default: InlineDiceCardComponent } = await import('../InlineDiceCard');
 
-      placeholders.forEach(el => {
+      placeholders.forEach((el, index) => {
         const attr = el.getAttribute('data-attr') || '';
         const dc = Number(el.getAttribute('data-dc')) || 10;
+        const requestId = `${message.id}:dice:${index}`;
+        const existingRoll = worldSystem.骰子检定?.history?.find(roll => roll.requestId === requestId);
         const container = document.createElement('div');
         el.replaceWith(container);
         const root = createRoot(container);
@@ -78,7 +80,10 @@ export function useInlinePortals(
           <InlineDiceCardComponent
             attr={attr}
             dc={dc}
+            requestId={requestId}
+            existingRoll={existingRoll}
             statData={worldSystem.数值属性}
+            diceData={worldSystem.骰子检定}
             onRoll={onDiceRoll}
           />
         );
@@ -92,7 +97,7 @@ export function useInlinePortals(
       deferredUnmount(diceRootsRef.current);
       diceRootsRef.current = [];
     };
-  }, [renderedContent, worldSystem, onDiceRoll, isUser, message.streaming, messageHtmlRef]);
+  }, [renderedContent, worldSystem, onDiceRoll, isUser, message.id, message.streaming, messageHtmlRef]);
 
   // ─── 天赋觉醒卡片 Portal ────────────────────────
   useEffect(() => {

@@ -15,9 +15,26 @@ export interface Bindings {
   EMAIL_FROM: string;
   /** 允许跨域（桌面端 Bearer）的 Origin 列表，逗号分隔。 */
   ALLOWED_ORIGINS?: string;
+  /** 免费体验上游（仅服务端使用，绝不返回客户端）。 */
+  TRIAL_LLM_BASE_URL?: string;
+  TRIAL_LLM_API_KEY?: string;
+  TRIAL_LLM_MODEL?: string;
+  TRIAL_MAX_REQUESTS?: string;
+  /** 匿名体验 token 签名密钥；未设置时回退 SESSION_SECRET。 */
+  TRIAL_ID_SECRET?: string;
 }
 
-export type WorkshopItemType = 'world_package' | 'character_preset' | 'npc_template' | 'history_preset';
+export type WorkshopItemType =
+  | 'world_package' | 'character_preset' | 'npc_template' | 'history_preset'
+  | 'gameplay_module' | 'event_pack' | 'workflow_pack' | 'adventure_pack' | 'visual_theme';
+
+export interface WorkshopDependency {
+  id: string;
+  type?: WorkshopItemType;
+  version?: string;
+  optional?: boolean;
+  reason?: string;
+}
 
 export interface SessionData {
   userId: string;
@@ -53,6 +70,8 @@ export interface WorkshopItemRow {
   id: string;
   owner_id: string;
   type: WorkshopItemType;
+  content_type?: string | null;
+  version?: string | null;
   title: string;
   description: string | null;
   tags: string | null;
@@ -61,6 +80,13 @@ export interface WorkshopItemRow {
   download_count: number;
   created_at: number;
   updated_at: number;
+  category?: string | null;
+  dependencies_json?: string | null;
+  min_app_version?: string | null;
+  compatibility_json?: string | null;
+  featured?: number;
+  screenshots_json?: string | null;
+  recommendations_json?: string | null;
 }
 
 /** 对外暴露的工坊条目。 */
@@ -68,12 +94,21 @@ export interface WorkshopItemPublic {
   id: string;
   ownerId: string;
   type: WorkshopItemType;
+  contentType?: string;
+  version: string;
   title: string;
   description: string | null;
   tags: string[];
   downloadCount: number;
   createdAt: number;
   updatedAt: number;
+  category?: string | null;
+  dependencies: WorkshopDependency[];
+  recommendations: WorkshopDependency[];
+  minAppVersion?: string | null;
+  compatibility: Record<string, unknown>;
+  featured: boolean;
+  screenshots: string[];
 }
 
 /** 对外暴露的用户信息。 */

@@ -1,0 +1,34 @@
+.profession-book { --book-accent: #b2874b; --book-surface: var(--creation-elevated, var(--bg-secondary, #f7f5ec)); --book-text: var(--creation-text, var(--text-primary, #263d42)); --book-muted: var(--creation-muted, var(--text-muted, #6f8182)); --book-theme-line: var(--creation-border, var(--border, #8b9b9b)); --book-line: color-mix(in srgb, var(--book-accent) 42%, var(--book-theme-line)); position: relative; min-width: 0; padding: 12px 0 6px; color: var(--book-text); }
+.profession-book[data-accent="crimson"] { --book-accent: #a64c58; }
+.profession-book[data-accent="amber"] { --book-accent: #b2874b; }
+.profession-book[data-accent="jade"] { --book-accent: #4d8f78; }
+.profession-book[data-accent="azure"] { --book-accent: #4e7ea2; }
+.profession-book[data-accent="violet"] { --book-accent: #7b68a6; }
+.profession-book[data-accent="silver"] { --book-accent: #718b95; }
+.profession-book__road { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; overflow-x: auto; padding: 4px 2px 10px; }
+.profession-book__tier { position: relative; min-width: 0; }
+.profession-book__tier-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; border-bottom: 1px solid color-mix(in srgb, var(--book-accent) 30%, transparent); color: var(--book-accent); }
+.profession-book__tier-heading span { font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.profession-book__tier-heading small { color: var(--book-muted); font-size: 10px; }
+.profession-book__nodes { display: grid; gap: 8px; }
+.profession-book__node { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 58px; padding: 9px 8px; border: 1px solid color-mix(in srgb, var(--book-line) 80%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--book-surface) 94%, transparent); color: inherit; text-align: left; cursor: pointer; transition: border-color 120ms ease, background 120ms ease, transform 120ms ease; }
+.profession-book__node:hover, .profession-book__node:focus-visible { border-color: var(--book-accent); transform: translateY(-1px); outline: none; }
+.profession-book__node.is-selected { border-color: var(--book-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-accent) 22%, transparent); }
+.profession-book__node.is-owned { background: color-mix(in srgb, var(--book-accent) 13%, var(--book-surface)); }
+.profession-book__node.is-locked { opacity: .56; }
+.profession-book__node.is-specialization { border-left: 3px solid var(--book-accent); }
+.profession-book__node.is-ultimate { border-width: 2px; }
+.profession-book__node.is-flash { animation: profession-book-node-flash 520ms ease-out; }
+.profession-book__node-icon { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border: 1px solid color-mix(in srgb, var(--book-accent) 55%, transparent); border-radius: 50%; color: var(--book-accent); }.profession-book__node-icon img { width: 28px; height: 28px; object-fit: contain; }
+.profession-book__node-copy { display: grid; min-width: 0; gap: 3px; flex: 1; }
+.profession-book__node-copy strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.profession-book__node-copy small { overflow: hidden; color: var(--book-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.profession-book__tier-arrow { display: none; width: 100%; margin: 7px 0 -5px; color: var(--book-accent); font-size: 14px; line-height: 1; text-align: center; }
+.profession-book__empty { display: block; padding: 18px 8px; border: 1px dashed color-mix(in srgb, var(--book-line) 60%, transparent); border-radius: 7px; color: var(--book-muted); font-size: 11px; text-align: center; }
+.profession-book__legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 6px 2px; color: var(--book-muted); font-size: 10px; }
+.profession-book__legend span { display: inline-flex; align-items: center; gap: 4px; }
+.profession-book__legend i { display: inline-block; width: 7px; height: 7px; border: 1px solid var(--book-line); border-radius: 50%; background: transparent; }
+.profession-book__legend i.is-owned { background: var(--book-accent); }.profession-book__legend i.is-available { border-color: var(--book-accent); }.profession-book__legend i.is-specialization { border-radius: 2px; border-left: 3px solid var(--book-accent); }.profession-book__legend i.is-ultimate { border-width: 2px; }
+@keyframes profession-book-node-flash { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--book-accent) 0%, transparent); } 35% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--book-accent) 36%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (max-width: 680px) { .profession-book__road { grid-template-columns: 1fr; overflow-x: visible; gap: 8px; } .profession-book__tier { padding-bottom: 4px; } .profession-book__tier-arrow { display: block; margin: 5px 0 -3px; } .profession-book__node { min-height: 54px; } }
+@media (prefers-reduced-motion: reduce) { .profession-book__node { transition: none; } .profession-book__node.is-flash { animation: none; } }

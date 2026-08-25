@@ -3,7 +3,7 @@
 // ============================================================
 import { memo } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { Zap, Clock, TrendingUp, Play, MousePointerClick, Timer, Radio, GitCompare, Coins, Heart, Flag, Backpack, User, Ampersand, Pipette, ToggleLeft, Filter, Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe, Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search, ListChecks, GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft, CreditCard, FileText, Sparkles, CircleDot, ScanSearch, PackagePlus } from 'lucide-react';
+import { Zap, Clock, TrendingUp, Play, MousePointerClick, Timer, Radio, GitCompare, Coins, Heart, Flag, Backpack, User, Ampersand, Pipette, ToggleLeft, Filter, Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe, Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search, ListChecks, GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft, CreditCard, FileText, Sparkles, CircleDot, ScanSearch, PackagePlus, ShieldAlert } from 'lucide-react';
 import type { NodeInstance, NodeDefinition } from '../../modules/workflowSchema';
 import { getNodeDefinition } from '../../modules/nodeRegistry';
 import SocketHandle from './SocketHandle';
@@ -16,7 +16,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; style?: Reac
   Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe,
   Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search: Search, ListChecks,
   GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft,
-  CreditCard, FileText, Sparkles, CircleDot, ScanSearch, PackagePlus,
+  CreditCard, FileText, Sparkles, CircleDot, ScanSearch, PackagePlus, ShieldAlert,
 };
 
 interface TypedNodeData extends NodeInstance {

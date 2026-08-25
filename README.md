@@ -12,7 +12,7 @@
 [![Zustand](https://img.shields.io/badge/Zustand-5-3B3B3B)](https://zustand-demo.pmnd.rs/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-`v2.7.6` · Web / PWA · Tauri 桌面端 · BYOK
+`v2.8.0` · Web / PWA · Tauri 桌面端 · BYOK
 
 </div>
 
@@ -38,9 +38,13 @@
 
 ### <img src="https://unpkg.com/lucide-static@latest/icons/puzzle.svg" width="16" height="16" /> 模块、事件与规则
 
-- 数值属性、成长体系、生存资源、经营资产、骰子检定、天赋体系等可插拔模块。
-- 自定义模块代理可根据世界需求生成和装配模块。
+- 数值属性、成长体系、生存资源、经营资产、骰子检定、职业与战斗等可插拔模块；未启用的世界不会显示对应创建步骤或注入相关提示词。
+- 先天天赋、职业能力、自由技能、动态技能、宠物/召唤能力和战斗道具共用统一能力协议；AI 只提出语义方案，最终数值由本地配平并经玩家确认。
+- 内置经典幻想与东方幻想两套职业典藏，共十二种四阶职业，支持能力树前置/互斥校验、复制修改、导入导出与 AI 扩展。
+- 独立卡片战场支持最多 4v4、每单位每轮一次行动、本地策略 AI、完整战前检查点和普通/困难/炼狱风险；整场机械结算结束后才调用一次主模型承接正文。
+- 自定义模块代理可根据世界需求生成、校验、保存、导出并发布受约束的玩法模块。
 - 事件包由事件卡、规则、周期规则和世界书组成，可导入、导出和按局启用。
+- 创意工坊支持世界包、玩法模块、事件/工作流包、冒险包和视觉主题，并提供分类、精选、热门、兼容版本与依赖检查。
 - 基于 React Flow 的类型化工作流编辑器与确定性规则解释器。
 - AI 合集生成器可按世界生成事件、规则与世界书合集。
 
@@ -49,6 +53,8 @@
 - Web 端使用 IndexedDB 保存游戏存档、事件包与本地配置。
 - 支持多存档、自动保存、快照回滚和 JSON 迁移。
 - 可选云存档、创意工坊与邮箱验证码账号体系。
+- 记忆检索可选择远程 Embedding、应用内 WASM 端侧模型或外部本地服务；不可用时自动降级到关键词召回。
+- 服务端可配置不可由客户端重置的三轮匿名体验额度，上游失败不会消耗次数。
 - 桌面端通过 Tauri 提供原生能力，移动端使用响应式面板与抽屉布局。
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/image.svg" width="20" height="20" /> 设计与流程图
@@ -116,6 +122,7 @@ src/
 ├─ context/             游戏与 UI Context
 ├─ data/                内置世界、世界 Schema 与加载器
 ├─ engine/              Prompt、流式响应、变量与事件总线
+├─ gameplay/            统一玩法内核、能力协议、职业与确定性战斗
 ├─ hooks/               游戏、向导、NPC、生图与响应式 Hooks
 ├─ memory/              编译式叙事记忆、向量检索与检查点
 ├─ modules/             属性、成长、生存、经营、骰子与天赋模块
@@ -163,6 +170,11 @@ bun run dev
 | `bun test` | 运行测试 |
 | `bun run tauri:dev` | 启动 Tauri 开发环境 |
 | `bun run tauri:build` | 构建桌面端 |
+| `bun run tauri:android:init` | 初始化 Android 工程（首次或清理后） |
+| `bun run tauri:android:dev` | 启动 Android 开发环境 |
+| `bun run tauri:android:build:debug` | 构建 ARM64 调试 APK |
+
+Windows 与 Android 的完整依赖、构建命令和产物位置见 [原生构建指南](docs/native-build.md)。
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/key-round.svg" width="20" height="20" /> API 配置
 
@@ -196,7 +208,7 @@ API Key 使用 Web Crypto 加密后保存在本机。浏览器端遇到 Provider
 
 ### 存档
 
-- 游戏存档包含世界、角色、对话、变量、记忆、任务、纪事和模块运行时
+- 游戏存档包含世界、角色、对话、变量、记忆、任务、纪事、模块运行时、职业能力与可恢复战斗会话
 - 支持自动保存、手动导入导出与历史快照回滚
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/shield-check.svg" width="20" height="20" /> 安全与隐私
@@ -209,6 +221,8 @@ API Key 使用 Web Crypto 加密后保存在本机。浏览器端遇到 Provider
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/file-text.svg" width="20" height="20" /> 文档
 
+- [快速开始](docs/GETTING_STARTED.md)
+- [玩法系统指南](docs/gameplay-system-guide.md)
 - [架构说明](docs/ARCHITECTURE.md)
 - [上手教程](docs/tutorial.md)
 - [变更日志](docs/CHANGELOG.md)

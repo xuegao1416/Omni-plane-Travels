@@ -5,6 +5,8 @@
 
 import type { WorldSystemData, StatModuleSchema, ProgressionModuleSchema, SurvivalModuleSchema, BusinessModuleSchema, DiceModuleSchema, TalentModuleSchema } from './schema';
 import { getXpForNextTier, getTierProgress } from './xpAlgorithm';
+import { resolveProfessionBinding } from '../data/professions';
+import { resolveCombatRuleset } from '../gameplay/combatRulesets';
 
 /**
  * 从世界定义模块数据中提取 WorldSystemData
@@ -18,7 +20,7 @@ export function extractWorldSystemData(
 
   // 新格式：直接是 WorldSystemData
   if ('数值属性' in worldSystem || '成长体系' in worldSystem ||
-      '生存资源' in worldSystem || '经营资产' in worldSystem || '骰子检定' in worldSystem) {
+      '生存资源' in worldSystem || '经营资产' in worldSystem || '骰子检定' in worldSystem || '天赋体系' in worldSystem || '职业体系' in worldSystem || '战斗系统' in worldSystem) {
     const result = { ...worldSystem } as WorldSystemData;
     // 兼容：数值属性可能是嵌套格式 { config, initialState }，需要展平为 StatModuleSchema
     const statRaw = result.数值属性 as any;
@@ -69,6 +71,12 @@ export function extractWorldSystemData(
           break;
         case 'talent':
           result.天赋体系 = data as unknown as TalentModuleSchema;
+          break;
+        case 'profession':
+          result.职业体系 = resolveProfessionBinding(data);
+          break;
+        case 'combat':
+          result.战斗系统 = resolveCombatRuleset(data);
           break;
       }
     }

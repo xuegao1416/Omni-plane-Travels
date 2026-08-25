@@ -24,6 +24,12 @@ interface SurvivalCardProps {
   onGenerateRecipe?: (request: string) => Promise<void>;
   /** 制作回调（消耗资源+产出） */
   onCraft?: (recipe: SurvivalRecipe) => void;
+  /** 解锁配方回调 */
+  onUnlock?: (recipe: SurvivalRecipe) => void;
+  /** 已解锁配方 ID（来自 gameplay runtime） */
+  unlockedRecipeIds?: string[];
+  /** 手动采集回调（消耗体力并推进世界时钟） */
+  onGather?: (resourceId: string) => void;
   /** 删除配方回调 */
   onDeleteRecipe?: (recipeId: string) => void;
   /** 是否正在生成配方 */
@@ -35,7 +41,7 @@ interface SurvivalCardProps {
 }
 
 export default memo(function SurvivalCard({
-  data, title, runtimeResources, onGenerateRecipe, onCraft, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
+  data, title, runtimeResources, onGenerateRecipe, onCraft, onUnlock, unlockedRecipeIds = [], onGather, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
 }: SurvivalCardProps) {
   const displayTitle = title || '生存资源';
   const threshold = data.rules?.criticalThreshold ?? 2;
@@ -173,6 +179,25 @@ export default memo(function SurvivalCard({
                     {isEmpty ? '未获取' : `${res.amount}/${res.max}`}
                   </span>
                 </div>
+                {onGather && (
+                  <button
+                    type="button"
+                    onClick={() => onGather(res.id)}
+                    disabled={res.amount >= res.max}
+                    title={`采集 +${res.gatherAmount ?? 1}，耗时 ${res.gatherTimeMinutes ?? 30} 分钟，消耗 ${res.gatherStaminaCost ?? 5} 体力`}
+                    style={{
+                      alignSelf: 'flex-start', marginTop: '2px', padding: '2px 7px',
+                      border: '1px solid var(--border)', borderRadius: '4px',
+                      background: res.amount >= res.max ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                      color: res.amount >= res.max ? 'var(--text-muted)' : 'var(--accent)',
+                      cursor: res.amount >= res.max ? 'not-allowed' : 'pointer',
+                      fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px',
+                    }}
+                  >
+                    <Sparkle size={10} />
+                    {res.amount >= res.max ? '已满' : `采集 · ${res.gatherTimeMinutes ?? 30}分 · -${res.gatherStaminaCost ?? 5}体力`}
+                  </button>
+                )}
                 <div style={{
                   height: '6px', background: 'var(--bg-tertiary)',
                   borderRadius: '3px', overflow: 'hidden',
@@ -266,7 +291,9 @@ export default memo(function SurvivalCard({
         )}
 
         {recipes.map(recipe => {
-          const craftable = canCraft(recipe);
+          const requiresUnlock = Boolean(recipe.unlockConditions?.length || recipe.unlockCost?.length);
+          const unlocked = !requiresUnlock || unlockedRecipeIds.includes(recipe.id);
+          const craftable = unlocked && canCraft(recipe);
           const inputStr = Object.entries(recipe.inputs)
             .map(([k, v]) => {
               const res = mergedResources.find(r => r.id === k);

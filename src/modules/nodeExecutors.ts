@@ -234,6 +234,45 @@ registerNodeExecutor('actions.add_event', (_inputs, _ctx, wv) => {
   };
 });
 
+function parseCombatActors(value: unknown): Array<{ id: string; identity: string; temporary: boolean }> {
+  let source = value;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch { return []; }
+  }
+  if (!Array.isArray(source)) return [];
+  return source.flatMap(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const raw = item as Record<string, unknown>;
+    const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+    const identity = typeof raw.identity === 'string' ? raw.identity.trim() : '';
+    return id && identity ? [{ id, identity, temporary: raw.temporary === true }] : [];
+  }).slice(0, 32);
+}
+
+registerNodeExecutor('actions.request_combat', (_inputs, _ctx, wv) => {
+  const id = typeof wv?.proposal_id === 'string' ? wv.proposal_id.trim() : '';
+  const context = typeof wv?.context === 'string' ? wv.context.trim() : '';
+  const threatBand = wv?.threat_band === 'weak' || wv?.threat_band === 'dangerous' || wv?.threat_band === 'boss' || wv?.threat_band === 'overwhelming'
+    ? wv.threat_band
+    : 'matched';
+  const enemies = parseCombatActors(wv?.enemies_json);
+  if (!id || !context || enemies.length === 0) return { outputs: { flow_out: true } };
+  const request = {
+    schemaVersion: 2,
+    source: 'event-workflow',
+    proposal: {
+      schemaVersion: 2,
+      id,
+      context,
+      threatBand,
+      allies: parseCombatActors(wv?.allies_json),
+      enemies,
+      neutrals: parseCombatActors(wv?.neutrals_json),
+    },
+  };
+  return { outputs: { flow_out: true }, actions: [{ kind: 'requestCombat', payload: request }] };
+});
+
 registerNodeExecutor('actions.schedule_tick', (inputs, _ctx, wv) => {
   const after = (wv?.after as number) ?? 1;
   const tag = (wv?.tag as string) ?? '';

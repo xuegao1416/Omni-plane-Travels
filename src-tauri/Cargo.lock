@@ -2329,7 +2329,7 @@ dependencies = [
 
 [[package]]
 name = "omni-plane-travels"
-version = "2.7.6"
+version = "2.8.0"
 dependencies = [
  "anyhow",
  "chrono",

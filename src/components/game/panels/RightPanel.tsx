@@ -1,13 +1,15 @@
-import { Clock, MapPin, Cloud, Heart, Zap } from 'lucide-react';
+import { Clock, MapPin, Cloud, Heart, Zap, Swords } from 'lucide-react';
 import type { GameState } from '../../../schema/variables';
 import type { WorldSystemData, ProgressionConfig, SurvivalRecipe, SurvivalModuleSchema, BusinessModuleSchema } from '../../../modules/schema';
 import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
-import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard } from './modules';
+import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard, TalentCard } from './modules';
 import { findWorldDef } from '../../../data/worldLoader';
 import { normalizeAssetStatus } from './businessOverlay/utils';
 import { CustomModulePanel } from './CustomModulePanel';
 import { formatWorldClock, getTimeSystemFromWorld } from '../../../time/worldClock';
 import { toDisplayText } from '../../../utils/displayText';
+
+const COMBAT_RISK_LABELS = { normal: '普通', hard: '困难', inferno: '炼狱' } as const;
 
 interface Props {
   gameState: GameState;
@@ -16,6 +18,12 @@ interface Props {
   onSurvivalGenerateRecipe?: (request: string) => Promise<void>;
   /** 生存资源：制作回调 */
   onSurvivalCraft?: (recipe: SurvivalRecipe) => void;
+  /** 生存资源：解锁配方回调 */
+  onSurvivalUnlock?: (recipe: SurvivalRecipe) => void;
+  /** 已解锁配方 ID */
+  unlockedRecipeIds?: string[];
+  /** 生存资源：手动采集回调 */
+  onSurvivalGather?: (resourceId: string) => void;
   /** 生存资源：删除配方回调 */
   onSurvivalDeleteRecipe?: (recipeId: string) => void;
   /** 是否正在生成配方 */
@@ -30,7 +38,17 @@ interface Props {
   survivalChangeLog?: ResourceChangeLog[];
   /** 预计算的经营资产数据（来自 GameScreen，保证资金同步） */
   businessData?: BusinessModuleSchema;
+  onAllocateStat?: (statId: string) => void;
+  onBreakthrough?: (targetTier: number) => void;
+  onUnlockTalent?: (talentId: string) => void;
+  onLearnSkill?: (skillId: string) => void;
+  onUseSkill?: (skillId: string) => void;
+  onAwakenAbility?: (abilityId: string) => void;
+  onRespecAbilities?: () => void;
+  onEquipAbility?: (abilityId: string, slotId: string) => void;
+  onUnequipAbility?: (abilityId: string) => void;
   onCustomModuleButton?: (moduleId: string, event: string) => void;
+  combatV3Enabled?: boolean;
 }
 
 // 世界状态行 - Lucide 图标 + 文字
@@ -61,11 +79,11 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
   );
 }
 
-export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onCustomModuleButton }: Props) {
+export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalUnlock, unlockedRecipeIds, onSurvivalGather, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
   const worldDef = worldId ? findWorldDef(worldId) : null;
-  const clockConfig = getTimeSystemFromWorld(worldDef || undefined);
+  const clockConfig = getTimeSystemFromWorld(worldDef ?? undefined);
   const displayWorldTime = world.时间系统.时钟
     ? formatWorldClock(world.时间系统.时钟, clockConfig)
     : world.时间系统.当前时间;
@@ -75,12 +93,14 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
 
   // 从世界定义获取成长体系配置（静态配置，不存入 GameState）
   const progMod = worldDef?.modules?.find(m => m.moduleId === 'progression' && m.enabled);
+  const hasProfessionModule = Boolean(worldDef?.modules?.some(module => module.moduleId === 'profession' && module.enabled));
   const progressionConfig = progMod?.moduleConfig as ProgressionConfig | undefined;
+  const combatRiskLabel = COMBAT_RISK_LABELS[gameState.v3?.featureFlags?.combatRiskMode ?? 'normal'];
 
   // 从世界定义构建 WorldSystemData（用于 UI 卡片展示）
   const keyMap: Record<string, string> = {
     stat: '数值属性', progression: '成长体系', survival: '生存资源',
-    business: '经营资产', dice: '骰子检定', talent: '天赋体系',
+    business: '经营资产', talent: '天赋体系',
   };
   const worldSystem: WorldSystemData = {};
   const moduleNames: Record<string, string> = {};
@@ -103,10 +123,8 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
               ...bizConfig,
               funds: runtimeBiz.资金,
               assets: (runtimeBiz.资产列表 ?? []).map(a => {
-                // AI 漏填收益字段时，给合理默认值
-                const hasIncome = a.基础收益 || a.每级收益 || a.维护费;
                 return {
-                  id: a.id || `asset-${Math.random().toString(36).slice(2, 8)}`,
+                  id: a.id || `asset-${a.名称 || a.类型 || 'runtime'}`,
                   name: a.名称 || a.类型 || a.id || '未命名资产',
                   type: a.类型 || '',
                   level: a.等级 ?? 1,
@@ -114,11 +132,15 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
                   description: a.描述 || '',
                   status: normalizeAssetStatus(a.状态),
                   income: {
-                    base: a.基础收益 ?? (hasIncome ? 0 : 5),
-                    perLevel: a.每级收益 ?? (hasIncome ? 0 : 3),
+                    base: a.基础收益 ?? 0,
+                    perLevel: a.每级收益 ?? 0,
                     cycle: bizConfig.cycleName || '天',
                   },
-                  maintenance: a.维护费 ?? (hasIncome ? 0 : 2),
+                  maintenance: a.维护费 ?? 0,
+                  staff: a.员工效率 !== undefined ? { current: 1, max: 1, efficiency: a.员工效率 } : undefined,
+                  marketTags: a.市场标签,
+                  risk: a.风险等级 ? { level: a.风险等级, description: '' } : undefined,
+                  upgradeCost: a.升级费用,
                 };
               }),
               transactionLog: (runtimeBiz.交易日志 || []).map((t, i) => ({
@@ -129,7 +151,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             (worldSystem as any)[key] = bizConfig;
           }
         } else {
-          (worldSystem as any)[key] = (mod.moduleConfig || mod.data);
+          (worldSystem as any)[key] = mod.moduleConfig || mod.data;
         }
         if (mod.name) moduleNames[key] = mod.name;
       }
@@ -149,6 +171,13 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
     dim5: { name: statModuleData.dim5?.name || '属性5' },
     dim6: { name: statModuleData.dim6?.name || '属性6' },
   } : undefined;
+  const statRuntime = gameState.gameplay?.stat;
+  const statDerived = Object.entries(statRuntime?.derived ?? {}).map(([id, value]) => ({
+    id, value: Number(value) || 0, name: statModuleData?.derived?.find((item: any) => item.id === id)?.name || id,
+  }));
+  const currentTick = gameState.simulationRuntime?.tick ?? 0;
+  const progressionFailureReason = [...(gameState.gameplay?.logs ?? [])].reverse().find(log => log.moduleId === 'progression' && log.status === 'blocked')?.reason;
+  const statModifiers = Object.values(statRuntime?.modifiers ?? {}).filter(modifier => modifier.expiresAtTick === undefined || modifier.expiresAtTick > currentTick);
 
   return (
     <div className="game-journey__status-panel" style={{
@@ -175,6 +204,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
               {displayWorldTime && <StatusRow icon={<Clock size={13} />} text={displayWorldTime} />}
               {toDisplayText(world.空间定位.当前位置) && <StatusRow icon={<MapPin size={13} />} text={toDisplayText(world.空间定位.当前位置)} />}
               {toDisplayText(world.时间系统.当前天气) && <StatusRow icon={<Cloud size={13} />} text={toDisplayText(world.时间系统.当前天气)} />}
+              {combatV3Enabled && <StatusRow icon={<Swords size={13} />} text={`战斗风险：${combatRiskLabel}（旅程开始后锁定）`} muted />}
             </>
           )}
         </div>
@@ -218,19 +248,19 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
           description: sp.description || '',
         }));
         const mergedData = {
-          attrA: { name: cfg?.attrA?.name || '生命', current: ss.血量, max: 100 },
-          attrB: { name: cfg?.attrB?.name || '能量', current: ss.体力值, max: 100 },
-          dim1: { name: cfg?.dim1?.name || '属性1', value: getVal('dim1', 50), range: [0, 100] as [number, number] },
-          dim2: { name: cfg?.dim2?.name || '属性2', value: getVal('dim2', 50), range: [0, 100] as [number, number] },
-          dim3: { name: cfg?.dim3?.name || '属性3', value: getVal('dim3', 50), range: [0, 100] as [number, number] },
-          dim4: { name: cfg?.dim4?.name || '属性4', value: getVal('dim4', 50), range: [0, 100] as [number, number] },
-          dim5: { name: cfg?.dim5?.name || '属性5', value: getVal('dim5', 50), range: [0, 100] as [number, number] },
-          dim6: { name: cfg?.dim6?.name || '属性6', value: getVal('dim6', 50), range: [0, 100] as [number, number] },
+          attrA: { name: cfg?.attrA?.name || '生命', current: ss.血量, max: statModData?.attrA?.max ?? 100 },
+          attrB: { name: cfg?.attrB?.name || '能量', current: ss.体力值, max: statModData?.attrB?.max ?? 100 },
+          dim1: { name: cfg?.dim1?.name || '属性1', value: getVal('dim1', 50), range: statModData?.dim1?.range ?? [0, 100] },
+          dim2: { name: cfg?.dim2?.name || '属性2', value: getVal('dim2', 50), range: statModData?.dim2?.range ?? [0, 100] },
+          dim3: { name: cfg?.dim3?.name || '属性3', value: getVal('dim3', 50), range: statModData?.dim3?.range ?? [0, 100] },
+          dim4: { name: cfg?.dim4?.name || '属性4', value: getVal('dim4', 50), range: statModData?.dim4?.range ?? [0, 100] },
+          dim5: { name: cfg?.dim5?.name || '属性5', value: getVal('dim5', 50), range: statModData?.dim5?.range ?? [0, 100] },
+          dim6: { name: cfg?.dim6?.name || '属性6', value: getVal('dim6', 50), range: statModData?.dim6?.range ?? [0, 100] },
           special,
         };
         return (
           <>
-            <BaseStatsCard data={mergedData as any} title={moduleNames?.['数值属性']} />
+            <BaseStatsCard data={mergedData as any} title={moduleNames?.['数值属性']} derived={statDerived} modifiers={statModifiers} availablePoints={player.可用属性点 ?? 0} onAllocate={onAllocateStat} />
             <SixDimCard data={mergedData as any} title={moduleNames?.['数值属性'] ? moduleNames['数值属性'] + ' · 六维' : undefined} />
           </>
         );
@@ -244,6 +274,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             currentXP: player.当前经验值 ?? 0,
           }}
           title={worldDef?.modules?.find(m => m.moduleId === 'progression')?.name || '成长体系'}
+          breakthroughFailureReason={progressionFailureReason}
           statNames={statConfig ? {
             attrA: statConfig.attrA.name,
             attrB: statConfig.attrB.name,
@@ -254,6 +285,23 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             dim5: statConfig.dim5.name,
             dim6: statConfig.dim6.name,
           } : undefined}
+          onBreakthrough={onBreakthrough}
+        />
+      )}
+      {worldSystem.天赋体系 && !hasProfessionModule && (
+        <TalentCard
+          data={worldSystem.天赋体系}
+          gameState={gameState}
+          abilityState={player.能力系统}
+          currentTick={gameState.simulationRuntime?.tick ?? 0}
+          title={moduleNames?.['天赋体系'] || '天赋与技能'}
+          onUnlockTalent={onUnlockTalent}
+          onLearnSkill={onLearnSkill}
+          onUseSkill={onUseSkill}
+          onAwakenAbility={onAwakenAbility}
+          onRespec={onRespecAbilities}
+          onEquipAbility={onEquipAbility}
+          onUnequipAbility={onUnequipAbility}
         />
       )}
       {worldSystem.生存资源 && (() => {
@@ -276,6 +324,9 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             runtimeResources={runtimeResources as any}
             onGenerateRecipe={onSurvivalGenerateRecipe}
             onCraft={onSurvivalCraft}
+            onUnlock={onSurvivalUnlock}
+            unlockedRecipeIds={unlockedRecipeIds}
+            onGather={onSurvivalGather}
             onDeleteRecipe={onSurvivalDeleteRecipe}
             isGeneratingRecipe={isGeneratingRecipe}
             onOpenOverlay={onOpenSurvivalOverlay}

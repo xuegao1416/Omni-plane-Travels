@@ -339,6 +339,7 @@ interface WorldHallViewProps {
   onOpenCustomModules: () => void;
   onOpenSettings: () => void;
   onOpenUserCenter: () => void;
+  onOpenWorkshop: () => void;
   onOpenEditor: (world: WorldDef | null, step?: number) => void;
   onDeleteWorld: (worldId: string) => void | Promise<{ ok: boolean }>;
   onImportWorld: (world: WorldDef) => void;
@@ -360,6 +361,7 @@ export default function WorldHallView({
   onOpenCustomModules,
   onOpenSettings,
   onOpenUserCenter,
+  onOpenWorkshop,
   onOpenEditor,
   onDeleteWorld,
   onImportWorld,
@@ -382,6 +384,7 @@ export default function WorldHallView({
   ));
   const [detailOpen, setDetailOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const layoutEditorEnabled = Boolean(
     DevLayoutCalibrationStudio
     && typeof window !== 'undefined'
@@ -511,10 +514,10 @@ export default function WorldHallView({
           <span><b>世界漫游指南</b><small>OMNI PLANE TRAVELS</small></span>
         </div>
         <div className="entry-hall-header__actions" data-layout-id="hall.nav" data-layout-label="顶部导航整体" data-layout-editable="true" data-layout-container="hall.screen">
-          <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-26-v2.png" icon={Settings} onClick={() => { playHallSound('confirm'); onOpenSettings(); }} data-layout-id="hall.nav.save" data-layout-label="导航 · 设置" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">设置</EntrySlicedButton>
+          <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-26-v2.png" icon={Settings} onClick={onOpenSettings} data-layout-id="hall.nav.save" data-layout-label="导航 · 设置" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">设置</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-07-v2.png" icon={Boxes} onClick={() => { playHallSound('confirm'); onOpenEvents(); }} data-layout-id="hall.nav.events" data-layout-label="导航 · 事件中心" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">事件中心</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-13-v2.png" icon={Sparkles} onClick={() => { playHallSound('confirm'); onOpenCustomModules(); }} data-layout-id="hall.nav.modules" data-layout-label="导航 · 自定义模块" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">自定义模块</EntrySlicedButton>
-          <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-25-v2.png" icon={MousePointer2} onClick={() => { playHallSound('confirm'); onOpenUserCenter(); }} data-layout-id="hall.nav.account" data-layout-label="导航 · 账号" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">账号</EntrySlicedButton>
+          <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-25-v2.png" icon={MousePointer2} onClick={onOpenUserCenter} data-layout-id="hall.nav.account" data-layout-label="导航 · 账号" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">账号</EntrySlicedButton>
         </div>
       </header>
 
@@ -619,6 +622,27 @@ export default function WorldHallView({
           onExportSave={onExportSave}
         />
       )}
+
+      {guideOpen && (
+        <div className="entry-hall-empty-choice" role="dialog" aria-modal="true" aria-labelledby="entry-hall-guide-title" onClick={event => { if (event.target === event.currentTarget) setGuideOpen(false); }}>
+          <div className="entry-hall-empty-choice__backdrop" aria-hidden="true" onClick={() => setGuideOpen(false)} />
+          <DawnFrameV4 mode="panel" withFill className="entry-hall-empty-choice__frame" ariaLabel="快速指南">
+            <div className="entry-hall-empty-choice__content" style={{ maxWidth: 560, textAlign: 'left' }}>
+              <button type="button" className="entry-hall-empty-choice__close" onClick={() => setGuideOpen(false)} aria-label="关闭"><X size={18} /></button>
+              <span className="entry-hall-empty-choice__kicker">QUICK START</span>
+              <h2 id="entry-hall-guide-title">三步开始一段旅程</h2>
+              <ol style={{ lineHeight: 1.8, paddingLeft: 22 }}>
+                <li>选择一枚世界晶体，打开世界详情。</li>
+                <li>点击“选择并继续”，在向导中设定角色与叙事视角。</li>
+                <li>进入游戏后，可从左侧抽屉打开事件、模块、任务、资源与记忆。</li>
+              </ol>
+              <p style={{ opacity: .78 }}>自定义世界可在空白晶体中创建或导入；自定义模块、事件包和云端工坊属于可选扩展，不影响基础游玩。</p>
+              <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={ArrowRight} onClick={() => { setGuideOpen(false); onStartWizard(); }}>开始创建角色</EntrySlicedButton>
+            </div>
+          </DawnFrameV4>
+        </div>
+      )}
+
 
       {layoutEditorEnabled && DevLayoutCalibrationStudio && (
         <Suspense fallback={null}>

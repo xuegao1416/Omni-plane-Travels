@@ -2,7 +2,7 @@
 //  卡片浮层 v2 — 执行 CardWorkflowDefinition 工作流
 //  订阅 EVENT_CARD 事件，加载工作流定义，执行 DAG，渲染结果
 // ============================================================
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { X, FileText, ScrollText, MessageCircle, Image, ListChecks, Sparkles, Filter, Dice5 } from 'lucide-react';
 import { eventBus, EVENTS } from '../../engine/eventBus';
 import { getWebEvent } from '../../modules/eventDb';
@@ -11,9 +11,9 @@ import type { CardWorkflowDefinition, CardNodeExecutionResult, CardExecutionCont
 import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 import { executeCardWorkflow, type CardWorkflowExecutionResult } from '../../modules/cardWorkflowEngine';
 import { useSaveStore } from '../../stores/saveStore';
-import { selectChoice, applyEffectTarget } from '../../modules/eventChoiceState';
 import type { GameState } from '../../schema/variables';
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
+import { applyNarrativeDecision, createNarrativeDecisionRecord, normalizeNarrativeDecisionAction, type NarrativeDecisionEffect, type NarrativeDecisionRecord } from '../../gameplay/narrativeDecision';
 import JourneyCardShell from '../game/shared/JourneyCardShell';
 
 interface CardEvent {
@@ -24,13 +24,15 @@ interface CardEvent {
 interface Props {
   gameState?: GameState;
   onChoice?: (event: CustomModuleChoiceEvent) => Promise<void> | void;
+  onDecisionApplied?: (state: GameState, record: NarrativeDecisionRecord) => Promise<void> | void;
 }
 
-export default function CardOverlay({ gameState, onChoice }: Props) {
+export default function CardOverlay({ gameState, onChoice, onDecisionApplied }: Props) {
   const [result, setResult] = useState<CardWorkflowExecutionResult | null>(null);
   const [title, setTitle] = useState('');
   const [current, setCurrent] = useState<CardEvent | null>(null);
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
+  const decisionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const offCard = eventBus.on(EVENTS.EVENT_CARD, (evt: CardEvent) => {
@@ -73,51 +75,62 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
     setResult(null);
     setCurrent(null);
     setSelectedChoice(null);
+    decisionIdRef.current = null;
   }, []);
 
   const handleSelectChoice = useCallback(async (index: number) => {
     if (!result?.choices || !current) return;
-    if (selectedChoice === index) return; // 已选中
+    if (selectedChoice === index || decisionIdRef.current) return; // 已选中或正在原子提交
 
     const choice = result.choices[index];
     if (!choice) return;
 
-    setSelectedChoice(index);
-
     const saveId = useSaveStore.getState().currentSaveId ?? 'default';
-    selectChoice({
+    if (!gameState) return;
+    decisionIdRef.current = `${saveId}:${current.eventPackId}:${current.cardId}:choice-0:${Date.now()}`;
+
+    const effects: NarrativeDecisionEffect[] = [];
+    if (choice.effect) {
+      effects.push({
+        type: 'delta',
+        effect: { statId: choice.effect.statId, resourcePath: choice.effect.resourcePath, delta: choice.effect.delta },
+      });
+    }
+    for (const pending of result.pendingEffects ?? []) {
+      if (pending.statId || pending.resourcePath) {
+        effects.push({ type: 'delta', effect: { statId: pending.statId, resourcePath: pending.resourcePath, delta: pending.delta ?? 0 } });
+      }
+      if (pending.flagPath && pending.value !== undefined) {
+        if (typeof pending.value === 'string' || typeof pending.value === 'number' || typeof pending.value === 'boolean' || pending.value === null) {
+          effects.push({ type: 'flag', path: pending.flagPath, value: pending.value });
+        }
+      }
+    }
+
+    const record = createNarrativeDecisionRecord({
+      id: decisionIdRef.current,
       saveId,
       eventPackId: current.eventPackId,
       cardId: current.cardId,
       blockId: 'choice-0',
       selectedIndex: index,
-      effect: choice.effect ? { statId: choice.effect.statId ?? '', resourcePath: choice.effect.resourcePath, delta: choice.effect.delta } : undefined,
+      action: normalizeNarrativeDecisionAction(choice.action)
+        ?? (effects.length > 0 ? { type: 'apply_effects', effects } : { type: 'narrative', instruction: choice.label }),
       aiNote: `事件「${title || current.cardId}」中，玩家选择了「${choice.label}」。${choice.aiNote ?? ''}`.trim(),
-      baseStatValue: 0,
     });
-
-    // 立即应用工作流中的 pendingEffects（不等下一 tick）
-    if (result.pendingEffects && result.pendingEffects.length > 0 && gameState) {
-      for (const pe of result.pendingEffects) {
-        if (pe.statId || pe.resourcePath) {
-          applyEffectTarget(gameState as unknown as import('../../schema/variables').GameState, {
-            statId: pe.statId,
-            resourcePath: pe.resourcePath,
-            delta: pe.delta ?? 0,
-          });
-        }
-        // 标记效果：直接写入 gameState
-        if (pe.flagPath && pe.value !== undefined) {
-          const parts = pe.flagPath.split('.');
-          let cur: Record<string, unknown> = gameState as unknown as Record<string, unknown>;
-          for (let i = 0; i < parts.length - 1; i++) {
-            if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
-            cur = cur[parts[i]] as Record<string, unknown>;
-          }
-          cur[parts[parts.length - 1]] = pe.value;
-        }
+    const applied = applyNarrativeDecision(gameState, record);
+    if (!applied.applied) return;
+    try {
+      await onDecisionApplied?.(applied.state, applied.record);
+      if (record.action.type === 'start_combat') {
+        eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, record);
       }
+    } catch (error) {
+      decisionIdRef.current = null;
+      console.warn('[CardOverlay] 事件选择保存失败，保留卡片等待重试:', error);
+      return;
     }
+    setSelectedChoice(index);
 
     // 延迟关闭，让玩家看到选中效果
     setTimeout(close, 600);
@@ -133,7 +146,7 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
     } catch (error) {
       console.warn('[custom-modules] onChoice failed after the event choice was applied', error);
     }
-  }, [result, current, selectedChoice, close, gameState, onChoice]);
+  }, [result, current, selectedChoice, close, gameState, onChoice, onDecisionApplied, title]);
 
   if (!result || !current) return null;
 
@@ -151,6 +164,10 @@ export default function CardOverlay({ gameState, onChoice }: Props) {
         <div
           className="event-fade-in game-journey-card__event-content"
           onClick={(e) => e.stopPropagation()}
+          style={{
+            width: 'min(460px, 92vw)', maxHeight: '82vh', overflow: 'auto',
+            padding: 'var(--space-5)', color: 'var(--text-primary)',
+          }}
         >
         {/* 标题栏 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>

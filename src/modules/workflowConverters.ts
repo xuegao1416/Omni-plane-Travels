@@ -84,6 +84,13 @@ function eventNodeToWorkflowNode(node: EventGraphNode): NodeInstance {
     if ('addEvent' in first) {
       widgetValues.event_id = first.addEvent.eventId;
       if (first.addEvent.eventPackId) widgetValues.event_pack_id = first.addEvent.eventPackId;
+    } else if ('requestCombat' in first) {
+      widgetValues.proposal_id = first.requestCombat.proposal.id;
+      widgetValues.context = first.requestCombat.proposal.context;
+      widgetValues.threat_band = first.requestCombat.proposal.threatBand;
+      widgetValues.allies_json = first.requestCombat.proposal.allies;
+      widgetValues.enemies_json = first.requestCombat.proposal.enemies;
+      widgetValues.neutrals_json = first.requestCombat.proposal.neutrals;
     } else if ('modifyResource' in first) {
       widgetValues.resource_key = first.modifyResource.key;
       widgetValues.delta = first.modifyResource.delta;
@@ -109,6 +116,7 @@ function resolveTypeId(node: EventGraphNode): string {
   if (node.kind === 'effect' && node.actions && node.actions.length > 0) {
     const first = node.actions[0];
     if ('addEvent' in first) return 'actions.add_event';
+    if ('requestCombat' in first) return 'actions.request_combat';
     if ('modifyResource' in first) return 'actions.modify_resource';
     if ('scheduleTick' in first) return 'actions.schedule_tick';
     return 'actions.set_value';
@@ -207,6 +215,9 @@ function workflowNodeToEventNode(node: NodeInstance): EventGraphNode | null {
           ...(wv.event_pack_id ? { eventPackId: wv.event_pack_id as string } : {}),
         },
       });
+    } else if (node.typeId === 'actions.request_combat') {
+      const action = combatRequestActionFromWidgets(wv);
+      if (action) actions.push(action);
     } else if (node.typeId === 'actions.modify_resource') {
       actions.push({ modifyResource: { key: (wv.resource_key as string) ?? '', delta: (wv.delta as number) ?? 0 } });
     } else if (node.typeId === 'actions.schedule_tick') {
@@ -411,6 +422,9 @@ function collectActions(nodes: NodeInstance[], nodeMap: Map<string, NodeInstance
           ...(wv.event_pack_id ? { eventPackId: wv.event_pack_id as string } : {}),
         },
       });
+    } else if (node.typeId === 'actions.request_combat') {
+      const action = combatRequestActionFromWidgets(wv);
+      if (action) actions.push(action);
     } else if (node.typeId === 'actions.modify_resource') {
       actions.push({ modifyResource: { key: (wv.resource_key as string) ?? '', delta: (wv.delta as number) ?? 0 } });
     } else if (node.typeId === 'actions.modify_stat') {
@@ -429,6 +443,46 @@ function collectActions(nodes: NodeInstance[], nodeMap: Map<string, NodeInstance
     }
   }
   return actions;
+}
+
+function parseCombatActorWidgets(value: unknown): Array<{ id: string; identity: string; temporary: boolean }> {
+  let source = value;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch { return []; }
+  }
+  if (!Array.isArray(source)) return [];
+  return source.flatMap(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const raw = item as Record<string, unknown>;
+    const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+    const identity = typeof raw.identity === 'string' ? raw.identity.trim() : '';
+    return id && identity ? [{ id, identity, temporary: raw.temporary === true }] : [];
+  }).slice(0, 32);
+}
+
+function combatRequestActionFromWidgets(wv: Record<string, unknown>): Action | undefined {
+  const id = typeof wv.proposal_id === 'string' ? wv.proposal_id.trim() : '';
+  const context = typeof wv.context === 'string' ? wv.context.trim() : '';
+  const enemies = parseCombatActorWidgets(wv.enemies_json);
+  if (!id || !context || enemies.length === 0) return undefined;
+  const threatBand = wv.threat_band === 'weak' || wv.threat_band === 'dangerous' || wv.threat_band === 'boss' || wv.threat_band === 'overwhelming'
+    ? wv.threat_band
+    : 'matched';
+  return {
+    requestCombat: {
+      schemaVersion: 2,
+      source: 'event-workflow',
+      proposal: {
+        schemaVersion: 2,
+        id,
+        context,
+        threatBand,
+        allies: parseCombatActorWidgets(wv.allies_json),
+        enemies,
+        neutrals: parseCombatActorWidgets(wv.neutrals_json),
+      },
+    },
+  };
 }
 
 function buildWhenFromConditionNodes(

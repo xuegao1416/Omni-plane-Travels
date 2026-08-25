@@ -140,6 +140,34 @@ export function saveNpcTemplate(name: string, npc: CustomNpc): NpcTemplate {
   return tpl;
 }
 
+/** 将可能含真实姓名/私人投射的主角预设转换为可检查的匿名 NPC 模板。 */
+export function anonymizePlayerPresetAsNpc(preset: PlayerPreset): NpcTemplate {
+  return saveNpcTemplate('匿名角色模板', {
+    id: uuid(),
+    name: '匿名角色',
+    gender: preset.gender,
+    age: preset.age,
+    race: '',
+    relationshipType: '未设定',
+    occupation: preset.career,
+    socialStatus: preset.socialClass,
+    personality: preset.personality,
+    hiddenPersonality: '',
+    currentThought: '',
+    appearance: preset.appearance,
+    currentOutfit: '',
+    currentAction: '',
+    currentLocation: '',
+    currentState: '正常',
+    shortTermGoal: '',
+    longTermGoal: '',
+    background: '',
+    chronicles: [],
+    skillsList: Object.fromEntries(Object.entries(preset.initialSkills ?? {}).map(([name, skill]) => [name, { 描述: skill.描述, 类型: skill.类型, 品质: skill.品质 }])),
+    itemsList: Object.fromEntries(Object.entries(preset.initialItems ?? {}).map(([name, item]) => [name, { 数量: item.数量, 类型: item.类型, 品质: item.品质, 备注: item.备注 }])),
+  });
+}
+
 export function deleteNpcTemplate(id: string) {
   const templates = getNpcTemplates().filter(t => t.id !== id);
   writeJSON(NPC_KEY, templates);

@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 export type Screen = 'start' | 'settings' | 'game';
-export type OverlayPanel = null | 'profile' | 'notebook' | 'characters' | 'variables' | 'worldbook' | 'memory' | 'dynamics' | 'modules' | 'tasks';
+export type OverlayPanel = null | 'profile' | 'notebook' | 'characters' | 'variables' | 'worldbook' | 'memory' | 'dynamics' | 'modules' | 'tasks' | 'profession';
 
 export interface NavButton {
   id: OverlayPanel | 'home';

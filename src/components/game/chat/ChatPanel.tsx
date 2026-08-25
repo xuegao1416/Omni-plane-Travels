@@ -28,29 +28,30 @@ interface Props {
   worldName?: string;
   worldSceneUrl?: string;
   mobileSummary?: React.ReactNode;
-  externalDraft?: { id: string; text: string };
+  readOnly?: boolean;
+  externalDraft?: { id: string; text: string } | null;
 }
 
-export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, worldName, worldSceneUrl, mobileSummary, externalDraft }: Props) {
+export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, worldName, worldSceneUrl, mobileSummary, readOnly = false, externalDraft = null }: Props) {
   const [showMonitor, setShowMonitor] = useState(false);
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const [visibleStart, setVisibleStart] = useState(() => getInitialMessageStart(messages.length));
   const historyAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const messageHistoryRef = useRef({ firstId: messages[0]?.id, length: messages.length });
-  const lastDraftIdRef = useRef('');
   const { settings, t } = useUISettings();
-
-  const previousHistory = messageHistoryRef.current;
-  const historyWasReplaced = previousHistory.firstId !== messages[0]?.id || messages.length < previousHistory.length;
-  const renderedStart = historyWasReplaced ? getInitialMessageStart(messages.length) : visibleStart;
-  const visibleMessages = useMemo(() => messages.slice(renderedStart), [messages, renderedStart]);
+  const lastDraftIdRef = useRef('');
 
   useEffect(() => {
     if (!externalDraft?.text || externalDraft.id === lastDraftIdRef.current) return;
     lastDraftIdRef.current = externalDraft.id;
     setInputText(externalDraft.text);
   }, [externalDraft]);
+
+  const previousHistory = messageHistoryRef.current;
+  const historyWasReplaced = previousHistory.firstId !== messages[0]?.id || messages.length < previousHistory.length;
+  const renderedStart = historyWasReplaced ? getInitialMessageStart(messages.length) : visibleStart;
+  const visibleMessages = useMemo(() => messages.slice(renderedStart), [messages, renderedStart]);
 
   // A new/truncated save gets a fresh recent window. Appending turns keeps the current reading range.
   useEffect(() => {
@@ -147,7 +148,8 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
               onCopy={handleCopy}
               onOptionClick={handleOptionClick}
               worldSystem={worldSystem}
-              onDiceRoll={onDiceRoll}
+              onDiceRoll={readOnly ? undefined : onDiceRoll}
+              readOnly={readOnly}
             />
           </ErrorBoundary>
         ))}
@@ -162,6 +164,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
         onOpenMonitor={() => setShowMonitor(true)}
         externalText={inputText}
         onExternalTextChange={() => setInputText('')}
+        readOnly={readOnly}
       />
 
       {/* 管线监控弹窗 */}

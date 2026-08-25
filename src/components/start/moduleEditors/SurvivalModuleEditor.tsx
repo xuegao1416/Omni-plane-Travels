@@ -1,88 +1,60 @@
 import type { SurvivalModuleSchema } from '../../../modules/schema';
+import { ConditionListEditor, CostListEditor, EffectListEditor, KeyValueListEditor } from './GameplayRuleEditors';
+import { inputStyle } from './shared';
 
-/** 生存资源编辑器 */
-export function SurvivalModuleEditor({ data, onChange }: {
-  data: SurvivalModuleSchema; onChange: (d: Record<string, unknown>) => void;
-}) {
-  const commit = (next: SurvivalModuleSchema) => onChange(next as any);
-
-  const addResource = () => {
-    const next = JSON.parse(JSON.stringify(data));
-    next.resources.push({ id: `res_${Date.now()}`, name: '新资源', symbol: '📦', amount: 5, max: 10, scarce: false, gatherRate: '', usage: '', description: '' });
-    commit(next);
-  };
-
-  const removeResource = (i: number) => {
-    const next = JSON.parse(JSON.stringify(data));
-    next.resources.splice(i, 1);
-    commit(next);
-  };
-
-  const setResField = (i: number, field: string, value: unknown) => {
-    const next = JSON.parse(JSON.stringify(data));
-    next.resources[i][field] = value;
-    commit(next);
-  };
-
-  const setRulesField = (field: string, value: unknown) => {
-    const next = JSON.parse(JSON.stringify(data));
-    if (!next.rules) next.rules = { cycleName: '一天', consumePerCycle: '', criticalThreshold: 2 };
-    next.rules[field] = value;
-    commit(next);
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 'var(--font-size-xs)' }}>
-      {/* 整体描述 */}
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ color: 'var(--text-muted)' }}>整体描述</span>
-        <input value={data.description || ''} onChange={e => commit({ ...data, description: e.target.value })} placeholder="一句话描述生存资源系统" style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-      </label>
-
-      {/* 生存规则 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ color: 'var(--text-muted)' }}>结算周期</span>
-          <input value={data.rules?.cycleName || '一天'} onChange={e => setRulesField('cycleName', e.target.value)} style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ color: 'var(--text-muted)' }}>危机阈值</span>
-          <input type="number" value={data.rules?.criticalThreshold ?? 2} onChange={e => setRulesField('criticalThreshold', Number(e.target.value))} style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-        </label>
-      </div>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ color: 'var(--text-muted)' }}>每周期消耗 <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>(AI参考描述，非固定值)</span></span>
-        <input value={data.rules?.consumePerCycle || ''} onChange={e => setRulesField('consumePerCycle', e.target.value)} placeholder="如：每人每天消耗1份口粮+1份水，人数增加时等比增长" style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-      </label>
-
-      {/* 资源列表 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>资源列表</span>
-        <button className="btn-ghost" onClick={addResource} style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px' }}>+ 添加</button>
-      </div>
-      {data.resources.length === 0 && (
-        <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>暂无资源，点击"添加"创建</div>
-      )}
-      {data.resources.map((res, i) => (
-        <div key={res.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <input value={res.symbol} onChange={e => setResField(i, 'symbol', e.target.value)} style={{ width: 32, textAlign: 'center', padding: '4px', fontSize: 'var(--font-size-sm)' }} placeholder="图标" />
-            <input value={res.name} onChange={e => setResField(i, 'name', e.target.value)} style={{ flex: 1, padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} placeholder="资源名" />
-            <input type="number" value={res.amount} onChange={e => setResField(i, 'amount', Number(e.target.value))} style={{ width: 48, padding: '4px', fontSize: 'var(--font-size-xs)' }} title="初始数量" />
-            <span style={{ color: 'var(--text-muted)' }}>/</span>
-            <input type="number" value={res.max} onChange={e => setResField(i, 'max', Number(e.target.value))} style={{ width: 48, padding: '4px', fontSize: 'var(--font-size-xs)' }} title="上限" />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--text-muted)' }}>
-              <input type="checkbox" checked={res.scarce} onChange={e => setResField(i, 'scarce', e.target.checked)} /> 稀缺
-            </label>
-            <button className="btn-ghost" onClick={() => removeResource(i)} style={{ color: 'var(--danger)', padding: '2px 6px', fontSize: 'var(--font-size-xs)' }}>✕</button>
-          </div>
-          <input value={res.description || ''} onChange={e => setResField(i, 'description', e.target.value)} placeholder="获取方式与用途" style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            <input value={res.gatherRate || ''} onChange={e => setResField(i, 'gatherRate', e.target.value)} placeholder="采集描述（如：初期每天3单位，后期可增长）" style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-            <input value={res.usage || ''} onChange={e => setResField(i, 'usage', e.target.value)} placeholder="消耗描述（如：初期每天1单位，人数增加时等比）" style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }} />
-          </div>
+export function SurvivalModuleEditor({ data, onChange }: { data: SurvivalModuleSchema; onChange: (d: Record<string, unknown>) => void }) {
+  const commit = (next: SurvivalModuleSchema) => onChange(next as unknown as Record<string, unknown>);
+  const clone = () => JSON.parse(JSON.stringify(data)) as SurvivalModuleSchema;
+  const set = (path: string, value: unknown) => { const next = clone(); const parts = path.split('.'); let target: any = next; parts.slice(0, -1).forEach(part => { if (!target[part]) target[part] = {}; target = target[part]; }); target[parts.at(-1)!] = value; commit(next); };
+  const setResource = (index: number, field: string, value: unknown) => { const next = clone(); (next.resources[index] as any)[field] = value; commit(next); };
+  const addResource = () => { const next = clone(); next.resources.push({ id: `res_${Date.now()}`, name: '新资源', symbol: '📦', amount: 5, max: 10, scarce: false, description: '', gatherRate: '', usage: '', gatherAmount: 1, gatherTimeMinutes: 30, gatherStaminaCost: 5 }); commit(next); };
+  const removeResource = (index: number) => { const next = clone(); next.resources.splice(index, 1); commit(next); };
+  const addRecipe = () => { const next = clone(); next.recipes = [...(next.recipes || []), { id: `recipe_${Date.now()}`, name: '新配方', inputs: {}, output: { resourceId: next.resources[0]?.id || '', amount: 1 }, description: '', unlockConditions: [], unlockCost: [], craftTimeMinutes: 30 }]; commit(next); };
+  const removeRecipe = (index: number) => { const next = clone(); next.recipes = (next.recipes || []).filter((_, i) => i !== index); commit(next); };
+  const addStatus = () => { const next = clone(); next.statuses = [...(next.statuses || []), { id: `status_${Date.now()}`, name: '新状态', description: '', durationTicks: 1, statEffects: [] }]; commit(next); };
+  const removeStatus = (index: number) => { const next = clone(); next.statuses = (next.statuses || []).filter((_, i) => i !== index); commit(next); };
+  const addEvolution = () => { const next = clone(); next.resourceEvolution = [...(next.resourceEvolution || []), { id: `evolution_${Date.now()}`, trigger: { keywords: [] }, afterRounds: 0, add: [], remove: [], narrateHint: '' }]; commit(next); };
+  const removeEvolution = (index: number) => { const next = clone(); next.resourceEvolution = (next.resourceEvolution || []).filter((_, i) => i !== index); commit(next); };
+  const addEvolutionResource = (index: number) => { const next = clone(); next.resourceEvolution![index].add = [...(next.resourceEvolution![index].add || []), { id: `evolved_${Date.now()}`, name: '新资源', symbol: '◆', amount: 1, max: 10, scarce: false, description: '', gatherRate: '', usage: '', gatherAmount: 1, gatherTimeMinutes: 30, gatherStaminaCost: 5 }]; commit(next); };
+  const removeEvolutionResource = (index: number, resourceIndex: number) => { const next = clone(); next.resourceEvolution![index].add = (next.resourceEvolution![index].add || []).filter((_, itemIndex) => itemIndex !== resourceIndex); commit(next); };
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 'var(--font-size-xs)' }}>
+    <label><span style={{ color: 'var(--text-muted)' }}>整体描述</span><input style={inputStyle} value={data.description || ''} onChange={e => set('description', e.target.value)} placeholder="一句话描述生存资源系统" /></label>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}><label><span style={{ color: 'var(--text-muted)' }}>结算周期</span><input style={inputStyle} value={data.rules?.cycleName || '一天'} onChange={e => set('rules.cycleName', e.target.value)} /></label><label><span style={{ color: 'var(--text-muted)' }}>危机阈值</span><input style={inputStyle} type="number" value={data.rules?.criticalThreshold ?? 2} onChange={e => set('rules.criticalThreshold', Number(e.target.value) || 0)} /></label></div>
+    <label><span style={{ color: 'var(--text-muted)' }}>每周期消耗说明</span><input style={inputStyle} value={data.rules?.consumePerCycle || ''} onChange={e => set('rules.consumePerCycle', e.target.value)} /></label>
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}><strong>资源列表</strong><button className="btn-ghost" onClick={addResource}>+ 添加</button></div>
+    {data.resources.map((res, i) => <div key={res.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 50px 50px 45px auto', gap: 4, alignItems: 'center' }}><input style={inputStyle} value={res.symbol} onChange={e => setResource(i, 'symbol', e.target.value)} /><input style={inputStyle} value={res.name} onChange={e => setResource(i, 'name', e.target.value)} placeholder="资源名" /><input style={inputStyle} type="number" value={res.amount} onChange={e => setResource(i, 'amount', Number(e.target.value) || 0)} /><input style={inputStyle} type="number" value={res.max} onChange={e => setResource(i, 'max', Number(e.target.value) || 0)} /><label><input type="checkbox" checked={res.scarce} onChange={e => setResource(i, 'scarce', e.target.checked)} />稀缺</label><button className="btn-ghost" onClick={() => removeResource(i)} style={{ color: 'var(--danger)' }}>✕</button></div>
+      <input style={inputStyle} value={res.id} onChange={e => setResource(i, 'id', e.target.value)} placeholder="资源 ID" /><input style={inputStyle} value={res.description} onChange={e => setResource(i, 'description', e.target.value)} placeholder="用途与获取方式" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px 90px 90px', gap: 4 }}><input style={inputStyle} value={res.gatherRate || ''} onChange={e => setResource(i, 'gatherRate', e.target.value)} placeholder="采集描述" /><input style={inputStyle} value={res.usage || ''} onChange={e => setResource(i, 'usage', e.target.value)} placeholder="消耗描述" /><input style={inputStyle} type="number" value={res.gatherAmount ?? 1} onChange={e => setResource(i, 'gatherAmount', Number(e.target.value) || 0)} placeholder="采集量" /><input style={inputStyle} type="number" value={res.gatherTimeMinutes ?? 30} onChange={e => setResource(i, 'gatherTimeMinutes', Number(e.target.value) || 0)} placeholder="分钟" /><input style={inputStyle} type="number" value={res.gatherStaminaCost ?? 5} onChange={e => setResource(i, 'gatherStaminaCost', Number(e.target.value) || 0)} placeholder="体力" /></div>
+    </div>)}
+    <div style={{ color: 'var(--text-muted)' }}>结构化周期消耗</div><KeyValueListEditor value={data.consumption?.perCycle || {}} onChange={perCycle => commit({ ...clone(), consumption: { ...(data.consumption || {}), perCycle } })} keyPlaceholder="资源 ID" valuePlaceholder="每周期消耗" /><KeyValueListEditor value={data.consumption?.exhaustionPenalty || {}} onChange={exhaustionPenalty => commit({ ...clone(), consumption: { ...(data.consumption || { perCycle: {} }), exhaustionPenalty } })} keyPlaceholder="属性 ID" valuePlaceholder="耗尽惩罚" />
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}><strong>制作配方</strong><button className="btn-ghost" onClick={addRecipe}>+ 添加</button></div>
+    {(data.recipes || []).map((recipe, i) => <div key={recipe.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}><div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr 70px auto', gap: 4 }}><input style={inputStyle} value={recipe.id} onChange={e => set(`recipes.${i}.id`, e.target.value)} /><input style={inputStyle} value={recipe.name} onChange={e => set(`recipes.${i}.name`, e.target.value)} /><input style={inputStyle} value={recipe.output.resourceId} onChange={e => set(`recipes.${i}.output.resourceId`, e.target.value)} placeholder="产出资源" /><input style={inputStyle} type="number" value={recipe.output.amount} onChange={e => set(`recipes.${i}.output.amount`, Number(e.target.value) || 0)} /><button className="btn-ghost" onClick={() => removeRecipe(i)} style={{ color: 'var(--danger)' }}>✕</button></div><input style={inputStyle} value={recipe.description} onChange={e => set(`recipes.${i}.description`, e.target.value)} placeholder="配方描述" /><KeyValueListEditor value={recipe.inputs} onChange={inputs => { const next = clone(); next.recipes![i].inputs = inputs; commit(next); }} keyPlaceholder="输入资源" valuePlaceholder="数量" /><input style={inputStyle} type="number" value={recipe.craftTimeMinutes ?? 0} onChange={e => set(`recipes.${i}.craftTimeMinutes`, Number(e.target.value) || 0)} placeholder="制作分钟" /><span style={{ color: 'var(--text-muted)' }}>解锁条件</span><ConditionListEditor value={recipe.unlockConditions} onChange={unlockConditions => set(`recipes.${i}.unlockConditions`, unlockConditions)} /><span style={{ color: 'var(--text-muted)' }}>解锁消耗</span><CostListEditor value={recipe.unlockCost} onChange={unlockCost => set(`recipes.${i}.unlockCost`, unlockCost)} /></div>)}
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}><strong>状态效果</strong><button className="btn-ghost" onClick={addStatus}>+ 添加</button></div>
+    {(data.statuses || []).map((status, i) => <div key={status.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}><div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 80px auto', gap: 4 }}><input style={inputStyle} value={status.id} onChange={e => set(`statuses.${i}.id`, e.target.value)} /><input style={inputStyle} value={status.name} onChange={e => set(`statuses.${i}.name`, e.target.value)} /><input style={inputStyle} type="number" value={status.durationTicks ?? 0} onChange={e => set(`statuses.${i}.durationTicks`, Number(e.target.value) || 0)} /><button className="btn-ghost" onClick={() => removeStatus(i)} style={{ color: 'var(--danger)' }}>✕</button></div><input style={inputStyle} value={status.description || ''} onChange={e => set(`statuses.${i}.description`, e.target.value)} placeholder="状态描述" /><EffectListEditor value={status.statEffects} onChange={statEffects => set(`statuses.${i}.statEffects`, statEffects)} /></div>)}
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}><strong>资源演化</strong><button className="btn-ghost" onClick={addEvolution}>+ 添加</button></div>
+    {(data.resourceEvolution || []).map((step, i) => <div key={step.id} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 90px auto', gap: 4 }}><input style={inputStyle} value={step.id} onChange={e => set(`resourceEvolution.${i}.id`, e.target.value)} placeholder="演化 ID" /><input style={inputStyle} value={(step.trigger?.keywords || []).join(',')} onChange={e => set(`resourceEvolution.${i}.trigger.keywords`, e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="触发关键词（逗号分隔）" /><input style={inputStyle} type="number" min={0} value={step.afterRounds ?? ''} onChange={e => set(`resourceEvolution.${i}.afterRounds`, e.target.value === '' ? undefined : Number(e.target.value) || 0)} placeholder="触发轮次" /><button className="btn-ghost" onClick={() => removeEvolution(i)} style={{ color: 'var(--danger)' }}>✕</button></div>
+      <input style={inputStyle} value={(step.remove || []).join(',')} onChange={e => set(`resourceEvolution.${i}.remove`, e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="移除资源 ID（逗号分隔）" />
+      <input style={inputStyle} value={step.narrateHint || ''} onChange={e => set(`resourceEvolution.${i}.narrateHint`, e.target.value)} placeholder="给 AI 的叙事提示" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-muted)' }}><span>新增资源：{step.add?.length ?? 0} 个</span><button className="btn-ghost" onClick={() => addEvolutionResource(i)}>+ 添加资源</button></div>
+      {(step.add || []).map((resource, resourceIndex) => <div key={resource.id} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 28px 50px 50px auto', gap: 4, alignItems: 'center' }}>
+        <input style={inputStyle} value={resource.id} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.id`, e.target.value)} placeholder="ID" />
+        <input style={inputStyle} value={resource.name} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.name`, e.target.value)} placeholder="名称" />
+        <input style={inputStyle} value={resource.symbol} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.symbol`, e.target.value)} placeholder="符号" />
+        <input style={inputStyle} type="number" value={resource.amount} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.amount`, Number(e.target.value) || 0)} placeholder="数量" />
+        <input style={inputStyle} type="number" value={resource.max} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.max`, Number(e.target.value) || 0)} placeholder="上限" />
+        <button className="btn-ghost" onClick={() => removeEvolutionResource(i, resourceIndex)} style={{ color: 'var(--danger)' }}>✕</button>
+        <input style={{ ...inputStyle, gridColumn: '1 / -1' }} value={resource.description || ''} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.description`, e.target.value)} placeholder="获取方式与用途" />
+        <label style={{ gridColumn: '1 / -1' }}><input type="checkbox" checked={resource.scarce} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.scarce`, e.target.checked)} /> 稀缺资源</label>
+        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr 90px 90px 90px', gap: 4 }}>
+          <input style={inputStyle} value={resource.gatherRate || ''} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.gatherRate`, e.target.value)} placeholder="采集描述" />
+          <input style={inputStyle} value={resource.usage || ''} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.usage`, e.target.value)} placeholder="消耗描述" />
+          <input style={inputStyle} type="number" value={resource.gatherAmount ?? 1} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.gatherAmount`, Number(e.target.value) || 0)} placeholder="采集量" />
+          <input style={inputStyle} type="number" value={resource.gatherTimeMinutes ?? 30} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.gatherTimeMinutes`, Number(e.target.value) || 0)} placeholder="分钟" />
+          <input style={inputStyle} type="number" value={resource.gatherStaminaCost ?? 5} onChange={e => set(`resourceEvolution.${i}.add.${resourceIndex}.gatherStaminaCost`, Number(e.target.value) || 0)} placeholder="体力" />
         </div>
-      ))}
-    </div>
-  );
+      </div>)}
+    </div>)}
+  </div>;
 }

@@ -20,6 +20,7 @@ function withProfileDefaults(raw: Partial<PlayerProfile> | null | undefined): Pl
     specialIdentity: raw.specialIdentity ?? '', perspective: raw.perspective ?? '第三人称',
     initialSkills: raw.initialSkills ?? {}, initialItems: raw.initialItems ?? {}, customNpcs: raw.customNpcs ?? [],
     portrait: raw.portrait ? { ...raw.portrait } : undefined,
+    combatRiskMode: raw.combatRiskMode ?? 'normal',
   };
 }
 
@@ -130,6 +131,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const optimized = optimizeSnapshots([...eng.messages]);
       const memStore = useMemoryStore.getState();
       const memData = memStore.toJSON();
+      const moduleBundle = eng.variableManager.createModulePersistenceBundle(saveId);
+      const combatResult = moduleBundle.coreState.v3?.combatResult;
+      const combatFlags = moduleBundle.coreState.v3?.featureFlags;
+      const playerDiedInInferno = combatFlags?.combatRiskMode === 'inferno'
+        && combatResult?.report?.deaths.some(id => id === 'player' || combatResult.report?.participants.some(unit => unit.id === id && unit.source === 'player'));
+      const existingMeta = useSaveStore.getState().savesMeta.find(meta => meta.id === saveId);
+      const lifecycle = existingMeta?.lifecycle === 'ended' || playerDiedInInferno ? 'ended' as const : 'active' as const;
 
       // 自建世界：带上完整世界定义（确保导出可移植）
       let customWorld: Record<string, unknown> | undefined;
@@ -143,7 +151,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         name: useSaveStore.getState().currentSaveName || s.personalInfo?.name || '未命名存档',
         timestamp: Date.now(),
         messages: optimized,
-        gameState: eng.variableManager.getState(),
+        gameState: moduleBundle.coreState,
+        moduleStates: moduleBundle.current,
+        moduleCheckpoints: moduleBundle.checkpoints,
         worldId: s.selectedWorld,
         personalInfo: s.personalInfo ?? undefined,
         characterHistory: s.characterHistory || undefined,
@@ -155,6 +165,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         },
         customWorld,
         simulationState: getEngineState(),
+        lifecycle,
+        ...(lifecycle === 'ended' ? {
+          endedAt: combatResult?.endedAt ?? existingMeta?.endedAt ?? Date.now(),
+          endReason: existingMeta?.endReason ?? '炼狱战斗中玩家死亡，存档已封存为只读。',
+        } : {}),
       };
     });
   }, []);

@@ -190,6 +190,7 @@ registerCardNodeExecutor('choice.conditional', (_node, ctx, inputs) => {
       label: String(opt.label ?? ''),
       aiNote: opt.aiNote as string | undefined,
       effect: opt.effect as { statId?: string; resourcePath?: string; delta: number } | undefined,
+      ...(opt.action ? { action: opt.action as import('../gameplay/narrativeDecision').NarrativeDecisionAction } : {}),
     })),
     outputs: { flow_out: true },
   };
@@ -223,6 +224,7 @@ registerCardNodeExecutor('choice.weighted', (_node, _ctx, inputs) => {
       label: String(opt.label ?? ''),
       aiNote: opt.aiNote as string | undefined,
       effect: opt.effect as { statId?: string; resourcePath?: string; delta: number } | undefined,
+      ...(opt.action ? { action: opt.action as import('../gameplay/narrativeDecision').NarrativeDecisionAction } : {}),
       weight: opt.weight,
     })),
     outputs: { flow_out: true },

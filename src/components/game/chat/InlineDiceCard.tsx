@@ -1,148 +1,119 @@
-// 内联骰子检定卡片 — 渲染在消息正文中的可交互骰子卡片
-import { useState, useCallback, useMemo, useEffect } from 'react';
+// 内联骰子检定卡片：正文完成后由本地系统自动结算，玩家不选择机械结果。
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Dices, Sparkles, XCircle } from 'lucide-react';
-import type { DiceRoll, StatModuleSchema } from '../../../modules/schema';
-import { rollDice, getCheckableAttributes, calcModifier } from '../../../modules/xpAlgorithm';
+import type { DiceModuleSchema, DiceRoll, StatModuleSchema } from '../../../modules/schema';
+import { resolveCheckableAttribute } from '../../../modules/xpAlgorithm';
+import { createDiceRoll } from '../../../gameplay/modules/dice';
 import JourneyCardShell from '../shared/JourneyCardShell';
 
 interface InlineDiceCardProps {
-  /** AI 指定的属性名（如 "力量"、"敏捷"） */
   attr: string;
-  /** AI 指定的难度等级 */
   dc: number;
-  /** 数值属性模块数据（用于获取可检定属性列表） */
+  requestId: string;
+  existingRoll?: DiceRoll;
   statData?: StatModuleSchema;
-  /** 掷骰结果回调 */
+  diceData?: DiceModuleSchema;
   onRoll?: (roll: DiceRoll) => void;
 }
 
-export default function InlineDiceCard({ attr, dc, statData, onRoll }: InlineDiceCardProps) {
-  const [animating, setAnimating] = useState(false);
-  const [result, setResult] = useState<DiceRoll | null>(null);
+export default function InlineDiceCard({
+  attr,
+  dc,
+  requestId,
+  existingRoll,
+  statData,
+  diceData = {},
+  onRoll,
+}: InlineDiceCardProps) {
+  const [animating, setAnimating] = useState(!existingRoll);
+  const [result, setResult] = useState<DiceRoll | null>(existingRoll ?? null);
+  const startedRef = useRef(false);
+  const selectedAttribute = useMemo(
+    () => statData ? resolveCheckableAttribute(statData, attr) : undefined,
+    [attr, statData],
+  );
+  const matchingBonuses = useMemo(() => selectedAttribute
+    ? (diceData.runtimeBonuses ?? []).filter(bonus => !bonus.statIds?.length || bonus.statIds.some(statId => statId === selectedAttribute.id))
+    : [], [diceData.runtimeBonuses, selectedAttribute]);
 
-  // 动态获取当前世界的可检定属性
-  const checkableAttrs = useMemo(() => statData ? getCheckableAttributes(statData) : [], [statData]);
-
-  // 根据属性名查找匹配（兼容 name 和 id 匹配）
-  const initialAttr = useMemo(() => {
-    if (!attr) return checkableAttrs[0]?.id || '';
-    const found = checkableAttrs.find(a => a.name === attr || a.id === attr);
-    return found?.id || '';
-  }, [attr, checkableAttrs]);
-
-  const [selectedAttr, setSelectedAttr] = useState(initialAttr);
-
-  // 当 initialAttr 变化时同步（首次渲染后 statData 可能异步到达）
   useEffect(() => {
-    if (initialAttr && !selectedAttr) {
-      setSelectedAttr(initialAttr);
-    }
-  }, [initialAttr, selectedAttr]);
-
-  const selectedAttrData = checkableAttrs.find(a => a.id === selectedAttr);
-  const modifier = selectedAttrData ? calcModifier(selectedAttrData.value) : 0;
-
-  const handleRoll = useCallback(() => {
-    if (!selectedAttrData || animating) return;
-
-    setAnimating(true);
-    setTimeout(() => {
-      const rollResult = rollDice(selectedAttrData.value, dc);
-      const roll: DiceRoll = {
-        attributeName: selectedAttrData.name,
-        attributeValue: selectedAttrData.value,
-        modifier: rollResult.modifier,
-        d20: rollResult.d20,
-        total: rollResult.total,
-        dc,
-        success: rollResult.success,
-        isNatural20: rollResult.isNatural20,
-        isNatural1: rollResult.isNatural1,
-        timestamp: Date.now(),
-      };
-      setResult(roll);
-      onRoll?.(roll);
+    if (existingRoll) {
+      setResult(existingRoll);
       setAnimating(false);
-    }, 300);
-  }, [selectedAttrData, dc, animating, onRoll]);
+      return undefined;
+    }
+    if (!selectedAttribute || startedRef.current) {
+      setAnimating(false);
+      return undefined;
+    }
+    startedRef.current = true;
+    setAnimating(true);
+    const timer = window.setTimeout(() => {
+      const roll = createDiceRoll(diceData, {
+        requestId,
+        attributeId: selectedAttribute.id,
+        attributeName: selectedAttribute.name,
+        attributeValue: selectedAttribute.value,
+        dc,
+        timestamp: Date.now(),
+        advantageMode: 'normal',
+        bonuses: matchingBonuses,
+      });
+      setResult(roll);
+      setAnimating(false);
+      onRoll?.(roll);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [dc, diceData, existingRoll, matchingBonuses, onRoll, requestId, selectedAttribute]);
 
-  // 结果颜色
   const resultColor = result
     ? result.isNatural20 ? 'var(--success)'
-    : result.isNatural1 ? 'var(--danger)'
-    : result.success ? 'var(--accent)'
-    : 'var(--text-muted)'
+      : result.isNatural1 ? 'var(--danger)'
+        : result.success ? 'var(--accent)'
+          : 'var(--text-muted)'
     : undefined;
 
   return (
-    <JourneyCardShell className="game-journey-card--dice" label="骰子检定" mode="panel">
+    <JourneyCardShell className="game-journey-card--dice" label="自动检定" mode="panel">
       <div className="inline-dice-card">
-      {/* 头部 */}
-      <div className="inline-dice-header">
-        <Dices size={14} aria-hidden="true" />
-        <span>骰子检定</span>
-        <span className="inline-dice-dc">DC {dc}</span>
-      </div>
+        <div className="inline-dice-header">
+          <Dices size={14} aria-hidden="true" />
+          <span>{selectedAttribute?.name ?? (attr || '骰子')}检定</span>
+          <span className="inline-dice-dc">DC {dc}</span>
+        </div>
 
-      {/* 操作区 */}
-      <div className="inline-dice-body">
-      <div className={`inline-dice-core${animating ? ' is-rolling' : ''}`} aria-hidden="true">
-        <span className="inline-dice-core__value">{result?.d20 ?? 'D20'}</span>
-        <Dices size={18} strokeWidth={1.4} />
-      </div>
-      <div className="inline-dice-controls">
-        {checkableAttrs.length > 0 ? (
-          <select
-            className="inline-dice-select"
-            value={selectedAttr}
-            onChange={e => setSelectedAttr(e.target.value)}
-          >
-            {!selectedAttr && <option value="">选择检定属性</option>}
-            {checkableAttrs.map(a => (
-              <option key={a.id} value={a.id}>{a.name} ({a.value})</option>
-            ))}
-          </select>
-        ) : (
-          <span className="inline-dice-no-attr">{attr || '无可用属性'}</span>
-        )}
-
-        {selectedAttrData && (
-          <span className="inline-dice-modifier">
-            修正 {modifier >= 0 ? '+' : ''}{modifier}
-          </span>
-        )}
-        {!selectedAttrData && checkableAttrs.length > 0 && attr && (
-          <span className="inline-dice-no-attr">未找到“{attr}”，请选择实际属性</span>
-        )}
-
-        <button
-          className="inline-dice-roll-btn"
-          onClick={handleRoll}
-          disabled={!selectedAttrData || animating}
-          aria-label={animating ? '骰子检定进行中' : '掷骰'}
-          title={animating ? '骰子检定进行中' : '掷骰'}
-        >
-          <Dices size={16} aria-hidden="true" />
-          <span>{animating ? '检定中…' : '掷骰'}</span>
-        </button>
-      </div>
-      </div>
-
-      {/* 结果展示 */}
-      {result && (
-        <div className="inline-dice-result" style={{ borderLeftColor: resultColor }}>
-          <div className="inline-dice-result-header">
-            <span className="inline-dice-result-attr">{result.attributeName}检定</span>
-            <span className="inline-dice-result-status" style={{ color: resultColor }}>
-              {result.isNatural20 ? <><Sparkles size={13} aria-hidden="true" /> 大成功</> : result.isNatural1 ? <><XCircle size={13} aria-hidden="true" /> 大失败</> : result.success ? <><CheckCircle2 size={13} aria-hidden="true" /> 成功</> : <><XCircle size={13} aria-hidden="true" /> 失败</>}
-            </span>
+        <div className="inline-dice-body">
+          <div className={`inline-dice-core${animating ? ' is-rolling' : ''}`} aria-hidden="true">
+            <span className="inline-dice-core__value">{result?.d20 ?? 'D20'}</span>
+            <Dices size={18} strokeWidth={1.4} />
           </div>
-          <div className="inline-dice-result-formula">
-            d20(<strong>{result.d20}</strong>) + 修正({result.modifier >= 0 ? '+' : ''}{result.modifier}) = <strong>{result.total}</strong>
-            {' '}vs DC{result.dc}
+          <div className="inline-dice-controls">
+            {selectedAttribute ? (
+              <>
+                <strong>{selectedAttribute.name}</strong>
+                <span className="inline-dice-modifier">{selectedAttribute.semanticLabel ?? selectedAttribute.id} · 当前值 {selectedAttribute.value}</span>
+                {matchingBonuses.length > 0 && <small>职业/天赋修正：{matchingBonuses.map(item => `${item.source} ${item.value >= 0 ? '+' : ''}${item.value}`).join('、')}</small>}
+                <small>{animating ? '本地系统正在自动结算…' : '本次检定已自动结算，结果不可手动改选。'}</small>
+              </>
+            ) : (
+              <span className="inline-dice-no-attr">当前世界没有可用于“{attr}”的数值属性，未执行检定。</span>
+            )}
           </div>
         </div>
-      )}
+
+        {result && (
+          <div className="inline-dice-result" style={{ borderLeftColor: resultColor }}>
+            <div className="inline-dice-result-header">
+              <span className="inline-dice-result-attr">{result.attributeName}检定</span>
+              <span className="inline-dice-result-status" style={{ color: resultColor }}>
+                {result.isNatural20 ? <><Sparkles size={13} /> 大成功</> : result.isNatural1 ? <><XCircle size={13} /> 大失败</> : result.success ? <><CheckCircle2 size={13} /> 成功</> : <><XCircle size={13} /> 失败</>}
+              </span>
+            </div>
+            <div className="inline-dice-result-formula">
+              d20(<strong>{result.d20}</strong>) + 属性修正({result.modifier >= 0 ? '+' : ''}{result.modifier}) = <strong>{result.total}</strong> vs DC{result.dc}
+            </div>
+          </div>
+        )}
       </div>
     </JourneyCardShell>
   );

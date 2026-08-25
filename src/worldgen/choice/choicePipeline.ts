@@ -6,6 +6,7 @@
 import type { WorldBookEntryDef, WorldDef, WorldModule } from '../../data/worlds-schema';
 import { executeBuildPipeline } from '../../modules/buildPipeline';
 import { createBuildContext } from '../../modules/buildContext';
+import { createFallbackModule } from '../../modules/defaults';
 import type { CallAI } from '../types';
 import type { DimensionGeneration, DimensionSelection } from './types';
 import { inferWorldClockConfig } from '../../time/worldClock';
@@ -235,7 +236,7 @@ ${selectionSummary}
 /** 模块ID到中文名称的映射 */
 const MODULE_ID_TO_KEY: Record<string, string> = {
   stat: '数值属性', progression: '成长体系', survival: '生存资源',
-  business: '经营资产', dice: '骰子检定', talent: '天赋体系',
+  business: '经营资产', dice: '骰子检定', talent: '天赋体系', profession: '职业体系',
 };
 
 /**
@@ -274,12 +275,7 @@ export async function generateModuleEntries(
       }
 
       // 兜底
-      return {
-        moduleId: id,
-        name: key || id,
-        description: '',
-        enabled: true,
-      };
+      return createFallbackModule(id, key || id);
     }) as WorldModule[];
 
     // 提取模块生成的世界书条目
@@ -294,12 +290,7 @@ export async function generateModuleEntries(
   } catch (err) {
     console.warn('[generateModuleEntries] 模块管线失败:', err);
     return {
-      modules: selectedModules.map(id => ({
-        moduleId: id,
-        name: MODULE_ID_TO_KEY[id] || id,
-        description: '',
-        enabled: true,
-      })) as WorldModule[],
+      modules: selectedModules.map(id => createFallbackModule(id, MODULE_ID_TO_KEY[id] || id)) as WorldModule[],
       worldBookEntries: [],
     };
   }

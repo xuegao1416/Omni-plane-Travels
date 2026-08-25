@@ -14,6 +14,7 @@ interface UseMenuItemsParams {
   onResend: (id: string) => void;
   onResendFromHere: (id: string) => void;
   onDelete: (id: string) => void;
+  readOnly?: boolean;
 }
 
 /**
@@ -28,22 +29,25 @@ export function useMenuItems({
   onResend,
   onResendFromHere,
   onDelete,
+  readOnly = false,
 }: UseMenuItemsParams): ContextMenuItem[] {
+  const copyItem: ContextMenuItem = {
+    label: '复制内容',
+    icon: <Copy size={14} />,
+    action: () => {
+      const raw = message.rawText || '';
+      const cleaned = processRegexScripts(stripTimeAdvanceTags(raw), displayScripts);
+      onCopy(isUser ? raw : dialogueMarkupToPlainText(stripTimeAdvanceTags(cleaned)));
+    },
+  };
+  if (readOnly) return [copyItem];
   return [
     {
       label: '编辑消息',
       icon: <Pencil size={14} />,
       action: onEdit,
     },
-    {
-      label: '复制内容',
-      icon: <Copy size={14} />,
-      action: () => {
-        const raw = message.rawText || '';
-        const cleaned = processRegexScripts(stripTimeAdvanceTags(raw), displayScripts);
-        onCopy(isUser ? raw : dialogueMarkupToPlainText(stripTimeAdvanceTags(cleaned)));
-      },
-    },
+    copyItem,
     ...(isUser ? [{
       label: '重新发送',
       icon: <RefreshCw size={14} />,

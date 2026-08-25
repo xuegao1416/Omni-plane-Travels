@@ -110,6 +110,10 @@ function applyPendingAction(
       }
       break;
     }
+    case 'requestCombat': {
+      applied.push({ ruleId, kind: 'requestCombat', detail: structuredClone(action.payload) });
+      break;
+    }
     case 'scheduleTick': {
       const { after, payload } = action.payload as { after: number; payload?: Record<string, unknown> };
       if (after > 0) {

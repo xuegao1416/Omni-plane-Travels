@@ -13,6 +13,7 @@ import { STORAGE_KEYS } from '../../config/storageKeys';
 import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
 import type { WorldDef } from '../../data/worlds-schema';
+import { anonymizePlayerPresetAsNpc, type PlayerPreset } from '../../storage/templateStore';
 
 /* ─── 类型定义 ─── */
 type AssetType = 'world_package' | 'character_preset' | 'npc_template' | 'history_preset';
@@ -27,6 +28,8 @@ interface AssetTypeInfo {
   getDesc: (item: any) => string;
   /** 上传时的类型标识 */
   uploadType: string;
+  /** 主角预设可能包含真名和私人投射，只保留本地管理。 */
+  publishable?: boolean;
 }
 
 const ASSET_TYPES: Record<AssetType, AssetTypeInfo> = {
@@ -45,6 +48,7 @@ const ASSET_TYPES: Record<AssetType, AssetTypeInfo> = {
     getName: (p: any) => p.name || '未命名预设',
     getDesc: (p: any) => p.description || '',
     uploadType: 'character_preset',
+    publishable: false,
   },
   npc_template: {
     label: 'NPC 模板',
@@ -187,6 +191,12 @@ export default function LocalAssetsTab() {
     URL.revokeObjectURL(url);
   };
 
+  const handleAnonymize = async (asset: { name: string; raw: any }) => {
+    anonymizePlayerPresetAsNpc(asset.raw as PlayerPreset);
+    refresh();
+    await showAlert('已生成“匿名角色模板”。姓名、组织、位置和私人经历均未复制，请在 NPC 模板中检查后再发布。', { title: '转换完成' });
+  };
+
   const items = currentAssets[activeType] || [];
 
   return (
@@ -201,7 +211,7 @@ export default function LocalAssetsTab() {
         本地资产
       </h3>
       <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
-        管理本地存储的世界包、预设和模板，可一键上传到创意工坊
+        管理本地存储的世界包、预设和模板；主角预设仅保存在本地
       </p>
 
       {/* 类型 Tab */}
@@ -294,25 +304,29 @@ export default function LocalAssetsTab() {
               {/* 操作按钮 */}
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 {/* 上传到创意工坊 */}
-                <button
-                  onClick={() => handleUpload(item)}
-                  disabled={uploadingId === item.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-                    padding: 'var(--space-2) var(--space-3)',
-                    background: 'var(--accent-dim)', color: 'var(--accent)',
-                    border: 'none', borderRadius: 'var(--radius-md)',
-                    cursor: uploadingId === item.id ? 'wait' : 'pointer',
-                    fontSize: 'var(--font-size-sm)', fontWeight: '500',
-                    opacity: uploadingId === item.id ? 0.6 : 1,
-                  }}
-                >
-                  {uploadingId === item.id
-                    ? <Loader size={14} className="animate-spin" />
-                    : <Upload size={14} />
-                  }
-                  上传到工坊
-                </button>
+                {ASSET_TYPES[activeType].publishable !== false && <button
+                    onClick={() => handleUpload(item)}
+                    disabled={uploadingId === item.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                      padding: 'var(--space-2) var(--space-3)',
+                      background: 'var(--accent-dim)', color: 'var(--accent)',
+                      border: 'none', borderRadius: 'var(--radius-md)',
+                      cursor: uploadingId === item.id ? 'wait' : 'pointer',
+                      fontSize: 'var(--font-size-sm)', fontWeight: '500',
+                      opacity: uploadingId === item.id ? 0.6 : 1,
+                    }}
+                  >
+                    {uploadingId === item.id
+                      ? <Loader size={14} className="animate-spin" />
+                      : <Upload size={14} />
+                    }
+                    上传到工坊
+                  </button>}
+                {activeType === 'character_preset' && <button
+                  onClick={() => void handleAnonymize(item)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', padding: 'var(--space-2) var(--space-3)', background: 'var(--accent-dim)', color: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)' }}
+                ><User size={14} />匿名化为 NPC</button>}
 
                 {/* 导出 */}
                 <button

@@ -10,6 +10,7 @@ export interface ApiSettingsTabProps {
   t: (key: string) => string;
   onSave?: () => void;
   onBack?: () => void;
+  onSelectTrial?: () => void;
 }
 
 export type ConfigSetter = <K extends keyof ApiConfig>(key: K, val: ApiConfig[K]) => void;

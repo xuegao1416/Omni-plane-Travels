@@ -1,6 +1,6 @@
 {
   "name": "omni-plane-travels",
-  "version": "2.7.6",
+  "version": "2.8.0",
   "description": "AI-Powered Interactive Fiction Engine — 多世界观、多阶段管线、编译式记忆系统",
   "type": "module",
   "private": true,
@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:android:init": "tauri android init --ci",
+    "tauri:android:dev": "tauri android dev",
+    "tauri:android:build:debug": "tauri android build --debug --apk --target aarch64 --ci"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260719.1",

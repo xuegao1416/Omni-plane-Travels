@@ -3,6 +3,8 @@ export const STORAGE_KEYS = {
   // UI 设置
   UI_SETTINGS: 'world_travel_guide_ui_settings',
   API_CONFIG: 'world_travel_guide_api_config',
+  TRIAL_CLIENT_ID: 'world_travel_guide_trial_client_id',
+  TRIAL_ENABLED: 'world_travel_guide_trial_enabled',
 
   // 记忆系统
   MEMORY_CONFIG: 'world_travel_guide_memory_config',

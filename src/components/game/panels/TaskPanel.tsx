@@ -11,11 +11,13 @@ import {
   Zap, Trophy, Shield,
 } from 'lucide-react';
 import type { GameState, Task, TaskType, TaskStage, TaskReward } from '../../../schema/variables';
+import type { ProfessionModuleSchema } from '../../../modules/schema';
+import { resolveOwnedAbility } from '../../../gameplay/profession';
 import { Collapsible } from '../../shared/Collapsible';
 import EmptyState from '../../shared/EmptyState';
 import { toDisplayText } from '../../../utils/displayText';
 
-interface Props { gameState: GameState; }
+interface Props { gameState: GameState; professionConfig?: ProfessionModuleSchema; }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -87,7 +89,7 @@ function StageIndicator({ stages }: { stages: TaskStage[] }) {
 }
 
 // ── 需求条件列表 ──
-function RequirementList({ task, gameState }: { task: Task; gameState: GameState }) {
+function RequirementList({ task, gameState, professionConfig }: { task: Task; gameState: GameState; professionConfig?: ProfessionModuleSchema }) {
   const items: Array<{ icon: typeof Package; label: string; met: boolean }> = [];
 
   // 物品需求
@@ -131,7 +133,12 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
   if (task.技能需求) {
     for (const req of safeArray<NonNullable<Task['技能需求']>[number]>(task.技能需求)) {
       const skill = gameState.玩家.技能系统?.[req.技能名];
-      const has = !!skill;
+      const professionAbility = professionConfig
+        ? resolveOwnedAbility(gameState, professionConfig, req.技能ID || req.技能名)
+        : undefined;
+      const storedProfessionAbility = Object.entries(gameState.玩家.能力系统?.职业状态?.已解锁能力 ?? {})
+        .some(([id, value]) => id === req.技能ID || id === req.技能名 || value.名称 === req.技能名);
+      const has = !!skill || !!professionAbility || storedProfessionAbility;
       items.push({
         icon: Swords,
         label: `技能: ${req.技能名}${req.最低品质 ? ` (${req.最低品质}+)` : ''}`,
@@ -195,7 +202,7 @@ function RequirementList({ task, gameState }: { task: Task; gameState: GameState
 // ── 奖励展示 ──
 function RewardDisplay({ reward }: { reward: TaskReward }) {
   const items: string[] = [];
-  if (reward.经验值) items.push(`⭐ ${reward.经验值}XP`);
+  if (reward.经验值) items.push(`⭐ 经验 ${reward.经验值}`);
   if (reward.金币) items.push(`💰 ${reward.金币}`);
   const rewardItems = safeArray<NonNullable<TaskReward['物品']>[number]>(reward.物品);
   const rewardSkills = safeArray<NonNullable<TaskReward['技能']>[number]>(reward.技能);
@@ -236,7 +243,7 @@ function RewardDisplay({ reward }: { reward: TaskReward }) {
 }
 
 // ── 单个任务卡片 ──
-function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
+function TaskCard({ task, gameState, professionConfig }: { task: Task; gameState: GameState; professionConfig?: ProfessionModuleSchema }) {
   const [expanded, setExpanded] = useState(false);
   const typeConfig = TASK_TYPE_CONFIG[task.任务类型] || TASK_TYPE_CONFIG['支线'];
   const TypeIcon = typeConfig.icon;
@@ -331,7 +338,7 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
           )}
 
           {/* 需求条件 */}
-          <RequirementList task={task} gameState={gameState} />
+          <RequirementList task={task} gameState={gameState} professionConfig={professionConfig} />
 
           {/* 阶段详情 */}
           {stages.map((stage, i) => (
@@ -357,7 +364,7 @@ function TaskCard({ task, gameState }: { task: Task; gameState: GameState }) {
 }
 
 // ── 主面板 ──
-export default function TaskPanel({ gameState }: Props) {
+export default function TaskPanel({ gameState, professionConfig }: Props) {
   const [filter, setFilter] = useState<TaskType | '全部'>('全部');
   const taskSystem = gameState.玩家.任务系统;
 
@@ -428,7 +435,7 @@ export default function TaskPanel({ gameState }: Props) {
       {/* 活跃任务列表 */}
       {sortedActive.length > 0 ? (
         sortedActive.map(task => (
-          <TaskCard key={task.任务名} task={task} gameState={gameState} />
+          <TaskCard key={task.任务名} task={task} gameState={gameState} professionConfig={professionConfig} />
         ))
       ) : (
         <EmptyState
@@ -443,14 +450,14 @@ export default function TaskPanel({ gameState }: Props) {
           {completedTasks.length > 0 && (
             <Collapsible icon={<CheckCircle2 size={14} />} title="已完成" count={completedTasks.length} defaultOpen={false}>
               {completedTasks.map(task => (
-                <TaskCard key={task.任务名} task={task} gameState={gameState} />
+                <TaskCard key={task.任务名} task={task} gameState={gameState} professionConfig={professionConfig} />
               ))}
             </Collapsible>
           )}
           {failedTasks.length > 0 && (
             <Collapsible icon={<XCircle size={14} />} title="已失败" count={failedTasks.length} defaultOpen={false}>
               {failedTasks.map(task => (
-                <TaskCard key={task.任务名} task={task} gameState={gameState} />
+                <TaskCard key={task.任务名} task={task} gameState={gameState} professionConfig={professionConfig} />
               ))}
             </Collapsible>
           )}

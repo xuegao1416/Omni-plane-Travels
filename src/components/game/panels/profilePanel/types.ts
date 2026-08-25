@@ -1,9 +1,12 @@
 import type { GameState, SkillData, InventoryItem } from '../../../../schema/variables';
+import type { ProfessionModuleSchema, StatModuleSchema } from '../../../../modules/schema';
 
 export interface ProfilePanelProps {
   gameState: GameState;
   /** 是否启用了经营模块（启用时隐藏货币资源，因为右侧已有经营卡片） */
   hasBusinessModule?: boolean;
+  professionConfig?: ProfessionModuleSchema;
+  statConfig?: StatModuleSchema;
 }
 
 export interface SkillSelection {

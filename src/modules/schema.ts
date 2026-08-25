@@ -4,6 +4,16 @@
 // ============================================================
 
 import type { WorldBookEntryDef } from '../data/worlds-schema';
+import type {
+  GameplayComparator,
+  GameplayCondition,
+  GameplayCost,
+  GameplayEffect,
+  GameplayLiteral,
+  GameplayReward,
+} from '../gameplay/types';
+import type { NarrativeDecisionAction } from '../gameplay/narrativeDecision';
+import type { CombatEncounterRequest } from '../gameplay/protocols';
 
 // ─── 数值属性模块 ───
 
@@ -12,7 +22,12 @@ export interface SixDimStat {
   name: string;           // AI生成的中文名
   value: number;          // 当前值
   range: [number, number]; // [最小值, 最大值]
+  /** 面向职业公式与自动检定的稳定语义；显示名仍可随世界变化。 */
+  semanticRole?: SixDimSemanticRole;
+  description?: string;
 }
+
+export type SixDimSemanticRole = 'power' | 'guard' | 'agility' | 'intellect' | 'social' | 'perception';
 
 /** 特色属性 */
 export interface SpecialStat {
@@ -21,6 +36,27 @@ export interface SpecialStat {
   value: number;          // 当前值
   range: [number, number];
   description: string;    // AI生成的描述
+}
+
+export interface StatModifierDefinition {
+  id: string;
+  statId: string;
+  delta: number;
+  mode?: 'flat' | 'percent';
+  source?: string;
+  durationTicks?: number;
+  permanent?: boolean;
+}
+
+export interface DerivedStatDefinition {
+  id: string;
+  name: string;
+  inputs: string[];
+  formula?: 'sum' | 'average' | 'min' | 'max' | 'ratio';
+  scale?: number;
+  offset?: number;
+  min?: number;
+  max?: number;
 }
 
 /** 完整的数值属性模块 */
@@ -38,6 +74,8 @@ export interface StatModuleSchema {
   dim6?: SixDimStat;
   /** 特色属性（0~4个） */
   special: SpecialStat[];
+  derived?: DerivedStatDefinition[];
+  modifiers?: StatModifierDefinition[];
 }
 
 // ─── 成长体系模块 ───
@@ -93,6 +131,27 @@ export interface ProgressionConfig {
     upgradeDesc: string;
     keywords: string[];
   };
+  /** 本地确定性成长来源；未配置时由模块适配器提供保守默认值。 */
+  activityRewards?: Array<{
+    id: string;
+    label: string;
+    keywords: string[];
+    /** 占升到下一阶段所需经验的比例（0~1）。 */
+    rate: number;
+  }>;
+  /** 每次升段/升级时发放的通用点数。 */
+  pointsPerTier?: {
+    attribute?: number;
+    talent?: number;
+    skill?: number;
+  };
+  breakthroughs?: Array<{
+    tierIndex: number;
+    conditions?: GameplayCondition[];
+    costs?: GameplayCost[];
+    rewards?: GameplayEffect[];
+    description?: string;
+  }>;
 }
 
 /**
@@ -121,10 +180,13 @@ export interface SurvivalResource {
   max: number;            // 上限（生存资源必须有上限）
   scarce: boolean;        // 是否稀缺
   gatherRate?: string;    // 采集速率描述（AI参考，如"每天可采集3单位"）
-  gatherAmount?: number;  // 单次明确采集量
-  gatherTimeMinutes?: number; // 单次明确采集耗时
-  gatherStaminaCost?: number; // 单次采集体力消耗
   usage?: string;         // 消耗速率描述（AI参考，如"每天消耗1单位"）
+  /** 一次手动采集的产量；缺省为 1。 */
+  gatherAmount?: number;
+  /** 一次手动采集推进的世界分钟数；缺省为 30。 */
+  gatherTimeMinutes?: number;
+  /** 一次手动采集消耗的体力；缺省为 5。 */
+  gatherStaminaCost?: number;
   description: string;    // 获取方式与用途
 }
 
@@ -137,6 +199,8 @@ export interface SurvivalRecipe {
   /** 明确的制作耗时；缺失的旧配方不会被机械加时。 */
   craftTimeMinutes?: number;
   description: string;
+  unlockConditions?: GameplayCondition[];
+  unlockCost?: GameplayCost[];
 }
 
 /** 资源演化蓝图条目 */
@@ -180,6 +244,7 @@ export interface SurvivalModuleSchema {
   };
   /** 结构化消耗规则（运行时确定性执行） */
   consumption?: SurvivalConsumption;
+  statuses?: Array<{ id: string; name: string; description?: string; durationTicks?: number; statEffects?: GameplayEffect[] }>;
   /** 资源演化蓝图（世界创建时 AI 生成） */
   resourceEvolution?: ResourceEvolutionStep[];
   /** AI可添加自定义字段 */
@@ -196,6 +261,8 @@ export interface BusinessAsset {
   level: number;           // 当前等级 (1~maxLevel)
   maxLevel: number;        // 最大等级
   description: string;     // AI 生成描述
+  /** 缺省为 true 以兼容旧世界；false 时需要玩家在经营面板购置。 */
+  initiallyOwned?: boolean;
 
   /** 收益（每周期） */
   income: {
@@ -203,12 +270,16 @@ export interface BusinessAsset {
     perLevel: number;      // 每级额外收益
     resource?: string;     // 产出资源名（可选）
     cycle: string;         // 结算周期："天"/"周"/"回合"
+    inputs?: Record<string, number>;
+    outputs?: Record<string, number>;
   };
 
   /** 每周期维护费 */
   maintenance: number;
   /** 升级费用（资金） */
   upgradeCost?: number;
+  purchaseCost?: number;
+  purchaseMaterials?: Record<string, number>;
   /** 升级所需材料 */
   upgradeMaterials?: Record<string, number>;
 
@@ -224,6 +295,9 @@ export interface BusinessAsset {
     level: 'low' | 'medium' | 'high';
     description: string;
   };
+
+  /** 可选市场标签，用于匹配行情；缺省时回退到 type/name。 */
+  marketTags?: string[];
 
   status: 'active' | 'idle' | 'damaged' | 'destroyed';
   /** AI可添加自定义字段 */
@@ -252,20 +326,43 @@ export interface BusinessModuleSchema {
   funds: number;            // 总资金
   cycleName: string;        // 结算周期名（"天"/"周"/"回合"）
   assets: BusinessAsset[];  // 资产列表
+  inventory?: Record<string, number>;
   /** 市场行情（可选） */
   market?: {
     items: MarketItem[];
   };
   /** 经营日志（可选） */
   transactionLog?: TransactionEntry[];
+  /** 确定性经营规则；不配置时使用保守默认值。 */
+  economy?: {
+    /** 市场涨跌对资产营收的最大影响比例（0~1）。 */
+    marketWeight?: number;
+    /** 资金不足时是否自动暂停高维护资产。 */
+    autoIdleOnDeficit?: boolean;
+    /** 最多保留的经营日志条数。 */
+    logLimit?: number;
+    production?: Array<{
+      id: string;
+      name: string;
+      inputs: Record<string, number>;
+      outputs: Record<string, number>;
+      cycles?: number;
+      unlockConditions?: GameplayCondition[];
+    }>;
+  };
   /** AI可添加自定义字段 */
   [key: string]: unknown;
 }
 
 // ─── 骰子检定模块 ───
 
+export type DiceAdvantageMode = 'normal' | 'advantage' | 'disadvantage';
+
 /** 骰子检定结果 */
 export interface DiceRoll {
+  /** 对应触发该检定的消息与占位符；用于自动检定防重放。 */
+  requestId?: string;
+  attributeId?: string;
   attributeName: string;  // 使用的属性名称
   attributeValue: number; // 属性当前值
   modifier: number;       // 属性修正值
@@ -276,12 +373,36 @@ export interface DiceRoll {
   isNatural20: boolean;   // 是否大成功
   isNatural1: boolean;    // 是否大失败
   timestamp: number;      // 掷骰时间
+  /** 进行优势/劣势检定时保留两次骰面，d20 为最终采用的骰面。 */
+  diceRolls?: number[];
+  advantageMode?: DiceAdvantageMode;
+  resultTier?: 'critical-failure' | 'failure' | 'partial' | 'success' | 'critical-success';
+  talentModifier?: number;
+  bonuses?: Array<{ source: string; value: number }>;
+}
+
+/** 由已拥有职业能力/先天天赋动态投影出的检定加成，不写回世界定义。 */
+export interface DiceRuntimeBonus {
+  source: string;
+  value: number;
+  /** 缺省表示适用于所有属性；通常应限制到具体规范属性。 */
+  statIds?: CombatScalingStatId[];
 }
 
 /** 完整的骰子检定模块 */
 export interface DiceModuleSchema {
   lastRoll?: DiceRoll;    // 最近一次掷骰结果
   history?: DiceRoll[];   // 掷骰历史（最多保留10次）
+  sides?: number;
+  defaultDC?: number;
+  historyLimit?: number;
+  modifierBase?: number;
+  modifierStep?: number;
+  criticalSuccess?: number;
+  criticalFailure?: number;
+  partialSuccessMargin?: number;
+  resultTiers?: { criticalFailure?: string; failure?: string; partial?: string; success?: string; criticalSuccess?: string };
+  runtimeBonuses?: DiceRuntimeBonus[];
 }
 
 // ─── 天赋体系模块 ───
@@ -293,6 +414,77 @@ export interface TalentDef {
   description: string;     // 描述
   rarity: '普通' | '精良' | '稀有' | '史诗' | '传说';  // 品质
   effects?: string[];      // 效果描述（纯文本，供AI参考）
+  maxRank?: number;
+  pointCost?: number;
+  unlockConditions?: GameplayCondition[];
+  /** 可选机械效果；可读写任意合法玩法路径，因此也能作用于经营等模块。 */
+  mechanics?: {
+    passive?: GameplayEffect[];
+    onUnlock?: GameplayEffect[];
+  };
+  diceModifier?: number;
+  /** 需要先解锁的天赋节点（全部满足）。旧配置缺省即无前置。 */
+  prerequisites?: string[];
+  /** 同一互斥组只能选择一个分支；缺省表示不互斥。 */
+  exclusiveGroup?: string;
+  /** 用于样板树的分支标识。 */
+  branch?: string;
+  /** 可配置树坐标（0~100 的百分比）；缺省由 UI 自动排布。 */
+  graph?: { x: number; y: number; column?: number; row?: number };
+  /** 各等级的点数消耗；缺省回退到 pointCost。 */
+  rankCosts?: number[];
+  /** 满足条件后将此节点觉醒为强化形态。 */
+  awakening?: {
+    id?: string;
+    name: string;
+    description: string;
+    conditions?: GameplayCondition[];
+    pointCost?: number;
+    effects?: GameplayEffect[];
+  };
+  /** 可占用的角色装备槽（例如核心天赋/战斗专长）。 */
+  equipmentSlot?: string;
+}
+
+/** 可主动使用或持续成长的技能定义。 */
+export interface SkillDef {
+  id: string;
+  name: string;
+  description: string;
+  categoryId?: string;
+  rarity: TalentDef['rarity'];
+  maxRank?: number;
+  pointCost?: number;
+  cooldownTicks?: number;
+  tags?: string[];
+  unlockConditions?: GameplayCondition[];
+  activation?: {
+    costs?: GameplayCost[];
+    effects?: GameplayEffect[];
+    rewards?: GameplayReward[];
+  };
+  prerequisites?: string[];
+  exclusiveGroup?: string;
+  branch?: string;
+  graph?: { x: number; y: number; column?: number; row?: number };
+  rankCosts?: number[];
+  /** 技能使用时自动积累熟练度，达到阈值可提升等级。 */
+  proficiency?: {
+    gainPerUse?: number;
+    thresholdPerRank?: number;
+    maxRank?: number;
+  };
+  /** 技能达到条件后可觉醒。 */
+  awakening?: {
+    id?: string;
+    name: string;
+    description: string;
+    conditions?: GameplayCondition[];
+    pointCost?: number;
+    effects?: GameplayEffect[];
+  };
+  equipmentSlot?: string;
+  diceModifier?: number;
 }
 
 /** 天赋大类 */
@@ -306,6 +498,226 @@ export interface TalentCategoryDef {
 /** 完整的天赋体系模块 */
 export interface TalentModuleSchema {
   categories: TalentCategoryDef[];  // AI生成的天赋大类列表
+  skills?: SkillDef[];
+  pointRules?: {
+    initialTalentPoints?: number;
+    initialSkillPoints?: number;
+    talentPointsPerTier?: number;
+    skillPointsPerTier?: number;
+  };
+  /** 角色可用装备槽；仅记录槽定义，不强制旧世界启用。 */
+  equipmentSlots?: Array<{ id: string; name: string; capacity?: number; description?: string }>;
+  /** 洗点配置；未配置时仍允许无损洗点（保持旧行为兼容）。 */
+  respec?: { enabled?: boolean; cost?: GameplayCost[] };
+}
+
+// ─── 职业、先天天赋与自由技能（新架构） ───
+
+export type ProfessionAbilityType = 'active' | 'passive' | 'specialization' | 'ultimate';
+
+export type ProfessionAccentKey = 'crimson' | 'amber' | 'jade' | 'azure' | 'violet' | 'silver';
+
+export type CombatScalingStatId = 'attrA' | 'attrB' | 'dim1' | 'dim2' | 'dim3' | 'dim4' | 'dim5' | 'dim6';
+
+/** 已解锁后持续生效的确定性战斗修正。 */
+export interface ProfessionCombatModifiers {
+  damage?: number;
+  healing?: number;
+  accuracy?: number;
+  armor?: number;
+  initiative?: number;
+}
+
+/** 已解锁后作用于指定规范属性检定的固定加值。 */
+export interface ProfessionCheckModifier {
+  statIds?: CombatScalingStatId[];
+  value: number;
+}
+
+/** 职业节点/先天天赋的可执行机械定义；描述文字不能替代这里的数值。 */
+export interface ProfessionAbilityMechanics {
+  combat?: ProfessionCombatModifiers;
+  checks?: ProfessionCheckModifier[];
+}
+
+export interface ProfessionAbilityDef {
+  id: string;
+  name: string;
+  description: string;
+  type: ProfessionAbilityType;
+  maxRank?: number;
+  pointCost?: number;
+  rankCosts?: number[];
+  prerequisites?: string[];
+  /** 前置默认 all；共享终极等节点可明确声明任一前置即可。 */
+  prerequisiteMode?: 'all' | 'any';
+  exclusiveGroup?: string;
+  requiredProfessionLevel?: number;
+  /** 树上的明确阶层；用于图形布局与等级门槛，不再靠数组顺序猜测。 */
+  tier?: number;
+  cooldownTicks?: number;
+  tags?: string[];
+  /** Optional local-dictionary icon key; URLs and paths are never accepted. */
+  iconKey?: string;
+  activation?: {
+    costs?: GameplayCost[];
+    effects?: GameplayEffect[];
+    rewards?: GameplayReward[];
+    /** 战斗中使用该能力时的声明式行动；不会执行任意代码。 */
+    combatAction?: CombatActionDefinition;
+  };
+  passiveEffects?: GameplayEffect[];
+  diceModifier?: number;
+  mechanics?: ProfessionAbilityMechanics;
+}
+
+export interface ProfessionDef {
+  id: string;
+  name: string;
+  description: string;
+  archetype?: string;
+  tags?: string[];
+  visual?: { emblemKey?: string; accentKey?: ProfessionAccentKey };
+  abilities: ProfessionAbilityDef[];
+}
+
+/** 只能在创建角色时选择；进入游戏后不靠点数购买。 */
+export interface InnateTalentDef {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  rarity?: TalentDef['rarity'];
+  exclusiveGroup?: string;
+  prerequisites?: string[];
+  effects?: GameplayEffect[];
+  mechanics?: ProfessionAbilityMechanics;
+  tags?: string[];
+  /** Optional local-dictionary icon key; URLs and paths are never accepted. */
+  iconKey?: string;
+}
+
+export interface ProfessionModuleSchema {
+  schemaVersion?: 2;
+  professions: ProfessionDef[];
+  innateTalents: InnateTalentDef[];
+  freeSkillCatalog?: SkillDef[];
+  /** v2 canonical alias; freeSkillCatalog remains a compatibility projection. */
+  freeSkills?: SkillDef[];
+  creationTalentBudget: number;
+  allowNoProfession?: boolean;
+  initialAbilityPoints?: number;
+  abilityPointsPerTier?: number;
+}
+
+/** 独立职业包元数据。职业内容不再内嵌进世界定义。 */
+export interface ProfessionPackManifest {
+  id: string;
+  name: string;
+  version: string;
+  schemaVersion: 1 | 2;
+  description?: string;
+  author?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  builtin?: boolean;
+  tags?: string[];
+}
+
+/** 可复用、可导入导出的职业内容资产。 */
+export interface ProfessionPack extends ProfessionModuleSchema {
+  schemaVersion?: 2;
+  manifest: ProfessionPackManifest;
+  /** Legacy v1 packs may be usable before they reach the v3 baseline. */
+  baselineStatus?: 'v3-complete' | 'legacy-v1-incomplete';
+}
+
+/** 世界只持有包引用与选择范围；包正文由职业典藏解析。 */
+export interface ProfessionWorldBinding {
+  packIds: string[];
+  enabledProfessionIds?: string[];
+  allowNoProfession?: boolean;
+  creationTalentBudget?: number;
+}
+
+// ─── 独立战斗规则域 ───
+
+export type CombatTargetMode = 'enemy' | 'ally' | 'self' | 'area' | 'none';
+
+export interface CombatStatusDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  durationRounds?: number;
+  damagePerRound?: number;
+  /** Additive runtime modifiers. Supported keys: armor, accuracy, damage, healing. */
+  modifiers?: Record<string, number>;
+}
+
+/** 职业行动的世界无关公式：以规范属性键引用当前世界的实际数值。 */
+export interface CombatScalingDefinition {
+  statId: CombatScalingStatId;
+  /** 0.08 表示取该属性的 8%。 */
+  coefficient: number;
+  appliesTo?: 'damage' | 'healing' | 'accuracy';
+}
+
+/** 声明式战斗行动；运行时只解释这些字段，不执行世界/模块代码。 */
+export interface CombatActionDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  target?: CombatTargetMode;
+  actionCost?: number;
+  accuracy?: number;
+  damage?: number;
+  healing?: number;
+  damageType?: string;
+  cooldownRounds?: number;
+  scaling?: CombatScalingDefinition[];
+  appliesStatus?: CombatStatusDefinition;
+}
+
+export interface CombatEnemyDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  maxHp: number;
+  armor?: number;
+  initiative?: number;
+  actions?: CombatActionDefinition[];
+  statuses?: CombatStatusDefinition[];
+}
+
+export interface CombatEncounterDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  enemies: CombatEnemyDefinition[];
+  roundLimit?: number;
+  rewards?: GameplayEffect[];
+}
+
+export interface CombatModuleSchema {
+  description?: string;
+  actionPointsPerTurn?: number;
+  playerActions?: CombatActionDefinition[];
+  encounters: CombatEncounterDefinition[];
+  /** Stat paths are configurable so worlds using attrA instead of 血量 remain compatible. */
+  playerHpPath?: string;
+  /** Optional maximum player HP for the encounter; defaults to current HP for legacy worlds. */
+  playerMaxHp?: number;
+  playerAttackPath?: string;
+  playerArmor?: number;
+  /** 玩家在遭遇开始时的先手值；敌人 initiative 参与同一排序。 */
+  playerInitiative?: number;
+  /** Use a fixed d20 result of 10 when no injected random source is provided. */
+  deterministic?: boolean;
+}
+
+/** 世界仅选择稳定的内置战斗规则，不要求世界生成 AI 编写战斗代码或遭遇。 */
+export interface CombatRulesetBinding {
+  rulesetId: string;
 }
 
 // ─── 世界演化规则模块 ───
@@ -392,7 +804,7 @@ export interface PeriodicRule {
   when?: Condition;
   /**
    * 动作序列（统一效果系统，所有效果通过 Action[] 表达）。
-   * 支持：set / addEvent / modifyResource / scheduleTick。
+   * 支持：set / addEvent / requestCombat / modifyResource / scheduleTick。
    */
   actions?: Action[];
   /**
@@ -537,6 +949,8 @@ export interface WorldSystemData {
   经营资产?: BusinessModuleSchema;
   骰子检定?: DiceModuleSchema;
   天赋体系?: TalentModuleSchema;
+  职业体系?: ProfessionModuleSchema;
+  战斗系统?: CombatModuleSchema;
   世界动态?: WorldDynamics;
   /** 保留扩展性：自定义模块数据 */
   [key: string]: unknown;
@@ -567,27 +981,24 @@ export type AssetKind = 'image' | 'text' | 'data' | 'audio';
 
 // ─── 规则 DSL（白名单，非图灵完备） ───
 
-export type Comparator = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'in' | 'contains';
+export type Comparator = GameplayComparator;
 
 /** Literal 仅基础值，禁止函数 / 引用 / 外部 IO */
-export type Literal = string | number | boolean | string[];
+export type Literal = GameplayLiteral;
 
-export type Condition =
-  | { all: Condition[] }
-  | { any: Condition[] }
-  | { not: Condition }
-  | { state: { path: string; op: Comparator; value: Literal } }
-  | { event: { type: string; where?: Record<string, Literal> } };
+export type Condition = GameplayCondition;
 
 export type ActionKind =
   | 'set'
   | 'addEvent'
+  | 'requestCombat'
   | 'modifyResource'
   | 'scheduleTick';
 
 export type Action =
   | { set: { path: string; value: Literal } }
   | { addEvent: { eventId: string; eventPackId?: string } }
+  | { requestCombat: CombatEncounterRequest }
   | { modifyResource: { key: string; delta: number } }
   | { scheduleTick: { after: number; payload?: Record<string, unknown> } };
 
@@ -890,6 +1301,8 @@ export interface ChoiceOption {
   effect?: ChoiceEffect;
   /** 给下一轮 AI 续写的决策上下文（玩家决策日志） */
   aiNote?: string;
+  /** Typed action; UI/runtime must not infer behavior from the button label. */
+  action?: NarrativeDecisionAction;
 }
 
 /**
@@ -1110,6 +1523,7 @@ export interface CardNodeExecutionResult {
     label: string;
     aiNote?: string;
     effect?: { statId?: string; resourcePath?: string; delta: number };
+    action?: NarrativeDecisionAction;
     /** 条件选项的显示条件路径 */
     conditionPath?: string;
     /** 条件选项的期望值 */

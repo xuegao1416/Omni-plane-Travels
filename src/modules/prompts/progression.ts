@@ -32,6 +32,7 @@ export function buildProgressionGenPrompt(params: {
     {
       "name": "段位名",
       "description": "该段位特征描述",
+      "xpRequired": 0,
       "statBonuses": {
         "attrAMax": 100, "attrBMax": 100,
         "dim1Max": 100, "dim2Max": 100, "dim3Max": 100,
@@ -40,6 +41,11 @@ export function buildProgressionGenPrompt(params: {
     }
   ],
   "xpFormula": { "baseXP": 100, "exponent": 2.0, "scaleFactor": 1.0 },
+  "activityRewards": [
+    { "id": "combat", "label": "战斗", "keywords": ["战斗", "迎战"], "rate": 0.1 },
+    { "id": "training", "label": "研习", "keywords": ["训练", "修炼", "学习"], "rate": 0.08 },
+    { "id": "exploration", "label": "探索", "keywords": ["探索", "调查"], "rate": 0.05 }
+  ],
   "narrativeStyle": {
     "upgradeDesc": "角色突破时的自然语言描述（1-2句话）",
     "keywords": ["突破", "顿悟", "境界"]
@@ -62,7 +68,12 @@ export function buildProgressionGenPrompt(params: {
       "dim4Max": 8, "dim5Max": 8, "dim6Max": 8
     }
   },
-  "xpFormula": { "baseXP": 100, "exponent": 1.5, "scaleFactor": 1.0 }
+  "xpFormula": { "baseXP": 100, "exponent": 1.5, "scaleFactor": 1.0 },
+  "activityRewards": [
+    { "id": "combat", "label": "战斗", "keywords": ["战斗", "迎战"], "rate": 0.1 },
+    { "id": "training", "label": "研习", "keywords": ["训练", "学习"], "rate": 0.08 },
+    { "id": "exploration", "label": "探索", "keywords": ["探索", "调查"], "rate": 0.05 }
+  ]
 }
 
 【数值设计指南 — 根据世界类型选择合适的数值尺度】
@@ -105,13 +116,14 @@ export function buildProgressionGenPrompt(params: {
 - xpFormula.exponent：增长指数（1.0~2.0，越大越难升级）
 
 【段位制设计要点】
+- 每个段位都必须输出完整的 xpRequired 与八项 statBonuses；首段 xpRequired 为 0，后续经验门槛会由本地算法复核
 - 每个段位的 statBonuses 代表该段位的属性天花板
 - 段位越高，statBonuses 越大，体现实力差距
 - 最低段位的 statBonuses 应接近角色初始属性范围
 - 最高段位的 statBonuses 应体现该世界的巅峰战力`;
 }
 
-/** 运行时UpdateVariable规则 */
+/** 运行时统一玩法事务契约 */
 export const PROGRESSION_UPDATE_RULES = `【成长体系更新规则】
 
 currentXP 语义说明：
@@ -124,11 +136,13 @@ currentXP 语义说明：
 - AI 不得因普通攻击、战斗描述、训练或探索自行修改当前经验值或当前段位索引
 - 正文自然描述角色行动即可，不要为了结算硬写“经验 +N”或属性数字
 - 只有任务奖励、事件奖励等已经明确给出具体经验数值的来源，才允许更新：
-  {"玩家":{"当前经验值":奖励结算后的新值}}
+  {"id":"ai:progression:reward","source":"ai","moduleId":"progression","effects":[{"add":{"path":"玩家.当前经验值","delta":奖励经验值,"min":0}}]}
 
 注意：
 - currentXP 不能为负数
 - currentXP 是当前级别内的累计值，不是总经验值
 - 等级制：currentTierIndex 不能超过 maxLevel
 - 段位制：currentTierIndex 不能超过 tiers.length - 1
-- 属性天花板由框架自动计算，AI不需要手动输出`;
+- 属性天花板由框架自动计算，AI不需要手动输出
+- 所有机械更新必须使用 GameplayTransaction JSON，禁止直接输出玩家状态对象或 RFC 补丁
+- 普通战斗、训练、探索不得创建经验事务，经验由本地结算系统提交`;

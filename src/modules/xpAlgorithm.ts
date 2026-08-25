@@ -3,7 +3,23 @@
 //  段位制和等级制统一入口，内部按 mode 分支
 // ============================================================
 
-import type { XpFormula, TierDef, StatBonuses, LevelData, ProgressionModuleSchema } from './schema';
+import type { XpFormula, TierDef, StatBonuses, LevelData, ProgressionConfig, ProgressionModuleSchema, SixDimSemanticRole, StatModuleSchema } from './schema';
+
+export const SIX_DIM_SEMANTICS: Record<`dim${1 | 2 | 3 | 4 | 5 | 6}`, { role: SixDimSemanticRole; label: string; keywords: string[] }> = {
+  dim1: { role: 'power', label: '力量・攻击类', keywords: ['力量', '气力', '攻击', '外攻', '武力', '破坏', '强壮', '蛮力'] },
+  dim2: { role: 'guard', label: '体魄・防护类', keywords: ['体魄', '防御', '护甲', '耐力', '坚韧', '生命', '抗性', '承受'] },
+  dim3: { role: 'agility', label: '灵巧・速度类', keywords: ['敏捷', '灵巧', '速度', '身法', '反应', '闪避', '潜行', '手艺'] },
+  dim4: { role: 'intellect', label: '智识・技术类', keywords: ['智力', '学识', '技术', '法术', '精神', '调查', '研究', '投资', '经营'] },
+  dim5: { role: 'social', label: '意志・交涉类', keywords: ['魅力', '交涉', '意志', '领导', '威慑', '社交', '情商', '信仰'] },
+  dim6: { role: 'perception', label: '感知・机运类', keywords: ['感知', '洞察', '幸运', '机运', '观察', '侦察', '直觉', '品味'] },
+};
+
+export function getSixDimSemantic(key: `dim${1 | 2 | 3 | 4 | 5 | 6}`, stat?: { semanticRole?: SixDimSemanticRole }): { role: SixDimSemanticRole; label: string; keywords: string[] } {
+  // 六维是跨世界、跨职业包的规范坐标。世界只能改显示名和说明，不能把
+  // dim1 从力量类改成智识类，否则职业公式会在不同世界指向不同含义。
+  void stat;
+  return SIX_DIM_SEMANTICS[key];
+}
 
 // ─── 公共计算 ───
 
@@ -113,15 +129,92 @@ export function rollDice(attributeValue: number, dc: number): {
 
 /** 获取可检定属性列表（从数值属性模块提取） */
 export function getCheckableAttributes(
-  statModule: import('./schema').StatModuleSchema
-): Array<{ id: string; name: string; value: number }> {
+  statModule: StatModuleSchema
+): Array<{ id: string; name: string; value: number; semanticLabel?: string; description?: string }> {
   const dims = [statModule.dim1, statModule.dim2, statModule.dim3, statModule.dim4, statModule.dim5, statModule.dim6];
-  const attrs: Array<{ id: string; name: string; value: number }> = [];
+  const attrs: Array<{ id: string; name: string; value: number; semanticLabel?: string; description?: string }> = [];
   dims.forEach((d, i) => {
-    if (d) attrs.push({ id: `dim${i + 1}`, name: d.name, value: d.value });
+    if (d) {
+      const id = `dim${i + 1}` as `dim${1 | 2 | 3 | 4 | 5 | 6}`;
+      attrs.push({ id, name: d.name, value: d.value, semanticLabel: getSixDimSemantic(id, d).label, description: d.description });
+    }
   });
   for (const sp of statModule.special) {
     attrs.push({ id: sp.id, name: sp.name, value: sp.value });
   }
   return attrs;
+}
+
+/** Repair AI/legacy progression payloads without discarding generated caps. */
+export function normalizeProgressionConfig(progression: ProgressionModuleSchema): ProgressionConfig {
+  const numberOr = (value: unknown, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const xpFormula: XpFormula = {
+    baseXP: Math.max(1, numberOr(progression.xpFormula?.baseXP, 100)),
+    exponent: Math.max(0.1, numberOr(progression.xpFormula?.exponent, 1.5)),
+    scaleFactor: Math.max(0.01, numberOr(progression.xpFormula?.scaleFactor, 1)),
+  };
+  const config: ProgressionConfig = {
+    mode: progression.mode === 'level' ? 'level' : 'tiered',
+    xpFormula,
+  };
+  if (config.mode === 'tiered' && Array.isArray(progression.tiers)) {
+    const statKeys = ['attrAMax', 'attrBMax', 'dim1Max', 'dim2Max', 'dim3Max', 'dim4Max', 'dim5Max', 'dim6Max'] as const;
+    const fallbackCaps: StatBonuses = { attrAMax: 100, attrBMax: 100, dim1Max: 50, dim2Max: 50, dim3Max: 50, dim4Max: 50, dim5Max: 50, dim6Max: 50 };
+    let previousCaps = fallbackCaps;
+    let previousXp = 0;
+    const tiers: TierDef[] = progression.tiers.map((tier, index) => {
+      const statBonuses = Object.fromEntries(statKeys.map(key => {
+        const generated = numberOr(tier?.statBonuses?.[key], 0);
+        const prior = numberOr(previousCaps[key], fallbackCaps[key]);
+        const fallback = index === 0 ? fallbackCaps[key] : Math.round(prior * 1.25);
+        return [key, generated > 0 ? generated : fallback];
+      })) as unknown as StatBonuses;
+      previousCaps = statBonuses;
+      const requestedXp = numberOr(tier?.xpRequired, -1);
+      const calculatedXp = calculateCumulativeXp(index, xpFormula);
+      const xpRequired = index === 0
+        ? 0
+        : requestedXp > previousXp
+          ? Math.round(requestedXp)
+          : Math.max(previousXp + 1, calculatedXp);
+      previousXp = xpRequired;
+      return {
+        name: tier?.name?.trim() || `第${index + 1}段`,
+        description: tier?.description?.trim() || '尚未填写段位描述',
+        xpRequired,
+        statBonuses,
+      };
+    });
+    config.tiers = tiers;
+  }
+  if (config.mode === 'level' && progression.levelData) config.levelData = progression.levelData;
+  if (progression.narrativeStyle) config.narrativeStyle = progression.narrativeStyle;
+  if (progression.activityRewards) config.activityRewards = progression.activityRewards;
+  if (progression.pointsPerTier) config.pointsPerTier = progression.pointsPerTier;
+  if (progression.breakthroughs) config.breakthroughs = progression.breakthroughs;
+  return config;
+}
+
+/** 将 AI 给出的检定名称收敛到当前世界真实属性；不把选择权暴露给玩家。 */
+export function resolveCheckableAttribute(statModule: StatModuleSchema, requested: string) {
+  const attributes = getCheckableAttributes(statModule);
+  if (!attributes.length) return undefined;
+  const normalized = requested.toLowerCase().replace(/[\s·・_\-]/g, '').replace(/(属性|检定|鉴定|判定)$/g, '');
+  const exact = attributes.find(item => item.id.toLowerCase() === normalized || item.name.toLowerCase() === normalized);
+  if (exact) return exact;
+  let best = attributes[0];
+  let bestScore = -1;
+  for (const item of attributes) {
+    const haystack = `${item.id}${item.name}${item.semanticLabel ?? ''}${item.description ?? ''}`.toLowerCase().replace(/[\s·・_\-]/g, '');
+    let score = haystack.includes(normalized) || normalized.includes(item.name.toLowerCase()) ? 40 : 0;
+    if (/^dim[1-6]$/.test(item.id)) {
+      const semantic = getSixDimSemantic(item.id as `dim${1 | 2 | 3 | 4 | 5 | 6}`, statModule[item.id as keyof StatModuleSchema] as { semanticRole?: SixDimSemanticRole });
+      score += semantic.keywords.reduce((sum, keyword) => sum + (normalized.includes(keyword) ? 8 : 0), 0);
+    }
+    if (score > bestScore) { best = item; bestScore = score; }
+  }
+  return best;
 }

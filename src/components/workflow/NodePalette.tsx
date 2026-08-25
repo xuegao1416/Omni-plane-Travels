@@ -2,7 +2,7 @@
 //  节点面板 — 可搜索、可折叠的分类节点库
 // ============================================================
 import { useState, useMemo } from 'react';
-import { Search, ChevronRight, ChevronDown, Zap, Clock, TrendingUp, Play, MousePointerClick, Timer, Radio, GitCompare, Coins, Heart, Flag, Backpack, User, Ampersand, Pipette, ToggleLeft, Filter, Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe, Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search as SearchIcon, ListChecks, GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft, CreditCard, FileText, Sparkles, CircleDot } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Zap, Clock, TrendingUp, Play, MousePointerClick, Timer, Radio, GitCompare, Coins, Heart, Flag, Backpack, User, Ampersand, Pipette, ToggleLeft, Filter, Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe, Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search as SearchIcon, ListChecks, GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft, CreditCard, FileText, Sparkles, CircleDot, ShieldAlert } from 'lucide-react';
 import { searchNodes, getNodeCategories } from '../../modules/nodeRegistry';
 import type { NodeDefinition } from '../../modules/workflowSchema';
 
@@ -12,7 +12,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; style?: Reac
   Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe,
   Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search: SearchIcon, ListChecks,
   GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft,
-  CreditCard, FileText, Sparkles, CircleDot,
+  CreditCard, FileText, Sparkles, CircleDot, ShieldAlert,
 };
 
 const CATEGORY_LABELS: Record<string, string> = {

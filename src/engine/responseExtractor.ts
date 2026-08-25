@@ -11,8 +11,8 @@ export function extractContentForPrompt(rawText: string): string {
   if (!rawText) return '';
   rawText = stripTimeAdvanceTags(rawText);
 
-  // 部分中转服务会先返回空占位块，再返回真正正文。
-  // 合并所有非空正文块，避免把有效回复误判成空回。
+  // 优先合并所有非空 <contenttext> 正文块。部分中转服务会先吐出一个
+  // 空占位块，再返回真正正文；只读取第一个块会把有效回复误判为空回。
   const contentBlocks = [...rawText.matchAll(/<contenttext>([\s\S]*?)<\/contenttext>/gi)]
     .map(match => stripInnerTags(match[1]).trim())
     .filter(Boolean);

@@ -14,6 +14,7 @@ import type {
 import { evaluate, type EvaluateResult, type EvaluateLimits } from './ruleEngine';
 import type { WorkflowDefinition } from './workflowSchema';
 import { executeWorkflowAsEvaluation } from './workflowBridge';
+import type { CombatEncounterRequest } from '../gameplay/protocols';
 
 export interface RegisteredEventRules {
   eventPackId: string;
@@ -163,6 +164,17 @@ export function collectAddEventEvents(results: EvaluateResult[]): AddEventAction
           out.push({ eventId: detail.eventId, eventPackId: detail.eventPackId || r.eventPackId || '' });
         }
       }
+    }
+  }
+  return out;
+}
+
+/** Collect typed combat requests without interpreting labels or narrative text. */
+export function collectCombatEncounterRequests(results: EvaluateResult[]): CombatEncounterRequest[] {
+  const out: CombatEncounterRequest[] = [];
+  for (const result of results) {
+    for (const action of result.applied) {
+      if (action.kind === 'requestCombat') out.push(action.detail as CombatEncounterRequest);
     }
   }
   return out;

@@ -90,7 +90,17 @@ export default function SaveArchiveView({
     [allSaves, selectedId],
   );
   const handleContinue = async () => {
-    if (!selectedSave || loading) return;
+    if (!selectedSave || loading || selectedSave.lifecycle === 'ended') return;
+    setLoading(true);
+    try {
+      const fullSave = await loadGame(selectedSave.id);
+      if (fullSave) onLoadSave(fullSave);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleReview = async () => {
+    if (!selectedSave || loading || selectedSave.lifecycle !== 'ended') return;
     setLoading(true);
     try {
       const fullSave = await loadGame(selectedSave.id);
@@ -151,7 +161,8 @@ export default function SaveArchiveView({
           <strong>{save.name || '未命名旅程'}</strong>
           <span className="entry-save-shard-card__world">{worldLabel(save.preview)}</span>
           <span className="entry-save-shard-card__meta"><MessageSquare size={12} /> {save.messageCount ?? 0} 条记录</span>
-          <span className="entry-save-shard-card__meta"><Clock3 size={12} /> {formatSaveTime(save.timestamp)}</span>
+           <span className="entry-save-shard-card__meta"><Clock3 size={12} /> {formatSaveTime(save.timestamp)}</span>
+           {save.lifecycle === 'ended' && <span className="entry-save-shard-card__meta" role="status">已封存 · {save.endReason || '不可继续'}</span>}
         </span>
         </DawnFrameV4>
       </button>
@@ -232,12 +243,14 @@ export default function SaveArchiveView({
                 <DawnFrameV4 mode="panel" withFill className="entry-save-details__frame">
                 {selectedSave ? (
                   <>
-                    <span className="entry-save-details__eyebrow">已选旅程 · READY</span>
+                     <span className="entry-save-details__eyebrow">已选旅程 · {selectedSave.lifecycle === 'ended' ? '只读封存' : 'READY'}</span>
                     <strong>{selectedSave.name || '未命名旅程'}</strong>
                     <span>{worldLabel(selectedSave.preview)} · {selectedSave.messageCount ?? 0} 条记录</span>
-                    <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={ArrowRight} onClick={handleContinue} aria-label="继续旅程" disabled={loading}>
-                      {loading ? '读取中…' : '继续旅程'}
-                    </EntrySlicedButton>
+                     {selectedSave.lifecycle === 'ended' && <span role="status">{selectedSave.endReason || '炼狱战斗中玩家死亡，存档已封存为只读。可查看或导出。'}</span>}
+                     {selectedSave.lifecycle === 'ended' && <EntrySlicedButton frame="dawn-v4-compact" icon={ArrowRight} onClick={handleReview} disabled={loading}>查看回顾</EntrySlicedButton>}
+                     <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={ArrowRight} onClick={handleContinue} aria-label={selectedSave.lifecycle === 'ended' ? '封存存档不可继续' : '继续旅程'} disabled={loading || selectedSave.lifecycle === 'ended'} title={selectedSave.lifecycle === 'ended' ? (selectedSave.endReason || '此存档已封存，只可查看或导出') : undefined}>
+                       {loading ? '读取中…' : selectedSave.lifecycle === 'ended' ? '已封存（不可继续）' : '继续旅程'}
+                     </EntrySlicedButton>
                   </>
                 ) : (
                   <span>选择一枚存档晶片继续</span>

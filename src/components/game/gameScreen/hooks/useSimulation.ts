@@ -9,6 +9,7 @@ import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
 import type { WorldDynamics } from '../../../../modules/schema';
 import { createDefaultWorldDynamics } from '../../../../modules/defaults';
+import { isCombatInteractionPaused } from '../../../../gameplay/combatRuntime';
 
 /**
  * 从世界定义中获取仿真规则。
@@ -53,6 +54,7 @@ export function useSimulation(
   // 手动推演
   const handleManualTick = useCallback(async () => {
     if (!simEngine.effectiveApiConfig || isSimulating) return;
+    if (isCombatInteractionPaused(engine.variableManager.getState())) return;
     setIsSimulating(true);
     try {
       // 同步 store 配置到引擎

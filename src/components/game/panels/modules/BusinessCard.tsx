@@ -1,8 +1,9 @@
 // 经营资产概览卡片 — 右侧面板摘要，点击展开覆盖层
 import { memo } from 'react';
-import { Briefcase, DollarSign, TrendingUp, Building2, ChevronRight } from 'lucide-react';
+import { Briefcase, DollarSign, TrendingUp, TrendingDown, Building2, ChevronRight } from 'lucide-react';
 import type { BusinessModuleSchema } from '../../../../modules/schema';
 import { Collapsible } from '../../../shared/Collapsible';
+import { previewBusinessModule } from '../../../../gameplay/modules/business';
 
 interface BusinessCardProps {
   data: BusinessModuleSchema;
@@ -10,19 +11,9 @@ interface BusinessCardProps {
   onOpenOverlay: () => void;
 }
 
-/** 计算所有 active 资产的净收入 */
-function calcNetIncome(data: BusinessModuleSchema): number {
-  if (!data.assets?.length) return 0;
-  return data.assets
-    .filter(a => a.status === 'active')
-    .reduce((sum, a) => {
-      const levelBonus = (a.income?.perLevel ?? 0) * Math.max(0, (a.level ?? 1) - 1);
-      return sum + (a.income?.base ?? 0) + levelBonus - (a.maintenance ?? 0);
-    }, 0);
-}
-
 export default memo(function BusinessCard({ data, title, onOpenOverlay }: BusinessCardProps) {
-  const netIncome = calcNetIncome(data);
+  const preview = previewBusinessModule(data);
+  const netIncome = preview.net;
   const activeAssets = data.assets?.filter(a => a.status === 'active').length ?? 0;
 
   return (
@@ -37,16 +28,24 @@ export default memo(function BusinessCard({ data, title, onOpenOverlay }: Busine
 
         {/* 净收入 */}
         {activeAssets > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TrendingUp size={14} color={netIncome >= 0 ? 'var(--success)' : 'var(--danger)'} />
-            <span style={{ color: 'var(--text-muted)' }}>净收入</span>
-            <span style={{
-              fontWeight: 600, marginLeft: 'auto',
-              color: netIncome >= 0 ? 'var(--success)' : 'var(--danger)',
-            }}>
-              {netIncome >= 0 ? '+' : ''}{netIncome}/{data.cycleName || '天'}
-            </span>
-          </div>
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TrendingUp size={14} color="var(--success)" />
+              <span style={{ color: 'var(--text-muted)' }}>预计收入</span>
+              <span style={{ fontWeight: 600, marginLeft: 'auto', color: 'var(--success)' }}>+{preview.grossIncome}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <TrendingDown size={14} color="var(--danger)" />
+              <span style={{ color: 'var(--text-muted)' }}>维护成本</span>
+              <span style={{ fontWeight: 600, marginLeft: 'auto', color: 'var(--danger)' }}>-{preview.maintenance}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: 3, borderTop: '1px solid var(--border)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>本期净额</span>
+              <span style={{ fontWeight: 600, marginLeft: 'auto', color: netIncome >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                {netIncome >= 0 ? '+' : ''}{netIncome}/{data.cycleName || '天'}
+              </span>
+            </div>
+          </>
         )}
 
         {/* 资产数量 */}
