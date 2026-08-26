@@ -24,6 +24,7 @@ import { findWorldDef } from '../data/worldLoader';
 import { resolveProfessionBinding } from '../data/professions';
 import { isProfessionModuleEnabled } from '../gameplay/profession/featureGate';
 import type { WorldDef } from '../data/worlds-schema';
+import type { GameState } from '../schema/variables';
 import { getSimulationEngine, restoreEngineState } from '../simulation/SimulationApi';
 import { createDefaultWorldDynamics } from '../modules/defaults';
 import { prepareGameplayState } from '../gameplay/migrations';
@@ -75,6 +76,45 @@ import {
 } from '../memory/memoryPipeline';
 
 export type { ChatMessage, GameEngine };
+
+function moduleInitNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  return moduleInitNumber(record.current) ?? moduleInitNumber(record.value);
+}
+
+export function applyStatModuleInitData(state: GameState, input: unknown): void {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return;
+  const statData = input as Record<string, unknown>;
+  const survival = state.玩家.生存状态;
+
+  const attrA = moduleInitNumber(statData.attrA);
+  if (attrA !== undefined) survival.血量 = attrA;
+  const attrB = moduleInitNumber(statData.attrB);
+  if (attrB !== undefined) survival.体力值 = attrB;
+  for (let index = 1; index <= 6; index += 1) {
+    const value = moduleInitNumber(statData[`dim${index}`]);
+    if (value !== undefined) survival[`dim${index}`] = value;
+  }
+
+  if (Array.isArray(statData.special)) {
+    for (const item of statData.special) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const special = item as Record<string, unknown>;
+      const value = moduleInitNumber(special);
+      if (typeof special.id === 'string' && special.id && value !== undefined) survival[special.id] = value;
+    }
+    return;
+  }
+
+  if (statData.special && typeof statData.special === 'object') {
+    for (const [id, item] of Object.entries(statData.special as Record<string, unknown>)) {
+      const value = moduleInitNumber(item);
+      if (id && value !== undefined) survival[id] = value;
+    }
+  }
+}
 
 /** 包装记忆管线任务，自动检测降级并抛出错误（消除 3 处重复代码） */
 function withDegradationCheck(
@@ -1540,28 +1580,9 @@ ${perspectiveInstruction}
     if (!moduleInitData || Object.keys(moduleInitData).length === 0) return;
 
     const state = varMgrRef.current.getState();
-    const ss = state.玩家.生存状态;
 
     // 数值属性
-    const statData = moduleInitData['数值属性'] as Record<string, unknown> | undefined;
-    if (statData) {
-      const getVal = (v: unknown): number | undefined => {
-        if (typeof v === 'number') return v;
-        if (v && typeof v === 'object' && 'current' in (v as any)) return (v as any).current;
-        if (v && typeof v === 'object' && 'value' in (v as any)) return (v as any).value;
-        return undefined;
-      };
-      const a = getVal(statData.attrA); if (a != null) ss.血量 = a;
-      const b = getVal(statData.attrB); if (b != null) ss.体力值 = b;
-      for (let i = 1; i <= 6; i++) {
-        const v = getVal(statData[`dim${i}`]); if (v != null) ss[`dim${i}`] = v;
-      }
-      if (Array.isArray(statData.special)) {
-        for (const sp of statData.special as Array<{ id: string; value: number }>) {
-          if (sp?.id && sp?.value != null) ss[sp.id] = sp.value;
-        }
-      }
-    }
+    applyStatModuleInitData(state, moduleInitData['数值属性']);
 
     const progressionData = moduleInitData['成长体系'] as Record<string, unknown> | undefined;
     if (progressionData) {

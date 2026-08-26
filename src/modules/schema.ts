@@ -61,6 +61,8 @@ export interface DerivedStatDefinition {
 
 /** 完整的数值属性模块 */
 export interface StatModuleSchema {
+  /** 角色创建点数购买力系数，运行时约束在 0.5~2.0，缺省为 1.0 */
+  pointScale?: number;
   /** 底层必选 - 生命类属性 */
   attrA: { name: string; current: number; max: number };
   /** 底层必选 - 能量类属性 */

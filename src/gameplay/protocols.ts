@@ -126,7 +126,7 @@ const LOCAL_PROFESSION_ICON_KEYS = new Set([
 ]);
 const LOCAL_PROFESSION_ACCENT_KEYS = new Set(['crimson', 'amber', 'jade', 'azure', 'violet', 'silver']);
 
-export type CombatRiskMode = 'normal' | 'hard' | 'inferno';
+export type CombatRiskMode = 'easy' | 'normal' | 'hard' | 'inferno';
 export type CombatThreatBand = 'weak' | 'matched' | 'dangerous' | 'boss' | 'overwhelming';
 export type CombatUnitSide = 'player' | 'ally' | 'enemy' | 'neutral';
 
@@ -832,7 +832,7 @@ export function normalizeCombatSessionV2(input: unknown): CombatSessionV2 | unde
     schemaVersion: 2,
     id,
     encounter,
-    riskMode: raw.riskMode === 'hard' || raw.riskMode === 'inferno' ? raw.riskMode : 'normal',
+    riskMode: normalizeCombatRiskMode(raw.riskMode),
     statLabels: {
       health: text(record(raw.statLabels)?.health, '生命'),
       resource: text(record(raw.statLabels)?.resource, '能量'),
@@ -867,7 +867,7 @@ export function createDefaultV3FeatureFlags(): V3FeatureFlags {
 }
 
 export function normalizeCombatRiskMode(value: unknown): CombatRiskMode {
-  return value === 'hard' || value === 'inferno' ? value : 'normal';
+  return value === 'easy' || value === 'hard' || value === 'inferno' ? value : 'normal';
 }
 
 /** Single guard shared by UI, engine rollback and snapshot restoration. */

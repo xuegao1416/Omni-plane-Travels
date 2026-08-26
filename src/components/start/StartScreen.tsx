@@ -165,7 +165,7 @@ export default function StartScreen() {
         onBackToMenu={() => { h.setView('main'); h.setStep(1); setEntryPhase('hall'); }}
         title={h.t('start.title')} subtitle={h.t('start.subtitle')} t={h.t}
         selectedWorld={h.selectedWorld}
-        allWorlds={h.allWorlds} worldEntry={h.worldEntry}
+        allWorlds={h.allWorlds} createdWorlds={h.createdWorlds} worldEntry={h.worldEntry}
         personalInfo={h.personalInfo} setPersonalInfo={h.setPersonalInfo}
         isFilling={h.isFilling} fillElapsed={h.fillElapsed} onAiFill={h.handleAiFill} onCancelFill={h.cancelFill}
         segments={h.segments} setSegments={h.setSegments}
@@ -176,6 +176,7 @@ export default function StartScreen() {
         onLoadPreset={h.handleLoadPreset}
         buildInitialState={h.buildInitialState}
         onStartGame={h.handleStartGame}
+        onSaveWorld={h.handleSaveWorld}
         apiConfig={h.apiConfig} settings={h.settings}
       />
     );

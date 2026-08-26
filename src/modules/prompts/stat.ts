@@ -102,8 +102,14 @@ export function buildStatGenPrompt(params: {
 4. 特色属性（1-2个，根据世界类型）：
    每个需要：id(英文), name(中文), value(初始值), range[最小,最大], description(一句话描述)
 
+5. 降临点数系数 pointScale（0.5~2.0，一位小数）：
+   衡量该世界“角色创建点数购买力”——机缘丰富/成长空间大的世界偏高，严苛/写实世界偏低。
+   ● 现实/校园：0.8~1.2　● 奇幻/武侠：1.0~1.5　● 网游/修仙/高武：1.5~2.0　● 末日/生存：0.6~1.0
+   默认 1.0。
+
 输出JSON（以下仅为格式示例，实际数值请根据世界类型自行设定）：
 {
+  "pointScale": <0.5~2.0 的一位小数>,
   "attrA": { "name": "${params.attrAName}", "current": <按世界上限的80%>, "max": <按世界上限> },
   "attrB": { "name": "${params.attrBName}", "current": <按世界上限的60%>, "max": <按世界上限> },
   "dim1": { "name": "${params.dim1Name}", "value": <按尺度波动>, "range": [<最小>, <最大>], "semanticRole":"power", "description":"..." },

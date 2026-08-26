@@ -14,7 +14,7 @@ export function getCreationStepLayout(hasProfession: boolean): CreationStepLayou
     historyStep: 4,
     confirmStep: 5,
   } : {
-    labels: ['降临身份', '能力与行囊', '前尘编年', '启程契约'],
+    labels: ['降临身份', '行囊与同行者', '前尘编年', '启程契约'],
     professionStep: -1,
     loadoutStep: 2,
     historyStep: 3,

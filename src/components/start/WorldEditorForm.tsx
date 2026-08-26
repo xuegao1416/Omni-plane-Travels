@@ -9,6 +9,7 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import type { ProfessionModuleSchema, ProfessionPack, ProfessionWorldBinding, TalentModuleSchema } from '../../modules/schema';
 import { buildStatGenPrompt, buildProgressionGenPrompt, buildSurvivalGenPrompt, buildBusinessGenPrompt } from '../../modules/prompts';
 import { normalizeProgressionConfig } from '../../modules/xpAlgorithm';
+import { clampPointScale } from '../../gameplay/creation/creationPoints';
 import { buildProfessionPackGenerationPrompt, extractLegacyProfessionPack, isProfessionBinding, parseGeneratedProfessionPack } from '../../data/professions';
 import ProfessionLibraryWorkspace from '../profession/ProfessionLibraryWorkspace';
 import GuidedChoiceOverlay from './GuidedChoiceOverlay';
@@ -285,7 +286,11 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
         const normalized = moduleId === 'progression'
           ? normalizeProgressionConfig(parsed as import('../../modules/schema').ProgressionModuleSchema)
           : moduleId === 'stat'
-            ? { ...parsed, special: Array.isArray(parsed.special) ? parsed.special : [] }
+            ? {
+                ...parsed,
+                special: Array.isArray(parsed.special) ? parsed.special : [],
+                pointScale: clampPointScale(parsed.pointScale),
+              }
             : parsed;
         updateModuleDataByModuleId(moduleId, normalized as any);
       }

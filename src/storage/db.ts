@@ -106,6 +106,12 @@ interface PlayerProfile {
   innateTalentIds?: string[];
   /** v3 combat risk is chosen once during creation and is immutable after start. */
   combatRiskMode?: CombatRiskMode;
+  /** 创建期属性加点分配。key: 'attrA'|'attrB'|'dim1'..'dim6'|special id → 点数。 */
+  creationPointAllocations?: Record<string, number>;
+  /** 创建期天赋抽卡已用次数（上限 CREATION_MAX_DRAWS=5）。 */
+  creationDrawCount?: number;
+  /** 通过命运抽卡获得的天赋 ID；只计抽卡费，不再重复计入直选花费。 */
+  creationDrawnTalentIds?: string[];
 }
 
 export type SaveLifecycle = 'active' | 'ended';

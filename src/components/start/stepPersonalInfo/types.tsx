@@ -25,6 +25,10 @@ export interface StepPersonalInfoProps {
   onModalStateChange?: (open: boolean) => void;
   phase?: 'identity' | 'loadout';
   showNavigation?: boolean;
+  /** Whether this journey actually has a separate profession creation step. */
+  hasProfessionStep?: boolean;
+  /** Optional content shown in the identity-and-narrative panel. */
+  difficultyContent?: React.ReactNode;
 }
 
 export type RightTab = 'identity' | 'stats' | 'skills' | 'items' | 'npcs';

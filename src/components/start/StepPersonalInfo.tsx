@@ -8,12 +8,27 @@ import {
 import { savePlayerPreset, downloadJSON, exportPlayerPresetJSON } from '../../storage/templateStore';
 import type { StepPersonalInfoProps, PlayerProfile, CustomNpc } from './stepPersonalInfo/types';
 import { PERSPECTIVE_OPTIONS } from './stepPersonalInfo/types';
-import { StatsTab, SkillsTab, ItemsTab, NpcsTab, DropdownItem } from './stepPersonalInfo/index';
+import { ProgressionInitEditor, SkillsTab, ItemsTab, NpcsTab, DropdownItem } from './stepPersonalInfo/index';
+import StepAbilityAlloc from './StepAbilityAlloc';
+import useCreationAllocations from './useCreationAllocations';
+import {
+  clampPointScale,
+  computeCreationSpending,
+  resolveCreationStatConfig,
+} from '../../gameplay/creation/creationPoints';
+import type { ProfessionModuleSchema } from '../../modules/schema';
+
+const EMPTY_PROFESSION_CONFIG: ProfessionModuleSchema = {
+  professions: [],
+  innateTalents: [],
+  creationTalentBudget: 0,
+  allowNoProfession: true,
+};
 
 export default function StepPersonalInfo({
   personalInfo, setPersonalInfo, isFilling, fillElapsed, onAiFill, onCancelFill, hasApiConfig, worldModules,
   apiConfig, selectedWorld, allWorlds, worldEntry,
-  onNext, onPrev, onModalStateChange, phase = 'identity', showNavigation = true,
+  onNext, onPrev, onModalStateChange, phase = 'identity', showNavigation = true, hasProfessionStep, difficultyContent,
 }: StepPersonalInfoProps) {
   const [npcEditorOpen, setNpcEditorOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<CustomNpc | null>(null);
@@ -22,8 +37,25 @@ export default function StepPersonalInfo({
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const presetMenuRef = useRef<HTMLDivElement>(null);
   const isIdentityPhase = phase === 'identity';
-  const hasProfessionModule = Boolean(worldModules?.some(module => module.moduleId === 'profession' && module.enabled));
+  const hasProfessionModule = hasProfessionStep
+    ?? Boolean(worldModules?.some(module => module.moduleId === 'profession' && module.enabled));
+  const statModule = worldModules?.find(module => module.moduleId === 'stat' && module.enabled);
+  const progressionModule = worldModules?.find(module => module.moduleId === 'progression' && module.enabled);
+  const statConfig = statModule
+    ? resolveCreationStatConfig(statModule.moduleConfig, statModule.initialState)
+    : undefined;
+  const pointScale = clampPointScale((statModule?.moduleConfig as Record<string, unknown> | undefined)?.pointScale);
+  const loadoutSpending = computeCreationSpending(EMPTY_PROFESSION_CONFIG, {
+    riskMode: personalInfo.combatRiskMode ?? 'normal',
+    pointScale,
+    talentIds: [],
+    drawnTalentIds: [],
+    drawCount: 0,
+    allocations: personalInfo.creationPointAllocations ?? {},
+  });
+  const { allocations, applyAllocations } = useCreationAllocations({ personalInfo, setPersonalInfo, statConfig });
   const hasLoadoutContent = Object.keys(personalInfo.moduleInitData ?? {}).length > 0
+    || Object.keys(personalInfo.creationPointAllocations ?? {}).length > 0
     || (!hasProfessionModule && Object.keys(personalInfo.initialSkills ?? {}).length > 0)
     || Object.keys(personalInfo.initialItems ?? {}).length > 0
     || personalInfo.customNpcs.length > 0;
@@ -119,15 +151,27 @@ export default function StepPersonalInfo({
   const renderLoadout = () => (
     <div className={`ritual-loadout-box${hasLoadoutContent ? ' has-content' : ' is-empty'}`}>
       <div className="ritual-loadout-heading">
-        <div><span className="ritual-section-kicker">行囊卷 · 世界法则下的个人负载</span><strong>{hasProfessionModule ? '行囊与同行者' : '能力与行囊'}</strong></div>
+        <div><span className="ritual-section-kicker">行囊卷 · 世界法则下的个人负载</span><strong>行囊与同行者</strong></div>
         <small>{hasLoadoutContent ? '已配置内容可继续编辑' : '当前世界没有额外行囊限制'}</small>
       </div>
       <div className="ritual-loadout-intro">沿用当前世界已启用的模块；没有模块的分组会保持轻量，不制造空白数据。</div>
+      {!hasProfessionModule && statConfig && (
+        <div className="ritual-loadout-alloc">
+          <StepAbilityAlloc
+            statConfig={statConfig}
+            allocations={allocations}
+            poolRemaining={loadoutSpending.remaining}
+            onChange={applyAllocations}
+          />
+        </div>
+      )}
       <div className="ritual-loadout-groups">
-        <details className="ritual-loadout-group" open>
-          <summary><span>属性与世界模块</span><small>{Object.keys(personalInfo.moduleInitData ?? {}).length} 项</small></summary>
-          <div className="ritual-loadout-group__body"><StatsTab worldModules={worldModules} personalInfo={personalInfo} setPersonalInfo={setPersonalInfo} /></div>
-        </details>
+        {progressionModule && (
+          <details className="ritual-loadout-group" open>
+            <summary><span>初始段位</span><small>第 {Number(((personalInfo.moduleInitData?.['成长体系'] ?? {}) as Record<string, unknown>).currentTierIndex ?? 0) + 1} 阶</small></summary>
+            <div className="ritual-loadout-group__body"><ProgressionInitEditor worldModules={worldModules} personalInfo={personalInfo} setPersonalInfo={setPersonalInfo} /></div>
+          </details>
+        )}
         {hasProfessionModule ? (
           <div className="ritual-loadout-intro">职业、先天天赋与职业能力已在上一卷确定；自由技能只会在旅途中学习，不在这里再选一次。</div>
         ) : (
@@ -157,6 +201,7 @@ export default function StepPersonalInfo({
                 <label className="form-group"><span>职业</span><input type="text" value={personalInfo.career} onChange={event => set('career', event.target.value)} placeholder="学生、佣兵、学者……" /></label>
               )}
               <div className="form-group"><span>叙事视角</span><div className="gender-radio-group ritual-perspective-options">{PERSPECTIVE_OPTIONS.map(option => <button type="button" key={option.value} className={`gender-radio${personalInfo.perspective === option.value ? ' selected' : ''}`} onClick={() => set('perspective', option.value)} aria-pressed={personalInfo.perspective === option.value}><strong>{option.label}</strong><small>{option.desc}</small></button>)}</div></div>
+              {difficultyContent}
               <div className="ritual-identity-note">填写姓名、性别与年龄后即可继续。</div>
             </div>
           </div>

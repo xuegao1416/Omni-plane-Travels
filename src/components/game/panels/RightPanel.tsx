@@ -9,7 +9,7 @@ import { CustomModulePanel } from './CustomModulePanel';
 import { formatWorldClock, getTimeSystemFromWorld } from '../../../time/worldClock';
 import { toDisplayText } from '../../../utils/displayText';
 
-const COMBAT_RISK_LABELS = { normal: '普通', hard: '困难', inferno: '炼狱' } as const;
+const COMBAT_RISK_LABELS = { easy: '简单', normal: '普通', hard: '困难', inferno: '炼狱' } as const;
 
 interface Props {
   gameState: GameState;

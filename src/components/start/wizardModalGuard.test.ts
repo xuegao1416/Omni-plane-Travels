@@ -7,8 +7,10 @@ const stepSource = readFileSync(new URL('./StepPersonalInfo.tsx', import.meta.ur
 describe('wizard modal interaction guard', () => {
   test('blocks both global navigation controls while a child modal is open', () => {
     expect(wizardSource).toContain('modalOpen');
-    expect(wizardSource).toContain('disabled={modalOpen}');
-    expect(wizardSource).toContain('disabled={modalOpen || !canAdvance}');
+    expect(wizardSource).toContain('professionLibraryOpen');
+    expect(wizardSource).toContain('navigationBlocked');
+    expect(wizardSource).toContain('disabled={navigationBlocked}');
+    expect(wizardSource).toContain('disabled={navigationBlocked || !canAdvance}');
   });
 
   test('reports NPC and picker modal state to the Wizard shell', () => {

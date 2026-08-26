@@ -7,6 +7,7 @@ import {
   migrateProfessionPack,
   normalizeAbilityProposal,
   normalizeCombatEncounterProposal,
+  normalizeCombatRiskMode,
   normalizeCombatSessionV2,
   synchronizeV3FeatureFlagsForWorld,
 } from './protocols';
@@ -81,6 +82,14 @@ describe('v3 core protocols and additive migrations', () => {
     expect(migrated.玩家.技能系统['旧技能']).toBeDefined();
     expect(migrated.narrativeDecisions).toEqual([]);
     expect(createDefaultV3FeatureFlags()).toEqual({ professionsEnabled: false, combatEnabled: false, combatRiskMode: 'normal' });
+  });
+
+  test('preserves easy risk through risk and combat-session normalization', () => {
+    expect(normalizeCombatRiskMode('easy')).toBe('easy');
+    expect(normalizeCombatSessionV2({
+      id: 'easy-session', riskMode: 'easy', seed: 7,
+      participants: [{ id: 'player', side: 'player', identity: '玩家' }],
+    })?.riskMode).toBe('easy');
   });
 
   test('reactivates optional v3 systems from the loaded world instead of preserving stale migration flags', () => {

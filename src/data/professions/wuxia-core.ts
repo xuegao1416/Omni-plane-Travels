@@ -33,6 +33,9 @@ export const WUXIA_CORE_PROFESSION_PACK: ProfessionModuleSchema = {
     { id: 'wuxia_grace', name: '江湖风度', description: '懂得在复杂人情中保留体面与余地。', cost: 1, rarity: '普通', mechanics: { checks: [{ statIds: ['dim5'], value: 1 }] } },
     { id: 'wuxia_lucky_coin', name: '机缘铜钱', description: '总能在关键时刻找到一线可能。', cost: 2, rarity: '稀有', mechanics: { checks: [{ statIds: ['dim6'], value: 2 }] } },
     { id: 'wuxia_patient_practice', name: '耐心苦练', description: '重复练习招式时更容易积累熟练。', cost: 2, rarity: '稀有', mechanics: { checks: [{ statIds: ['dim4'], value: 1 }] } },
+    { id: 'wuxia_harmony_of_heaven', name: '天人合一', description: '身心与天地气机相融，举止顺势而发，外邪难侵。', cost: 99999, rarity: '传说', tags: ['神技'], mechanics: { combat: { armor: 1 }, checks: [{ statIds: ['dim2', 'dim5'], value: 2 }] } },
+    { id: 'wuxia_sword_heart_divine', name: '剑心通明·神会', description: '心中无剑亦无滞碍，一念便能照见招式最深处的破绽。', cost: 99999, rarity: '传说', tags: ['神技'], mechanics: { combat: { accuracy: 1 }, checks: [{ statIds: ['dim3', 'dim4'], value: 2 }] } },
+    { id: 'wuxia_cycle_of_destiny', name: '宿命轮回', description: '似曾历尽无数江湖，生死关头总能先一步抓住那线机缘。', cost: 99999, rarity: '传说', tags: ['神技'], mechanics: { combat: { initiative: 1 }, checks: [{ statIds: ['dim6'], value: 2 }] } },
   ],
   professions: [
     path('swordsman', '剑客', '以剑势、步法与拆招立足江湖。', [

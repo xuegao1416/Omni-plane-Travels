@@ -356,6 +356,50 @@ describe('v3 deterministic combat core', () => {
     expect(twice.alreadyApplied).toBe(true);
   });
 
+  test('easy defeat restores the checkpoint while preserving settlement metadata and an active save', () => {
+    const checkpointState = makeState();
+    const session = combatSession(checkpointState);
+    session.riskMode = 'easy';
+    session.lifecycle = 'terminal';
+    session.status = 'defeat';
+    session.participants.find(unit => unit.id === 'player')!.hp = 0;
+    session.result = {
+      status: 'defeat',
+      rewardEffects: [{ add: { path: '玩家.货币资源.主货币.数量', delta: 50, min: 0 } }],
+      rewardsApplied: false,
+      narration: { status: 'succeeded', attempts: 1, requestId: 'easy-defeat-narration' },
+      terminalTransactionId: 'easy-defeat-terminal',
+    };
+
+    const postCombatState = makeState();
+    postCombatState.玩家.生存状态.血量 = 3;
+    postCombatState.玩家.货币资源.主货币.数量 = 17;
+    const settled = settleCombatResult(postCombatState, session);
+
+    expect(settled.state.玩家.生存状态.血量).toBe(session.preCombatCheckpoint.gameState.玩家.生存状态.血量);
+    expect(settled.state.玩家.货币资源.主货币.数量).toBe(session.preCombatCheckpoint.gameState.玩家.货币资源.主货币.数量);
+    expect(settled.result).toMatchObject({
+      status: 'defeat',
+      rewardsApplied: true,
+      narration: { status: 'succeeded', attempts: 1, requestId: 'easy-defeat-narration' },
+      terminalTransactionId: 'easy-defeat-terminal',
+      report: { riskMode: 'easy', finalState: { status: 'defeat' } },
+    });
+    expect(settled.state.v3?.combatResult).toEqual(settled.result);
+
+    const save = applyCombatResultToSave({
+      id: 'save_1_easyxx', name: '简单存档', timestamp: 1, messages: [],
+      gameState: settled.state, worldId: 'world', lifecycle: 'active',
+    } as GameSave, {
+      sessionId: session.id,
+      riskMode: 'easy',
+      playerDied: true,
+      result: settled.result,
+    });
+    expect(save.lifecycle).toBe('active');
+    expect(save.endedAt).toBeUndefined();
+  });
+
   test('resolves enemy and ally targets relative to the acting unit', () => {
     const enemyAttack = combatSession();
     const enemy = enemyAttack.participants.find(unit => unit.id === 'enemy')!;

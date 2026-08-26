@@ -11,14 +11,25 @@ import { loadSaveWithMigration, type GameSave, type PlayerProfile } from '../../
 import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
+import type { ProfessionModuleSchema } from '../../modules/schema';
 import { resetSimulationEngine } from '../../simulation/SimulationApi';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
 import { initializeProfessionSelection } from '../../gameplay/profession';
 import { resolveProfessionBinding } from '../../data/professions';
 import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
 import { migrateGameStateToV3 } from '../../gameplay/protocols';
+import { isDivineTalent } from '../../gameplay/creation/creationPoints';
 
 import { v4 as uuid } from 'uuid';
+
+function selectedTalentBudgetOverride(config: ProfessionModuleSchema, talentIds: readonly string[]): number {
+  const selectedIds = new Set(talentIds);
+  return config.innateTalents.reduce((total, talent) => (
+    selectedIds.has(talent.id) && !isDivineTalent(talent)
+      ? total + Math.max(0, Math.trunc(talent.cost))
+      : total
+  ), 0);
+}
 
 export function useStartScreen() {
   const { navigate, state, dispatch, engine, markNewGameStarted } = useGame();
@@ -196,7 +207,9 @@ export function useStartScreen() {
     }
     const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;
     const initialized = professionConfig?.professions.length
-      ? initializeProfessionSelection(gs, professionConfig, pi.professionId ?? null, pi.innateTalentIds ?? [])
+      ? initializeProfessionSelection(gs, professionConfig, pi.professionId ?? null, pi.innateTalentIds ?? [], {
+        talentBudgetOverride: selectedTalentBudgetOverride(professionConfig, pi.innateTalentIds ?? []),
+      })
       : gs;
     const migrated = migrateGameStateToV3(initialized);
     migrated.v3!.featureFlags = {
@@ -257,6 +270,7 @@ export function useStartScreen() {
         professionConfig,
         wizard.personalInfo.professionId ?? null,
         wizard.personalInfo.innateTalentIds ?? [],
+        { talentBudgetOverride: selectedTalentBudgetOverride(professionConfig, wizard.personalInfo.innateTalentIds ?? []) },
       ));
     }
 

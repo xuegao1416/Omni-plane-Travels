@@ -14,6 +14,7 @@ import {
   type GameplayExecutionContext,
   type GameplayExecutionResult,
 } from '../kernel';
+import { DIVINE_TALENT_COST } from '../creation/creationPoints';
 
 export type ProfessionActionResult = GameplayExecutionResult<GameState>;
 
@@ -31,8 +32,10 @@ export function validateProfessionSelection(
   config: ProfessionModuleSchema,
   professionId: string | null,
   talentIds: readonly string[],
+  budgetOverride?: number,
 ): { ok: boolean; reason?: string; spent: number; remaining: number } {
-  const budget = Math.max(0, Math.trunc(config.creationTalentBudget || 0));
+  const requestedBudget = budgetOverride ?? config.creationTalentBudget;
+  const budget = Number.isFinite(requestedBudget) ? Math.max(0, Math.trunc(requestedBudget)) : 0;
   if (!professionId && config.allowNoProfession === false) {
     return { ok: false, reason: '这个世界必须选择职业', spent: 0, remaining: budget };
   }
@@ -59,7 +62,10 @@ export function validateProfessionSelection(
       return { ok: false, reason: `天赋「${talent.name}」缺少前置天赋`, spent: 0, remaining: budget };
     }
   }
-  const spent = selected.reduce((sum, item) => sum + Math.max(0, Math.trunc(item?.cost ?? 0)), 0);
+  const spent = selected.reduce((sum, item) => {
+    const cost = Math.max(0, Math.trunc(item?.cost ?? 0));
+    return cost >= DIVINE_TALENT_COST ? sum : sum + cost;
+  }, 0);
   if (spent > budget) return { ok: false, reason: '先天天赋预算不足', spent, remaining: budget - spent };
   return { ok: true, spent, remaining: budget - spent };
 }
@@ -69,8 +75,9 @@ export function initializeProfessionSelection(
   config: ProfessionModuleSchema,
   professionId: string | null,
   talentIds: readonly string[],
+  options: { talentBudgetOverride?: number } = {},
 ): GameState {
-  const validation = validateProfessionSelection(config, professionId, talentIds);
+  const validation = validateProfessionSelection(config, professionId, talentIds, options.talentBudgetOverride);
   if (!validation.ok) throw new Error(validation.reason);
   const state = clone(source);
   const profession = config.professions.find(item => item.id === professionId);

@@ -14,4 +14,12 @@ describe('new journey draft reset', () => {
     expect(startScreen).toContain('h.setIncludeAgeStages(true);');
     expect(wizard).toContain('resetForNewJourney');
   });
+
+  test('resets world-specific creation choices only after the selected world changes', () => {
+    const shell = read('./WizardShell.tsx');
+
+    expect(shell).toContain('previousWorldRef');
+    expect(shell).toContain('previousWorldRef.current === selectedWorld');
+    expect(shell).toContain('creationDrawnTalentIds: undefined');
+  });
 });

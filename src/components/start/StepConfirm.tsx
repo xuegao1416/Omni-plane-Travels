@@ -5,6 +5,13 @@ import type { SegmentDef } from './StepCharacterHistory';
 import {
   ShieldCheck, User, Users, ScrollText,
 } from 'lucide-react';
+import {
+  DIFFICULTY_LABELS,
+  DIFFICULTY_DESCRIPTIONS,
+  DIFFICULTY_POINT_DESCRIPTIONS,
+  computeCreationPool,
+  type CreationSpending,
+} from '../../gameplay/creation/creationPoints';
 
 interface StepConfirmProps {
   personalInfo: PlayerProfile;
@@ -19,17 +26,29 @@ interface StepConfirmProps {
   showNavigation?: boolean;
   hasProfession?: boolean;
   hasCombat?: boolean;
+  showDifficulty?: boolean;
   combatRiskMode?: CombatRiskMode;
-  onCombatRiskModeChange?: (mode: CombatRiskMode) => void;
+  pointScale?: number;
+  creationSpending?: CreationSpending;
 }
 
 export default function StepConfirm({
-  personalInfo, segmentDefs, segments, buildInitialState, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true, hasProfession = false, hasCombat = false, combatRiskMode = 'normal', onCombatRiskModeChange,
+  personalInfo, segmentDefs, segments, buildInitialState, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true, hasProfession = false, hasCombat = false, showDifficulty = false, combatRiskMode = 'normal', pointScale = 1, creationSpending,
 }: StepConfirmProps) {
   const npcCount = personalInfo.customNpcs.length;
   const skillCount = hasProfession ? 0 : Object.keys(personalInfo.initialSkills).length;
   const itemCount = Object.keys(personalInfo.initialItems).length;
   const hasSegments = Object.values(segments).some(v => v.trim());
+  const creationPool = computeCreationPool(combatRiskMode, pointScale);
+  const spending = creationSpending ?? {
+    pool: creationPool,
+    talentSpent: 0,
+    drawSpent: 0,
+    statSpent: 0,
+    totalSpent: 0,
+    remaining: creationPool,
+    ok: true,
+  };
 
   return (
     <div className="confirm-layout">
@@ -114,32 +133,40 @@ export default function StepConfirm({
             <p>暂无开局内容</p>
           </div>
         )}
-        {hasCombat && (
+        {showDifficulty && (
           <div className="confirm-card" aria-labelledby="combat-risk-title">
             <div className="confirm-card-header">
               <ShieldCheck size={16} />
-              <span id="combat-risk-title">战斗风险（开始后不可修改）</span>
+              <span id="combat-risk-title">降临难度（第一步已定）</span>
             </div>
-            <div className="confirm-card-body" role="radiogroup" aria-label="战斗风险">
-              {([
-                ['normal', '普通', '可在战前恢复检查点重打，归零后失去战力但可继续。'],
-                ['hard', '困难', '可重打；战斗可能造成重伤或死亡。'],
-                ['inferno', '炼狱', '不可重打或历史回滚；玩家死亡后存档封存为只读。'],
-              ] as Array<[CombatRiskMode, string, string]>).map(([mode, label, description]) => (
-                <label key={mode} className="confirm-risk-option">
-                  <input
-                    type="radio"
-                    name="combat-risk-mode"
-                    value={mode}
-                    checked={combatRiskMode === mode}
-                    onChange={() => onCombatRiskModeChange?.(mode)}
-                  />
-                  <span><strong>{label}</strong><small>{description}</small></span>
-                </label>
-              ))}
+            <div className="confirm-card-body">
+              <div className="confirm-risk-readonly">
+                <strong>{DIFFICULTY_LABELS[combatRiskMode]}</strong>
+                <small>{hasCombat ? DIFFICULTY_DESCRIPTIONS[combatRiskMode] : DIFFICULTY_POINT_DESCRIPTIONS[combatRiskMode]}</small>
+              </div>
             </div>
           </div>
         )}
+        {showDifficulty && <div className="confirm-card confirm-creation-pool-card">
+          <div className="confirm-card-header">
+            <ShieldCheck size={16} />
+            <span>降临点数</span>
+          </div>
+          <div className="confirm-card-body">
+            <div className="confirm-creation-pool">
+              <div className="confirm-creation-pool__total">
+                <strong>{spending.pool}</strong>
+                <small>点数池总量 · 世界系数 {pointScale.toFixed(1)}</small>
+              </div>
+              <dl className="confirm-creation-spending">
+                <div><dt>天赋直选</dt><dd>{spending.talentSpent}</dd></div>
+                <div><dt>命运抽卡</dt><dd>{spending.drawSpent}</dd></div>
+                <div><dt>属性分配</dt><dd>{spending.statSpent}</dd></div>
+                <div className="is-remaining"><dt>剩余</dt><dd>{spending.remaining}</dd></div>
+              </dl>
+            </div>
+          </div>
+        </div>}
       </div>
 
       {/* 导航 */}

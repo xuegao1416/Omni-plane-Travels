@@ -93,7 +93,7 @@ export function prepareCombatEncounterRequest(state: GameState, request: CombatE
 
 export interface CombatSessionOptions {
   seed: number;
-  riskMode?: 'normal' | 'hard' | 'inferno';
+  riskMode?: 'easy' | 'normal' | 'hard' | 'inferno';
   selectedAllyIds?: string[];
   statRanges?: CombatStatRanges;
   statLabels?: { health: string; resource: string };
@@ -138,7 +138,7 @@ export type CombatAutoStrategy = 'aggressive' | 'balanced' | 'defensive' | 'supp
 
 export interface CombatResultSettlement {
   sessionId: string;
-  riskMode: 'normal' | 'hard' | 'inferno';
+  riskMode: 'easy' | 'normal' | 'hard' | 'inferno';
   playerDied: boolean;
   result: CombatResult;
 }
@@ -997,7 +997,7 @@ function moveToNextActor(session: CombatSessionV2): void {
 }
 
 function reportUnitStatus(unit: CombatParticipantV2, riskMode: CombatSessionV2['riskMode']): CombatMechanicalReportV2['participants'][number]['status'] {
-  if (unit.hp <= 0) return riskMode === 'normal' ? 'incapacitated' : 'dead';
+  if (unit.hp <= 0) return riskMode === 'normal' || riskMode === 'easy' ? 'incapacitated' : 'dead';
   if (unit.hp < unit.maxHp * 0.25) return 'incapacitated';
   if (unit.hp < unit.maxHp) return 'wounded';
   return 'active';
@@ -1296,7 +1296,7 @@ export function applyCombatResultToSave(saveInput: GameSave, settlement: CombatR
 }
 
 function worldValueForRatio(ratio: number, originalMax: number, riskMode: CombatSessionV2['riskMode']): number {
-  if (ratio <= 0 && riskMode === 'normal') return Math.max(1, Math.ceil(originalMax * 0.1));
+  if (ratio <= 0 && (riskMode === 'normal' || riskMode === 'easy')) return Math.max(1, Math.ceil(originalMax * 0.1));
   return Math.max(0, Math.round(clamp(ratio, 0, 1) * originalMax));
 }
 
@@ -1326,7 +1326,7 @@ function applyParticipantBinding(state: GameState, session: CombatSessionV2, uni
   applyInventoryBinding(state, binding, unit.itemQuantities ?? binding.originalItemQuantities);
   if (binding.injuryPath) {
     const status = unit.hp <= 0
-      ? session.riskMode === 'normal' ? '失去战力' : '死亡'
+      ? session.riskMode === 'normal' || session.riskMode === 'easy' ? '失去战力' : '死亡'
       : unit.hp < unit.maxHp * 0.35 ? '重伤' : '正常';
     setGameplayPath(state, binding.injuryPath, status, false);
   }
@@ -1364,9 +1364,18 @@ export function settleCombatResult(stateInput: GameState, sessionInput: CombatSe
   const result = clone(session.result ?? { ...emptyResult(), status: session.status === 'active' ? 'draw' : session.status });
   const transactionId = result.terminalTransactionId ?? `${session.id}:terminal:${result.status}`;
   if (state.v3?.combatResult?.terminalTransactionId === transactionId && state.v3.combatResult.rewardsApplied) return { state, result: clone(state.v3.combatResult), alreadyApplied: true };
+  // 简单难度：玩家战败时自动恢复战前状态；机械报告仍如实记录败退供叙事层使用。
+  const easyDefeatRestores = session.riskMode === 'easy'
+    && allCombatParticipants(session).some(unit => (unit.id === 'player' || unit.source === 'player') && unit.hp <= 0);
+  if (easyDefeatRestores) {
+    result.rewardEffects = [];
+    session.rewardEffects = [];
+  }
   result.report ??= buildMechanicalReport(session);
-  const consequenceState = clone(state);
-  applyCombatConsequences(consequenceState, session);
+  const consequenceState = easyDefeatRestores
+    ? restoreCombatCheckpoint(session.preCombatCheckpoint).gameState
+    : clone(state);
+  if (!easyDefeatRestores) applyCombatConsequences(consequenceState, session);
   const execution = result.rewardEffects.length > 0
     ? executeGameplayTransaction(consequenceState, { id: transactionId, moduleId: 'combat', source: 'combat.result', effects: result.rewardEffects }, { tick: session.round, enabledModules: ['combat'] })
     : { state: consequenceState, status: 'applied' as const };

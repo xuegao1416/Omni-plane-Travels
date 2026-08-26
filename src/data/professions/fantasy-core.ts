@@ -36,6 +36,9 @@ export const FANTASY_CORE_PROFESSION_PACK: ProfessionModuleSchema = {
     { id: 'battle_sense', name: '战场直觉', description: '能在混乱中迅速判断威胁。', cost: 2, rarity: '稀有', mechanics: { combat: { accuracy: 1 }, checks: [{ statIds: ['dim6'], value: 1 }] } },
     { id: 'night_eyes', name: '夜行之眼', description: '在昏暗环境中仍能捕捉细节。', cost: 1, rarity: '普通', mechanics: { checks: [{ statIds: ['dim6'], value: 1 }] } },
     { id: 'kindred_bond', name: '同伴羁绊', description: '与可靠伙伴并肩时更能发挥力量。', cost: 2, rarity: '稀有', mechanics: { combat: { healing: 1 }, checks: [{ statIds: ['dim5'], value: 1 }] } },
+    { id: 'dragonheart_awakening', name: '龙心觉醒', description: '远古龙血在危难中苏醒，赋予超凡威势与不屈体魄。', cost: 99999, rarity: '传说', tags: ['神技'], mechanics: { combat: { armor: 1 }, checks: [{ statIds: ['dim2'], value: 2 }] } },
+    { id: 'fate_spindle', name: '命运纺锤', description: '能够窥见并轻拨命运丝线，让最渺茫的转机成为现实。', cost: 99999, rarity: '传说', tags: ['神技'], mechanics: { combat: { initiative: 1 }, checks: [{ statIds: ['dim6'], value: 2 }] } },
+    { id: 'world_whisper', name: '世界低语', description: '世界本身向你低语，揭示表象之下的奥秘与裂隙。', cost: 99999, rarity: '传说', tags: ['神技'], mechanics: { combat: { accuracy: 1 }, checks: [{ statIds: ['dim4', 'dim6'], value: 2 }] } },
   ],
   professions: [
     profession('warrior', '战士', '前排・武器', '以坚韧与武技正面掌控战场。', [

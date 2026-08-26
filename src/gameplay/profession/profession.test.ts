@@ -27,12 +27,53 @@ const config: ProfessionModuleSchema = {
   }],
 };
 
+const extendedBudgetConfig: ProfessionModuleSchema = {
+  ...config,
+  innateTalents: [
+    ...config.innateTalents,
+    { id: 'expensive', name: '天生神力', description: '', cost: 4 },
+    { id: 'divine', name: '命运神技', description: '', cost: 99999 },
+  ],
+};
+
 describe('profession domain', () => {
   test('validates creation-only talent budget, conflicts, and no-profession choice', () => {
     expect(validateProfessionSelection(config, null, ['lucky']).ok).toBe(true);
     expect(validateProfessionSelection(config, 'warrior', ['brave', 'calm']).reason).toContain('互斥');
     expect(validateProfessionSelection(config, 'warrior', ['brave', 'lucky']).ok).toBe(true);
     expect(validateProfessionSelection(config, 'missing', []).ok).toBe(false);
+  });
+
+  test('accepts an explicit talent budget override and initialize forwards it', () => {
+    expect(validateProfessionSelection(extendedBudgetConfig, 'warrior', ['expensive']).ok).toBe(false);
+    expect(validateProfessionSelection(extendedBudgetConfig, 'warrior', ['expensive'], 4)).toMatchObject({
+      ok: true,
+      spent: 4,
+      remaining: 0,
+    });
+
+    const initialized = initializeProfessionSelection(
+      createDefaultGameState(),
+      extendedBudgetConfig,
+      'warrior',
+      ['expensive'],
+      { talentBudgetOverride: 4 },
+    );
+    expect(initialized.玩家.能力系统?.先天天赋?.expensive).toBeDefined();
+  });
+
+  test('does not charge divine talents against the creation budget', () => {
+    expect(validateProfessionSelection(extendedBudgetConfig, 'warrior', ['divine'])).toMatchObject({
+      ok: true,
+      spent: 0,
+      remaining: 3,
+    });
+    expect(() => initializeProfessionSelection(
+      createDefaultGameState(),
+      extendedBudgetConfig,
+      'warrior',
+      ['divine'],
+    )).not.toThrow();
   });
 
   test('initializes profession, innate talents, and preserves unrelated free skills', () => {

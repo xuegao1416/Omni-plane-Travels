@@ -1,7 +1,7 @@
 import { ArrowLeft, Swords } from 'lucide-react';
 import type { CombatSessionV2 } from '../../../gameplay/protocols';
 
-const riskLabels: Record<CombatSessionV2['riskMode'], string> = { normal: '普通', hard: '困难', inferno: '炼狱' };
+const riskLabels: Record<CombatSessionV2['riskMode'], string> = { easy: '简单', normal: '普通', hard: '困难', inferno: '炼狱' };
 
 export default function CombatHeader({
   session, saving, error, readOnly, initiativeNames, onLeave,
