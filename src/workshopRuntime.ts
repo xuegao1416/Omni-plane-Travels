@@ -41,7 +41,7 @@ export interface WorkshopInstallOptions {
   worldId?: string;
 }
 
-interface StoredWorkshopRuntimeAsset {
+export interface StoredWorkshopRuntimeAsset {
   id: string;
   type: 'adventure_pack' | 'visual_theme';
   version: string;
@@ -72,6 +72,22 @@ async function writeRuntimeAssets(value: StoredWorkshopRuntimeAsset[]): Promise<
 
 export async function listWorkshopRuntimeAssets(): Promise<StoredWorkshopRuntimeAsset[]> {
   return jsonCopy(await readRuntimeAssets());
+}
+
+export async function deleteWorkshopRuntimeAsset(id: string): Promise<void> {
+  const assets = await readRuntimeAssets();
+  await writeRuntimeAssets(assets.filter((asset) => asset.id !== id));
+}
+
+export async function updateWorkshopRuntimeAsset(
+  id: string,
+  patch: Pick<StoredWorkshopRuntimeAsset, 'title' | 'data'>,
+): Promise<void> {
+  const assets = await readRuntimeAssets();
+  const index = assets.findIndex((asset) => asset.id === id);
+  if (index < 0) throw new Error('找不到要编辑的本地资产');
+  assets[index] = { ...assets[index], title: patch.title, data: jsonCopy(patch.data) };
+  await writeRuntimeAssets(assets);
 }
 
 async function installPassiveRuntimeAsset(

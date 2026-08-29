@@ -4,11 +4,12 @@
 import { create } from 'zustand';
 import { API_ENDPOINTS, fetchWithAuth } from '../config/api';
 import { useAuthStore } from './authStore';
+import type { WorkshopAssetType } from '../workshopCatalog';
 
 export interface WorkshopItem {
   id: string;
   ownerId: string;
-  type: 'world_package' | 'character_preset' | 'npc_template' | 'history_preset' | 'gameplay_module' | 'event_pack' | 'workflow_pack' | 'adventure_pack' | 'visual_theme';
+  type: WorkshopAssetType;
   contentType?: string;
   title: string;
   description: string | null;

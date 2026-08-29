@@ -5,10 +5,11 @@
  *  - 列表公开、可按 type/tag 过滤、分页。
  *  - 上传需登录；仅创建者可改/删自己的条目（403）。
  *  - 所有数据存 JSON（砍掉图片），不需要 R2。
- *  - type 支持：world_package / npc_template / history_preset / gameplay_module / event_pack / workflow_pack / adventure_pack / visual_theme
+ *  - 公开类型与本地资产目录共用同一份定义；人物预设、人生经历只保存在本地。
  */
 import type { Bindings, WorkshopDependency, WorkshopItemRow, WorkshopItemType, WorkshopItemPublic } from './types';
 import { validateCustomGameplayModule } from '../custom-modules/validator';
+import { isLocalOnlyAssetType, isPublicWorkshopType } from '../workshopCatalog';
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
@@ -16,8 +17,7 @@ const MAX_TITLE = 200;
 const MAX_TAG_LEN = 32;
 const MAX_TAGS = 16;
 const MAX_DATA_SIZE = 1_048_576; // 1MB
-const ACCEPTED_TYPES: WorkshopItemType[] = ['world_package', 'character_preset', 'npc_template', 'history_preset', 'gameplay_module', 'event_pack', 'workflow_pack', 'adventure_pack', 'visual_theme'];
-const CONTENT_TYPES = new Set<WorkshopItemType>(ACCEPTED_TYPES);
+const LEGACY_DB_TYPES = new Set<WorkshopItemType>(['world_package', 'character_preset', 'npc_template', 'history_preset']);
 
 export interface WorkshopInput {
   title?: string;
@@ -57,10 +57,14 @@ export interface WorkshopResult {
   body: Record<string, unknown>;
 }
 
-const PRIVATE_CONTENT_TYPE_ERROR = {
-  error: 'PRIVATE_CONTENT_TYPE',
-  message: '主角人物预设仅保存在本地；请匿名化后发布为 NPC 模板',
-} as const;
+function privateContentTypeError(type: string) {
+  return {
+    error: 'PRIVATE_CONTENT_TYPE',
+    message: type === 'history_preset'
+      ? '人生经历仅保存在本地，不能发布到创意工坊'
+      : '主角人物预设仅保存在本地；请匿名化后发布为 NPC 模板',
+  } as const;
+}
 
 function normalizeTags(tags?: string[]): string[] {
   if (!tags) return [];
@@ -176,7 +180,7 @@ function validateEventPackShape(data: unknown, label: string): WorkshopContentVa
 
 /** Server-authoritative structural validation for every public workshop type. */
 export function validateWorkshopContent(type: WorkshopItemType, data: unknown): WorkshopContentValidationResult {
-  if (type === 'character_preset') return contentError('PRIVATE_CONTENT_TYPE', '主角人物预设仅保存在本地；请匿名化后发布为 NPC 模板');
+  if (isLocalOnlyAssetType(type)) return contentError('PRIVATE_CONTENT_TYPE', privateContentTypeError(type).message);
   if (!recordValue(data)) return contentError('INVALID_CONTENT', '发布内容必须是 JSON 对象');
 
   switch (type) {
@@ -197,15 +201,6 @@ export function validateWorkshopContent(type: WorkshopItemType, data: unknown): 
       if (!recordValue(source)) return contentError('INVALID_NPC_TEMPLATE', 'NPC 模板的 npc 必须是 JSON 对象', 'npc');
       const npcIssue = requireString(source, 'name', 'NPC 模板 npc');
       if (npcIssue) return npcIssue;
-      return { ok: true };
-    }
-    case 'history_preset': {
-      const issue = requireString(data, 'id', '人生经历') ?? requireString(data, 'name', '人生经历');
-      if (issue) return issue;
-      if (!recordValue(data.segments) || !Object.values(data.segments).every(value => typeof value === 'string')) {
-        return contentError('INVALID_HISTORY_PRESET', '人生经历必须包含“键 -> 文本”的 segments 对象', 'segments');
-      }
-      if (data.includeAgeStages !== undefined && typeof data.includeAgeStages !== 'boolean') return contentError('INVALID_HISTORY_PRESET', 'includeAgeStages 必须是布尔值', 'includeAgeStages');
       return { ok: true };
     }
     case 'gameplay_module': {
@@ -286,13 +281,14 @@ export async function listItems(env: Bindings, params: ListParams): Promise<List
   const page = Math.max(params.page || 1, 1);
   const offset = (page - 1) * pageSize;
 
-  // Character presets are private local assets, including legacy rows created
-  // before the server-side upload guard existed.
-  const where: string[] = ["status = ?", "COALESCE(content_type, type) <> 'character_preset'"];
+  // Private presets stay hidden even for legacy rows created before the guard.
+  const where: string[] = ["status = ?", "COALESCE(content_type, type) NOT IN ('character_preset', 'history_preset')"];
   const binds: unknown[] = ['published'];
   if (params.type) {
     const type = params.type as WorkshopItemType;
-    if (ACCEPTED_TYPES.slice(0, 4).includes(type)) {
+    if (!isPublicWorkshopType(type)) {
+      where.push('1 = 0');
+    } else if (LEGACY_DB_TYPES.has(type)) {
       where.push('(content_type = ? OR (content_type IS NULL AND type = ?))');
       binds.push(type, type);
     } else {
@@ -334,7 +330,7 @@ export async function listItems(env: Bindings, params: ListParams): Promise<List
 
 /** 详情（公开）。不存在返回 null。 */
 export async function getItem(env: Bindings, itemId: string): Promise<WorkshopItemRow | null> {
-  const row = await env.DB.prepare("SELECT * FROM workshop_items WHERE id = ? AND status = 'published' AND COALESCE(content_type, type) <> 'character_preset'")
+  const row = await env.DB.prepare("SELECT * FROM workshop_items WHERE id = ? AND status = 'published' AND COALESCE(content_type, type) NOT IN ('character_preset', 'history_preset')")
     .bind(itemId)
     .first<WorkshopItemRow>();
   return row || null;
@@ -355,11 +351,11 @@ export async function createItem(
   input: WorkshopInput,
 ): Promise<WorkshopResult> {
   const requestedType = input.contentType || input.type;
-  if (!requestedType || !CONTENT_TYPES.has(requestedType)) {
-    return { status: 400, body: { error: 'INVALID_TYPE', message: 'type 不受支持' } };
+  if (requestedType && isLocalOnlyAssetType(requestedType)) {
+    return { status: 400, body: privateContentTypeError(requestedType) };
   }
-  if (requestedType === 'character_preset') {
-    return { status: 400, body: PRIVATE_CONTENT_TYPE_ERROR };
+  if (!requestedType || !isPublicWorkshopType(requestedType)) {
+    return { status: 400, body: { error: 'INVALID_TYPE', message: 'type 不受支持' } };
   }
   const title = (input.title || '').trim();
   if (!title) {
@@ -387,7 +383,7 @@ export async function createItem(
   const screenshots = normalizeScreenshots(input.screenshots);
   const version = normalizeVersion(input.version);
   // Keep the legacy CHECK constraint valid while exposing the richer content type.
-  const dbType = ACCEPTED_TYPES.slice(0, 4).includes(requestedType) ? requestedType : 'world_package';
+  const dbType = LEGACY_DB_TYPES.has(requestedType) ? requestedType : 'world_package';
   const contentType = requestedType;
   const now = Date.now();
 
@@ -438,11 +434,12 @@ export async function updateItem(
   }
 
   const requestedType = input.contentType || input.type;
-  if (requestedType && !CONTENT_TYPES.has(requestedType)) {
-    return { status: 400, body: { error: 'INVALID_TYPE', message: 'type 不合法' } };
+  const storedType = (row.content_type || row.type) as WorkshopItemType;
+  if ((requestedType && isLocalOnlyAssetType(requestedType)) || (!requestedType && isLocalOnlyAssetType(storedType))) {
+    return { status: 400, body: privateContentTypeError(requestedType || storedType) };
   }
-  if (requestedType === 'character_preset' || (!requestedType && (row.content_type || row.type) === 'character_preset')) {
-    return { status: 400, body: PRIVATE_CONTENT_TYPE_ERROR };
+  if (requestedType && !isPublicWorkshopType(requestedType)) {
+    return { status: 400, body: { error: 'INVALID_TYPE', message: 'type 不合法' } };
   }
 
   const title = input.title !== undefined ? input.title.trim().slice(0, MAX_TITLE) : row.title;
@@ -476,7 +473,7 @@ export async function updateItem(
      WHERE id = ?`,
   )
     .bind(
-      requestedType ? (ACCEPTED_TYPES.slice(0, 4).includes(requestedType) ? requestedType : 'world_package') : row.type,
+      requestedType ? (LEGACY_DB_TYPES.has(requestedType) ? requestedType : 'world_package') : row.type,
       requestedType || row.content_type || row.type,
       input.version !== undefined ? normalizeVersion(input.version) : normalizeVersion(row.version),
       title, description, tags !== undefined ? JSON.stringify(tags) : row.tags, dataJson, now,

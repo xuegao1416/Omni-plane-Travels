@@ -1047,7 +1047,29 @@
 }
 .game-journey-card--dice .game-journey-card__content { width: 100%; padding: 0; }
 .game-journey-card--dice .inline-dice-card { width: 100%; box-sizing: border-box; }
-.game-journey-card--event { background: color-mix(in srgb, var(--journey-surface) 92%, transparent) !important; border-color: var(--journey-border) !important; color: var(--journey-text) !important; }
+.game-journey-card--event {
+  width: min(460px, calc(100vw - 48px));
+  max-width: 100%;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--journey-surface) 92%, transparent) !important;
+  border-color: var(--journey-border) !important;
+  color: var(--journey-text) !important;
+}
+.game-journey-card--event > .dawn-frame-v4__content,
+.game-journey-card--event > .dawn-frame-v4__content > .game-journey-card__content,
+.game-journey-card__event-content {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.game-journey-card--event > .dawn-frame-v4__content > .game-journey-card__content { padding: 0; }
+.game-journey-card__event-content {
+  max-height: min(82vh, 760px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-5);
+  color: var(--text-primary);
+}
 .game-journey .message-html-content .action-option-card { appearance: none; width: 100%; min-width: 0; border: 1px solid var(--journey-border); border-radius: 10px; background: color-mix(in srgb, var(--journey-surface) 78%, transparent); color: var(--journey-text); font: inherit; text-align: left; overflow-wrap: anywhere; }
 .game-journey .message-html-content .action-option-card:hover { border-color: var(--journey-accent); background: color-mix(in srgb, var(--journey-surface-muted) 88%, transparent); box-shadow: 0 8px 18px color-mix(in srgb, var(--journey-glow) 36%, transparent); }
 .game-journey .message-html-content .action-option-card.selected { border-color: var(--journey-accent); background: var(--journey-selected, var(--journey-surface-muted)); color: var(--journey-text); box-shadow: 0 0 0 1px var(--journey-accent); }
@@ -1854,4 +1876,74 @@
 .game-journey__nested-panel--side {
   border-radius: 0;
   box-shadow: -12px 0 38px color-mix(in srgb, var(--journey-glow, #c8e2d6) 30%, transparent);
+}
+
+/* Pipeline monitor: keep the stage label column shrinkable while status and
+   retry controls remain readable. Error payloads get their own full-width
+   row so a long JSON/message can never force one-character wrapping. */
+.pipeline-monitor__modal {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.pipeline-monitor__detail-list {
+  min-width: 0;
+  overflow-x: hidden;
+}
+.pipeline-monitor__detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.pipeline-monitor__detail-main,
+.pipeline-monitor__detail-copy,
+.pipeline-monitor__detail-status {
+  min-width: 0;
+}
+.pipeline-monitor__detail-main {
+  overflow: hidden;
+}
+.pipeline-monitor__detail-copy {
+  overflow: hidden;
+}
+.pipeline-monitor__detail-copy > div:first-child,
+.pipeline-monitor__detail-copy > div:last-child {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.pipeline-monitor__detail-error {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin-top: 2px;
+  color: #f44336;
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+@media (max-width: 640px) {
+  .pipeline-monitor__modal {
+    width: calc(100vw - 48px) !important;
+    max-height: calc(100dvh - 24px);
+  }
+  .pipeline-monitor__header {
+    padding: 12px 14px !important;
+  }
+  .pipeline-monitor__detail-list {
+    padding: 10px 12px !important;
+    max-height: min(56dvh, 440px) !important;
+  }
+  .pipeline-monitor__detail-row {
+    padding: 9px 10px !important;
+  }
+  .pipeline-monitor__detail-status {
+    max-width: 44%;
+  }
+  .pipeline-monitor__footer {
+    padding: 9px 14px !important;
+  }
 }

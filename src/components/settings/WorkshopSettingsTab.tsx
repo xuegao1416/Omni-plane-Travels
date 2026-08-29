@@ -7,40 +7,40 @@ import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
 import { STORAGE_KEYS } from '../../config/storageKeys';
 import type { WorldDef } from '../../data/worlds-schema';
-import { getAllWorlds } from '../../data/worldLoader';
 import { installWorkshopItem, type WorkshopInstallOperation, restoreCustomWorldStorage } from '../../workshopRuntime';
+import { PUBLIC_WORKSHOP_TYPES, isPublicWorkshopType, type PublicWorkshopType } from '../../workshopCatalog';
 import {
   Store, Download, Trash2, Loader, RefreshCw,
-  Globe, User, BookOpen, Layers, Plus, Upload, X, Puzzle, CalendarDays, TrendingUp, Star, ChevronRight, ArrowLeft
+  Globe, BookOpen, Plus, Upload, X, Puzzle, CalendarDays, TrendingUp, Star, ChevronRight, ArrowLeft
 } from 'lucide-react';
 
-const TYPE_LABELS: Record<string, { label: string; icon: typeof Globe }> = {
+const TYPE_LABELS: Record<PublicWorkshopType, { label: string; icon: typeof Globe }> = {
   world_package: { label: '世界包', icon: Globe },
-  character_preset: { label: '人物预设', icon: User },
   npc_template: { label: 'NPC 模板', icon: BookOpen },
-  history_preset: { label: '人生经历', icon: Layers },
   gameplay_module: { label: '玩法模块', icon: Puzzle },
   event_pack: { label: '事件包', icon: CalendarDays },
   workflow_pack: { label: '工作流包', icon: TrendingUp },
   adventure_pack: { label: '冒险包', icon: BookOpen },
   visual_theme: { label: '视觉主题', icon: Star },
 };
-const PUBLISHABLE_TYPES = Object.keys(TYPE_LABELS).filter(type => type !== 'character_preset');
+const PUBLISHABLE_TYPES = PUBLIC_WORKSHOP_TYPES;
+
+function getTypeInfo(type: string): { label: string; icon: typeof Globe } {
+  return isPublicWorkshopType(type) ? TYPE_LABELS[type] : { label: type, icon: Store };
+}
 
 export default function WorkshopSettingsTab() {
   const { user, isAuthenticated } = useAuthStore();
   const { items, isLoading, error, fetchItems, fetchItem, downloadItem, deleteItem, getInstallPlan } = useWorkshopStore();
   const { DialogUI, confirm, alert: showAlert } = useDialog();
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [sort, setSort] = useState<'latest' | 'popular' | 'featured'>('latest');
-  const [category, setCategory] = useState('');
+  const [typeFilter, setTypeFilter] = useState<PublicWorkshopType | ''>('');
   const [detail, setDetail] = useState<WorkshopItemDetail | null>(null);
   const [detailPlan, setDetailPlan] = useState<WorkshopInstallPlan | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     title: '',
     description: '',
-    type: 'world_package' as string,
+    type: 'world_package' as PublicWorkshopType,
     version: '1.0.0',
     category: 'world',
     tags: '',
@@ -48,12 +48,10 @@ export default function WorkshopSettingsTab() {
     file: null as File | null,
   });
   const [uploading, setUploading] = useState(false);
-  const availableWorlds = getAllWorlds();
-  const [installWorldId, setInstallWorldId] = useState(() => availableWorlds[0]?.id || '');
 
   useEffect(() => {
-    fetchItems({ type: typeFilter || undefined, sort, category: category || undefined });
-  }, [fetchItems, typeFilter, sort, category]);
+    fetchItems({ type: typeFilter || undefined, sort: 'latest' });
+  }, [fetchItems, typeFilter]);
 
   const installOne = async (item: WorkshopItem, data: any, bindWorldId?: string): Promise<WorkshopInstallOperation> => {
     if (item.type === 'world_package') {
@@ -89,7 +87,7 @@ export default function WorkshopSettingsTab() {
         return;
       }
       const optional = plan.recommendations.filter(recommendation => recommendation.optional);
-      const requiredSummary = plan.items.map(entry => `${TYPE_LABELS[entry.type]?.label || entry.type}「${entry.title}」`).join('\n');
+      const requiredSummary = plan.items.map(entry => `${getTypeInfo(entry.type).label}「${entry.title}」`).join('\n');
       const recommendationSummary = plan.recommendations.length
         ? `\n\n推荐内容（不会被静默忽略）：\n${plan.recommendations.map(rec => `${rec.optional ? '可选' : '必需'} · ${rec.type || '内容'} · ${rec.id}${rec.reason ? `：${rec.reason}` : ''}`).join('\n')}`
         : '';
@@ -103,23 +101,14 @@ export default function WorkshopSettingsTab() {
         payloads.push({ entry, data: result.data });
       }
 
-      const hasGameplayModule = payloads.some(({ entry }) => entry.type === 'gameplay_module');
       const worldPayload = payloads.find(({ entry }) => entry.type === 'world_package');
       const worldData = worldPayload?.data as Partial<WorldDef> | undefined;
       const packageWorldId = worldPayload
         ? (typeof worldData?.id === 'string' && worldData.id.trim() ? worldData.id : `workshop_${worldPayload.entry.id}`)
         : undefined;
-      // A world package is the explicit owner of any gameplay module in its
-      // install plan. Standalone modules require a player-selected world.
-      const bindWorldId = packageWorldId || (hasGameplayModule ? installWorldId : undefined);
-      if (hasGameplayModule && !bindWorldId) {
-        await showAlert('安装玩法模块前，请先选择要绑定的世界。模块不会自动绑定到所有世界。', { title: '需要选择目标世界' });
-        return;
-      }
-      if (hasGameplayModule && !packageWorldId && !availableWorlds.some(world => world.id === bindWorldId)) {
-        await showAlert('所选绑定世界不存在，请刷新后重新选择。', { title: '目标世界无效' });
-        return;
-      }
+      // A world package owns modules that arrive in the same install plan.
+      // Standalone modules remain unbound until the player enables them from the module workspace.
+      const bindWorldId = packageWorldId;
 
       const operations: WorkshopInstallOperation[] = [];
       try {
@@ -208,11 +197,11 @@ export default function WorkshopSettingsTab() {
   const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString('zh-CN');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
+    <div className="registry-settings-page registry-workshop-page" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
       {DialogUI}
 
       {/* 标题 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="registry-settings-title-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600' }}>创意工坊</h3>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           {isAuthenticated && (
@@ -230,7 +219,7 @@ export default function WorkshopSettingsTab() {
             </button>
           )}
           <button
-            onClick={() => fetchItems({ type: typeFilter || undefined, sort })}
+            onClick={() => fetchItems({ type: typeFilter || undefined, sort: 'latest' })}
             disabled={isLoading}
             style={{
               display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
@@ -252,7 +241,7 @@ export default function WorkshopSettingsTab() {
           borderRadius: 'var(--radius-lg)', border: '1px solid var(--accent)',
           display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
         }}>
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div className="registry-workshop-upload-grid" style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                 标题 *
@@ -272,7 +261,7 @@ export default function WorkshopSettingsTab() {
               <select
                 className="input-field"
                 value={uploadForm.type}
-                onChange={e => setUploadForm(f => ({ ...f, type: e.target.value }))}
+                onChange={e => setUploadForm(f => ({ ...f, type: e.target.value as PublicWorkshopType }))}
                 style={{ width: '100%', padding: '8px 10px' }}
               >
                 {PUBLISHABLE_TYPES.map(type => <option key={type} value={type}>{TYPE_LABELS[type].label}</option>)}
@@ -307,7 +296,7 @@ export default function WorkshopSettingsTab() {
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <div className="registry-workshop-upload-grid" style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                 标签（逗号分隔）
@@ -351,17 +340,8 @@ export default function WorkshopSettingsTab() {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)' }}>
-        <Puzzle size={14} color="var(--accent)" />
-        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>玩法模块绑定世界</span>
-        <select aria-label="玩法模块绑定世界" value={installWorldId} onChange={event => setInstallWorldId(event.target.value)} disabled={availableWorlds.length === 0} style={{ minWidth: 180, padding: '6px 8px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-          {availableWorlds.length === 0 ? <option value="">暂无可绑定世界</option> : availableWorlds.map(world => <option key={world.id} value={world.id}>{world.name}</option>)}
-        </select>
-        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>仅绑定此世界</span>
-      </div>
-
       {/* 类型筛选 */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <div className="registry-type-tabs registry-workshop-type-tabs" style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <button
           onClick={() => setTypeFilter('')}
           style={{
@@ -374,7 +354,7 @@ export default function WorkshopSettingsTab() {
         >
           全部
         </button>
-        {Object.entries(TYPE_LABELS).map(([type, { label }]) => (
+        {PUBLIC_WORKSHOP_TYPES.map(type => (
           <button
             key={type}
             onClick={() => setTypeFilter(type)}
@@ -386,30 +366,9 @@ export default function WorkshopSettingsTab() {
               cursor: 'pointer', fontSize: 'var(--font-size-sm)',
             }}
           >
-            {label}
+            {TYPE_LABELS[type].label}
           </button>
         ))}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>排序</span>
-        {([
-          ['latest', '最新'], ['popular', '热门'], ['featured', '精选'],
-        ] as const).map(([value, label]) => (
-          <button key={value} onClick={() => setSort(value)} style={{
-            padding: '4px 9px', background: sort === value ? 'var(--accent-dim)' : 'var(--bg-tertiary)',
-            color: sort === value ? 'var(--accent)' : 'var(--text-secondary)', border: 'none',
-            borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-size-xs)',
-          }}>{label}</button>
-        ))}
-        <select aria-label="按分类筛选" value={category} onChange={event => setCategory(event.target.value)} style={{ padding: '6px 10px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-          <option value="">全部分类</option>
-          <option value="world">世界</option>
-          <option value="character">角色</option>
-          <option value="gameplay">玩法</option>
-          <option value="story">剧情</option>
-          <option value="visual">视觉</option>
-        </select>
       </div>
 
       {/* 错误提示 */}
@@ -423,7 +382,7 @@ export default function WorkshopSettingsTab() {
       )}
 
       {/* 条目列表 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div className="registry-asset-list" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {items.length === 0 && !isLoading && (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -437,7 +396,7 @@ export default function WorkshopSettingsTab() {
         )}
 
         {items.map(item => {
-          const typeInfo = TYPE_LABELS[item.type] || { label: item.type, icon: Store };
+          const typeInfo = getTypeInfo(item.type);
           const TypeIcon = typeInfo.icon;
           return (
             <div
@@ -487,12 +446,11 @@ export default function WorkshopSettingsTab() {
                 </div>
               )}
 
-              {(item.dependencies?.length || item.minAppVersion || item.category || item.featured) ? (
+              {(item.dependencies?.length || item.minAppVersion || item.category) ? (
                 <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
                   {item.category && <span>分类：{item.category}</span>}
                   {item.minAppVersion && <span>最低版本：{item.minAppVersion}</span>}
                   {item.dependencies && item.dependencies.length > 0 && <span>依赖：{item.dependencies.map(dep => dep.id).join('、')}</span>}
-                  {item.featured && <span style={{ color: 'var(--accent)' }}>精选</span>}
                 </div>
               ) : null}
 
@@ -504,7 +462,7 @@ export default function WorkshopSettingsTab() {
                 <span>{formatTime(item.createdAt)}</span>
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <div className="registry-card-actions" style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <button
                   onClick={() => void openDetail(item)}
                   disabled={isLoading}
@@ -561,7 +519,7 @@ export default function WorkshopSettingsTab() {
         <div role="dialog" aria-modal="true" aria-label={`${detail.title}详情`} style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', padding: 'var(--space-5)', background: 'rgba(0,0,0,.58)' }} onClick={() => setDetail(null)}>
           <section onClick={event => event.stopPropagation()} style={{ width: 'min(760px, 100%)', maxHeight: 'min(760px, 90vh)', overflow: 'auto', padding: 'var(--space-5)', background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div><div style={{ color: 'var(--accent)', fontSize: 'var(--font-size-xs)' }}>{TYPE_LABELS[detail.type]?.label || detail.type}</div><h2 style={{ margin: '4px 0' }}>{detail.title}</h2><div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>作者 {detail.ownerId} · v{detail.version} · {detail.minAppVersion ? `最低版本 ${detail.minAppVersion}` : '无最低版本限制'}</div></div>
+              <div><div style={{ color: 'var(--accent)', fontSize: 'var(--font-size-xs)' }}>{getTypeInfo(detail.type).label}</div><h2 style={{ margin: '4px 0' }}>{detail.title}</h2><div style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>作者 {detail.ownerId} · v{detail.version} · {detail.minAppVersion ? `最低版本 ${detail.minAppVersion}` : '无最低版本限制'}</div></div>
               <button type="button" aria-label="关闭详情" onClick={() => setDetail(null)} style={{ border: 0, background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             {detail.screenshots?.length ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8, margin: 'var(--space-4) 0' }}>{detail.screenshots.slice(0, 6).map((src, index) => <img key={`${src}-${index}`} src={src} alt={`${detail.title}截图${index + 1}`} loading="lazy" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }} />)}</div> : null}
@@ -573,7 +531,7 @@ export default function WorkshopSettingsTab() {
               {detailPlan?.errors.map(error => <span key={`${error.code}-${error.id}`} style={{ color: 'var(--danger)', fontSize: 'var(--font-size-sm)' }}>{error.code === 'CYCLE' ? `循环依赖：${error.path.join(' → ')}` : error.code === 'MISSING' ? `缺少依赖：${error.id}` : `版本不兼容：${error.id}`}</span>)}
               {detailPlan?.recommendations.map(recommendation => <span key={`recommend-${recommendation.id}`} style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>推荐：{recommendation.id}{recommendation.reason ? ` · ${recommendation.reason}` : ''}</span>)}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 'var(--space-4)' }}><button type="button" onClick={() => setDetail(null)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', borderRadius: 'var(--radius-md)' }}><ArrowLeft size={14} />返回列表</button><button type="button" onClick={() => { setDetail(null); void handleDownload(detail); }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', border: 0, background: 'var(--accent)', color: 'var(--color-on-accent, #fff)', borderRadius: 'var(--radius-md)' }}><Download size={14} />按计划安装</button></div>
+            <div className="registry-detail-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 'var(--space-4)' }}><button type="button" onClick={() => setDetail(null)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', borderRadius: 'var(--radius-md)' }}><ArrowLeft size={14} />返回列表</button><button type="button" onClick={() => { setDetail(null); void handleDownload(detail); }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', border: 0, background: 'var(--accent)', color: 'var(--color-on-accent, #fff)', borderRadius: 'var(--radius-md)' }}><Download size={14} />按计划安装</button></div>
           </section>
         </div>
       )}

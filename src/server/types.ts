@@ -3,6 +3,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import type { WorkshopAssetType } from '../workshopCatalog';
 
 export interface Bindings {
   /** D1 数据库（users / save_slots / workshop_items / sessions / email_codes）。 */
@@ -24,9 +25,7 @@ export interface Bindings {
   TRIAL_ID_SECRET?: string;
 }
 
-export type WorkshopItemType =
-  | 'world_package' | 'character_preset' | 'npc_template' | 'history_preset'
-  | 'gameplay_module' | 'event_pack' | 'workflow_pack' | 'adventure_pack' | 'visual_theme';
+export type WorkshopItemType = WorkshopAssetType;
 
 export interface WorkshopDependency {
   id: string;

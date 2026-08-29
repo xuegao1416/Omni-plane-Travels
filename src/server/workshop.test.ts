@@ -19,7 +19,6 @@ describe('workshop v2 metadata', () => {
     const valid: Record<string, unknown> = {
       world_package: { id: 'world-a', name: 'World A', description: 'A world', modules: [] },
       npc_template: { id: 'npc-template', name: 'NPC', npc: { name: 'NPC', gender: 'unknown' } },
-      history_preset: { id: 'history', name: 'History', segments: { prologue: '开始' }, includeAgeStages: true },
       gameplay_module: { kind: 'custom-gameplay-module', schemaVersion: 1, id: 'mod', name: 'M', version: '1.0.0', author: 'a', scope: 'world', state: {}, logic: { onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [] }, permissions: { read: [], write: 'own-state-only' } },
       event_pack: { manifest: { id: 'events', name: 'Events', version: '1.0.0', type: 'rule' }, rules: [] },
       workflow_pack: { id: 'flow', name: 'Flow', version: 1, nodes: [], connections: [] },
@@ -31,6 +30,8 @@ describe('workshop v2 metadata', () => {
       expect(validateWorkshopContent(type as never, data).ok).toBe(true);
       expect(validateWorkshopContent(type as never, {}).ok).toBe(false);
     }
+    expect(validateWorkshopContent('character_preset', { id: 'player' }).ok).toBe(false);
+    expect(validateWorkshopContent('history_preset', { id: 'history', name: 'History', segments: { prologue: '开始' } }).ok).toBe(false);
   });
   test('maps the public content type and discovery metadata', () => {
     const item = toPublic(row());

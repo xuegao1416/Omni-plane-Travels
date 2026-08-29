@@ -111,11 +111,11 @@ export default function CloudSaveSettingsTab() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+    <div className="registry-settings-page registry-cloud-page" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
       {DialogUI}
 
       {/* 标题 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="registry-settings-title-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600' }}>云存档管理</h3>
         <button
           onClick={fetchSlots}
@@ -221,7 +221,7 @@ export default function CloudSaveSettingsTab() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="registry-card-actions registry-cloud-card-actions" style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => handleUpload(slotIndex)}
                   disabled={isLoading}

@@ -7,7 +7,7 @@ import type { PipelineStatus as PipelineStatusType, PipelineStageResult, Pipelin
 import { STAGE_LABELS } from '../../../engine/pipelineTypes';
 import { STAGE_META, STAGE_ORDER, STATUS_CONFIG, formatMs } from './pipelineUI';
 import { RETRYABLE_STAGES } from '../../../engine/pipelineExecutor';
-import { X, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, RefreshCw, Copy } from 'lucide-react';
 
 interface Props {
   status: PipelineStatusType | null;
@@ -17,7 +17,18 @@ interface Props {
 }
 
 export default function PipelineMonitorModal({ status, onClose, onRetrySingleStage, isGenerating }: Props) {
-  const [expanded, setExpanded] = useState(true);
+  const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const toggleError = (id: string) => setExpandedErrors((prev) => ({ ...prev, [id]: !prev[id] }));
+  const copyError = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+    } catch {
+      /* 复制失败静默处理 */
+    }
+  };
 
   if (!status) return null;
 
@@ -119,45 +130,59 @@ export default function PipelineMonitorModal({ status, onClose, onRetrySingleSta
                   : stage.status === 'error' ? '#f44336'
                   : 'var(--border)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                  <span style={{ display: 'flex', color: meta.color }}><meta.icon size={14} /></span>
-                  <div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {STAGE_LABELS[id]}
-                    </div>
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>
-                      {meta.desc}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'flex', color: meta.color }}><meta.icon size={14} /></span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {STAGE_LABELS[id]}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>
+                        {meta.desc}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right' }}>
-                  <div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: statusCfg.color }}>
-                      {statusCfg.label}
-                      {stage.status === 'success' && elapsed != null ? ` · ${formatMs(elapsed)}` : ''}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right', flexShrink: 0 }}>
+                    <div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: statusCfg.color }}>
+                        {statusCfg.label}
+                        {stage.status === 'success' && elapsed != null ? ` · ${formatMs(elapsed)}` : ''}
+                      </div>
+                      {stage.dataLength != null && (
+                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                          {stage.dataLength} 字
+                        </div>
+                      )}
                     </div>
-                    {stage.status === 'error' && stage.error && (
-                      <div style={{ fontSize: 'var(--font-size-xs)', color: '#f44336', marginTop: '2px', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {stage.error}
-                      </div>
-                    )}
-                    {stage.dataLength != null && (
-                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-                        {stage.dataLength} 字
-                      </div>
+                    {allDone && (stage.status === 'success' || stage.status === 'error') && RETRYABLE_STAGES.has(id) && onRetrySingleStage && (
+                      <button
+                        onClick={() => { onRetrySingleStage(id); }}
+                        disabled={isGenerating}
+                        title="重试此步骤"
+                        style={styles.retrySmallBtn}
+                      >
+                        <RefreshCw size={11} />
+                      </button>
                     )}
                   </div>
-                  {allDone && (stage.status === 'success' || stage.status === 'error') && RETRYABLE_STAGES.has(id) && onRetrySingleStage && (
-                    <button
-                      onClick={() => { onRetrySingleStage(id); }}
-                      disabled={isGenerating}
-                      title="重试此步骤"
-                      style={styles.retrySmallBtn}
-                    >
-                      <RefreshCw size={11} />
-                    </button>
-                  )}
                 </div>
+                {stage.status === 'error' && stage.error && (
+                  <div style={styles.errorBlock}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button type="button" onClick={() => toggleError(id)} style={styles.errorActionBtn}>
+                        {expandedErrors[id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        <span>{expandedErrors[id] ? '收起' : '查看详情'}</span>
+                      </button>
+                      <button type="button" onClick={() => copyError(id, stage.error!)} style={styles.errorActionBtn}>
+                        <Copy size={12} />
+                        <span>{copiedId === id ? '已复制' : '复制'}</span>
+                      </button>
+                    </div>
+                    {expandedErrors[id] && (
+                      <pre style={styles.errorDetail}>{stage.error}</pre>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -215,10 +240,28 @@ const styles: Record<string, React.CSSProperties> = {
     maxHeight: '440px', overflow: 'auto',
   },
   detailRow: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'flex', flexDirection: 'column', alignItems: 'stretch',
     padding: '10px 14px', borderRadius: 'var(--radius-md)',
     background: 'var(--bg-primary)',
     borderLeft: '3px solid',
+  },
+  errorBlock: {
+    marginTop: '8px',
+  },
+  errorActionBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '3px',
+    padding: '3px 8px', borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--border)', background: 'transparent',
+    color: 'var(--text-muted)', cursor: 'pointer',
+    fontSize: 'var(--font-size-xs)',
+  },
+  errorDetail: {
+    margin: '6px 0 0', padding: '8px 10px',
+    background: 'rgba(244,67,54,0.08)', color: '#f44336',
+    borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--font-size-xs)', lineHeight: 1.5,
+    whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere',
+    maxHeight: '200px', overflow: 'auto', textAlign: 'left',
   },
   footer: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
