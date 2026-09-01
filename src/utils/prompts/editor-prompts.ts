@@ -6,6 +6,7 @@
 import type { StatModuleSchema, ProgressionModuleSchema, SurvivalModuleSchema, BusinessModuleSchema, DiceModuleSchema, TalentModuleSchema, CombatModuleSchema, ProfessionModuleSchema, WorldSystemData } from '../../modules/schema';
 import { extractWorldSystemData } from '../../modules/runtime';
 import { getXpForNextTier } from '../../modules/xpAlgorithm';
+import { materializeNpcSurvivalStats } from '../npcStats';
 
 // 角色补全选项
 export interface CharacterFillOptions {
@@ -257,7 +258,7 @@ export function buildNpcFillPrompt(options: {
   statModule?: CharacterFillOptions['statModule'];
   hasProgression?: boolean;
 }): string {
-  const { worldSetting, playerName, playerGender, playerAge, playerBackground, npc, hasProgression } = options;
+  const { worldSetting, playerName, playerGender, playerAge, playerBackground, npc, statModule, hasProgression } = options;
 
   // 构建NPC已填信息列表
   const npcInfo: string[] = [];
@@ -332,6 +333,17 @@ ${npcInfo.length > 0 ? npcInfo.join('\n') : '- （暂无）'}
   "background": "NPC背景故事（2-3句话）",
   "skillsList": {"技能名": {"描述": "技能描述", "类型": "战斗/生活/社交/特殊", "品质": "普通/精良/稀有/史诗/传说"}},
   "itemsList": {"物品名": {"数量": 1, "类型": "物品类型", "品质": "普通/精良/稀有/史诗/传说", "备注": "备注"}}
+  ${statModule ? `,
+  "survivalStats": {
+    "血量": <${statModule.attrA.name}初始值，0~${statModule.attrA.max}>,
+    "体力值": <${statModule.attrB.name}初始值，0~${statModule.attrB.max}>,
+    "dim1": <${statModule.dim1.name}初始值，范围 ${JSON.stringify(statModule.dim1.range)}>,
+    "dim2": <${statModule.dim2.name}初始值，范围 ${JSON.stringify(statModule.dim2.range)}>,
+    "dim3": <${statModule.dim3.name}初始值，范围 ${JSON.stringify(statModule.dim3.range)}>,
+    "dim4": <${statModule.dim4.name}初始值，范围 ${JSON.stringify(statModule.dim4.range)}>,
+    "dim5": <${statModule.dim5.name}初始值，范围 ${JSON.stringify(statModule.dim5.range)}>,
+    "dim6": <${statModule.dim6.name}初始值，范围 ${JSON.stringify(statModule.dim6.range)}>
+  }` : ''}
   ${hasProgression ? `,
   "tierIndex": <NPC的段位/等级索引，根据实力设定，0=最低段位/等级>` : ''}
 }`;
@@ -462,6 +474,9 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
       (progressionConfig as any).levelData
     )
   );
+  const npcStatExample = statModule
+    ? JSON.stringify(materializeNpcSurvivalStats(undefined, statModule))
+    : '';
 
   return `你是一个后台变量裁定系统，负责分析玩家消息和AI回复，提取需要更新的变量。
 你的任务是识别剧情中的关键变化，更新游戏状态，但不续写剧情。
@@ -513,6 +528,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
 
 【创建新NPC - 必须包含以下全部字段】
 创建时使用 set effect，路径为 人物档案.角色名，value 为完整 NPC 对象。value 必须包含姓名、种族、性别、年龄、人物分类、社会身份、关系数据、个人信息、人物事迹、当前行动、短期目标和长期目标；启用数值/成长模块时再填入对应模块字段。
+${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 生存状态；字段路径为 人物档案.角色名.生存状态。按角色特点在世界范围内填写，结构示例：${npcStatExample}` : ''}
 
 【更新已有NPC - ★ 每轮必须输出，不可省略 ★】
 场景中出现的每个NPC都必须更新，即使只是旁观或沉默。
@@ -739,7 +755,7 @@ ${generateModuleUpdateRules(worldSystem, progressionConfig)}
 6. ★ 禁止混淆角色口吻 ★：每个NPC的当前想法必须是该角色独有的视角、语气和对主角的称呼。角色A的想法里不能出现角色B的称呼方式或视角
 
 【示例输出】（注意：创建新NPC时才设置初始好感度，更新已有NPC时仅在发生关系事件后才更新好感度）
-<UpdateVariable>{"id":"npc-arrival-1","source":"ai","label":"记录神秘老者登场","effects":[{"set":{"path":"人物档案.神秘老者","value":{"姓名":"神秘老者","种族":"人类","性别":"男","年龄":80,"人物分类":"在场","社会身份":{"职业":"智者"},"关系数据":{"好感度":0,"关系类型":"初次见面"},"个人信息":{"外貌":"白发苍苍的老者，银丝般的胡须垂至胸前","表性格":"温和、睿智","当前想法":"终于等到了预言中的勇者，不知他是否真能拯救这片大陆……","当前状态":"微笑着注视着你","当前穿着":"深蓝色长袍，上面绣着银色星辰图案"},"当前行动":"向勇者走来","人物事迹":["在城门口与玩家初次相遇"]}}}]}</UpdateVariable>
+<UpdateVariable>{"id":"npc-arrival-1","source":"ai","label":"记录神秘老者登场","effects":[{"set":{"path":"人物档案.神秘老者","value":{"姓名":"神秘老者","种族":"人类","性别":"男","年龄":80,"人物分类":"在场","社会身份":{"职业":"智者"},"关系数据":{"好感度":0,"关系类型":"初次见面"}${npcStatExample ? `,"生存状态":${npcStatExample}` : ''},"个人信息":{"外貌":"白发苍苍的老者，银丝般的胡须垂至胸前","表性格":"温和、睿智","当前想法":"终于等到了预言中的勇者，不知他是否真能拯救这片大陆……","当前状态":"微笑着注视着你","当前穿着":"深蓝色长袍，上面绣着银色星辰图案"},"当前行动":"向勇者走来","人物事迹":["在城门口与玩家初次相遇"]}}}]}</UpdateVariable>
 【最终输出门禁】
 再次确认：输出只能是上面的 GameplayTransaction。不要输出旧的“设置/世界/玩家/人物档案”对象、RFC 6902 数组、chronicleOperations 或任何裸字段合并。即使上方规则用旧字段展示业务语义，也必须把它们翻译成 effects 中的点号路径后再输出。`;
 }

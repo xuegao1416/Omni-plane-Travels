@@ -89,6 +89,8 @@ export interface GameplayLogEntry {
   revertedBy?: string;
   changes: GameplayChange[];
   eventIds: string[];
+  /** bestEffort 模式下被跳过或修正的 effect/cost 警告。 */
+  warnings?: string[];
 }
 
 export interface ScheduledGameplayEvent {
@@ -146,6 +148,11 @@ export interface GameplayExecutionContext {
   events?: readonly GameplayEventInput[];
   /** Explicit calendar rules for gameplay clock writes. */
   worldClockConfig?: import('../time/worldClock').WorldClockConfig;
+  /**
+   * 当为 true 时，事务中的单个 effect/cost 失败不会导致整个事务失败，
+   * 而是记录为警告并继续应用剩余内容。用于 AI 变量更新等模糊来源。
+   */
+  bestEffort?: boolean;
 }
 
 export interface GameplayExecutionResult<TState extends GameplayStateRoot = GameplayStateRoot> {

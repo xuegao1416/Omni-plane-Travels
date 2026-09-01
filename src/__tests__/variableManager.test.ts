@@ -156,6 +156,32 @@ describe('VariableManager module partitions', () => {
 });
 
 describe('VariableManager.applyUpdateVariable atomicity', () => {
+  it('limits AI writes to real GameState roots without breaking the legacy compatibility entry', () => {
+    const vm = freshVM();
+
+    expect(vm.applyAiUpdateVariable(JSON.stringify({ 玩家: { 当前目标: '寻找药材' } }))).toBe(true);
+    expect(vm.getState().玩家.当前目标).toBe('寻找药材');
+
+    expect(vm.applyAiUpdateVariable(JSON.stringify({ before: { 玩家: { 当前目标: '旧值' } }, after: {} }))).toBe(false);
+    expect((vm.getState() as any).before).toBeUndefined();
+    expect((vm.getState() as any).after).toBeUndefined();
+
+    expect(vm.applyAiUpdateVariable(JSON.stringify({
+      id: 'bad-root', source: 'ai', effects: [{ set: { path: 'gameplay.logs', value: [] } }],
+    }))).toBe(false);
+    expect(vm.applyAiUpdateVariable(JSON.stringify({
+      id: 'nested-audit', source: 'ai', effects: [{ set: { path: '玩家.before', value: '旧值' } }],
+    }))).toBe(false);
+    expect(vm.applyAiUpdateVariable(JSON.stringify({ 玩家: { after: { 当前目标: '新值' } } }))).toBe(false);
+    expect(vm.applyAiUpdateVariable(JSON.stringify({
+      id: 'allowed-schedule', source: 'ai',
+      effects: [{ schedule: { after: 1, event: { type: 'narrative.follow-up' } } }],
+    }))).toBe(true);
+
+    expect(vm.applyUpdateVariable(JSON.stringify({ legacyEnvelope: { kept: true } }))).toBe(true);
+    expect((vm.getState() as any).legacyEnvelope).toEqual({ kept: true });
+  });
+
   it('applies gameplay transactions through the shared kernel log', () => {
     const vm = freshVM();
     const state = vm.getState();
@@ -181,23 +207,31 @@ describe('VariableManager.applyUpdateVariable atomicity', () => {
     });
   });
 
-  it('does not commit an AI transaction when a later effect fails', () => {
+  it('applies AI transaction in best-effort mode and skips invalid effects', () => {
     const vm = freshVM();
     const state = vm.getState();
     state.玩家.经营资产 = { 资金: 20, 资产列表: [], 交易日志: [] };
+    state.玩家.当前经验值 = 0;
     vm.setState(state);
 
     const applied = vm.applyUpdateVariable(JSON.stringify({
-      id: 'ai-broken', source: 'ai',
+      id: 'ai-partial', source: 'ai',
       costs: [{ path: '玩家.经营资产.资金', amount: 3 }],
-      effects: [{ add: { path: '不存在的数值路径', delta: 1 } }],
+      effects: [
+        { add: { path: '玩家.当前经验值', delta: 5 } },
+        { add: { path: '玩家.经营资产', delta: 1 } }, // 无效：目标是对象而非数值
+      ],
     }));
 
-    expect(applied).toBe(false);
-    expect(vm.getState().玩家.经营资产?.资金).toBe(20);
-    expect(vm.getState().gameplay?.logs.at(-1)).toMatchObject({
-      transactionId: 'ai-broken', status: 'failed',
+    expect(applied).toBe(true);
+    // bestEffort 下消耗仍会扣除，有效 effect 仍会应用
+    expect(vm.getState().玩家.经营资产?.资金).toBe(17);
+    expect(vm.getState().玩家.当前经验值).toBe(5);
+    const lastLog = vm.getState().gameplay?.logs.at(-1);
+    expect(lastLog).toMatchObject({
+      transactionId: 'ai-partial', status: 'applied',
     });
+    expect(lastLog?.warnings.some((w: string) => w.includes('数值路径无效'))).toBe(true);
   });
 
   it('prevents cross-round poisoning and repairs the same damage in old saves', () => {
@@ -313,5 +347,34 @@ describe('VariableManager manual time editing', () => {
     expect(vm.setStateFromJSON(json)).toBe(true);
     expect(vm.getState().世界.时间系统.时钟?.elapsedMinutes).toBe(124);
     expect(vm.getState().世界.时间系统.当前时间).toContain('2026年·八月·第1日 17:04');
+  });
+});
+
+
+describe('VariableManager.removeNpc — NPC 删除', () => {
+  it('删除存在的 NPC 后再次调用返回 false，且不抛错', () => {
+    const state = createDefaultGameState();
+    state.人物档案 = {
+      路人甲: { 姓名: '路人甲', 关系数据: { 好感度: 0, 关系类型: '路人' } } as any,
+      店小二: { 姓名: '店小二', 关系数据: { 好感度: 5, 关系类型: '熟识' } } as any,
+    };
+    const vm = new VariableManager(state);
+
+    expect(vm.removeNpc('路人甲')).toBe(true);
+    expect(vm.getState().人物档案).not.toHaveProperty('路人甲');
+    expect(vm.getState().人物档案).toHaveProperty('店小二');
+
+    // 二次删除已不存在的 NPC：返回 false 且不抛错
+    expect(vm.removeNpc('路人甲')).toBe(false);
+    expect(vm.getState().人物档案).toHaveProperty('店小二');
+  });
+
+  it('空 id 与空档案的场景下安全短路', () => {
+    const state = createDefaultGameState();
+    const vm = new VariableManager(state);
+
+    expect(vm.removeNpc('')).toBe(false);
+    expect(vm.removeNpc('随便一个')).toBe(false);
+    expect(vm.getState().人物档案).toEqual({});
   });
 });

@@ -58,6 +58,7 @@ import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBr
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 import { useMemoryStore } from '../../memory/memoryStore';
 import { usePortraitStore } from '../../stores/portraitStore';
+import { imageDb } from '../../storage/imageDb';
 import { getEngineState } from '../../simulation/SimulationApi';
 import { normalizeCombatEncounterRequest, type CombatCommandInputV2, type CombatEncounterRequest } from '../../gameplay/protocols';
 import { applyNarrativeDecision, createNarrativeDecisionRecord, type NarrativeDecisionRecord } from '../../gameplay/narrativeDecision';
@@ -949,6 +950,35 @@ export default function GameScreen() {
     if (ok) bumpVersion();
     return ok;
   }, [engine, apiConfig, bumpVersion]);
+  const handleDeleteNpc = useCallback((npcId: string) => {
+    if (engine.isReadOnly) return false;
+    if (!npcId) return false;
+    const s = engine.variableManager.getState();
+    const npc = s.人物档案?.[npcId];
+    if (!npc) {
+      setNotification(t('npc.delete.fail'));
+      return false;
+    }
+    const npcName = (npc as any).姓名 || npcId;
+    const removed = engine.variableManager.removeNpc(npcId);
+    if (!removed) {
+      setNotification(t('npc.delete.fail'));
+      return false;
+    }
+    // 清理头像 blob（PortraitHeader 写入的稳定 key 是 portrait-）；
+    // 同时清理 npc 自身记录里可能另存的 portraitBlobKey。
+    const portraitKey = 'portrait-' + npcId;
+    imageDb.deleteBlob(portraitKey).catch(() => { /* 没有头像时静默 */ });
+    const ext = npc as any;
+    if (ext.portraitBlobKey && ext.portraitBlobKey !== portraitKey) {
+      imageDb.deleteBlob(ext.portraitBlobKey).catch(() => { /* 同上 */ });
+    }
+    usePortraitStore.getState().clearPortrait(npcId);
+    bumpVersion();
+    useSaveStore.getState().scheduleAutoSave();
+    setNotification(t('npc.delete.success').replace('{name}', npcName));
+    return true;
+  }, [engine, bumpVersion, t]);
   // ── Simulation rules change handler ──
   const handleSimulationRulesChange = useCallback((rules: WorldDynamicsConfig) => {
     if (!worldDef || engine.isReadOnly) return;
@@ -980,7 +1010,7 @@ export default function GameScreen() {
     const content = (() => {
       switch (panel) {
         case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} />;
-        case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
+        case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} onDeleteNpc={readOnly ? undefined : handleDeleteNpc} />;
         case 'tasks': return <TaskPanel gameState={gameState} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} />;
         case 'profession': return <ProfessionTreePanel config={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} gameState={gameState} currentTick={gameState.simulationRuntime?.tick ?? 0} onUnlock={id => applyProfessionAction('unlock', id)} onUse={id => applyProfessionAction('use', id)} />;
         case 'notebook': return <NotebookPanel gameState={gameState} />;

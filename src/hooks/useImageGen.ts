@@ -80,7 +80,15 @@ export function useImageGen() {
   const generateAndSave = useCallback(
     async (
       prompt: string,
-      options: { category?: ImageCategory; characterName?: string; negativePrompt?: string } = {},
+      options: {
+        category?: ImageCategory;
+        characterName?: string;
+        negativePrompt?: string;
+        /** Persist this image even when it belongs to inline story content. */
+        persist?: boolean;
+        /** Stable blob key used to restore an inline image after its message remounts. */
+        storageKey?: string;
+      } = {},
       onStatusChange?: (status: string) => void,
     ) => {
       return enqueueTask(async () => {
@@ -109,20 +117,21 @@ export function useImageGen() {
         try {
           const result = await generateConfiguredImage(prompt, effectiveConfig);
 
-          const isPersistent = taskRecord.category !== 'story'; // 角色画像持久化，正文图不存
+          const isPersistent = taskRecord.category !== 'story' || options.persist === true || Boolean(options.storageKey);
+          const imageBlobKey = isPersistent ? (options.storageKey || taskId) : null;
 
-          // 仅持久化分类（角色画像）保存到 IndexedDB
-          if (isPersistent) {
-            await imageDb.saveBlob(taskId, result.blob, 'image/png', options.characterName);
+          if (imageBlobKey) {
+            await imageDb.saveBlob(imageBlobKey, result.blob, 'image/png', options.characterName);
           }
 
-          // 正文图用 blob URL（刷新后失效，不占存储）
+          // Non-persistent previews use a temporary URL; persisted inline
+          // images and portraits are resolved through getStoredImageUrl.
           const blobUrl = isPersistent ? '' : URL.createObjectURL(result.blob);
 
           // 更新任务记录
           updateTask(taskId, {
             status: 'completed',
-            imageBlobKey: isPersistent ? taskId : null,
+            imageBlobKey,
             imageUrl: blobUrl,
             updatedAt: Date.now(),
             prompt: result.prompt || taskRecord.prompt,
@@ -138,7 +147,7 @@ export function useImageGen() {
             },
           });
 
-          return { ...taskRecord, status: 'completed' as const, imageBlobKey: isPersistent ? taskId : null, imageUrl: blobUrl };
+          return { ...taskRecord, status: 'completed' as const, imageBlobKey, imageUrl: blobUrl };
         } catch (e) {
           updateTask(taskId, {
             status: 'failed',
@@ -152,12 +161,10 @@ export function useImageGen() {
     [config, addTask, updateTask],
   );
 
-  // 获取图片 URL
-  const getImageUrl = useCallback(async (task: ImageTask): Promise<string> => {
-    const cacheKey = `blob:${task.imageBlobKey || task.id}`;
+  const getStoredImageUrl = useCallback(async (blobKey: string): Promise<string> => {
+    const cacheKey = `blob:${blobKey}`;
     if (imageUrlCache.has(cacheKey)) return imageUrlCache.get(cacheKey)!;
 
-    const blobKey = task.imageBlobKey || task.id;
     if (blobKey) {
       const blobData = await imageDb.getBlob(blobKey);
       if (blobData && blobData.blob) {
@@ -168,8 +175,17 @@ export function useImageGen() {
       }
     }
 
-    return task.imageUrl || '';
+    return '';
   }, []);
+
+  // 获取图片 URL
+  const getImageUrl = useCallback(async (task: ImageTask): Promise<string> => {
+    const blobKey = task.imageBlobKey || task.id;
+    const storedUrl = await getStoredImageUrl(blobKey);
+    if (storedUrl) return storedUrl;
+
+    return task.imageUrl || '';
+  }, [getStoredImageUrl]);
 
   // 删除任务
   const deleteImageTask = useCallback(
@@ -221,6 +237,7 @@ export function useImageGen() {
     comfyData,
     generateAndSave,
     getImageUrl,
+    getStoredImageUrl,
     deleteImageTask,
     validateConfig,
     loadComfyUIData,

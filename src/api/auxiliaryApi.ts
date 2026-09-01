@@ -1,7 +1,7 @@
 // 变量提取 API 客户端 - 从 AI 回复中提取变量更新
 
 import type { ApiConfig } from './types';
-import { buildEndpoint, prepareFetchRequest } from './client';
+import { buildEndpoint, prepareFetchRequest, getRequestTimeoutMs } from './client';
 import { nativeFetch } from '../utils/nativeFetch';
 
 /**
@@ -71,12 +71,39 @@ export async function callAuxiliaryApi(
   };
 
   const { url: fetchUrl, headers } = prepareFetchRequest(url, apiKey);
-  const resp = await nativeFetch(fetchUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  });
+
+  // 变量提取也必须有独立超时，否则挂死的端点会拖到浏览器断连才报 NetworkError
+  const timeoutMs = getRequestTimeoutMs(config);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    if (!controller.signal.aborted) {
+      console.warn(`[变量提取] 请求超过 ${Math.round(timeoutMs / 1000)}s，强制中止`);
+      controller.abort(new DOMException('Variable extraction timeout', 'TimeoutError'));
+    }
+  }, timeoutMs);
+
+  const onExternalAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+
+  let resp: Response;
+  try {
+    resp = await nativeFetch(fetchUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[变量提取] 请求失败（模型：${model}，端点：${fetchUrl}）：${msg}`);
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    if (signal) signal.removeEventListener('abort', onExternalAbort);
+  }
 
   if (!resp.ok) {
     throw new Error(`辅助 API 请求失败: ${resp.status}`);

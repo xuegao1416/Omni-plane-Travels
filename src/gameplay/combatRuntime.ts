@@ -131,7 +131,9 @@ export function startV3Combat(stateInput: GameState, selectedIds: string[]): V3C
 }
 
 export function applyV3CombatCommand(stateInput: GameState, input: CombatCommandInputV2): V3CombatRuntimeResult {
-  const state = clone(stateInput);
+  // resolveCombatCommandV2 already clones the session. Avoid cloning the full
+  // save and its embedded pre-combat checkpoint before resolving every action.
+  const state = stateInput;
   const session = state.v3?.combatSession;
   if (!session || session.lifecycle !== 'active') return { ok: false, state, errors: ['当前没有可操作的 v3 战斗'] };
   const resolution = resolveCombatCommandV2(session, input);

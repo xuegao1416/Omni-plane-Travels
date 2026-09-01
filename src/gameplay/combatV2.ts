@@ -176,6 +176,21 @@ function normalizedStats(stats: SurvivalStats | undefined, ranges: CombatStatRan
   return result;
 }
 
+function npcCombatStats(stats: SurvivalStats, ranges: CombatStatRanges): SurvivalStats {
+  const result: SurvivalStats = { ...stats };
+  const dimensionKeys = ['dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'] as const;
+  const hasAnyDimension = dimensionKeys.some(key => {
+    const current = result[key];
+    return current !== undefined && current !== null && Number.isFinite(Number(current));
+  });
+  if (hasAnyDimension) return result;
+  for (const key of dimensionKeys) {
+    const range = ranges[key] ?? [0, 20];
+    result[key] = (Number(range[0]) + Number(range[1])) / 2;
+  }
+  return result;
+}
+
 function identityStats(source: SurvivalStats | undefined, ranges: CombatStatRanges, threatMultiplier = 1, preserveCurrentRatio = true): Pick<CombatParticipantV2, 'hp' | 'maxHp' | 'resource' | 'maxResource' | 'attackPower' | 'healingPower' | 'armor' | 'accuracy' | 'evasion' | 'critChance' | 'initiative' | 'normalizedAttributes'> {
   const originalMaxHp = originalLimit(source, '血量', '血量上限');
   const originalMaxResource = originalLimit(source, '体力值', '体力上限');
@@ -325,9 +340,10 @@ function threatMultiplier(threat: CombatThreatBand): number {
   return { weak: 0.65, matched: 1, dangerous: 1.3, boss: 1.75, overwhelming: 2.2 }[threat];
 }
 
-function npcIsAlly(npc: NPCData): boolean {
+export function isCombatAllyNpc(npc: NPCData): boolean {
   const relation = npc.关系数据?.关系类型?.toLowerCase() ?? '';
-  return /友|盟|伙伴|同伴|ally|friend/.test(relation) && npc.人物分类 !== '离场';
+  return /友|盟|伙伴|同伴|搭档|队友|战友|恋人|夫妻|家人|亲人|师徒|护卫|ally|friend|companion|partner/.test(relation)
+    && npc.人物分类 !== '离场';
 }
 
 function npcIsHostile(npc: NPCData): boolean {
@@ -417,7 +433,7 @@ function npcUnit(id: string, npc: NPCData, ranges: CombatStatRanges, source: 'al
     inventoryPath: npc.物品列表 && typeof npc.物品列表 === 'object' && !Array.isArray(npc.物品列表) ? `人物档案.${id}.物品列表` : undefined,
     injuryPath: `人物档案.${id}.战斗状态`,
   }, npc.物品列表);
-  const unit = participant(id, npc.姓名 || id, source, source, identityStats(npc.生存状态, ranges, multiplier), false, {}, {}, binding);
+  const unit = participant(id, npc.姓名 || id, source, source, identityStats(npcCombatStats(npc.生存状态, ranges), ranges, multiplier), false, {}, {}, binding);
   unit.itemQuantities = clone(binding.originalItemQuantities);
   return unit;
 }
@@ -447,11 +463,23 @@ export function buildValidatedCombatRoster(state: GameState, proposalInput: Comb
   player.itemQuantities = clone(playerBinding.originalItemQuantities);
   pool.push(player);
 
-  // Only allies explicitly present in the encounter may enter the selectable
-  // roster. This keeps off-scene friendly NPCs out of battle while the local
-  // relationship record remains authoritative over an AI-proposed identity.
+  // Keep off-scene NPCs out, but do not rely on the auxiliary model to repeat
+  // an ally list perfectly: a friendly NPC named in the encounter context is
+  // explicitly present and should be selectable too.
+  const opposingIds = new Set([...proposal.enemies, ...proposal.neutrals].flatMap(actor => [actor.id, actor.identity]));
+  const contextualAllies = Object.entries(state.人物档案)
+    .filter(([id, npc]) => {
+      const name = String(npc.姓名 || '').trim();
+      return Boolean(name)
+        && !opposingIds.has(id)
+        && !opposingIds.has(name)
+        && proposal.context.includes(name)
+        && isCombatAllyNpc(npc)
+        && Number(npc.生存状态?.血量 ?? 0) > 0;
+    })
+    .map(([id, npc]) => ({ id, identity: npc.姓名 || id, temporary: false, source: 'npc' as const }));
   const addedAllies = new Set<string>();
-  for (const actor of proposal.allies) {
+  for (const actor of [...proposal.allies, ...contextualAllies]) {
     if (actor.id === 'player') continue;
     const knownEntry = state.人物档案[actor.id]
       ? { id: actor.id, npc: state.人物档案[actor.id] }
@@ -460,7 +488,7 @@ export function buildValidatedCombatRoster(state: GameState, proposalInput: Comb
       errors.push(`友方身份「${actor.identity}」不存在于本地人物档案`);
       continue;
     }
-    if (!npcIsAlly(knownEntry.npc)) {
+    if (!isCombatAllyNpc(knownEntry.npc)) {
       errors.push(`友方身份「${actor.identity}」未被本地人物档案标记为友方`);
       continue;
     }
@@ -1393,7 +1421,10 @@ export function settleCombatResult(stateInput: GameState, sessionInput: CombatSe
 
 /** Persist the complete immutable combat snapshot into the v3 save state. */
 export function persistCombatSession(stateInput: GameState, sessionInput: CombatSessionV2): GameState {
-  const state = clone(stateInput);
+  // Combat actions are frequent, while the rest of GameState is unchanged.
+  // Reuse those immutable branches instead of cloning the entire save (which
+  // also contains the full pre-combat checkpoint) on every single action.
+  const state: GameState = { ...stateInput };
   state.v3 = {
     ...(state.v3 ?? { schemaVersion: 3 }),
     schemaVersion: 3,

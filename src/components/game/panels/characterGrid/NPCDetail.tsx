@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   User, BarChart3, Briefcase, MapPin, Sparkles, BookOpen, Brain, Dna,
   Zap, Star, Shield, Swords, Backpack, ScrollText, Heart, Activity,
@@ -101,17 +101,30 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
   );
 }
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId, onPortraitChange }: {
+export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
   npc: NPCData; npcId: string; onClose: () => void;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  /** 删除该 NPC；返回 false 表示删除未生效。 */
+  onDeleteNpc?: (npcId: string) => boolean | Promise<boolean>;
   worldId?: string;
   onPortraitChange?: (npcId: string, url: string) => void;
+  /** 删除成功后的回调（用于关闭外层卡片选择状态）。 */
+  onDeleted?: () => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
 
   const ext = npc as any;
+  const handleDelete = useCallback(async () => {
+    if (!onDeleteNpc) return;
+    const ok = await onDeleteNpc(npcId);
+    if (ok) {
+      // 通知外层移除选中态；onDeleteNpc 内部已经做完存档 + 头像清理。
+      onDeleted?.();
+    }
+  }, [onDeleteNpc, onDeleted, npcId]);
+
   const chronicles = (ext.人物事迹 as string[] | undefined) ?? [];
   const rd = npc.关系数据 ?? { 好感度: 0, 关系类型: '未知' };
   const sj = npc.社会身份 ?? { 职业: '', 社会地位: '' };
@@ -128,7 +141,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
         width: '92%', maxWidth: '640px', height: '82vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} />
+        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} onDelete={onDeleteNpc ? () => handleDelete() : undefined} />
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <div style={{

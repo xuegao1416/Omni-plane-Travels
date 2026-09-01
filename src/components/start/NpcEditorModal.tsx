@@ -12,6 +12,7 @@ import { exportNpcTemplateJSON, downloadJSON } from '../../storage/templateStore
 import { useDialog } from '../shared/Dialog';
 import OverlayPortal from '../shared/OverlayPortal';
 import { isNpcDraftDirty } from './npcModalState';
+import { materializeNpcSurvivalStats, materializeNpcTierIndex } from '../../utils/npcStats';
 
 const QUALITY_OPTIONS = ['普通', '精良', '稀有', '史诗', '传说'] as const;
 
@@ -158,6 +159,11 @@ export default function NpcEditorModal({
   };
 
   const canSave = npc.name.trim().length > 0;
+  const saveNpc = () => onSave({
+    ...npc,
+    ...(statMod ? { survivalStats: materializeNpcSurvivalStats(npc.survivalStats, statConfig) } : {}),
+    ...(progMod ? { tierIndex: materializeNpcTierIndex(npc.tierIndex, progConfig?.currentTierIndex ?? 0) } : {}),
+  });
 
   // NPC AI 补全
   const { isFilling, fillElapsed, handleAiFill } = useNpcFill({
@@ -446,7 +452,7 @@ export default function NpcEditorModal({
 
         <div className="world-editor-footer">
           <button className="btn-secondary" onClick={() => { void requestClose(); }} style={{ padding: 'var(--space-2) var(--space-5)' }}>{t('common.cancel')}</button>
-          <button className="btn-primary" onClick={() => onSave(npc)} disabled={!canSave} style={{ padding: 'var(--space-2) var(--space-6)' }}>
+          <button className="btn-primary" onClick={saveNpc} disabled={!canSave} style={{ padding: 'var(--space-2) var(--space-6)' }}>
             {initial ? t('npcEditor.saveChanges') : t('npcEditor.createNpc')}
           </button>
         </div>

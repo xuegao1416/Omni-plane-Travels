@@ -130,6 +130,25 @@ describe('v3 deterministic combat core', () => {
     expect(['attack', 'skill', 'item', 'defend', 'flee']).toContain(auto.kind);
   });
 
+  test('uses range midpoints only for missing legacy NPC dimensions and preserves explicit zero', () => {
+    const ranges = {
+      attrA: [0, 100] as [number, number], attrB: [0, 100] as [number, number],
+      dim1: [0, 20] as [number, number], dim2: [0, 20] as [number, number], dim3: [0, 20] as [number, number],
+      dim4: [0, 20] as [number, number], dim5: [0, 20] as [number, number], dim6: [0, 20] as [number, number],
+    };
+    const legacy = makeState();
+    legacy.人物档案.enemy.生存状态 = { 血量: 80, 体力值: 50 };
+
+    const inferred = buildValidatedCombatRoster(legacy, proposal(1), { statRanges: ranges }).plan?.enemyPool[0];
+    expect(inferred?.normalizedAttributes?.dim1).toBe(50);
+    expect(inferred?.attackPower).toBe(10);
+
+    legacy.人物档案.enemy.生存状态.dim1 = 0;
+    const explicitZero = buildValidatedCombatRoster(legacy, proposal(1), { statRanges: ranges }).plan?.enemyPool[0];
+    expect(explicitZero?.normalizedAttributes?.dim1).toBe(0);
+    expect(explicitZero?.attackPower).toBe(4);
+  });
+
   test('uses the actor accuracy as the baseline and applies a skill accuracy modifier instead of replacing it', () => {
     const session = combatSession(makeState(), 1, 17);
     const player = session.participants.find(unit => unit.id === 'player')!;

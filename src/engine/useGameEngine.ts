@@ -61,6 +61,8 @@ import { isCombatFeatureEnabled, isCombatInteractionPaused, isCombatSaveEnded, p
 import type { CombatCheckpointRestore } from '../gameplay/combatV2';
 import { constrainPreCombatNarrative } from '../gameplay/combatNarrativeBoundary';
 import { inferImmediateCombatEncounterRequest } from './variableExtraction';
+import type { StatModuleSchema } from '../modules/schema';
+import { materializeNpcSurvivalStats, materializeNpcTierIndex } from '../utils/npcStats';
 import {
   executeMemoryWrite,
   executeMemorySummary,
@@ -1597,18 +1599,23 @@ ${perspectiveInstruction}
 
   const setInitialNPCs = useCallback((npcs: CustomNpc[]) => {
     const state = varMgrRef.current.getState();
+    const worldDef = activeWorldDefRef.current;
+    const statModule = worldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled);
+    const statConfig = (statModule?.moduleConfig ?? statModule?.data) as StatModuleSchema | undefined;
+    const progressionModule = worldDef?.modules?.find(module => module.moduleId === 'progression' && module.enabled);
+    const progressionConfig = (progressionModule?.moduleConfig ?? progressionModule?.data) as Record<string, unknown> | undefined;
     for (const npc of npcs) {
       const npcId = `NPC_${npc.name}`;
+      const npcTierIndex = progressionModule
+        ? materializeNpcTierIndex(npc.tierIndex, progressionConfig?.currentTierIndex as number | undefined)
+        : undefined;
       state.人物档案[npcId] = {
         姓名: npc.name,
         种族: npc.race || '人类',
         性别: npc.gender || '',
         年龄: npc.age || '',
         背景: npc.background || '',
-        生存状态: npc.survivalStats
-          ? { 血量: npc.survivalStats['血量'] ?? 100, 体力值: npc.survivalStats['体力值'] ?? 100,
-              ...Object.fromEntries(Object.entries(npc.survivalStats).filter(([k]) => k !== '血量' && k !== '体力值')) }
-          : { 血量: 100, 体力值: 100 },
+        生存状态: materializeNpcSurvivalStats(npc.survivalStats, statConfig),
         社会身份: {
           职业: npc.occupation || '',
           社会地位: npc.socialStatus || '',
@@ -1637,6 +1644,7 @@ ${perspectiveInstruction}
         人物事迹: npc.chronicles || [],
         技能列表: npc.skillsList || {},
         物品列表: npc.itemsList || {},
+        ...(npcTierIndex !== undefined ? { 成长状态: { 当前段位索引: npcTierIndex, 当前经验值: 0 } } : {}),
       };
     }
     varMgrRef.current.setState(state);

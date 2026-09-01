@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Boxes,
   Compass,
+  Copy,
   ExternalLink,
   Layers,
   MousePointer2,
@@ -18,7 +19,9 @@ import {
   X,
 } from 'lucide-react';
 import type { WorldDef } from '../../data/worldLoader';
+import { forkWorld, listWorldDrafts, saveWorldDraft, deleteWorldDraft, type WorldDraft } from '../../data/worldLoader';
 import { resolveWorldArtwork } from '../../data/worldArtwork';
+import WorldForkSelectModal from './WorldForkSelectModal';
 import type { GameSave, SaveMeta } from '../../storage/db';
 import { TABS, type TabKey } from './stepWorldBrowser/constants';
 import { normalizeExternal } from './stepWorldBrowser/constants';
@@ -378,6 +381,7 @@ export default function WorldHallView({
   const pageCount = getHallPageCount(customWorlds.length);
   const [hallPage, setHallPage] = useState(0);
   const [emptySlotOpen, setEmptySlotOpen] = useState(false);
+  const [forkSelectOpen, setForkSelectOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [activeWorldId, setActiveWorldId] = useState(() => (
     allWorlds.some(world => world.id === selectedWorld) ? selectedWorld : worlds[0]?.id ?? ''
@@ -474,6 +478,21 @@ export default function WorldHallView({
       setDetailOpen(false);
       setActiveWorldId('');
     }
+  };
+
+  const handleFork = (draft: WorldDraft) => {
+    saveWorldDraft(draft);
+    setForkSelectOpen(false);
+    onOpenEditor(draft, 1);
+  };
+
+  const handleEditDraft = (draft: WorldDraft) => {
+    setForkSelectOpen(false);
+    onOpenEditor(draft, 1);
+  };
+
+  const handleDeleteDraft = (draftId: string) => {
+    deleteWorldDraft(draftId);
   };
   useEffect(() => {
     if (!emptySlotOpen) return undefined;
@@ -602,12 +621,23 @@ export default function WorldHallView({
               <p>从世界编织仪式开始，或导入已有世界档案。</p>
               <div className="entry-hall-empty-choice__actions">
                 <button type="button" onClick={() => { closeEmptySlot(); onOpenEditor(null); }}><Plus size={16} />创建世界</button>
+                <button type="button" onClick={() => { closeEmptySlot(); setForkSelectOpen(true); }}><Copy size={16} />基于已有世界创作</button>
                 <button type="button" onClick={() => importInputRef.current?.click()}><Upload size={16} />导入世界</button>
               </div>
               <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImportFile} hidden />
             </div>
           </DawnFrameV4>
         </div>
+      )}
+
+      {forkSelectOpen && (
+        <WorldForkSelectModal
+          isOpen={forkSelectOpen}
+          onClose={() => setForkSelectOpen(false)}
+          onFork={handleFork}
+          onEditDraft={handleEditDraft}
+          onDeleteDraft={handleDeleteDraft}
+        />
       )}
 
       {archiveOpen && (

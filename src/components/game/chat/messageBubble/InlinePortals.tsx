@@ -158,13 +158,13 @@ export function useInlinePortals(
     const mountImageButtons = async () => {
       const { default: InlineImageGenButtonComponent } = await import('../InlineImageGenButton');
 
-      placeholders.forEach(el => {
+      placeholders.forEach((el, index) => {
         const promptText = el.getAttribute('data-prompt') || '';
         if (!promptText.trim()) return;
         const container = document.createElement('div');
         el.replaceWith(container);
         const root = createRoot(container);
-        root.render(<InlineImageGenButtonComponent prompt={promptText.trim()} msgId={message.id} />);
+        root.render(<InlineImageGenButtonComponent prompt={promptText.trim()} msgId={message.id} imageKey={`${message.id}:inline-image:${index}`} />);
         imageGenRootsRef.current.push(root);
       });
     };

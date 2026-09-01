@@ -11,7 +11,7 @@ import { loadSaveWithMigration, type GameSave, type PlayerProfile } from '../../
 import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
-import type { ProfessionModuleSchema } from '../../modules/schema';
+import type { ProfessionModuleSchema, StatModuleSchema } from '../../modules/schema';
 import { resetSimulationEngine } from '../../simulation/SimulationApi';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
 import { initializeProfessionSelection } from '../../gameplay/profession';
@@ -19,6 +19,7 @@ import { resolveProfessionBinding } from '../../data/professions';
 import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
 import { migrateGameStateToV3 } from '../../gameplay/protocols';
 import { isDivineTalent } from '../../gameplay/creation/creationPoints';
+import { materializeNpcSurvivalStats, materializeNpcTierIndex } from '../../utils/npcStats';
 
 import { v4 as uuid } from 'uuid';
 
@@ -146,6 +147,10 @@ export function useStartScreen() {
     // 经营模块启用时，删除默认的货币资源（资金由经营资产统一管理）
     const hasBusinessModule = selectedWorldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
     const professionModule = isProfessionModuleEnabled(selectedWorldDef) ? selectedWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
+    const statModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled);
+    const statConfig = (statModule?.moduleConfig ?? statModule?.data) as StatModuleSchema | undefined;
+    const progressionModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'progression' && module.enabled);
+    const progressionConfig = (progressionModule?.moduleConfig ?? progressionModule?.data) as Record<string, unknown> | undefined;
     if (hasBusinessModule) {
       delete (gs.玩家 as any).货币资源;
     }
@@ -166,16 +171,10 @@ export function useStartScreen() {
     for (const npc of pi.customNpcs) {
       const npcId = `NPC_${npc.name}`;
 
-      // 构建 NPC 生存状态（从 survivalStats 获取，如果没有则使用默认值）
-      const npcSurvivalState: { 血量: number; 体力值: number;[key: string]: number } = { 血量: 100, 体力值: 100 };
-      if (npc.survivalStats && typeof npc.survivalStats === 'object') {
-        if (npc.survivalStats.血量 != null) npcSurvivalState.血量 = Number(npc.survivalStats.血量);
-        if (npc.survivalStats.体力值 != null) npcSurvivalState.体力值 = Number(npc.survivalStats.体力值);
-        for (let i = 1; i <= 6; i++) {
-          const key = `dim${i}`;
-          if (npc.survivalStats[key] != null) npcSurvivalState[key] = Number(npc.survivalStats[key]);
-        }
-      }
+      const npcSurvivalState = materializeNpcSurvivalStats(npc.survivalStats, statConfig);
+      const npcTierIndex = progressionModule
+        ? materializeNpcTierIndex(npc.tierIndex, progressionConfig?.currentTierIndex as number | undefined)
+        : undefined;
 
       gs.人物档案[npcId] = {
         姓名: npc.name, 种族: npc.race || '人类', 性别: npc.gender || '', 年龄: npc.age || '',
@@ -203,6 +202,7 @@ export function useStartScreen() {
         人物事迹: npc.chronicles || [],
         技能列表: npc.skillsList || {},
         物品列表: npc.itemsList || {},
+        ...(npcTierIndex !== undefined ? { 成长状态: { 当前段位索引: npcTierIndex, 当前经验值: 0 } } : {}),
       };
     }
     const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;

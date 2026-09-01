@@ -9,6 +9,11 @@ export interface CharacterGridProps {
   worldId?: string;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  /**
+   * 删除指定 NPC：调用方负责清理外部资源并保存存档。
+   * 返回 false 表示删除未生效（如 NPC 不存在或处于只读模式）。
+   */
+  onDeleteNpc?: (npcId: string) => boolean | Promise<boolean>;
 }
 
 export type DetailTab = 'overview' | 'dossier' | 'skills' | 'items';

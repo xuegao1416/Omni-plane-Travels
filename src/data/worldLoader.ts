@@ -84,3 +84,78 @@ export function getWorldBookEntriesForWorld(worldId: string): WorldBookEntryDef[
   const world = findWorldDef(worldId);
   return world?.worldBookEntries ?? [];
 }
+
+// ── 世界草稿（fork 场景）────────────────────────────────────────────
+
+export interface WorldDraft extends WorldDef {
+  isDraft: true;
+  forkedFrom: string;       // 派生来源内置世界 id
+  draftName: string;        // 展示用草稿名，如 "日式校园 - 草稿 1"
+  draftCreatedAt: number;   // 创建时间戳
+  draftUpdatedAt: number;   // 最后更新时间戳
+}
+
+/** 深拷贝一个世界，生成草稿副本（新 id，标记 isDraft） */
+export function forkWorld(world: WorldDef, draftName: string): WorldDraft {
+  const now = Date.now();
+  // 生成唯一草稿 id
+  const base = `${world.id}_fork_${now}`;
+  const forked: WorldDef = JSON.parse(JSON.stringify(world));
+  forked.id = base;
+  // 清除 entryId避免冲突
+  forked.entryId = null;
+  return {
+    ...forked,
+    isDraft: true,
+    forkedFrom: world.id,
+    draftName,
+    draftCreatedAt: now,
+    draftUpdatedAt: now,
+  } as WorldDraft;
+}
+
+/** 保存草稿到 localStorage（覆盖同名草稿，或新增） */
+export function saveWorldDraft(draft: WorldDraft): void {
+  const drafts = listWorldDrafts();
+  const idx = drafts.findIndex(d => d.id === draft.id);
+  if (idx >= 0) drafts[idx] = draft;
+  else drafts.push(draft);
+  localStorage.setItem(STORAGE_KEYS.WORLD_DRAFTS, JSON.stringify(drafts));
+}
+
+/** 列出所有草稿 */
+export function listWorldDrafts(): WorldDraft[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.WORLD_DRAFTS) || '[]');
+  } catch { return []; }
+}
+
+/** 删除草稿 */
+export function deleteWorldDraft(draftId: string): void {
+  const drafts = listWorldDrafts().filter(d => d.id !== draftId);
+  localStorage.setItem(STORAGE_KEYS.WORLD_DRAFTS, JSON.stringify(drafts));
+}
+
+/** 将草稿正式保存为自定义世界（从草稿移除，写入 CUSTOM_WORLDS） */
+export function promoteDraftToCustomWorld(draft: WorldDraft): WorldDef {
+  const world: WorldDef = { ...draft };
+  delete (world as any).isDraft;
+  delete (world as any).forkedFrom;
+  delete (world as any).draftName;
+  delete (world as any).draftCreatedAt;
+  delete (world as any).draftUpdatedAt;
+  const customs = getCustomWorlds();
+  const idx = customs.findIndex(w => w.id === world.id);
+  if (idx >= 0) customs[idx] = world;
+  else customs.push(world);
+  localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(customs));
+  deleteWorldDraft(draft.id);
+  return world;
+}
+
+/** 获取当前 CUSTOM_WORLDS 列表（不含草稿） */
+function getCustomWorlds(): WorldDef[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
+  } catch { return []; }
+}

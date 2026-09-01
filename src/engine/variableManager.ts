@@ -26,11 +26,72 @@ const CORE_OBJECT_PATHS = new Set([
   '玩家', '玩家.生存状态', '玩家.身份信息', '玩家.技能系统', '玩家.货币资源', '玩家.物品栏',
   '人物档案',
 ]);
+const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);
+const AI_TRANSACTION_KEYS = new Set(['id', 'moduleId', 'source', 'label', 'conditions', 'costs', 'effects', 'rewards', 'events']);
+const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 function isSafePath(path: string): boolean {
   return !path.split('.').some(seg => DANGEROUS_PATH_SEGMENTS.has(seg));
+}
+
+function isAllowedAiStatePath(path: unknown): boolean {
+  if (typeof path !== 'string' || !path.trim()) return false;
+  const normalized = path.trim().replace(/^\//, '').replaceAll('/', '.');
+  const segments = normalized.split('.');
+  return isSafePath(normalized)
+    && AI_STATE_ROOTS.has(segments[0])
+    && !segments.some(segment => AI_FORBIDDEN_FIELDS.has(segment));
+}
+
+function containsForbiddenAiField(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (seen.has(value as object)) return false;
+  seen.add(value as object);
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (AI_FORBIDDEN_FIELDS.has(key)) return true;
+    if (containsForbiddenAiField(child, seen)) return true;
+  }
+  return false;
+}
+
+function areAllowedAiEffects(value: unknown): boolean {
+  if (!Array.isArray(value)) return value === undefined;
+  return value.every(effect => {
+    if (!isRecord(effect)) return false;
+    for (const operation of ['set', 'add', 'append', 'remove'] as const) {
+      if (operation in effect) {
+        const payload = effect[operation];
+        return isRecord(payload)
+          && isAllowedAiStatePath(payload.path)
+          && !containsForbiddenAiField(payload.value);
+      }
+    }
+    return isRecord(effect.emit) || isRecord(effect.schedule);
+  });
+}
+
+function areAllowedAiConditions(value: unknown): boolean {
+  if (!Array.isArray(value)) return value === undefined;
+  const check = (condition: unknown): boolean => {
+    if (!isRecord(condition)) return false;
+    if (isRecord(condition.state)) return isAllowedAiStatePath(condition.state.path);
+    if (Array.isArray(condition.all)) return condition.all.every(check);
+    if (Array.isArray(condition.any)) return condition.any.every(check);
+    if (condition.not !== undefined) return check(condition.not);
+    return isRecord(condition.event);
+  };
+  return value.every(check);
+}
+
+function isAllowedAiTransaction(value: Record<string, unknown>): boolean {
+  if (!Object.keys(value).every(key => AI_TRANSACTION_KEYS.has(key))) return false;
+  if (!areAllowedAiConditions(value.conditions)) return false;
+  if (value.costs !== undefined && (!Array.isArray(value.costs) || !value.costs.every(cost => isRecord(cost) && isAllowedAiStatePath(cost.path)))) return false;
+  if (!areAllowedAiEffects(value.effects)) return false;
+  if (value.rewards !== undefined && (!Array.isArray(value.rewards) || !value.rewards.every(reward => isRecord(reward) && areAllowedAiEffects(reward.effects)))) return false;
+  return true;
 }
 
 /** 递归检测对象树（含嵌套）是否含原型污染危险键（L-19）。用于 merge 前的源头净化校验 */
@@ -396,6 +457,9 @@ export class VariableManager {
           }
         }
 
+        // AI 经常尝试按索引写入阶段状态；确保每个任务都有阶段数组，避免 set 失败。
+        if (!Array.isArray(task.阶段)) task.阶段 = [];
+
         task.任务名 = toDisplayText(task.任务名, key);
         task.描述 = toDisplayText(task.描述, task.任务名 as string);
         task.目标 = toDisplayText(task.目标, task.描述 as string);
@@ -535,7 +599,8 @@ export class VariableManager {
 
   private commitGameplayTransaction(transaction: GameplayTransaction): boolean {
     const tick = this.state.simulationRuntime?.tick ?? 0;
-    const result = executeGameplayTransaction(this.state, transaction, { tick });
+    const isAiSource = transaction.source.startsWith('ai') || transaction.source === 'legacy:rfc';
+    const result = executeGameplayTransaction(this.state, transaction, { tick, bestEffort: isAiSource });
     if (result.status === 'applied' && !this.hasValidCoreStateShape(result.state as GameState)) {
       // AI transactions must not be able to replace a core container with a
       // scalar/null value. Keep the original state and report rejection.
@@ -730,6 +795,40 @@ export class VariableManager {
    * object/RFC updates. Legacy semantics are evaluated on a candidate state,
    * then committed through the same atomic kernel boundary.
    */
+  applyAiUpdateVariable(updateText: string): boolean {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(updateText);
+    } catch {
+      const lines = updateText.split('\n').map(line => line.trim()).filter(Boolean);
+      if (lines.length === 0 || !lines.every(line => {
+        const separator = line.indexOf('=');
+        return separator > 0 && isAllowedAiStatePath(line.slice(0, separator).trim());
+      })) return false;
+      return this.applyUpdateVariable(updateText);
+    }
+
+    if (Array.isArray(parsed)) {
+      if (!parsed.every(patch => isRecord(patch)
+        && isAllowedAiStatePath(patch.path)
+        && (patch.from === undefined || isAllowedAiStatePath(patch.from))
+        && !containsForbiddenAiField(patch.value))) return false;
+      return this.applyUpdateVariable(updateText);
+    }
+    if (!isRecord(parsed)) return false;
+
+    const canonical = ['conditions', 'costs', 'effects', 'rewards', 'events']
+      .some(key => Array.isArray(parsed[key]));
+    if (canonical) {
+      return isAllowedAiTransaction(parsed) && this.applyUpdateVariable(updateText);
+    }
+
+    if (!Object.keys(parsed).length
+      || !Object.keys(parsed).every(key => AI_STATE_ROOTS.has(key))
+      || containsForbiddenAiField(parsed)) return false;
+    return this.applyUpdateVariable(updateText);
+  }
+
   // 从AI响应中的更新标签解析并应用更新
   applyUpdateVariable(updateText: string): boolean {
     let parsed: unknown;
@@ -985,6 +1084,21 @@ export class VariableManager {
     }
     (snapshot as any).人物档案 = safeNpcs;
     return snapshot;
+  }
+
+  /**
+   * 删除一个 NPC（从 人物档案 中移除该条所有数据）。
+   * - 若该 NPC 不存在，返回 false。
+   * - 删除后，世界书条目是按需由 人物档案 动态抽取关键词生成的，
+   *   下一轮灌入世界书时会自动跳过已删除角色，无需手工清理世界书条目。
+   * - 调用方负责做好后续的 bumpVersion / scheduleAutoSave / 引用头像清理。
+   */
+  removeNpc(npcId: string): boolean {
+    if (!npcId) return false;
+    const roster = this.state.人物档案;
+    if (!roster || !Object.prototype.hasOwnProperty.call(roster, npcId)) return false;
+    delete roster[npcId];
+    return true;
   }
 
   // 用主API总结NPC事迹，防止条目过多

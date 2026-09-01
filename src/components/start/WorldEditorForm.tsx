@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { useDialog } from '../shared/Dialog';
 import type { ChangeEvent } from 'react';
 import type { WorldDef, WorldBookEntryDef } from '../../data/worlds-schema';
+import { saveWorldDraft, promoteDraftToCustomWorld, type WorldDraft } from '../../data/worldLoader';
 import { createPresetArtwork, getDefaultArtworkPreset, processWorldArtworkFile, resolveWorldArtwork, WORLD_ARTWORK_PRESETS } from '../../data/worldArtwork';
 import { requestStreamWithRetry } from '../../api/client';
 import ModuleSelector, { expandModuleDependencies, getDefaultSelectedModules } from './ModuleSelector';
@@ -71,10 +73,62 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   const isEditing = previewMode === 'create' ? false : (previewMode === 'edit' || !!initialWorld);
   const [editorMode, setEditorMode] = useState<'manual' | 'ai'>(isEditing ? 'manual' : 'ai');
+  const dialog = useDialog();
+
+  const isDraft = (initialWorld as any)?.isDraft === true;
+  // Refs for draft auto-save
+  const savedRef = useRef(false);          // true once draft has been promoted via handleSave
+  const formSnapshotRef = useRef<FormState | null>(null); // captures form at mount for draft update
 
   useEffect(() => {
     if (presentationMode === 'world-weave' && initialStep !== undefined) setWeaveStep(clampWeaveStep(initialStep));
   }, [initialStep, presentationMode]);
+
+  // Auto-save draft every 30s when editing a draft
+  useEffect(() => {
+    if (!isDraft) return;
+    formSnapshotRef.current = form;
+    const interval = setInterval(() => {
+      if (savedRef.current) return;
+      const current = formSnapshotRef.current;
+      if (!current?.name?.trim()) return;
+      const base = initialWorld as WorldDraft;
+      const draft: WorldDraft = {
+        ...base,
+        name: current.name,
+        description: current.description,
+        tags: current.tags ? current.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        coverColor: current.coverColor,
+        difficulty: current.difficulty as WorldDef['difficulty'],
+        modules: current.modules,
+        worldBookEntries: refinedEntries.length > 0 ? refinedEntries : base.worldBookEntries,
+        draftUpdatedAt: Date.now(),
+      };
+      saveWorldDraft(draft);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [isDraft, form, refinedEntries, initialWorld]);
+
+  // Cleanup: save draft on unmount (if not yet promoted)
+  useEffect(() => {
+    return () => {
+      if (!isDraft || savedRef.current) return;
+      if (!form?.name?.trim()) return;
+      const base = initialWorld as WorldDraft;
+      const draft: WorldDraft = {
+        ...base,
+        name: form.name,
+        description: form.description,
+        tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        coverColor: form.coverColor,
+        difficulty: form.difficulty as WorldDef['difficulty'],
+        modules: form.modules,
+        worldBookEntries: refinedEntries.length > 0 ? refinedEntries : base.worldBookEntries,
+        draftUpdatedAt: Date.now(),
+      };
+      saveWorldDraft(draft);
+    };
+  }, [isDraft, form, refinedEntries, initialWorld]);
 
   // 互斥计算
   const disabledByConflict = new Set<string>();
@@ -318,9 +372,13 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   const handleSave = () => {
     if (!form.name.trim()) return;
-    const world = formToWorldDef(form, initialWorld, refinedEntries);
+    let world = formToWorldDef(form, initialWorld, refinedEntries);
     world.modules = normalizeSelectedWorldModules(world.modules);
     injectModuleRuleEntries(world, form, refinedEntries);
+    if (isDraft) {
+      savedRef.current = true;
+      world = promoteDraftToCustomWorld({ ...initialWorld as WorldDraft, ...world } as WorldDraft);
+    }
     onSave(world);
   };
 
@@ -372,10 +430,17 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     />
   );
 
-  const handleWeaveBack = () => {
+  const handleWeaveBack = async () => {
     setWeaveValidation('');
-    if (weaveStep === 1) onCancel();
-    else setWeaveStep(step => step - 1);
+    if (weaveStep === 1) {
+      if (isDraft) {
+        const confirmed = await dialog.confirm('确定要取消吗？草稿将保留。', { confirmText: '取消编辑', cancelText: '继续编辑' });
+        if (!confirmed) return;
+      }
+      onCancel();
+    } else {
+      setWeaveStep(step => step - 1);
+    }
   };
 
   const handleWeaveNext = () => {
@@ -591,7 +656,13 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
             <>
             <button className="btn-ghost" onClick={handleExport} style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-sm)' }}><Download size={14} style={{ flexShrink: 0 }} /> 导出</button>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-secondary" onClick={onCancel} style={{ padding: '8px 20px' }}>{t('common.cancel')}</button>
+              <button className="btn-secondary" onClick={async () => {
+              if (isDraft) {
+                const confirmed = await dialog.confirm('确定要取消吗？草稿将保留。', { confirmText: '取消编辑', cancelText: '继续编辑' });
+                if (!confirmed) return;
+              }
+              onCancel();
+            }} style={{ padding: '8px 20px' }}>{t('common.cancel')}</button>
               <button className="btn-primary" onClick={handleSave} disabled={!form.name.trim()} style={{ padding: '8px 24px', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Save size={14} style={{ flexShrink: 0 }} /> {t('worldEditor.saveWorld')}</button>
             </div>
             </>

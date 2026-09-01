@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Star, X, ImageIcon, Upload, Save } from 'lucide-react';
+import { Star, X, ImageIcon, Upload, Save, Trash2 } from 'lucide-react';
 import Avatar from '../../../shared/Avatar';
 import { useDialog } from '../../../shared/Dialog';
 import { useCharacterPortrait, buildPortraitPrompt, translatePromptWithLLM } from '../../../../hooks/useCharacterPortrait';
@@ -8,18 +8,24 @@ import { saveNpcTemplate } from '../../../../storage/templateStore';
 import { usePortraitStore } from '../../../../stores/portraitStore';
 import type { NPCData } from '../../../../schema/variables';
 import { categoryStyle, npcDataToCustomNpc } from './types';
+import { useUISettings } from '../../../../context/UISettingsContext';
+import { confirmNpcDeletion } from './confirmNpcDeletion';
 
-export function PortraitHeader({ npc, npcId, onClose, onPortraitChange }: {
+export function PortraitHeader({ npc, npcId, onClose, onPortraitChange, onDelete }: {
   npc: NPCData; npcId: string; onClose: () => void;
   onPortraitChange?: (npcId: string, url: string) => void;
+  /** 提供时，标题栏会出现一个删除按钮；点击后弹出二次确认。 */
+  onDelete?: () => void | Promise<void>;
 }) {
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
   const [portraitStatus, setPortraitStatus] = useState('');
   const [showPortraitZoom, setShowPortraitZoom] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { DialogUI, prompt: dlgPrompt, alert: dlgAlert, loading: dlgLoading, close: dlgClose } = useDialog();
+  const { DialogUI, prompt: dlgPrompt, alert: dlgAlert, confirm: dlgConfirm, loading: dlgLoading, close: dlgClose } = useDialog();
   const { generatePortrait } = useCharacterPortrait();
   const setPortrait = usePortraitStore(s => s.setPortrait);
+  const { t } = useUISettings();
 
   const ext = npc as any;
   const cat = categoryStyle(npc.人物分类);
@@ -99,6 +105,26 @@ export function PortraitHeader({ npc, npcId, onClose, onPortraitChange }: {
     await dlgAlert(`NPC模板「${name.trim()}」已保存 ✓`);
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!onDelete || deleting) return;
+    await confirmNpcDeletion(
+      () => dlgConfirm(t('npc.delete.confirm'), {
+        title: t('npc.delete.title'),
+        confirmText: t('npc.delete'),
+        cancelText: t('common.cancel'),
+        danger: true,
+      }),
+      async () => {
+        setDeleting(true);
+        try {
+          await onDelete();
+        } finally {
+          setDeleting(false);
+        }
+      },
+    );
+  };
+
   return (
     <>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
@@ -139,6 +165,16 @@ export function PortraitHeader({ npc, npcId, onClose, onPortraitChange }: {
             </div>
           )}
         </div>
+        {onDelete && (
+          <button type="button" onClick={handleDeleteConfirm} disabled={deleting} title={t('npc.delete.button')} style={{
+            border: 'none', background: 'var(--bg-tertiary)', width: '28px', height: '28px',
+            borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--danger)',
+            flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: deleting ? 0.55 : 1,
+          }}>
+            <Trash2 size={14} />
+          </button>
+        )}
         <button onClick={handleSaveTemplate} title="保存为NPC模板" style={{
           border: 'none', background: 'var(--bg-tertiary)', width: '28px', height: '28px',
           borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--accent)',

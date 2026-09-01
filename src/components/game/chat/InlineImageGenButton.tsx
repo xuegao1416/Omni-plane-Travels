@@ -14,16 +14,36 @@ interface CachedState {
   taskId: string | null;
 }
 const globalImageStateCache = new Map<string, CachedState>();
+const globalImageStateListeners = new Map<string, Set<(state: CachedState) => void>>();
+
+function publishImageState(cacheKey: string, state: CachedState) {
+  globalImageStateCache.set(cacheKey, state);
+  globalImageStateListeners.get(cacheKey)?.forEach(listener => listener(state));
+}
 
 interface Props {
   prompt: string;
   /** 消息 ID，用于构建缓存 key */
   msgId?: string | number;
+  /** Stable placeholder identity; unlike the prompt it does not change during final rendering. */
+  imageKey?: string;
 }
 
-export default function InlineImageGenButton({ prompt, msgId }: Props) {
-  const { config, generateAndSave, getImageUrl } = useImageGen();
-  const cacheKey = `${msgId || 'unknown'}::${prompt}`;
+/** Stable, compact IndexedDB key for one inline image placeholder. */
+export function buildInlineImageStorageKey(identity: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const safeIdentity = identity.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+  return `inline-story-${safeIdentity}-${(hash >>> 0).toString(36)}`;
+}
+
+export default function InlineImageGenButton({ prompt, msgId, imageKey }: Props) {
+  const { config, generateAndSave, getImageUrl, getStoredImageUrl } = useImageGen();
+  const cacheKey = imageKey || `${msgId || 'unknown'}::${prompt}`;
+  const storageKey = buildInlineImageStorageKey(cacheKey);
 
   // 从全局缓存恢复状态
   const cached = globalImageStateCache.get(cacheKey);
@@ -37,17 +57,39 @@ export default function InlineImageGenButton({ prompt, msgId }: Props) {
     return () => { mountedRef.current = false; };
   }, []);
 
+  useEffect(() => {
+    const listener = (next: CachedState) => {
+      setStatus(next.status);
+      setImageUrl(next.imageUrl);
+      setErrorMsg(next.errorMsg);
+    };
+    const listeners = globalImageStateListeners.get(cacheKey) ?? new Set<(state: CachedState) => void>();
+    listeners.add(listener);
+    globalImageStateListeners.set(cacheKey, listeners);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) globalImageStateListeners.delete(cacheKey);
+    };
+  }, [cacheKey]);
+
   // 状态变化时同步到全局缓存
   const updateState = useCallback((patch: Partial<CachedState>) => {
     const prev = globalImageStateCache.get(cacheKey) || { status: 'idle', imageUrl: '', errorMsg: '', taskId: null };
     const next = { ...prev, ...patch };
-    globalImageStateCache.set(cacheKey, next);
-    if (mountedRef.current) {
-      if (patch.status !== undefined) setStatus(patch.status);
-      if (patch.imageUrl !== undefined) setImageUrl(patch.imageUrl);
-      if (patch.errorMsg !== undefined) setErrorMsg(patch.errorMsg);
-    }
+    publishImageState(cacheKey, next);
   }, [cacheKey]);
+
+  // The message node can be rebuilt when the rest of the generation pipeline
+  // commits its snapshot. Restore the completed inline image from IndexedDB
+  // instead of falling back to an empty button/text-only message.
+  useEffect(() => {
+    if (globalImageStateCache.has(cacheKey)) return;
+    let cancelled = false;
+    getStoredImageUrl(storageKey).then(url => {
+      if (!cancelled && url) updateState({ status: 'done', imageUrl: url, taskId: storageKey });
+    }).catch(() => { /* no image has been generated for this placeholder yet */ });
+    return () => { cancelled = true; };
+  }, [cacheKey, getStoredImageUrl, storageKey, updateState]);
 
   const handleClick = useCallback(async () => {
     if (status === 'generating' || status === 'done') return;
@@ -64,7 +106,7 @@ export default function InlineImageGenButton({ prompt, msgId }: Props) {
       console.log('[InlineImage] 开始生成:', prompt.substring(0, 50));
       const result = await generateAndSave(
         prompt,
-        { category: 'story' },
+        { category: 'story', persist: true, storageKey },
         (s) => {
           if (s === 'generating' && mountedRef.current) {
             updateState({ status: 'generating' });
@@ -87,7 +129,7 @@ export default function InlineImageGenButton({ prompt, msgId }: Props) {
       console.error('[InlineImage] 生成失败:', e);
       updateState({ status: 'error', errorMsg: (e as Error).message || '生图失败' });
     }
-  }, [status, config, prompt, generateAndSave, getImageUrl, updateState]);
+  }, [status, config, prompt, generateAndSave, getImageUrl, storageKey, updateState]);
 
   // 重试
   const handleRetry = useCallback(() => {
