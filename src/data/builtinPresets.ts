@@ -2,6 +2,7 @@
 // 将系统提示提取为结构化预设，将标签清理逻辑提取为可配置的正则脚本
 
 import type { RegexScript } from '../utils/regexScripts';
+import { MacroEngine } from '../engine/macroEngine';
 import { DRC_V12_PROMPTS, DRC_V12_REGEX_SCRIPTS } from './presetDrcV12';
 
 // ============ 类型定义 ============
@@ -439,6 +440,346 @@ const PROMPT_WRITING_STYLE = `<WritingStyle>
 - 聚焦人际关系中的细腻情感，展现真实而直白的内心活动
 - 避免过度煽情或说教，让情感自然流露
 </WritingStyle>`;
+
+// ── 文风切换模块 ──
+// 机制：所有文风条目都写同一个变量 base_writing，后开启的覆盖先开启的（天然单选）；
+// 条目本身渲染为空字符串，实际内容由下方 writing_style_slot 条目通过 {{getvar}} 注入。
+// 注意：文风内容里不能出现 "}}"，否则会截断 setvar 宏。
+
+/** 将文风内容包装为 setvar 宏（写入 base_writing 变量） */
+function wrapWritingStyle(content: string): string {
+  return `{{setvar::base_writing::\n${content}\n}}`;
+}
+
+/** 文风切换·轻小说 */
+const PROMPT_STYLE_LIGHT_NOVEL = `<WritingStyle>
+文风：日系轻小说
+
+核心结构：
+- 对话 + 叙述，二者相辅相成，共同构建叙事
+
+具体解构：
+对话：
+- 对话是角色之间的交流，角色会说错话，也会带各种语气词与主观性词汇
+- 对话与叙述互相配合，一同撑起一篇轻小说的质感
+
+叙述·描述：
+- 是对角色对话的补充说明，包括环境描写、角色神态、补充动作、节奏与氛围控制
+- 叙述须从故事主角的视角展开，所有看法、主观情感与对事物的描述都以主角为基准
+- 核心以故事内的角色为准，而非藏在文章背后的作者
+- 角色的动作是关键，务必用生动、多样的动词来描写动作
+
+叙述·内心独白：
+- 目的是展现角色的内心世界，塑造一个立体、复杂、可能并不可靠的叙述者形象
+- 形式上包含内心评论、情绪反应与主观解读
+
+额外要求：
+- 叙述主观性：代入主角，以主角为准，文中应存在主角的主观表达，避免完全客观
+- 叙述情感性：思考故事进行到此处时主角或角色会有的情感，在叙述中体现情感，而非单纯客观描述
+- 独白深度性：角色会对事件的过程进行思考或表达感想，这些都属于内心独白，应在正文中体现
+
+节奏参考（仅示意结构，实际行文应丰富多变）：
+对话 → 由对话展开的叙述 → 对话 → 叙述 → 对话 → 对话 → 叙述……
+
+示例（仅提供风格参考，不为正文内容提供情节借鉴）：
+"……走吧，再不走就赶不上了。"
+她应了一声，却站在原地没动。校门口的灯一盏盏亮起来，把两个人的影子拉成两条细长的线。他知道她在等他先开口，也知道有些话一旦说出口，就再也收不回去了。
+风吹过来，卷起她额前的碎发。他想，就这样多待一会儿，好像也没什么不好。
+</WritingStyle>`;
+
+/** 文风切换·轻松吐槽（口语化日常 + 旁观式吐槽） */
+const PROMPT_STYLE_BANTER = `<WritingStyle>
+文风：轻松吐槽（口语化日常 + 旁观式吐槽）
+
+叙事基调：
+- 像深夜和朋友窝在沙发聊天那样轻松随意，讲身边趣事，不追求文采，不堆砌辞藻，用平实的句子也生动有趣
+- 允许适度"锐评"：你可以对角色的行为做点到为止的调侃，但绝不贬低、不刻薄
+- 你偶尔会直接与读者说话，但不知道角色脑子里具体在想什么，只对角色的行为吐槽
+
+心理碎念：
+- 核心是角色的情绪、心理活动与嘴里说的话，其余从简
+- 心理活动要"碎"：尝到一点苗头就偷着乐，乐完又疑心是自己想多，转头再替那点甜找出七八个证据；嘴上死活不肯认，心里已经把下次见面偷偷排练了八遍
+- 多用"也许、可能、该不会、会不会、说不定、但又觉得、可是、还是说"这类拿不准的词，把心吊在半空晃悠，别一句话说死
+- 只许写角色亲眼所见、亲耳所闻、自己吓自己的那部分，他猜错了也别替他圆场
+- 嘴越贫，心越软——越是骂骂咧咧，越说明他记挂你；吐槽是护短的另一种说法，不是真的嫌弃
+
+语言与节奏：
+- 对话占比高，口语化，句尾爱带"啦、啊、吧、了、着"这类语气词
+- 段落长短要有变化，长段里能藏下七拐八绕的小心思；别通篇碎段，也别两句话翻来覆去说同一个意思
+- 动作只挑有戏的写（弹烟灰这种小动作值得写，"起身"这种流程动作跳过），动词少用"看""说"，换成更具体的说法（打量、开口、斜眼、撇嘴）
+- 比喻要鲜活可爱、有画面感，让人想笑而不是皱眉
+
+敢省略、敢跳过：
+- 不必把每件琐事都交代清楚，用"反正""总之""大概"跳过没意思的细枝末节
+- 环境只是背景音，不抢戏，但可以带情绪色彩、可以带吐槽
+
+禁止事项：
+- 禁止否肯句、比拟句、递进句
+- 禁止写没发生的动作（"没说话""没停下来"）
+- 禁止解剖学式的身体细节（眼皮、后背、手指这类部位堆砌，假装写人物细节其实是解剖学报告）
+- 禁止堆砌程度副词（那是论文和分析报告，不是人过日子）与"某人说"这类机械交代
+- 禁止客观总结、复述剧情、替角色解释动机
+- 禁止过于刻薄——吐槽是温柔的，是"这反应很有她的风格"，不是"她这智商没救了"
+
+示例（仅风格参考）：
+他把泡面盖子掀开，热气糊了一脸。加不加肠？加吧，都辛苦一天了，不加说不过去。他一边安慰自己一边撕开火腿肠，动作利落得像练过。可筷子刚挑起来，又顿住——等下，昨天好像也这么说的。算了，反正工资也没地方去，全进肚子也算是花在了刀刃上。
+无所谓，反正没人看着，不是吗？
+他埋头嗦了两口，觉得汤有点咸了，寻思着待会儿要不要再灌杯水，顺便把攒了三天的碗刷了。嗯，刷碗这事也可以明天再说。
+</WritingStyle>`;
+
+/** 文风切换·校园青春（恋爱向） */
+const PROMPT_STYLE_CAMPUS = `<WritingStyle>
+文风：校园青春（恋爱向）
+
+气质底色：
+- 故事发生在课桌、走廊、操场与放学路上，日常里藏着心照不宣的悸动
+- 语气干净明亮，带一点少年人特有的笨拙与认真，不油腻、不沧桑
+- 恋爱是主线，但校园生活要真实：作业、社团、值日、晚自习，都是情感的背景板
+
+节奏与留白：
+- 心动藏在细枝末节：借橡皮时指尖的停顿、发作业时故意多停留的一秒、体育课后递来的那瓶水
+- 推进要慢，尤以"第一次"为甚：第一次并肩走、第一次牵手、第一次单独吃饭，都值得铺开细写
+- 句子以短句为主，关键瞬间可以只留画面不解释，让读者自己心跳
+
+视角与心理：
+- 多用单方内心视角：看到的、猜到的、不敢确认的，写足那种"想靠近又怕越界"的拉扯
+- 心理描写克制，用行为外化情绪：假装看风景、反复擦黑板、把纸条揉皱又展开
+- 允许误读与口是心非：明明在意却说不去、明明想见却说再等等
+
+对话特征：
+- 口语自然，带校园腔调；少年人讲话常常言不由衷，越喜欢越嘴硬
+- 玩笑底下藏试探："你该不会是喜欢我吧？""少来。"——气氛在玩笑与认真之间摇晃
+- 关键时刻话要短，紧张到说不利索反而更真
+
+氛围描写：
+- 用季节与光线定调：夏末的蝉鸣、初冬呵出的白气、晚自习后空荡的走廊灯
+- 环境为情绪服务，点到为止，不堆砌景物
+
+禁止事项：
+- 禁成人化油腻：亲密描写保持青涩与分寸，不露骨、不熟练
+- 禁苦情套路：不写堕胎、霸凌到窒息的压抑基调，主线仍是干净明亮的成长恋爱
+- 禁把角色当提线木偶：除了恋爱，他们还有自己的朋友、烦恼与去路
+
+示例（仅风格参考）：
+晚自习下课铃响，她把写了一半的纸条又塞回笔袋，假装专心收拾书包。他从前排绕过来，经过她桌边时脚步慢了半拍："明天早上，校门口那家豆浆，去吗？"
+她低着头，声音闷闷的："几点？"
+"七点二十。"
+"哦。"她终于抬头看他一眼，又飞快移开，"那……你请客。"
+他笑了，没戳穿她作业本上画满的小人，转身走了。走廊的灯一盏盏灭下去，她的脸在暗处悄悄烫起来。
+</WritingStyle>`;
+
+/** 文风切换·白描 */
+const PROMPT_STYLE_BAIMIAO = `<WritingStyle>
+文风：白描（克制写实）
+
+一、情节推进——以动作链推动，不靠冲突
+- 人物做一件事，做完做下一件，叙事在具体可见的行为序列中向前走；不靠内心独白交代动机，动机藏在动作的选择里
+  （例·鲁迅《孔乙己》："孔乙己一到店，所有喝酒的人便都看着他笑。他不回答，对柜里说，'温两碗酒，要一碟茴香豆。'便排出九文大钱。"——不写孔乙己的窘迫，只写他排出九文大钱的动作，窘迫自现）
+- 大事件用一句话带过或直接省略，让读者自己补完；时间跨度以一个感官细节的变化标记
+  （例·余华《活着》："老人和牛渐渐远去，我听到老人粗哑的嗓音从远处传来，他的歌声在空旷的傍晚像风一样飘扬。"——一生的悲欢都被压进这一个渐远的背影里）
+- 不用过渡句，一个场景写完，空一行，下一个场景直接开始
+- 关键信息用最短的对话完成，对话推动情节时，不需要叙述者解释"这句话意味着什么"
+  （例·鲁迅《故乡》："水生，给老爷磕头。"——一句招呼，身份、隔膜、时间的距离全在里面）
+
+二、张力——来自平静表面下的不对称
+- 反差蓄力：用极平静的笔触写极不平静的事，越大的事件越轻描淡写，张力越强
+  （例·沈从文《边城》结尾："这个人也许永远不回来了，也许'明天'回来。"——把天大的失去，写得轻得像一句叹息）
+- 细节位移：情感转变时不写心理，写一个细节的微小变化——目光移开、手里的东西放下、习惯动作中断
+  （例·鲁迅《祝福》："她一手提着竹篮，内中一个破碗，空的。"——一个"空的"，写尽祥林嫂沦为乞丐的惨）
+- 未完成句/中断：一句话没说完、一件事没做完、动作停在半途，中断本身就是叙事信息
+- 环境呼应：不用环境"象征"情绪，让环境与人物动作处于同一时间流中，形成自然呼应
+  （例·鲁迅《故乡》："渐近故乡时，天气又阴晦了，冷风吹进船舱中，呜呜的响，从篷隙向外一望，苍黄的天底下，远近横着几个萧索的荒村，没有一些活气。"）
+
+三、节奏——四种时距切换
+- 场景/实时：关键对话、重要动作、情感转折点，以对话和动作逐拍呈现
+- 概要/压缩：日常生活的重复、时间的流逝，用一两句话概括数日数月，保留一个具体细节作锚点
+- 省略/跳切：重大变故、难以言说之事，直接跳过，以跳过后的日常状态暗示发生了什么
+- 停顿/驻留：感官细节、风物描写、氛围营造，叙事暂停，镜头停在一个物件、一片光、一种气味上
+
+四、场景构建——自然光协议
+- 锚点开场（一个声音、一种温度、一个时间标记）→ 环境（两三个名词勾勒，不铺排）→ 人物以动作进入 → 动作推进 → 以一个回响的细节收尾
+
+示例（仅风格参考）：
+天刚亮，鸟叫得很碎。河边泊着两条船，水很低，露出一截船底的青苔。老头已经蹲在船头，端着一碗粥呼呼地喝。"今天走不走？""看看再说。"他把碗放回船板，往对岸看了看，水面没有风。粥碗搁在那里，慢慢凉了。
+
+禁止事项：
+- 禁止用内心独白交代动机——动机藏在动作选择里
+- 禁止叙述者评论解释情节意义（"这件事对他影响很大"之类）
+- 禁止人为制造冲突激化矛盾——矛盾应从日常生活纹理中自然生长
+- 禁止用巧合推动情节
+- 禁止在转折处加速语速——越重要的转折越要从容，长短句结合，在开头或末尾落点金句
+- 正文应拒绝以旁白形式复读文风说明
+</WritingStyle>`;
+
+/** 文风切换·古风武侠（正剧为骨、日常为皮，半文半白） */
+const PROMPT_STYLE_WUXIA = `<WritingStyle>
+文风：古风武侠（正剧为骨、日常为皮，半文半白）
+
+总基调：以古典江湖的宏大与神秘为底色，角色互动、对话与心理偏鲜活幽默，庄重的壳子里藏着会喘气的人。
+
+语言要求：
+- 句式：叙述与场景描写用典雅短句，保持韵律；对话与心理活动用口语化短句，自然流畅；二者切换自然不割裂
+- 四字为锋：短句截断，以四字词组作为叙事推进的鼓点，长短句交错；以逗号蓄势，以句号定音，动作连贯处用逗号压实，唯在绝杀、定格、生死转折处才用句号切断
+- 不设过渡语，留白给读者；场景转接直接切入
+- 称呼：对外与正式场合守礼数（前辈、尊者、道友），回了自家山头就原形毕露（管师父喊"那老头"、损同门"隔壁那个卷王"、逗家里那只傻鸟）
+- 术语：江湖与仙侠的行话照用不误（丹田、元神、灵根、秘境、天劫），写到体验感受时允许大白话
+
+意象与感官：
+- 择古意冷硬之象，巧嵌虚词（乃、亦、骤、皆、且、矣、哉、之、其）以生古韵
+- 诗化意象可连续叠加，但忌堆砌；写生铁的冷、血的粘稠、泥沙的粗粝，精确光影与肌理
+- 不写宏观全景，放大微观的物理声响与生理触觉
+
+动词与动作：
+- 严肃场景用大气动作（拂袖负手、眸光微凝），日常场景用鲜活小动作（顺手把暗器当瓜子嗑、偷摸把沾了泥的靴子在裤腿上蹭净）
+- 战斗保留画面感与冲击力（一刀劈开雨幕，刀光在瞳仁里定格），间隙可插入角色实时自嘲；非核心战斗可轻量化，节省篇幅
+- 严禁概括性交锋，拆解发力、轨迹与重心；禁止"像、如"类比喻，直接陈述意象
+
+技法与留白：
+- 情感彻底剥离：不写"恐惧、愤怒"等心理词，一切情绪化为生理极限反应（战栗、虎口崩裂、冷汗化冰）
+- 情感物化：以器物之变传情（砚中墨凝、伞骨积雪倾泻）
+- 段落末尾以极短句或单字收束，定格生死瞬间
+
+节奏与调性：
+- 场景气压分档：宗门大典、两军对垒、高手过招前，收着写、往正剧靠；回了洞府、落了集市、走在赶路的官道上，就松下来写烟火气
+- 内心独白是释放轻松感的主要窗口，点到即止；允许玩梗吐槽，但需符合江湖逻辑，不强行出戏
+
+注意：别总换行！紧紧咬住"半文半白"与"四字为锋"的底子，字里行间要有把人按在水里喘不过气的压迫感！
+
+示例（仅风格参考）：
+长街尽头，仇家拦路，刀已出鞘三分。他不慌，先整了整衣领，又弯腰把鞋带系好，这才抬头："急着投胎？那边茶摊的牛肉面还没尝，我劝你排队等下一轮。"
+仇家一怔，刀光便慢了半拍——就这半拍，他已掠出三丈，回头甩下一句："下次记得提前预约，本座档期很满。"街边小孩看得直拍手，他爹一把捂住他的嘴："别笑，那是咱镇上的活阎王。"
+</WritingStyle>`;
+
+/** 文风切换·散文 */
+const PROMPT_STYLE_PROSE = `<WritingStyle>
+文风：散文小说
+
+注意：文中所举例子仅用于示范笔法，不构成对具体情节的暗示或借鉴。
+
+故事导向：
+- 叙事贴着故事本身走，不为炫技恋战；镜头大半落在事与景上，人物只给必要的近景
+- 场景与动作先行，情绪翻涌到要紧处，才让神态、小动作出场
+- 对话由故事牵着走，该出声时出声，闲笔少留
+
+情绪表达：
+- 愁也罢喜也罢，都长在人物的言语举止上，别靠叙述者跳出来解说；故事里没有画外音，虚的按实的写，实的也按实的写
+- 人物在情节里隐隐透出善意与体面，面对生活磨来的疼，不诉苦、不嚎，只淡淡接住，照常过日子
+
+段落指导：
+- 段落短小疏朗，三五句一歇；行文直白顺畅，段落之间不断气、不失序
+
+语言特色：
+- 短句打底，长句拆散，用流水句一句撵一句地往前送
+- 字词跟着人走，取平实的老派白话与单音节动词，读来有说话的口气
+- 情感见好就收：再大的事也按家常日子讲，用动作和事实托住，不代人物抒情剖白
+- 炼字：用词精准而独到，一句中一个准确的动词胜过十句形容
+  （例·朱自清《荷塘月色》："月光如流水一般，静静地泻在这一片叶子和花上。"——一个"泻"字，把月光写活了）
+</WritingStyle>`;
+
+/** 文风切换·自由随性 */
+const PROMPT_STYLE_FREEFORM = `<WritingStyle>
+文风：自由随性
+
+- 根据当前故事的情感基调，结合剧情、世界观与人物设定，自由选择最合适的行文方式，不固定于单一套路
+- 情感浓烈处可放长句抒情，情节紧张处可短句提速，日常平淡处可平实白描——文风服务于当下场景
+- 保持整体叙事统一，不在一段内混搭多种腔调；基调切换时留出自然的过渡
+- 以"读起来舒服、贴得住人物"为最高准则，宁可朴素，不要炫技
+</WritingStyle>`;
+
+/** 文风切换条目（默认全部关闭，开启任意一个即覆盖默认文风；同时开启多个时仅 order 最大者生效） */
+const STYLE_SWITCH_PROMPTS: PresetPromptEntry[] = [
+  {
+    identifier: 'style_switch_header',
+    name: '━━━━ 文风切换（单选） ━━━━',
+    role: 'system',
+    content: '{{//文风切换：默认文风见上方「写作风格」条目。开启下方任意一个文风条目即可整体覆盖默认文风；同时开启多个时，仅排序最后的一个生效。}}',
+    enabled: true,
+    order: 695,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_light_novel',
+    name: '🖋️丨文风·轻小说',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_LIGHT_NOVEL),
+    enabled: false,
+    order: 701,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_banter',
+    name: '🖋️丨文风·轻松吐槽',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_BANTER),
+    enabled: false,
+    order: 703,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_campus',
+    name: '🖋️丨文风·校园青春',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_CAMPUS),
+    enabled: false,
+    order: 704,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_baimiao',
+    name: '🖋️丨文风·白描',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_BAIMIAO),
+    enabled: false,
+    order: 705,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_wuxia',
+    name: '🖋️丨文风·古风武侠',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_WUXIA),
+    enabled: false,
+    order: 707,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_prose',
+    name: '🖋️丨文风·散文',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_PROSE),
+    enabled: false,
+    order: 708,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'style_freeform',
+    name: '🖋️丨文风·自由随性',
+    role: 'system',
+    content: wrapWritingStyle(PROMPT_STYLE_FREEFORM),
+    enabled: false,
+    order: 709,
+    triggerMode: 'blue',
+  },
+  {
+    identifier: 'writing_style_slot',
+    name: '文风插槽（生效文风注入点，勿关）',
+    role: 'system',
+    content: '{{getvar::base_writing}}',
+    enabled: true,
+    order: 720,
+    triggerMode: 'blue',
+  },
+];
+
+/** 渲染 legacy systemPrompt 字段：用宏引擎解析 setvar/getvar，得到与运行时一致的最终文本 */
+function renderLegacySystemPrompt(prompts: PresetPromptEntry[]): string {
+  const joined = prompts
+    .filter(p => p.enabled)
+    .sort((a, b) => a.order - b.order)
+    .map(p => p.content)
+    .join('\n\n');
+  return new MacroEngine().resolve(joined);
+}
 
 /** 视角边界规范 */
 const PROMPT_PERSPECTIVE_BOUNDARY = `<PerspectiveBoundary>
@@ -953,7 +1294,10 @@ const DEFAULT_PROMPTS: PresetPromptEntry[] = [
 
   // 第三组：写作技巧
   { identifier: 'writing_rules',     name: '写作规则',      role: 'system', content: PROMPT_WRITING_RULES,     enabled: true, order: 600, triggerMode: 'blue' },
-  { identifier: 'writing_style',     name: '写作风格',      role: 'system', content: PROMPT_WRITING_STYLE,     enabled: true, order: 700, triggerMode: 'blue' },
+  // 默认文风（写入 base_writing 变量，可被下方文风切换条目覆盖）
+  { identifier: 'writing_style',     name: '写作风格（默认文风）', role: 'system', content: wrapWritingStyle(PROMPT_WRITING_STYLE), enabled: true, order: 700, triggerMode: 'blue' },
+  // 文风切换（单选覆盖）：古风武侠 / 校园青春 / 都市霓虹 / 废土冷峻 + 注入插槽
+  ...STYLE_SWITCH_PROMPTS,
   { identifier: 'perspective_boundary', name: '视角边界规范', role: 'system', content: PROMPT_PERSPECTIVE_BOUNDARY, enabled: true, order: 800, triggerMode: 'blue' },
   { identifier: 'calling_consistency', name: '称呼一致性', role: 'system', content: PROMPT_CALLING_CONSISTENCY, enabled: true, order: 805, triggerMode: 'blue' },
 
@@ -979,12 +1323,8 @@ const DEFAULT_PROMPTS: PresetPromptEntry[] = [
   { identifier: 'integrity_statement', name: '完整性声明',   role: 'system', content: PROMPT_INTEGRITY_STATEMENT, enabled: true, order: 1500, triggerMode: 'blue' },
 ];
 
-// ── 向后兼容的完整系统提示（由 prompts[] 拼接生成） ──
-const DEFAULT_SYSTEM_PROMPT = DEFAULT_PROMPTS
-  .filter(p => p.enabled)
-  .sort((a, b) => a.order - b.order)
-  .map(p => p.content)
-  .join('\n\n');
+// ── 向后兼容的完整系统提示（由 prompts[] 拼接 + 宏引擎渲染生成） ──
+const DEFAULT_SYSTEM_PROMPT = renderLegacySystemPrompt(DEFAULT_PROMPTS);
 
 // ============ Claude 专用模块 ============
 
@@ -1301,7 +1641,7 @@ const DEEPSEEK_REDUNDANT_ANTI_PROMPTS = new Set([
 const DEEPSEEK_PROMPTS: PresetPromptEntry[] = [
   ...DEFAULT_PROMPTS.map(p => {
     if (p.identifier === 'task') return { ...p, content: PROMPT_DEEPSEEK_TASK };
-    if (p.identifier === 'writing_style') return { ...p, content: PROMPT_DEEPSEEK_WRITING_STYLE };
+    if (p.identifier === 'writing_style') return { ...p, content: wrapWritingStyle(PROMPT_DEEPSEEK_WRITING_STYLE) };
     if (p.identifier === 'anti_formula') return { ...p, content: PROMPT_DEEPSEEK_ANTI_CLICHE };
     if (p.identifier === 'nsfw_content') return { ...p, content: PROMPT_DEEPSEEK_NSFW };
     if (p.identifier === 'thinking') return { ...p, content: PROMPT_DEEPSEEK_THINKING, enabled: false };
@@ -1331,7 +1671,10 @@ const DEEPSEEK_PROMPTS: PresetPromptEntry[] = [
 
   // 写作技巧
   { identifier: 'writing_rules',     name: '写作规则',      role: 'system', content: PROMPT_WRITING_RULES,     enabled: true, order: 600, triggerMode: 'blue' },
-  { identifier: 'writing_style',     name: '写作风格',      role: 'system', content: PROMPT_WRITING_STYLE,     enabled: true, order: 700, triggerMode: 'blue' },
+  // 默认文风（写入 base_writing 变量，可被下方文风切换条目覆盖）
+  { identifier: 'writing_style',     name: '写作风格（默认文风）', role: 'system', content: wrapWritingStyle(PROMPT_WRITING_STYLE), enabled: true, order: 700, triggerMode: 'blue' },
+  // 文风切换（单选覆盖）：古风武侠 / 校园青春 / 都市霓虹 / 废土冷峻 + 注入插槽
+  ...STYLE_SWITCH_PROMPTS,
   { identifier: 'perspective_boundary', name: '视角边界规范', role: 'system', content: PROMPT_PERSPECTIVE_BOUNDARY, enabled: true, order: 800, triggerMode: 'blue' },
 
   { identifier: 'expression_rules',  name: '表达规范与禁用词', role: 'system', content: PROMPT_EXPRESSION_RULES, enabled: true, order: 1000, triggerMode: 'blue' },
@@ -1362,7 +1705,7 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     id: 'claude',
     name: 'Claude 专用预设',
     description: '针对 Claude 模型安全机制优化，内置增色模块开关',
-    systemPrompt: CLAUDE_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
+    systemPrompt: renderLegacySystemPrompt(CLAUDE_PROMPTS),
     prompts: CLAUDE_PROMPTS,
     regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
@@ -1372,7 +1715,7 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     id: 'deepseek',
     name: 'DeepSeek 专用预设',
     description: '针对 DeepSeek 模型优化 — 精简推理与正文，优先保证完整回复和行动选项',
-    systemPrompt: DEEPSEEK_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
+    systemPrompt: renderLegacySystemPrompt(DEEPSEEK_PROMPTS),
     prompts: DEEPSEEK_PROMPTS,
     regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
@@ -1382,7 +1725,7 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
     id: 'dialogue_avatar',
     name: '对话头像预设',
     description: '对话头像风格 - 所有对话都用 [SPEAK] 格式渲染带头像的对话卡片',
-    systemPrompt: DIALOGUE_PRESET_PROMPTS.filter(p => p.enabled).sort((a, b) => a.order - b.order).map(p => p.content).join('\n\n'),
+    systemPrompt: renderLegacySystemPrompt(DIALOGUE_PRESET_PROMPTS),
     prompts: DIALOGUE_PRESET_PROMPTS,
     regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
