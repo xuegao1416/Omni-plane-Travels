@@ -1,5 +1,6 @@
 import type { GameState, SkillData, InventoryItem } from '../../../../schema/variables';
 import type { ProfessionModuleSchema, StatModuleSchema } from '../../../../modules/schema';
+import type { VariableManager } from '../../../../engine/variableManager';
 
 export interface ProfilePanelProps {
   gameState: GameState;
@@ -7,6 +8,8 @@ export interface ProfilePanelProps {
   hasBusinessModule?: boolean;
   professionConfig?: ProfessionModuleSchema;
   statConfig?: StatModuleSchema;
+  /** 引擎实例，用于删除物品等写操作 */
+  variableManager?: VariableManager;
 }
 
 export interface SkillSelection {

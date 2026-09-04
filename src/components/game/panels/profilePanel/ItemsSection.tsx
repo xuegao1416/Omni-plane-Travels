@@ -1,17 +1,22 @@
 import { useState } from 'react';
-import { Backpack } from 'lucide-react';
+import { Backpack, Trash2 } from 'lucide-react';
 import { Collapsible } from '../../../shared/Collapsible';
 import { getQualityColor } from '../../../shared/qualityUtils';
 import { DetailModal, DetailRow } from './shared';
 import { getItemIcon } from '../../../shared/itemIcons';
 import type { InventoryItem, ItemSelection } from './types';
+import type { VariableManager } from '../../../../engine/variableManager';
+import { eventBus, EVENTS } from '../../../../engine/eventBus';
+import { useSaveStore } from '../../../../stores/saveStore';
 
 interface Props {
   items: Record<string, InventoryItem>;
+  variableManager?: VariableManager;
 }
 
-export function ItemsSection({ items }: Props) {
+export function ItemsSection({ items, variableManager }: Props) {
   const [selectedItem, setSelectedItem] = useState<ItemSelection | null>(null);
+  const scheduleAutoSave = useSaveStore(s => s.scheduleAutoSave);
 
   return (
     <>
@@ -84,6 +89,43 @@ export function ItemsSection({ items }: Props) {
           <DetailRow label="数量" value={selectedItem.data?.数量 ?? 1} />
           {selectedItem.data?.类型 && <DetailRow label="类型" value={selectedItem.data.类型} />}
           {selectedItem.data?.备注 && <DetailRow label="备注" value={selectedItem.data.备注} />}
+          {variableManager && (
+            <div style={{ marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+              <button
+                onClick={() => {
+                  const removed = variableManager.removeInventoryItem(selectedItem.name);
+                  if (removed) {
+                    // 实时刷新：GameScreen 监听该事件 bumpVersion，物品格立即消失
+                    eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+                    scheduleAutoSave();
+                    setSelectedItem(null);
+                  }
+                }}
+                style={{
+                  width: '100%', padding: '8px 12px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#e53e3e';
+                  (e.currentTarget as HTMLButtonElement).style.color = '#e53e3e';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+                }}
+              >
+                <Trash2 size={13} />
+                丢弃物品
+              </button>
+            </div>
+          )}
         </DetailModal>
       )}
     </>

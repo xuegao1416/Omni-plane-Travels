@@ -236,6 +236,7 @@ export class VariableManager {
     ensureNpcCategoryDefaults(this.state);
     ensureNpcChronicleDefaults(this.state);
     ensureNpcStructureDefaults(this.state);
+    this.pruneEmptyInventoryEntries();
     this.migrateNotebookToChronicle();
     this.normalizeChronicle();
     this.migrateNotebookToTaskSystem();
@@ -283,6 +284,31 @@ export class VariableManager {
    */
   private validateAndClampModuleValues(): void {
     // 世界系统已移除，属性范围约束由世界书条目中的提示词控制
+  }
+
+  /**
+   * 清理数量归零的物品条目（玩家 + 全部 NPC 的 物品栏）。
+   * - AI 变量提取常把消耗品写成 数量:0（add 效果 min:0 的自然结果），战斗扣减同理；
+   *   若不清理会留下"空壳物品"，继续出现在下一回合快照与提示词中，污染叙事。
+   * - 物品栏不变式：任何条目 数量 >= 1；数量缺失/非数字视为遗留数据，保留不动。
+   */
+  private pruneEmptyInventoryEntries(): void {
+    const prune = (inventory: unknown): void => {
+      if (!isRecord(inventory)) return;
+      for (const [key, value] of Object.entries(inventory)) {
+        if (isRecord(value) && typeof (value as Record<string, unknown>).数量 === 'number'
+          && ((value as Record<string, unknown>).数量 as number) <= 0) {
+          delete (inventory as Record<string, unknown>)[key];
+        }
+      }
+    };
+    prune((this.state.玩家 as Record<string, unknown> | undefined)?.物品栏);
+    const roster = this.state.人物档案;
+    if (isRecord(roster)) {
+      for (const npc of Object.values(roster)) {
+        prune((npc as Record<string, unknown> | undefined)?.物品栏);
+      }
+    }
   }
 
 
@@ -1098,6 +1124,23 @@ export class VariableManager {
     const roster = this.state.人物档案;
     if (!roster || !Object.prototype.hasOwnProperty.call(roster, npcId)) return false;
     delete roster[npcId];
+    return true;
+  }
+
+  /**
+   * 从主角物品栏中彻底删除一件物品（整条删除，含全部数量）。
+   * - itemKey: 物品的名称（Record 的 key，即物品名）
+   * - 若物品不存在或 key 为空，返回 false。
+   * - 真删除：不留数量递减、不留空壳条目，下一回合快照中不再出现。
+   * - 撤销途径：回滚到删除前的历史快照即可找回（快照包含 玩家.物品栏）。
+   * - 调用方负责做好后续的 bumpVersion / scheduleAutoSave。
+   */
+  removeInventoryItem(itemKey: string): boolean {
+    if (!itemKey) return false;
+    const items = (this.state.玩家 as Record<string, unknown>)?.物品栏 as Record<string, unknown> | undefined;
+    if (!items || !Object.prototype.hasOwnProperty.call(items, itemKey)) return false;
+
+    delete items[itemKey];
     return true;
   }
 

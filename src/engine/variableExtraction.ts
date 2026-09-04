@@ -104,6 +104,10 @@ export function createVariableExtractionSnapshot(state: GameState, narrativeText
       const mentioned = narrativeText.includes(id) || (name.length > 0 && narrativeText.includes(name));
       if (getNpcCategoryValue(npc) === '离场' && !mentioned) continue;
       const personal = npc.个人信息 ?? {} as GameState['人物档案'][string]['个人信息'];
+      // NPC 物品栏：非空时带上，供 AI 在 NPC 使用/消耗/交付道具时更新（含删除）
+      const npcInventory = (npc as Record<string, unknown>).物品栏;
+      const hasInventory = !!npcInventory && typeof npcInventory === 'object' && !Array.isArray(npcInventory)
+        && Object.keys(npcInventory as Record<string, unknown>).length > 0;
       const cleaned = Object.fromEntries(Object.entries({
         姓名: npc.姓名,
         种族: npc.种族,
@@ -114,6 +118,7 @@ export function createVariableExtractionSnapshot(state: GameState, narrativeText
         战斗状态: npc.战斗状态,
         社会身份: npc.社会身份,
         关系数据: npc.关系数据,
+        ...(hasInventory ? { 物品栏: npcInventory } : {}),
         个人信息: Object.fromEntries(Object.entries({
           外貌: personal.外貌,
           表性格: personal.表性格,
@@ -212,7 +217,10 @@ async function callAuxiliaryApiForEngine(
 
   const variableUpdatePrompt = `${buildVariableExtractionPrompt(worldSystemFromDef, progressionConfig as Record<string, unknown>)}${
     hasEnabledCombatModule(worldDef, gameState) ? COMBAT_ENCOUNTER_CONTRACT_PROMPT : ''
-  }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}`;
+  }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}
+【机械结算只读边界】
+simulationRuntime 及其 effectLog 属于本地规则运行记录，不是允许修改的变量路径。下面是最近已结算记录，快照数值已包含这些变化，不得因为正文再次提及而重复加减。不要输出主线进度、候选事件或未来剧情为实际状态；只提取这轮正文已经发生且尚未结算的事实。
+${JSON.stringify(gameState.simulationRuntime?.effectLog?.slice(-12) ?? []).slice(0, 5000)}`;
 
   return callAuxiliaryApi(config, messages, variableUpdatePrompt, signal);
 }
@@ -228,8 +236,15 @@ export async function runVariableExtraction(params: {
   delayMs: number;
   maxRetries: number;
   signal?: AbortSignal;
+  /** A retry must still belong to the same save, world, turn and manager. */
+  isCurrent?: () => boolean;
 }): Promise<void> {
   const { varMgr, parsed, round, userText, mainApiConfig, worldBook, worldId, delayMs, maxRetries, signal } = params;
+  const assertCurrent = () => {
+    signal?.throwIfAborted();
+    if (params.isCurrent && !params.isCurrent()) throw new DOMException('变量提取对应的回合已失效', 'AbortError');
+  };
+  assertCurrent();
 
   if (!parsed.content.trim()) {
     const error = new Error('正文内容为空，无法执行变量提取');
@@ -259,9 +274,7 @@ export async function runVariableExtraction(params: {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      if (signal?.aborted) {
-        throw new DOMException('变量提取已中止', 'AbortError');
-      }
+      assertCurrent();
 
       // 始终通过独立 API 调用提取变量（正文和变量完全分离）
       const updateText = await callAuxiliaryApiForEngine(
@@ -273,6 +286,7 @@ export async function runVariableExtraction(params: {
         worldId,
         signal,
       );
+      assertCurrent();
 
       // AI 返回 null/空字符串/仅空白：视为无需更新，不是错误
       if (!updateText || !updateText.trim()) {
@@ -302,6 +316,7 @@ export async function runVariableExtraction(params: {
         const abilityProposals = extractStructuredAbilityProposals(parsedUpdate);
         const gameplayUpdate = stripCombatEncounterMetadata(parsedUpdate);
         const gameplayJson = gameplayUpdate === undefined ? jsonContent : JSON.stringify(gameplayUpdate);
+        assertCurrent();
         const applied = varMgr.applyAiUpdateVariable(gameplayJson);
         if (applied) {
           const activeWorld = findWorldDef(worldId);
@@ -333,6 +348,7 @@ export async function runVariableExtraction(params: {
       eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
       return;
     } catch (err: unknown) {
+      assertCurrent();
       lastError = err;
       console.warn(`[变量提取] 第 ${attempt + 1}/${maxRetries + 1} 次失败:`, (err as Error).message || err);
       if (attempt < maxRetries) {
@@ -343,6 +359,7 @@ export async function runVariableExtraction(params: {
     }
   }
 
+  assertCurrent();
   const finalError = lastError instanceof Error
     ? lastError
     : new Error('变量提取全部重试失败');

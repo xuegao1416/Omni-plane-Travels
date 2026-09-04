@@ -1009,7 +1009,7 @@ export default function GameScreen() {
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
     const content = (() => {
       switch (panel) {
-        case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} />;
+        case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} variableManager={engine.variableManager} />;
         case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} onDeleteNpc={readOnly ? undefined : handleDeleteNpc} />;
         case 'tasks': return <TaskPanel gameState={gameState} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} />;
         case 'profession': return <ProfessionTreePanel config={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} gameState={gameState} currentTick={gameState.simulationRuntime?.tick ?? 0} onUnlock={id => applyProfessionAction('unlock', id)} onUse={id => applyProfessionAction('use', id)} />;
