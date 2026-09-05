@@ -4,7 +4,7 @@ import { SkillsSection } from './profilePanel/SkillsSection';
 import { ItemsSection } from './profilePanel/ItemsSection';
 import { ProfessionSection } from './profilePanel/ProfessionSection';
 
-export default function ProfilePanel({ gameState, hasBusinessModule, professionConfig, statConfig }: ProfilePanelProps) {
+export default function ProfilePanel({ gameState, hasBusinessModule, professionConfig, statConfig, variableManager }: ProfilePanelProps) {
   const p = gameState.玩家;
 
   return (
@@ -12,7 +12,7 @@ export default function ProfilePanel({ gameState, hasBusinessModule, professionC
       <IdentitySection player={p} hasBusinessModule={hasBusinessModule} />
       <ProfessionSection gameState={gameState} config={professionConfig} statConfig={statConfig} />
       <SkillsSection skills={p.技能系统} />
-      <ItemsSection items={p.物品栏} />
+      <ItemsSection items={p.物品栏} variableManager={variableManager} />
     </div>
   );
 }
