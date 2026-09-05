@@ -176,7 +176,7 @@ export interface WorldBookEntryMeta {
 /** 世界书条目（直接嵌入 WorldDef，可注入到 system prompt） */
 export interface WorldBookEntryDef {
   uid: number;
-  key: string[];                 // 触发关键词（空数组 = 始终注入）
+  key: string[];                 // 触发关键词（空数组时：constant=true 常驻注入；constant=false 不注入）
   keysecondary?: string[];
   exclude_key?: string[];        // 排除关键词（命中即否决）
   comment: string;               // 条目标题

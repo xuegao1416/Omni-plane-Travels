@@ -271,8 +271,14 @@ class WIScanner {
     let primaryMatched = false;
 
     if (primaryKeys.length === 0) {
-      // 没有主关键词：直接视为常驻模式
-      primaryMatched = true;
+      // 没有主关键词：只有 constant 常驻条目才无条件放行（对齐 SillyTavern 语义）。
+      // 非常驻且无关键词的条目没有任何触发途径，直接跳过，
+      // 避免整本世界书被无条件全量注入（曾导致单轮 prompt 携带 20 万字）。
+      if (entry.constant === true) {
+        primaryMatched = true;
+      } else {
+        return false;
+      }
     } else {
       // 关键有主关键词时，一律走"关键词模式"匹配，
       // 即使 constant=true 也强制要求扫描文本里命中关键词。

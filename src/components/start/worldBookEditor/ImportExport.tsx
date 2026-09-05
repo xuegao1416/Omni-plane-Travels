@@ -3,6 +3,7 @@ import { Upload, Download, Plus, Save, AlertCircle } from 'lucide-react';
 import type { WorldBookEntryDef } from '../../../data/worlds-schema';
 import type { EditModeEntry } from './types';
 import { cleanEntries } from './utils';
+import { parseWorldBookImport, mergeWorldBookEntries } from '../../../utils/worldBookImport';
 
 interface ImportExportProps {
   entries: EditModeEntry[];
@@ -40,26 +41,16 @@ export function ImportExport({
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result as string);
-        const incoming: WorldBookEntryDef[] = data.worldBookEntries || data.entries || [];
-        if (!Array.isArray(incoming) || incoming.length === 0) {
-          onImportMsg('未找到有效的条目数据');
+        // 兼容多种格式：worldBookEntries / entries（大小写不限，数组或对象均可）/ 角色卡内嵌
+        const parsed = parseWorldBookImport(data);
+        if (parsed.entries.length === 0) {
+          onImportMsg('未找到有效的条目数据（支持 worldBookEntries / entries，数组或对象格式均可）');
           return;
         }
         onEntriesChange(prev => {
-          const existingUids = new Set(prev.map(e => e.uid));
-          const merged = [...prev];
-          let added = 0, replaced = 0;
-          for (const item of incoming) {
-            if (existingUids.has(item.uid)) {
-              merged[merged.findIndex(e => e.uid === item.uid)] = { ...item };
-              replaced++;
-            } else {
-              merged.push({ ...item });
-              added++;
-            }
-          }
-          onImportMsg(`导入完成：新增 ${added} 条，替换 ${replaced} 条`);
-          return merged;
+          const result = mergeWorldBookEntries(prev as WorldBookEntryDef[], parsed);
+          onImportMsg(`导入完成：新增 ${result.added} 条，替换 ${result.replaced} 条`);
+          return result.merged as EditModeEntry[];
         });
       } catch {
         onImportMsg('JSON 解析失败');

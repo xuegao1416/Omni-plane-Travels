@@ -2,6 +2,7 @@ import {
   BookOpen, ScrollText, Map, Flag, DollarSign, User, Swords, Layers, BookMarked,
 } from 'lucide-react';
 import type { WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
+import { parseWorldBookImport } from '../../../utils/worldBookImport';
 
 export const DIFFICULTY_FILTERS = [
   { key: 'all', label: '全部', color: undefined as string | undefined },
@@ -27,33 +28,12 @@ export function findEntryByType(entries: WorldBookEntryDef[] | undefined, type: 
   return entries?.find(e => e.entryType === type);
 }
 
-/** 将外部格式 JSON 转为 WorldDef */
+/** 将外部格式 JSON 转为 WorldDef（兼容 worldBookEntries / entries 任意大小写、数组或对象、角色卡内嵌） */
 export function normalizeExternal(data: any, fileName: string): WorldDef {
-  let rawList: any[] = [];
-  if (Array.isArray(data)) rawList = data;
-  else if (data.entries) rawList = Array.isArray(data.entries) ? data.entries : Object.values(data.entries);
-  else if (data.worldBookEntries) rawList = Array.isArray(data.worldBookEntries) ? data.worldBookEntries : Object.values(data.worldBookEntries);
-  else if (data.items) rawList = data.items;
-  else rawList = [data];
-
-  const entries: WorldBookEntryDef[] = [];
+  const parsed = parseWorldBookImport(data);
   const baseUid = Date.now();
-
-  for (let i = 0; i < rawList.length; i++) {
-    const item = rawList[i];
-    if (typeof item === 'string') {
-      entries.push({ uid: baseUid + i, key: [], comment: `条目 ${i + 1}`, content: item, constant: false, order: i + 1, position: 'after_char' });
-    } else if (typeof item === 'object' && item !== null) {
-      entries.push({
-        uid: item.uid ?? (baseUid + i), key: item.key || item.keys || [], keysecondary: item.keysecondary,
-        comment: item.comment || item.name || item.title || `条目 ${i + 1}`,
-        content: item.content || item.text || item.description || JSON.stringify(item),
-        constant: item.constant ?? false, order: item.order ?? item.insertionOrder ?? (i + 1),
-        position: item.position || 'after_char', depth: item.depth, entryType: undefined, probability: item.probability,
-        disable: item.disable ?? (item.enabled === false),
-      });
-    }
-  }
+  // 新建世界：统一重新分配 uid，保证唯一
+  const entries: WorldBookEntryDef[] = parsed.entries.map((entry, i) => ({ ...entry, uid: baseUid + i }));
 
   const baseName = fileName.replace(/\.json$/i, '');
   return {

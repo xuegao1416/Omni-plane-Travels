@@ -5,6 +5,7 @@ import { findWorldDef } from '../../../data/worldLoader';
 import type { WorldBookEntryDef, WorldDef } from '../../../data/worlds-schema';
 import type { EditEntry } from './inGameWorldBook/types';
 import { persistWorldToStorage, loadDefs } from './inGameWorldBook/utils';
+import { parseWorldBookImport, mergeWorldBookEntries } from '../../../utils/worldBookImport';
 import { Toolbar } from './inGameWorldBook/Toolbar';
 import { EntryList } from './inGameWorldBook/EntryList';
 import s from './inGameWorldBook/styles.module.css';
@@ -62,17 +63,13 @@ export default function InGameWorldBookEditor({ engine, worldId, onClose }: Prop
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result as string);
-        const incoming: WorldBookEntryDef[] = data.worldBookEntries || data.entries || [];
-        if (!Array.isArray(incoming) || incoming.length === 0) { setImportMsg('未找到有效的条目数据'); return; }
+        // 兼容多种格式：worldBookEntries / entries（大小写不限，数组或对象均可）/ 角色卡内嵌
+        const parsed = parseWorldBookImport(data);
+        if (parsed.entries.length === 0) { setImportMsg('未找到有效的条目数据（支持 worldBookEntries / entries，数组或对象格式均可）'); return; }
         setEntries(prev => {
-          const existingUids = new Set(prev.map(e => e.uid));
-          const merged = [...prev]; let added = 0; let replaced = 0;
-          for (const item of incoming) {
-            if (existingUids.has(item.uid)) { merged[merged.findIndex(e => e.uid === item.uid)] = { ...item }; replaced++; }
-            else { merged.push({ ...item }); added++; }
-          }
-          setImportMsg(`导入完成：新增 ${added} 条，替换 ${replaced} 条`);
-          return merged;
+          const result = mergeWorldBookEntries(prev as WorldBookEntryDef[], parsed);
+          setImportMsg(`导入完成：新增 ${result.added} 条，替换 ${result.replaced} 条`);
+          return result.merged as EditEntry[];
         });
       } catch { setImportMsg('JSON 解析失败'); }
     };
