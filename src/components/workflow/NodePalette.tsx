@@ -1,9 +1,9 @@
 // ============================================================
 //  节点面板 — 可搜索、可折叠的分类节点库
 // ============================================================
-import { useState, useMemo } from 'react';
-import { Search, ChevronRight, ChevronDown, Zap, Clock, TrendingUp, Play, MousePointerClick, Timer, Radio, GitCompare, Coins, Heart, Flag, Backpack, User, Ampersand, Pipette, ToggleLeft, Filter, Variable, Package, HeartPulse, Swords, AlarmClock, UserCog, ShoppingBag, NotebookPen, Globe, Eye, Database, BarChart, UserCheck, Hash, Dices, Calculator, Type, Search as SearchIcon, ListChecks, GitBranch, GitMerge, ListOrdered, DoorOpen, ArrowRightLeft, CreditCard, FileText, Sparkles, CircleDot, ShieldAlert } from 'lucide-react';
-import { searchNodes, getNodeCategories } from '../../modules/nodeRegistry';
+import { useState,useMemo } from 'react';
+import { Search,ChevronRight,ChevronDown,Zap,Clock,TrendingUp,Play,MousePointerClick,Timer,Radio,GitCompare,Coins,Heart,Flag,Backpack,User,Ampersand,Pipette,ToggleLeft,Filter,Variable,Package,HeartPulse,Swords,AlarmClock,UserCog,ShoppingBag,NotebookPen,Globe,Eye,Database,BarChart,UserCheck,Hash,Dices,Calculator,Type,Search as SearchIcon,ListChecks,GitBranch,GitMerge,ListOrdered,DoorOpen,ArrowRightLeft,CreditCard,FileText,Sparkles,CircleDot,ShieldAlert,Gauge } from 'lucide-react';
+import { searchNodes,getNodeCategories } from '../../modules/nodeRegistry';
 import type { NodeDefinition } from '../../modules/workflowSchema';
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
@@ -33,8 +33,6 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ size?: number; style?
   output: CreditCard,
 };
 
-// 临时导入缺失的 icon
-import { Gauge } from 'lucide-react';
 
 interface NodePaletteProps {
   onAddNode: (typeId: string) => void;

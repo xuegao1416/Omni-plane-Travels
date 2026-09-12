@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import { createInitialCustomModuleState } from './stateStore';
 import { executeCustomModuleLifecycle } from './runtime';
 import { executeCustomModuleActions } from './actionExecutor';
-import type { CustomGameplayModule, CustomGameplayModuleDefinition } from './schema';
+import type { CustomGameplayModule,CustomGameplayModuleDefinition } from './schema';
 
 const moduleDefinition = {
   kind: 'custom-gameplay-module',

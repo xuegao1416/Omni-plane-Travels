@@ -1,4 +1,4 @@
-import { Menu, Maximize2, Minimize2, PanelRightOpen } from 'lucide-react';
+import { Menu,Maximize2,Minimize2,PanelRightOpen } from 'lucide-react';
 import MobileOverlay from '../MobileOverlay';
 import type { OverlayPanel } from './types';
 import type { MobileNavItem } from './navConfig';
@@ -14,7 +14,6 @@ interface MobileLayoutProps {
   showLeftOverlay: boolean;
   onShowLeftOverlay: (show: boolean) => void;
   mobileNavItems: MobileNavItem[];
-  t: (key: string) => string;
 
   // Right overlay
   showRightOverlay: boolean;
@@ -41,7 +40,6 @@ export default function MobileLayout({
   showLeftOverlay,
   onShowLeftOverlay,
   mobileNavItems,
-  t,
   showRightOverlay,
   onShowRightOverlay,
   mobileActivePanel,

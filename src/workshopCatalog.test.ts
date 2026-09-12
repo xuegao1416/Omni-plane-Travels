@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { LOCAL_ASSET_TYPES, LOCAL_ONLY_ASSET_TYPES, PUBLIC_WORKSHOP_TYPES } from './workshopCatalog';
+import { describe,expect,test } from 'bun:test';
+import { LOCAL_ASSET_TYPES,LOCAL_ONLY_ASSET_TYPES,PUBLIC_WORKSHOP_TYPES } from './workshopCatalog';
 
 describe('workshop and local asset catalog', () => {
   test('keeps local-only presets private and mirrors every public workshop type locally', () => {

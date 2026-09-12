@@ -14,8 +14,7 @@ const world = {
   id: 'world-card-bindings-test',
   name: '绑定测试世界',
   description: '测试世界',
-  entryId: null,
-} satisfies WorldDef;
+  } satisfies WorldDef;
 
 function workflow(id: string, name: string): CardWorkflowDefinition {
   return {

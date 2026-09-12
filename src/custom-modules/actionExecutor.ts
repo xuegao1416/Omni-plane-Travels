@@ -1,11 +1,11 @@
 import type {
-  CustomGameplayModuleDefinition,
-  CustomModuleAction,
-  CustomModuleReference,
-  CustomModuleValue,
-  V2Action,
-  JsonValue,
-  StateFieldDefinition,
+CustomGameplayModuleDefinition,
+CustomModuleAction,
+CustomModuleReference,
+CustomModuleValue,
+V2Action,
+JsonValue,
+StateFieldDefinition,
 } from './schema';
 import type { CustomModuleRuntimeState } from './stateStore';
 

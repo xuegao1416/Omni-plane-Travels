@@ -1,11 +1,11 @@
 /**
  * 本地资产：公开工坊类型与本地独占预设的统一资产目录。
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy,Suspense,useCallback,useEffect,useMemo,useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BookOpen, CalendarDays, Compass, Download, Globe, Layers, Loader,
-  Package, Palette, Pencil, Puzzle, Trash2, TrendingUp, Upload, User,
+BookOpen,CalendarDays,Compass,Download,Globe,Layers,Loader,
+Package,Palette,Pencil,Puzzle,Trash2,TrendingUp,Upload,User,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { STORAGE_KEYS } from '../../config/storageKeys';
@@ -14,22 +14,22 @@ import { useConfigStore } from '../../stores/configStore';
 import { useDialog } from '../shared/Dialog';
 import type { WorldDef } from '../../data/worlds-schema';
 import type { CustomNpc } from '../../storage/db';
-import { anonymizePlayerPresetAsNpc, type NpcTemplate, type PlayerPreset } from '../../storage/templateStore';
+import { anonymizePlayerPresetAsNpc,type NpcTemplate,type PlayerPreset } from '../../storage/templateStore';
 import {
-  LOCAL_ASSET_TYPES,
-  isPublicWorkshopType,
-  type WorkshopAssetType,
+LOCAL_ASSET_TYPES,
+isPublicWorkshopType,
+type WorkshopAssetType,
 } from '../../workshopCatalog';
 import {
-  deleteCustomGameplayModule,
-  listCustomGameplayModules,
-  saveCustomGameplayModule,
+deleteCustomGameplayModule,
+listCustomGameplayModules,
+saveCustomGameplayModule,
 } from '../../custom-modules/storage';
-import { allWebEvents, deleteWebEvent, type WebEventRecord } from '../../modules/eventDb';
+import { allWebEvents,deleteWebEvent,type WebEventRecord } from '../../modules/eventDb';
 import {
-  deleteWorkshopRuntimeAsset,
-  listWorkshopRuntimeAssets,
-  updateWorkshopRuntimeAsset,
+deleteWorkshopRuntimeAsset,
+listWorkshopRuntimeAssets,
+updateWorkshopRuntimeAsset,
 } from '../../workshopRuntime';
 import StructuredAssetEditor from './StructuredAssetEditor';
 
@@ -158,7 +158,6 @@ async function portableAssetData(type: WorkshopAssetType, asset: LocalAsset): Pr
 export default function LocalAssetsTab() {
   const { isAuthenticated } = useAuthStore();
   const apiConfig = useConfigStore(state => state.apiConfig);
-  const settings = useConfigStore(state => state.settings);
   const { DialogUI, confirm, alert: showAlert } = useDialog();
   const [activeType, setActiveType] = useState<WorkshopAssetType>('world_package');
   const [assetGroups, setAssetGroups] = useState<AssetGroups>(() => emptyGroups());
@@ -429,7 +428,7 @@ export default function LocalAssetsTab() {
 
       {editor?.type === 'world_package' && typeof document !== 'undefined' && createPortal(
         <Suspense fallback={<div className="local-asset-native-overlay registry-assets-empty"><Loader size={24} className="animate-spin" />正在打开世界编辑器…</div>}>
-          <WorldEditorForm initialWorld={editor.asset.raw as WorldDef} onSave={world => void handleWorldSave(world)} onCancel={() => setEditor(null)} apiConfig={apiConfig} settings={settings} presentationMode="world-weave" previewMode="edit" />
+          <WorldEditorForm initialWorld={editor.asset.raw as WorldDef} onSave={world => void handleWorldSave(world)} onCancel={() => setEditor(null)} apiConfig={apiConfig} previewMode="edit" />
         </Suspense>,
         document.body,
       )}

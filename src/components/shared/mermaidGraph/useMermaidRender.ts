@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState,useEffect,useRef,useCallback } from 'react';
 import type { NodeDetail } from './types';
-import { ensureMermaidInit, getMermaid, getNodeKeyFromDomId } from './mermaidInit';
+import { ensureMermaidInit,getMermaid,getNodeKeyFromDomId } from './mermaidInit';
 
 interface UseMermaidRenderParams {
   graphDefinition: string;

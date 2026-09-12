@@ -166,8 +166,7 @@ export interface ProgressionState {
 }
 
 /**
- * 完整的成长体系模块（兼容旧格式）
- * @deprecated 新代码请使用 ProgressionConfig + ProgressionState 分离读取
+ * 成长体系的组合视图。编辑器/构建层仍以该结构读写；运行时可按需投影为 ProgressionConfig + ProgressionState。
  */
 export interface ProgressionModuleSchema extends ProgressionConfig, ProgressionState {}
 
@@ -603,8 +602,6 @@ export interface ProfessionModuleSchema {
   schemaVersion?: 2;
   professions: ProfessionDef[];
   innateTalents: InnateTalentDef[];
-  freeSkillCatalog?: SkillDef[];
-  /** v2 canonical alias; freeSkillCatalog remains a compatibility projection. */
   freeSkills?: SkillDef[];
   creationTalentBudget: number;
   allowNoProfession?: boolean;
@@ -617,7 +614,7 @@ export interface ProfessionPackManifest {
   id: string;
   name: string;
   version: string;
-  schemaVersion: 1 | 2;
+  schemaVersion: 2;
   description?: string;
   author?: string;
   createdAt?: number;
@@ -630,8 +627,6 @@ export interface ProfessionPackManifest {
 export interface ProfessionPack extends ProfessionModuleSchema {
   schemaVersion?: 2;
   manifest: ProfessionPackManifest;
-  /** Legacy v1 packs may be usable before they reach the v3 baseline. */
-  baselineStatus?: 'v3-complete' | 'legacy-v1-incomplete';
 }
 
 /** 世界只持有包引用与选择范围；包正文由职业典藏解析。 */
@@ -809,12 +804,6 @@ export interface PeriodicRule {
    * 支持：set / addEvent / requestCombat / modifyResource / scheduleTick。
    */
   actions?: Action[];
-  /**
-   * @deprecated 已废弃 — 请使用 actions 字段。
-   * 旧版 ModuleEffects 格式，引擎会自动转换为 Action[] 执行。
-   * 仅保留用于向后兼容旧数据，新数据不应使用此字段。
-   */
-  effects?: ModuleEffects;
   /** 事件描述（编辑器/AI 叙事用，引擎忽略） */
   description?: string;
   /** 结算后是否喂给 AI 做叙事渲染 */
@@ -1065,11 +1054,6 @@ export interface EventGraphNode {
   description?: string;
   /** 结算后是否喂给 AI 做叙事渲染 */
   narrateToAI?: boolean;
-  /**
-   * @deprecated 已废弃 — 周期节点请通过连线 effect 节点产出 actions。
-   * 旧版 ModuleEffects 格式，图转换时自动迁移为 actions。
-   */
-  effects?: ModuleEffects;
   /** 事件节点产出的 SimEvent 片段 */
   event?: Partial<SimEvent>;
   /** 世界状态轴更新（worldState 节点） */
@@ -1546,7 +1530,7 @@ export interface CardNodeExecutionResult {
   /** 输出 socket 值 */
   outputs?: Record<string, unknown>;
   /** 动态选项配置（choice.dynamic 节点输出） */
-  dynamicConfig?: Record<string, unknown>;
+  dynamicConfig?: DynamicChoiceConfig;
 }
 
 // ─── 世界书文件 ───
@@ -1555,7 +1539,7 @@ export interface WorldBookFile {
   entries: WorldBookEntryDef[];
 }
 
-// ─── 校验参考：当前世界可用变量白名单（validateEvent 引用完整性） ───
+// ─── 当前世界可用变量白名单（编辑器/规则校验参考） ───
 export interface WorldDefLike {
   /** 合法 statId 集合（如 attrA.current / dim1.value / special.<id>） */
   statIds: string[];

@@ -1,6 +1,6 @@
 import type { ApiConfig } from '../../../api/types';
 import { Toggle } from '../SettingsUIComponents';
-import { rowStyle, REASONING_OPTIONS, warningStyle } from './types';
+import { rowStyle,REASONING_OPTIONS,warningStyle } from './types';
 
 interface Props {
   config: ApiConfig;

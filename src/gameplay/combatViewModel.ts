@@ -54,6 +54,12 @@ function portraitFor(unit: CombatParticipantV2, portraits: Record<string, { src?
 function card(unit: CombatParticipantV2, session: CombatSessionV2, portraits: Record<string, { src?: string; gender?: string }>): CombatUnitCardModel {
   const maxHp = Math.max(1, unit.maxHp);
   const maxResource = Math.max(1, unit.maxResource ?? 0);
+  // Mechanics use normalized cross-world values, but the battle cards should
+  // speak the same numbers as the player's/NPC's regular status panel.
+  const displayMaxHp = Math.max(1, Math.round(unit.stateBinding?.originalMaxHp ?? maxHp));
+  const displayMaxResource = Math.max(1, Math.round(unit.stateBinding?.originalMaxResource ?? maxResource));
+  const displayHp = Math.max(0, Math.round((unit.hp / maxHp) * displayMaxHp));
+  const displayResource = Math.max(0, Math.round(((unit.resource ?? 0) / maxResource) * displayMaxResource));
   const initiativeIndex = session.initiativeOrder.indexOf(unit.id);
   const recent = [...session.actionSequence].reverse().find(action => action.resolved && (action.unitId === unit.id || action.targetIds.includes(unit.id)));
   const feedback = recent
@@ -63,9 +69,11 @@ function card(unit: CombatParticipantV2, session: CombatSessionV2, portraits: Re
         : recent.unitId === unit.id ? 'acted' as const
           : undefined
     : undefined;
+  const displayDamage = recent?.damage ? Math.max(1, Math.round((recent.damage / maxHp) * displayMaxHp)) : 0;
+  const displayHealing = recent?.healing ? Math.max(1, Math.round((recent.healing / maxHp) * displayMaxHp)) : 0;
   const feedbackText = recent
-    ? feedback === 'hit' ? `受到 ${recent.damage} 点伤害${recent.critical ? '（暴击）' : ''}`
-      : feedback === 'healed' ? `恢复 ${recent.healing} 点生命`
+    ? feedback === 'hit' ? `受到 ${displayDamage} 点伤害${recent.critical ? '（暴击）' : ''}`
+      : feedback === 'healed' ? `恢复 ${displayHealing} 点生命`
         : feedback === 'missed' ? '攻击未命中'
           : feedback === 'acted' ? '已行动' : undefined
     : undefined;
@@ -73,10 +81,10 @@ function card(unit: CombatParticipantV2, session: CombatSessionV2, portraits: Re
     id: unit.id,
     name: unit.identity,
     side: unit.side === 'enemy' ? 'enemy' : 'ally',
-    hp: Math.max(0, unit.hp),
-    maxHp,
-    resource: Math.max(0, unit.resource ?? 0),
-    maxResource,
+    hp: displayHp,
+    maxHp: displayMaxHp,
+    resource: displayResource,
+    maxResource: displayMaxResource,
     hpPercent: Math.round(Math.max(0, Math.min(1, unit.hp / maxHp)) * 100),
     resourcePercent: Math.round(Math.max(0, Math.min(1, (unit.resource ?? 0) / maxResource)) * 100),
     statuses: [...new Set([

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { BookOpen, Check, LockKeyhole, Sparkles, X } from 'lucide-react';
-import type { InnateTalentDef, ProfessionModuleSchema } from '../../modules/schema';
+import { BookOpen,Check,LockKeyhole,Sparkles,X } from 'lucide-react';
+import type { InnateTalentDef,ProfessionModuleSchema } from '../../modules/schema';
 import { describeProfessionMechanics } from '../../gameplay/profession';
 import { isDivineTalent } from '../../gameplay/creation/creationPoints';
-import { professionEmblemSrc, resolveAbilityIconKey } from '../../data/professions/professionVisuals';
+import { professionEmblemSrc,resolveAbilityIconKey } from '../../data/professions/professionVisuals';
 import OverlayPortal from '../shared/OverlayPortal';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 

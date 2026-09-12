@@ -1,4 +1,4 @@
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle,XCircle } from 'lucide-react';
 
 interface Props {
   testing: boolean;

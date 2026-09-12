@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, SkipForward } from 'lucide-react';
+import { ChevronLeft,ChevronRight,SkipForward } from 'lucide-react';
 import { EntrySlicedButton } from '../EntrySurface';
 
 interface BottomNavProps {

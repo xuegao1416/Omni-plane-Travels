@@ -1,4 +1,4 @@
-import { ArrowLeft, Swords } from 'lucide-react';
+import { ArrowLeft,Swords } from 'lucide-react';
 import type { CombatSessionV2 } from '../../../gameplay/protocols';
 
 const riskLabels: Record<CombatSessionV2['riskMode'], string> = { easy: '简单', normal: '普通', hard: '困难', inferno: '炼狱' };

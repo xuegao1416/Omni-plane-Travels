@@ -5,8 +5,8 @@
 
 import { useMemo } from 'react';
 import {
-  BarChart3, TrendingUp, Leaf, Briefcase, Dice6, Star, Swords,
-  type LucideIcon,
+BarChart3,TrendingUp,Leaf,Briefcase,Dice6,Star,Swords,
+type LucideIcon,
 } from 'lucide-react';
 
 /** 模块定义（框架层零指向性） — 唯一模块定义源 */

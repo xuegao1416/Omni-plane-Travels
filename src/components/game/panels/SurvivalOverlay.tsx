@@ -7,10 +7,10 @@
  * - 变更日志（最近 N 次资源变化 + 原因）
  * - 演化蓝图进度（当前阶段 + 下一阶段触发条件）
  */
-import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, X, Leaf, ScrollText, AlertTriangle, Clock, Zap, Backpack, Hammer, Sparkle, Trash2 } from 'lucide-react';
+import { useState,useEffect } from 'react';
+import { ArrowLeft,X,Leaf,ScrollText,AlertTriangle,Clock,Zap,Backpack,Hammer,Sparkle,Trash2 } from 'lucide-react';
 import type { InventoryItem } from '../../../schema/variables';
-import type { SurvivalModuleSchema, ResourceEvolutionStep, SurvivalRecipe } from '../../../modules/schema';
+import type { SurvivalModuleSchema,ResourceEvolutionStep,SurvivalRecipe } from '../../../modules/schema';
 import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
 
 interface SurvivalOverlayProps {

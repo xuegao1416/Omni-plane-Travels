@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../../../engine/types';
-import type { WorldSystemData, DiceRoll } from '../../../../modules/schema';
+import type { WorldSystemData,DiceRoll } from '../../../../modules/schema';
 
 export interface Props {
   message: ChatMessage;

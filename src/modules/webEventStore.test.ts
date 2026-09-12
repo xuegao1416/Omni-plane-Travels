@@ -9,6 +9,7 @@ import {
   webDisablePack,
   webUninstallPack,
   webValidatePack,
+  webGetEventDetail,
   createEmptyPack,
   createPackWithEvent,
   saveEventToPack,
@@ -16,7 +17,6 @@ import {
   renameEventInPack,
   listEventsInPack,
   savePackMeta,
-  savePeriodicRulesToPack,
   webExportPack,
   installWorldEventPacks,
 } from './webEventStore';
@@ -69,7 +69,12 @@ async function buildZip(
 ): Promise<ArrayBuffer> {
   const zip = new JSZip();
   zip.file('manifest.json', JSON.stringify(packManifest));
-  zip.file('schema/card.json', JSON.stringify(cardFile));
+  const legacy = cardFile as typeof legacyPuckCard;
+  zip.file('schema/events.json', JSON.stringify({
+    version: 1,
+    name: packManifest.name,
+    events: [{ id: 'legacy-event', name: packManifest.name, puck: legacy?.puck, cards: legacy?.cards }],
+  }));
   zip.file('assets/keep.bin', new Uint8Array([0, 1, 255, 42]));
   for (const [path, content] of Object.entries(additionalFiles)) {
     zip.file(path, content);
@@ -154,6 +159,7 @@ test('web 导入 → 列表 → 启用/禁用 → 卸载', async () => {
     const record = await getWebEvent('test-mod');
     expect(record).toBeDefined();
     expect(record?.files['schema/card.json']).toBeUndefined();
+    expect(record?.manifest.cards).toBeUndefined();
     const index = JSON.parse(record?.files['schema/events.json'] as string) as {
       version: number;
       events: Array<{ id: string; name: string }>;
@@ -174,6 +180,9 @@ test('web 导入 → 列表 → 启用/禁用 → 卸载', async () => {
       ['legacy-choice', 'choice.static'],
     ]);
     expect(workflow.connections).toHaveLength(2);
+
+    const detail = await webGetEventDetail('test-mod');
+    expect(detail.cardsSummary).toEqual([{ id: eventId, title: manifest.name, file: `schema/event-${eventId}.json`, kind: 'add' }]);
 
     const asset = record?.files['assets/keep.bin'];
     expect(asset).toBeInstanceOf(Blob);
@@ -261,9 +270,9 @@ test('web migration failure does not create a new IndexedDB record and keeps for
   expect(error).toMatchObject({
     name: 'EventApiError',
     code: 'LEGACY_COMPONENT_UNSUPPORTED',
-    filePath: 'schema/card.json',
+    filePath: 'schema/events.json',
     context: {
-      filePath: 'schema/card.json',
+      filePath: 'schema/events.json',
       eventId: expect.any(String),
       componentId: 'legacy-video',
       componentType: 'video',
@@ -281,6 +290,7 @@ test('web migration failure does not overwrite an existing record with the same 
 
     const conflictingBuf = await buildZip(existingManifest, legacyPuckCard, {
       'schema/events.json': JSON.stringify({ version: 2, events: [] }),
+      'schema/card.json': JSON.stringify(legacyPuckCard),
     });
     const error = await captureError(() => webImportFromFile(conflictingBuf));
     expect(error).toBeInstanceOf(EventApiError);
@@ -425,19 +435,6 @@ test('listEventsInPack returns canonical metadata without fabricated cards', asy
   expect('cards' in (events[0] as object)).toBe(false);
 });
 
-test('savePeriodicRulesToPack keeps periodic rules out of events.json', async () => {
-  const packId = await createEmptyPack('周期规则包');
-  const periodicRules: PeriodicRule[] = [{ id: 'periodic-one', intervalTicks: 3, actions: [] }];
-
-  await savePeriodicRulesToPack(packId, periodicRules);
-
-  const record = await getWebEvent(packId);
-  const index = JSON.parse(record!.files['schema/events.json'] as string) as Record<string, unknown>;
-  expect(index.version).toBe(2);
-  expect(index).not.toHaveProperty('periodicRules');
-  expect(JSON.parse(record!.files['schema/rules.json'] as string)).toMatchObject({ periodicRules });
-});
-
 test('webExportPack exports the same canonical files without schema/card.json', async () => {
   const entry: EventIndexEntry = { id: 'evt-one', name: '事件一' };
   const workflow = workflowFor(entry);
@@ -503,8 +500,7 @@ function worldWithEventPack(eventPacks: NonNullable<WorldDef['eventPacks']>): Wo
     id: 'world-event-pack-test',
     name: '世界事件包测试',
     description: '测试世界',
-    entryId: null,
-    eventPacks,
+        eventPacks,
   };
 }
 

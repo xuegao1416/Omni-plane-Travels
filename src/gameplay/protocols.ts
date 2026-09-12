@@ -3,10 +3,9 @@ import type {
   CombatScalingStatId,
   ProfessionAccentKey,
   ProfessionAbilityType,
-  ProfessionPack,
 } from '../modules/schema';
 import type { GameplayCost, GameplayEffect, GameplayReward } from './types';
-import { createDefaultGameState, type GameState } from '../schema/variables';
+import type { GameState } from '../schema/variables';
 import type { NarrativeDecisionRecord } from './narrativeDecision';
 import type { ChatMessage } from '../engine/types';
 import type { SimulationState } from '../simulation/types';
@@ -64,8 +63,7 @@ export interface AbilityDefinition {
     checks?: Array<{ statIds?: CombatScalingStatId[]; value: number }>;
     combatAction?: CombatActionDefinition;
   };
-  /** Original fields retained for lossless v1/v2 round trips and editor repair. */
-  legacy?: Record<string, unknown>;
+  target?: AbilityProposalTarget;
 }
 
 export interface AbilityRuntime {
@@ -116,8 +114,6 @@ export interface ProfessionPackV2 {
   allowNoProfession: boolean;
   initialAbilityPoints: number;
   abilityPointsPerTier: number;
-  baselineStatus?: 'v3-complete' | 'legacy-v1-incomplete';
-  legacy?: Record<string, unknown>;
 }
 
 const LOCAL_PROFESSION_ICON_KEYS = new Set([
@@ -395,7 +391,7 @@ export interface V3GameStateRuntime {
   pendingEncounterRequest?: CombatEncounterRequest;
   combatSession?: CombatSessionV2;
   combatResult?: CombatResult;
-  /** Unified definitions/instances; absent keeps old saves unchanged. */
+  /** Unified definitions/instances; optional while the feature is inactive. */
   abilityDefinitions?: Record<string, AbilityDefinition>;
   abilityInstances?: Record<string, AbilityInstance>;
   pendingAbilityProposals?: Record<string, AbilityProposal>;
@@ -508,8 +504,6 @@ function normalizeAbility(value: unknown, fallbackCategory: AbilityCategory, pro
     ...(Number.isFinite(Number(proficiencyRaw.maxRank)) ? { maxRank: integer(proficiencyRaw.maxRank, 1, 1, 99) } : {}),
   } : undefined;
   const statuses = strings(mechanics?.statuses);
-  const legacySource = record(raw.legacy);
-  const legacy = legacySource ? clone(legacySource) : clone(raw);
   const normalizedMechanics = {
     ...(costs?.length ? { costs } : {}),
     ...(effects?.length ? { effects } : {}),
@@ -543,8 +537,8 @@ function normalizeAbility(value: unknown, fallbackCategory: AbilityCategory, pro
     ...(typeof raw.exclusiveGroup === 'string' && raw.exclusiveGroup.trim() ? { exclusiveGroup: raw.exclusiveGroup.trim() } : {}),
     tags: strings(raw.tags),
     ...(typeof raw.iconKey === 'string' && LOCAL_PROFESSION_ICON_KEYS.has(raw.iconKey.trim()) ? { iconKey: raw.iconKey.trim() } : {}),
+    ...(raw.target === 'self' || raw.target === 'ally' || raw.target === 'enemy' || raw.target === 'area' || raw.target === 'none' ? { target: raw.target } : {}),
     ...(Object.keys(normalizedMechanics).length ? { mechanics: normalizedMechanics } : {}),
-    legacy,
   };
 }
 
@@ -568,7 +562,6 @@ function normalizeManifest(value: unknown): ProfessionPackManifestV2 {
 export function migrateProfessionPack(input: unknown): ProfessionPackV2 {
   const raw = record(input) ?? {};
   const manifest = normalizeManifest(raw.manifest);
-  const packLegacy = record(raw.legacy) ? clone(raw.legacy) as Record<string, unknown> : clone(raw);
   const professions = Array.isArray(raw.professions)
     ? raw.professions.map(item => {
       const profession = record(item);
@@ -606,7 +599,6 @@ export function migrateProfessionPack(input: unknown): ProfessionPackV2 {
     allowNoProfession: raw.allowNoProfession !== false,
     initialAbilityPoints: integer(raw.initialAbilityPoints, 0, 0, 999),
     abilityPointsPerTier: integer(raw.abilityPointsPerTier, 1, 0, 999),
-    legacy: packLegacy,
   };
 }
 
@@ -767,8 +759,8 @@ function normalizeActionRecord(value: unknown, index: number): CombatActionRecor
   const kind = raw.kind === 'attack' || raw.kind === 'skill' || raw.kind === 'item' || raw.kind === 'defend' || raw.kind === 'flee' ? raw.kind : undefined;
   if (!kind) return undefined;
   const targetIds = strings(raw.targetIds);
-  const commandId = text(raw.commandId, text(raw.id, `legacy-command-${index}`));
-  const transactionId = text(raw.transactionId, `combat:legacy:${commandId}`);
+  const commandId = text(raw.commandId, text(raw.id, `command-${index}`));
+  const transactionId = text(raw.transactionId, `combat:${commandId}`);
   return {
     id: text(raw.id, `combat-action-${index}`),
     commandId,
@@ -798,14 +790,10 @@ export function normalizeCombatSessionV2(input: unknown): CombatSessionV2 | unde
   const seed = integer(raw.seed, 0, 0, 2147483647);
   const round = integer(raw.round, 1, 1, 999999);
   const id = raw.id.trim();
-  const encounter = normalizeCombatEncounterProposal(raw.encounter) ?? {
-    schemaVersion: 2, id: `${id}:encounter`, context: '旧存档战斗', threatBand: 'matched' as const,
-    allies: [], enemies: [{ id: 'enemy-1', identity: '未知敌人', temporary: true }], neutrals: [],
-  };
+  const encounter = normalizeCombatEncounterProposal(raw.encounter);
   const rawCheckpoint = record(raw.preCombatCheckpoint);
-  const checkpointGameState = record(rawCheckpoint?.gameState)
-    ? clone(rawCheckpoint?.gameState) as GameState
-    : createDefaultGameState();
+  if (!encounter || !rawCheckpoint || !record(rawCheckpoint.gameState)) return undefined;
+  const checkpointGameState = clone(rawCheckpoint.gameState) as GameState;
   const checkpoint: CombatCheckpointV2 = {
     schemaVersion: 2,
     sessionId: id,
@@ -875,68 +863,109 @@ export function canRollbackCombat(riskMode: CombatRiskMode = 'normal', lifecycle
   return lifecycle !== 'ended' && riskMode !== 'inferno';
 }
 
-function migrateLegacyCombatSession(value: unknown, checkpointState?: GameState): CombatSessionV2 | undefined {
-  const raw = record(value);
-  if (!raw) return undefined;
-  const id = text(raw.encounterId, '');
-  if (!id) return undefined;
-  const legacyParticipants = Array.isArray(raw.participants) ? raw.participants : [];
-  const participantsInput = legacyParticipants.map(item => {
-    const participant = record(item) ?? {};
+
+function migratePreviousCombatRuntime(state: GameState): CombatSessionV2 | undefined {
+  const legacyRoot = record((state as unknown as Record<string, unknown>).combat);
+  const legacy = record(legacyRoot?.active);
+  if (!legacy) return undefined;
+
+  const rawParticipants = Array.isArray(legacy.participants) ? legacy.participants : [];
+  const migratedParticipants = rawParticipants.map((item) => {
+    const raw = record(item) ?? {};
+    const rawStatuses = Array.isArray(raw.statuses) ? raw.statuses : [];
+    const typedStatuses = rawStatuses.flatMap((status) => {
+      const value = record(status);
+      if (!value) return [];
+      return [{
+        id: text(value.id, 'status'),
+        name: text(value.name, text(value.id, '状态')),
+        remainingRounds: integer(value.remainingRounds, 1, 0, 999),
+        stacks: integer(value.stacks, 1, 1, 999),
+        ...(Number.isFinite(Number(value.damagePerRound)) ? { damagePerRound: number(value.damagePerRound, 0, 0, 999999) } : {}),
+        ...(Number.isFinite(Number(value.healingPerRound)) ? { healingPerRound: number(value.healingPerRound, 0, 0, 999999) } : {}),
+        ...(record(value.modifiers) ? { modifiers: Object.fromEntries(Object.entries(value.modifiers as Record<string, unknown>).flatMap(([key, amount]) => Number.isFinite(Number(amount)) ? [[key, number(amount, 0)]] : [])) } : {}),
+      }];
+    });
     return {
-      id: text(participant.id, 'unit'),
-      side: normalizeSide(participant.side),
-      identity: text(participant.name, text(participant.id, '单位')),
-      hp: participant.hp,
-      maxHp: participant.maxHp,
-      statuses: [],
-      cooldowns: participant.cooldowns,
-      items: [],
-      actedRound: 0,
+      ...raw,
+      identity: text(raw.identity ?? raw.name, text(raw.id, '单位')),
+      statuses: rawStatuses.filter((status): status is string => typeof status === 'string'),
+      ...(typedStatuses.length ? { typedStatuses } : {}),
+      source: raw.side === 'player' ? 'player' : raw.side === 'enemy' ? 'enemy' : raw.source,
+      actedRound: integer(raw.actedRound, 0, 0, 999999),
+      items: Array.isArray(raw.items) ? raw.items : [],
     };
   });
-  const participants = normalizeParticipants(participantsInput);
-  const actors = participants.map(participant => ({ id: participant.id, identity: participant.identity, temporary: false }));
-  const proposal: CombatEncounterProposal = {
+  const participants = normalizeParticipants(migratedParticipants, 64);
+  if (participants.length === 0) return undefined;
+
+  const encounterId = text(legacy.encounterId, 'previous-combat');
+  const encounter: CombatEncounterProposal = {
     schemaVersion: 2,
-    id,
-    context: text(raw.encounterName, '旧存档战斗'),
+    id: encounterId,
+    context: text(legacy.encounterName, '上一版战斗'),
     threatBand: 'matched',
-    allies: actors.filter(actor => participants.find(item => item.id === actor.id)?.side === 'ally'),
-    enemies: actors.filter(actor => participants.find(item => item.id === actor.id)?.side === 'enemy'),
-    neutrals: actors.filter(actor => participants.find(item => item.id === actor.id)?.side === 'neutral'),
+    allies: participants.filter((unit) => unit.side === 'ally').map((unit) => ({ id: unit.id, identity: unit.identity, temporary: unit.temporary === true, source: unit.source === 'pet' || unit.source === 'summon' || unit.source === 'temporary' ? unit.source : 'npc' })),
+    enemies: participants.filter((unit) => unit.side === 'enemy').map((unit) => ({ id: unit.id, identity: unit.identity, temporary: unit.temporary === true, source: unit.source === 'pet' || unit.source === 'summon' || unit.source === 'temporary' ? unit.source : 'npc' })),
+    neutrals: participants.filter((unit) => unit.side === 'neutral').map((unit) => ({ id: unit.id, identity: unit.identity, temporary: unit.temporary === true, source: 'npc' })),
   };
-  if (proposal.enemies.length === 0) return undefined;
-  return normalizeCombatSessionV2({
-    id,
-    encounter: proposal,
-    riskMode: 'normal',
-    seed: 0,
-    round: raw.round,
-    activeUnitId: raw.activeActorId,
-    actionPointsPerTurn: raw.actionPointsPerTurn,
-    participants: participants.map(participant => ({ ...participant })),
-    ...(checkpointState ? {
-      preCombatCheckpoint: {
-        capturedAt: Date.now(),
-        round: 0,
-        seed: 0,
-        randomCursor: 0,
-        participants,
-        gameState: clone(checkpointState),
-        checkpointRevision: 1,
-      },
-    } : {}),
-  });
+
+  const checkpointState = clone(state) as GameState & Record<string, unknown>;
+  delete checkpointState.combat;
+  const sessionId = `migrated-${encounterId}`;
+  const round = integer(legacy.round, 1, 1, 999999);
+  const seed = 0;
+  const checkpoint: CombatCheckpointV2 = {
+    schemaVersion: 2,
+    sessionId,
+    capturedAt: Date.now(),
+    round: Math.max(0, round - 1),
+    seed,
+    randomCursor: 0,
+    participants: clone(participants),
+    gameState: checkpointState,
+    checkpointRevision: 1,
+  };
+  const status = legacy.status === 'victory' || legacy.status === 'defeat' || legacy.status === 'draw'
+    ? legacy.status
+    : 'active';
+  const enemyIds = participants.filter((unit) => unit.side === 'enemy').map((unit) => unit.id);
+  return {
+    schemaVersion: 2,
+    id: sessionId,
+    encounter,
+    riskMode: normalizeCombatRiskMode(state.v3?.featureFlags?.combatRiskMode),
+    statLabels: { health: '生命', resource: '能量' },
+    seed,
+    round,
+    activeUnitId: text(legacy.activeActorId, participants.find((unit) => unit.side === 'player')?.id ?? participants[0]?.id ?? 'player'),
+    actionPointsPerTurn: integer(legacy.actionPointsPerTurn, 1, 1, 5),
+    participants,
+    actionSequence: [],
+    preCombatCheckpoint: checkpoint,
+    status,
+    lifecycle: status === 'active' ? 'active' : 'terminal',
+    availableAllyPool: clone(participants.filter((unit) => unit.side !== 'enemy')),
+    availableEnemyPool: clone(participants.filter((unit) => unit.side === 'enemy')),
+    lockedEnemyIds: enemyIds,
+    waves: [{ id: `${sessionId}:wave:1`, unitIds: enemyIds }],
+    initiativeOrder: Array.isArray(legacy.turnOrder) ? strings(legacy.turnOrder) : participants.map((unit) => unit.id),
+    randomCursor: 0,
+    appliedTransactionIds: [],
+    abilityDefinitions: {},
+    abilityInstances: {},
+    itemDefinitions: {},
+  };
 }
 
-export function migrateGameStateToV3(state: GameState): GameState {
+export function normalizeGameStateV3(state: GameState): GameState {
   const next = clone(state);
   next.narrativeDecisions = Array.isArray(next.narrativeDecisions) ? next.narrativeDecisions : [];
   const current = next.v3;
   const normalizedCurrentCombat = current?.combatSession
     ? normalizeCombatSessionV2(current.combatSession) ?? clone(current.combatSession)
-    : undefined;
+    : migratePreviousCombatRuntime(next);
+  delete (next as GameState & Record<string, unknown>).combat;
   const pendingEncounterRequest = current?.pendingEncounterRequest
     ? normalizeCombatEncounterRequest(current.pendingEncounterRequest)
     : undefined;
@@ -954,19 +983,15 @@ export function migrateGameStateToV3(state: GameState): GameState {
     ...(current?.abilityInstances ? { abilityInstances: clone(current.abilityInstances) } : {}),
     ...(current?.pendingAbilityProposals ? { pendingAbilityProposals: clone(current.pendingAbilityProposals) } : {}),
   };
-  if (!next.v3.combatSession && state.combat?.active) {
-    const migratedCombat = migrateLegacyCombatSession(state.combat.active, state);
-    if (migratedCombat) next.v3.combatSession = migratedCombat;
-  }
   return next;
 }
 
-/** The loaded world's enabled modules override stale flags created by older migrations. */
+/** The loaded world's enabled modules are authoritative for runtime feature flags. */
 export function synchronizeV3FeatureFlagsForWorld(
   stateInput: GameState,
   options: { professionsEnabled: boolean; combatEnabled: boolean; fallbackRiskMode?: CombatRiskMode },
 ): GameState {
-  const state = migrateGameStateToV3(stateInput);
+  const state = normalizeGameStateV3(stateInput);
   state.v3!.featureFlags = {
     professionsEnabled: options.professionsEnabled,
     combatEnabled: options.combatEnabled,
@@ -975,14 +1000,5 @@ export function synchronizeV3FeatureFlagsForWorld(
   return state;
 }
 
-export function isProfessionPackV2(value: unknown): value is ProfessionPackV2 {
-  const raw = record(value);
-  return raw?.schemaVersion === 2 && record(raw.manifest)?.schemaVersion === 2;
-}
-
-export function isLegacyProfessionPack(value: unknown): value is ProfessionPack {
-  const raw = record(value);
-  return raw?.schemaVersion !== 2 && Array.isArray(raw?.professions) && record(raw?.manifest) !== undefined;
-}
 
 export type { NarrativeDecisionRecord };

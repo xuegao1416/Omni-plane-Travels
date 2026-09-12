@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { NarrativeMemoryRuntime, VectorMemoryItem } from '../../../../memory/types';
+import type { NarrativeMemoryRuntime,VectorMemoryItem } from '../../../../memory/types';
 import type { NodeDetail } from '../../../shared/MermaidGraphPanel';
 import { buildMemoryRuntimeGraphPayload } from '../../../../memory/narrativeGraph';
 

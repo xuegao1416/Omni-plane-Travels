@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect,useState } from 'react';
 import UpdateLogOverlay from './UpdateLogOverlay';
+import { APP_VERSION } from '../../config/version';
 
 interface MainMenuViewProps {
   onStartWizard: () => void;
@@ -49,7 +50,7 @@ export default function MainMenuView({ onStartWizard, title, subtitle }: MainMen
       </section>
 
       <div className="entry-home-footer" aria-label="版本">
-        <span>v2.8.1</span>
+        <span>v{APP_VERSION}</span>
       </div>
       <UpdateLogOverlay />
     </main>

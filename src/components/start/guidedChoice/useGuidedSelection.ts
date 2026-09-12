@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { WorldDef, WorldBookEntryDef, WorldModule } from '../../../data/worlds-schema';
-import type { DimensionChoice, DimensionGeneration, DimensionSelection } from '../../../worldgen/choice';
-import { generateWorldFromSelections, generateModuleEntries } from '../../../worldgen/choice';
-import { requestStreamWithRetry, requestCompletion } from '../../../api/client';
+import { useState,useEffect,useCallback,useRef } from 'react';
+import type { WorldDef,WorldBookEntryDef,WorldModule } from '../../../data/worlds-schema';
+import type { DimensionChoice,DimensionGeneration,DimensionSelection } from '../../../worldgen/choice';
+import { generateWorldFromSelections,generateModuleEntries } from '../../../worldgen/choice';
+import { requestStreamWithRetry,requestCompletion } from '../../../api/client';
 import { GUIDED_DIMENSIONS } from './dimensions';
-import { generateGuidedOptions, regenerateDimensionOptions, extractJSON } from './helpers';
+import { generateGuidedOptions,regenerateDimensionOptions,extractJSON } from './helpers';
 
 export interface UseGuidedSelectionParams {
   visible: boolean;
@@ -280,8 +280,7 @@ ${customSubtitle.trim() ? `- 描述：${customSubtitle.trim()}` : ''}
         icon: worldDef.icon || 'Globe',
         tags: worldDef.tags || [],
         difficulty: worldDef.difficulty || 'medium',
-        entryId: null,
-        modules: modules.length > 0 ? modules : undefined,
+                modules: modules.length > 0 ? modules : undefined,
         worldBookEntries: [...worldBookEntries, ...moduleWorldBookEntries],
       });
     } catch (err) {

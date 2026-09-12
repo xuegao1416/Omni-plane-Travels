@@ -3,10 +3,10 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Target, X } from 'lucide-react';
+import { ChevronDown,ChevronRight,Target,X } from 'lucide-react';
 import type { SimEvent } from '../../../../simulation/types';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
-import { LEVEL_ICONS, LEVEL_COLORS, getLevelLabel } from './constants';
+import { LEVEL_ICONS,LEVEL_COLORS,getLevelLabel } from './constants';
 import { PlayerHookItem } from './PlayerHookItem';
 
 interface EventCardProps {

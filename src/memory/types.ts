@@ -94,8 +94,6 @@ export interface MemoryRetentionConfig {
   maxHotEventCards: number;
   checkpointInterval: number;
   maxVectorMemories: number;
-  /** @deprecated 原始事实账本不再截断；保留字段仅用于兼容旧配置。 */
-  maxSourceEvents: number;
 }
 
 export interface MemoryDebugConfig {
@@ -148,7 +146,6 @@ export interface MemorySystemConfig {
   vectorRerankUseLlmFallback: boolean;
   vectorRerankLlmApiPresetId: string | null;
 
-  _migrations?: Record<string, boolean>;
 }
 
 // ─── 提示词模板 ───
@@ -184,7 +181,7 @@ export interface MemoryIngestFailure {
   resolvedAt: number;
 }
 
-export interface SceneAnchor {
+export interface SceneAnchor extends MemoryVisibility {
   timeLabel: string;
   locationLabel: string;
   presentEntities: string[];
@@ -194,7 +191,7 @@ export interface SceneAnchor {
   recentChange: string;
   confidence: number;
   updatedAt?: number;
-  /** 事实来源治理：旧存档缺失时按 unknown 处理。 */
+  /** 事实来源治理；缺省时按 unknown 处理。 */
   sourceType?: MemorySourceType;
   validFromRound?: number | null;
   validUntilRound?: number | null;
@@ -203,6 +200,7 @@ export interface SceneAnchor {
 
 /** 记忆来源类型。区分世界设定、剧情事实与玩家推测，避免摘要把推测当事实。 */
 export type MemorySourceType =
+  | 'offscreen_event'
   | 'world_fact'
   | 'plot_fact'
   | 'system_state'
@@ -214,7 +212,14 @@ export type MemorySourceType =
 
 export type MemoryLayer = 'fact' | 'state' | 'inference' | 'summary';
 
-export interface MemoryProvenance {
+export interface MemoryVisibility {
+  visibility?: 'public' | 'offscreen' | 'restricted';
+  playerKnown?: boolean;
+  knownBy?: string[];
+  discovery?: { sourceEventId: string; evidence: string; round: number };
+}
+
+export interface MemoryProvenance extends MemoryVisibility {
   sourceType?: MemorySourceType;
   layer?: MemoryLayer;
   confidence?: number;
@@ -232,7 +237,7 @@ export interface MemoryProvenance {
 }
 
 /** 不可变的原始叙事事件账本条目。 */
-export interface NarrativeSourceEvent {
+export interface NarrativeSourceEvent extends MemoryProvenance {
   id: string;
   round: number;
   userText: string;
@@ -493,6 +498,19 @@ export interface DebugLog {
   [key: string]: unknown;
 }
 
+
+export interface NarrativeOffscreenFact {
+  id: string;
+  logicalEventKey: string;
+  description: string;
+  subjectIds: string[];
+  occurredAt: string;
+  visibility: 'foreground' | 'reader_only' | 'secret';
+  provenance: 'director_offscreen_receipt';
+  confidence: number;
+  recordedAt: number;
+}
+
 export interface NarrativeMemoryRuntime {
   version: string;
   bankId: string;
@@ -523,6 +541,8 @@ export interface NarrativeMemoryRuntime {
   vectorMemory?: VectorFact[];
   /** 只追加、不原地修改。原始叙事证据不会被摘要或保留策略静默删除。 */
   sourceEvents: NarrativeSourceEvent[];
+  /** 已被变量消费者接受提交的幕后事实。 */
+  offscreenFacts: NarrativeOffscreenFact[];
 }
 
 // ─── 向量记忆 ───
@@ -532,7 +552,7 @@ export type VectorFactType =
   | 'event' | 'clue' | 'item' | 'ability' | 'status' | 'rule' | 'world'
   | 'other';
 
-export interface VectorFact {
+export interface VectorFact extends MemoryVisibility {
   fact: string;
   title?: string;
   summary?: string;

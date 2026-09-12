@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Images, ChevronDown, ChevronRight } from 'lucide-react';
+import { Images,ChevronDown,ChevronRight } from 'lucide-react';
 
 const IMAGE_STEPS = [
   { src: '/proxy-tutorial-images/step1.png', label: '第一步：改中文' },

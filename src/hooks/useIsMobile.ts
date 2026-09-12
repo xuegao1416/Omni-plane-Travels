@@ -1,36 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { BREAKPOINTS, type BreakpointKey } from '../constants/breakpoints';
-
-/**
- * 检测当前视口是否为移动端
- * @param breakpoint - 断点宽度，默认 768px（BREAKPOINTS.md）
- * @returns boolean
- *
- * @deprecated 推荐使用 useBreakpoint() 获取精确档位，便于针对不同设备适配。
- *             现有调用点暂保留以向后兼容，后续阶段逐步迁移到 useBreakpoint。
- */
-export function useIsMobile(breakpoint = BREAKPOINTS.md) {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
-
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
-      setIsMobile(e.matches);
-    };
-
-    // 初始化
-    handler(mq);
-
-    // 监听变化
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [breakpoint]);
-
-  return isMobile;
-}
 
 /**
  * 获取当前视口的断点档位。

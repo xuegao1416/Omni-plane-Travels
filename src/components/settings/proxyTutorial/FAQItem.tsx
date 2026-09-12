@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, HelpCircle } from 'lucide-react';
+import { ChevronDown,ChevronRight } from 'lucide-react';
 
 export function FAQItem({ question, answer }: { question: string; answer: string }) {
   const [isOpen, setIsOpen] = useState(false);

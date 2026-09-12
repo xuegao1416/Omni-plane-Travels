@@ -36,3 +36,14 @@ dist-ssr
 src-tauri/target/
 src-tauri/gen/
 ~/.tauri/
+
+# Generated diagnostics / local reports
+reports/
+
+# Local handoff archives and snapshot notes (not release source)
+/Omni-plane-Travels.zip
+/deliverables/
+/LATEST_FIXES_2026-09-12.md
+/SNAPSHOT_ASSET_NOTE.md
+/STAGE4_SNAPSHOT.md
+/.release-notes.md

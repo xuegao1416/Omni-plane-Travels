@@ -1,5 +1,5 @@
-import type { DimensionGeneration, DimensionSelection } from '../../../worldgen/choice';
-import { GUIDED_DIMENSIONS, DIMENSION_HINTS } from './dimensions';
+import type { DimensionGeneration,DimensionSelection } from '../../../worldgen/choice';
+import { GUIDED_DIMENSIONS,DIMENSION_HINTS } from './dimensions';
 
 /** 增强版选项生成（包含 worldType 和 conflict 维度） */
 export async function generateGuidedOptions(

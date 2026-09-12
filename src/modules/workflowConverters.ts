@@ -1,6 +1,6 @@
 // ============================================================
-//  工作流转换器 — 新旧格式双向互转
-//  WorkflowDefinition ↔ RuleFile / EventGraph
+//  工作流表示转换器
+//  编辑器 WorkflowDefinition ↔ 当前规则运行时 RuleFile / EventGraph
 // ============================================================
 import type {
   WorkflowDefinition, WorkflowConnection, NodeInstance,
@@ -349,8 +349,8 @@ export function workflowToRuleFile(workflow: WorkflowDefinition): RuleFile {
     if (!node.typeId.startsWith('triggers.')) continue;
 
     const reachable = bfs(node.id, connMap, nodeMap);
-    const actions = collectActions(reachable, nodeMap);
-    const when = buildWhenFromConditionNodes(node, reachable, connMap, nodeMap);
+    const actions = collectActions(reachable);
+    const when = buildWhenFromConditionNodes(node, reachable);
 
     if (node.typeId === 'triggers.periodic') {
       const pr: PeriodicRule = {
@@ -409,7 +409,7 @@ function bfs(
   return result;
 }
 
-function collectActions(nodes: NodeInstance[], nodeMap: Map<string, NodeInstance>): Action[] {
+function collectActions(nodes: NodeInstance[]): Action[] {
   const actions: Action[] = [];
   for (const node of nodes) {
     if (!node.typeId.startsWith('actions.')) continue;
@@ -488,8 +488,6 @@ function combatRequestActionFromWidgets(wv: Record<string, unknown>): Action | u
 function buildWhenFromConditionNodes(
   triggerNode: NodeInstance,
   reachable: NodeInstance[],
-  connMap: Map<string, WorkflowConnection[]>,
-  nodeMap: Map<string, NodeInstance>,
 ): Condition {
   const conditions: Condition[] = [];
 

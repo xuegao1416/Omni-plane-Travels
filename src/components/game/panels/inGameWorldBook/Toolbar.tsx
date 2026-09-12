@@ -1,4 +1,4 @@
-import { Lock, Plus, Save, Upload, Download, AlertCircle, X, Pencil } from 'lucide-react';
+import { Lock,Plus,Save,Upload,Download,AlertCircle,X,Pencil } from 'lucide-react';
 import type { EditEntry } from './types';
 import s from './styles.module.css';
 

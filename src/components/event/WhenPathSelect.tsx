@@ -1,7 +1,7 @@
 // 路径下拉 —— 用于 When 条件编辑器和 set 动作，分组显示可选路径。
 // 路径体系：GameState 中文路径（玩家.生存状态.血量 / 玩家.生存资源.water.数量 等）
 // 数据来源：worldDef.modules 提供资源/属性列表；无 worldDef 时只显示固定键。
-import React, { useMemo, useState, useEffect } from 'react';
+import React,{ useMemo,useState,useEffect } from 'react';
 import type { WorldDef } from '../../data/worlds-schema';
 
 interface Props {

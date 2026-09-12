@@ -1,10 +1,10 @@
 import {
-  TrendingUp, TrendingDown, DollarSign,
-  Users, AlertTriangle, ChevronRight, ArrowUpRight, Package,
+TrendingUp,TrendingDown,DollarSign,
+Users,AlertTriangle,ChevronRight,ArrowUpRight,Package,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { BusinessAsset } from '../../../../modules/schema';
-import { STATUS_COLORS, RISK_COLORS } from './constants';
+import { STATUS_COLORS,RISK_COLORS } from './constants';
 
 /** 计算资产净收益 */
 export function assetNetIncome(asset: BusinessAsset): number {

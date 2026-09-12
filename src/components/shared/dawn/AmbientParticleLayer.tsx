@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect,useMemo,useState } from 'react';
 import type { CSSProperties } from 'react';
 
 const PARTICLE_COUNT = 48;

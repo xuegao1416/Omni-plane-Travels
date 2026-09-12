@@ -1,6 +1,8 @@
 # 原生构建指南
 
-本项目使用 Tauri 2 同时构建 Windows 桌面端和 Android 客户端。Web 前端由同一套 `bun run build` 生成。
+> v2.8.3 当前源码不包含 `src-tauri` 原生工程，交付 Web/PWA。以下为完整 Tauri 工程的历史构建说明，仅在工作副本已包含该工程时适用；不能只运行下列命令就从当前源码生成安装包。发布流程会检测原生工程，缺失时跳过 Windows/Android 任务。
+
+完整原生工程使用 Tauri 2 构建 Windows 桌面端和 Android 客户端。Web 前端由同一套 `bun run build` 生成。
 
 ## Windows
 

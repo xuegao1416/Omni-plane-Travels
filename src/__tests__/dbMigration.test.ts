@@ -1,17 +1,17 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect } from 'bun:test';
+import { describe,it,expect } from 'bun:test';
 import {
-  deleteSave,
-  getAllSaveMeta,
-  importSaveFromData,
-  loadGame,
-  planV2ToV3Migration,
-  saveAllSaveMeta,
-  saveGameIncremental,
-  SAVE_SCHEMA_VERSION,
+deleteSave,
+getAllSaveMeta,
+importSaveFromData,
+loadGame,
+planV3ToV4Migration,
+saveAllSaveMeta,
+saveGameIncremental,
+SAVE_SCHEMA_VERSION,
 } from '../storage/db';
 import type { GameSave } from '../storage/db';
-import { getDefaultPortraitSource, getPortraitSource } from '../components/start/PortraitEditor';
+import { getDefaultPortraitSource,getPortraitSource } from '../components/start/PortraitEditor';
 import { getModuleStates } from '../storage/moduleStateDb';
 import { createDefaultGameState } from '../schema/variables';
 
@@ -59,6 +59,7 @@ function makeOldSave(): GameSave {
     id: 'save_1',
     name: '测试存档',
     timestamp: 123,
+    schemaVersion: SAVE_SCHEMA_VERSION - 1,
     messages: [
       { id: 'm1', role: 'user', rawText: 'hi', round: 0, timestamp: 1 } as any,
       { id: 'm2', role: 'assistant', rawText: 'hello', round: 0, timestamp: 2 } as any,
@@ -69,9 +70,9 @@ function makeOldSave(): GameSave {
   };
 }
 
-describe('db 迁移 planV2ToV3Migration', () => {
+describe('db 迁移 planV3ToV4Migration', () => {
   it('将内联 messages 拆分为分片并生成紧凑头部', () => {
-    const plan = planV2ToV3Migration(makeOldSave());
+    const plan = planV3ToV4Migration(makeOldSave());
     expect(plan).not.toBeNull();
     expect(plan!.head.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(plan!.head.messageCount).toBe(3);
@@ -88,13 +89,19 @@ describe('db 迁移 planV2ToV3Migration', () => {
   it('已是新格式（schemaVersion>=4）返回 null（跳过）', () => {
     const save = makeOldSave() as any;
     save.schemaVersion = 4;
-    expect(planV2ToV3Migration(save)).toBeNull();
+    expect(planV3ToV4Migration(save)).toBeNull();
+  });
+
+  it('更早于 v3 的内部存档不再串联迁移', () => {
+    const save = makeOldSave() as any;
+    save.schemaVersion = 2;
+    expect(() => planV3ToV4Migration(save)).toThrow('仅保留 v3 → v4');
   });
 
   it('无消息的存档生成空分片头部', () => {
     const save = makeOldSave();
     save.messages = [];
-    const plan = planV2ToV3Migration(save);
+    const plan = planV3ToV4Migration(save);
     expect(plan).not.toBeNull();
     expect(plan!.head.messageCount).toBe(0);
     expect(plan!.messageRecords.length).toBe(0);
@@ -102,8 +109,10 @@ describe('db 迁移 planV2ToV3Migration', () => {
 });
 
 describe('imported save metadata', () => {
-  it('records the imported message count and repairs older metadata that omitted it', async () => {
+  it('records the imported message count and repairs incomplete metadata', async () => {
     const rawData = {
+      type: 'omni-plane-travels-save',
+      version: '2.0',
       save: {
         id: `import-message-count-${Date.now()}`,
         name: '导入消息计数测试',
@@ -118,8 +127,8 @@ describe('imported save metadata', () => {
     try {
       expect(meta.messageCount).toBe(3);
 
-      const { messageCount: _, ...legacyMeta } = meta;
-      await saveAllSaveMeta([legacyMeta]);
+      const { messageCount: _, ...incompleteMeta } = meta;
+      await saveAllSaveMeta([incompleteMeta]);
       const repaired = await getAllSaveMeta();
       expect(repaired[0]?.messageCount).toBe(3);
     } finally {
@@ -128,10 +137,12 @@ describe('imported save metadata', () => {
     }
   });
 
-  it('moves legacy module fields into independent records and restores them on load', async () => {
+  it('migrates direct-previous export v1 module fields into independent records', async () => {
     const state = createDefaultGameState();
     state.玩家.生存资源 = { water: { 数量: 4 } };
     const meta = await importSaveFromData({
+      type: 'omni-plane-travels-save',
+      version: '1.0',
       save: {
         id: `import-module-state-${Date.now()}`,
         name: '导入模块分区测试',

@@ -10,8 +10,7 @@ const FALLBACK_WORLD = {
   id: 'unknown',
   name: 'Unknown World',
   description: '',
-  entryId: null,
-} as const;
+  } as const;
 
 /**
  * Activates the presentation theme for the currently selected world.

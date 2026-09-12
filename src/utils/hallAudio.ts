@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from '../config/storageKeys';
 const HALL_SOUND_SOURCES = {
   crystalSelect: '/audio/sfx-crystal-select.mp3',
   confirm: '/audio/sfx-ui-confirm.mp3',
@@ -15,7 +16,7 @@ const activeSounds = new Set<HTMLAudioElement>();
 export type HallSound = keyof typeof HALL_SOUND_SOURCES;
 
 export function playHallSound(sound: HallSound) {
-  if (typeof window === 'undefined' || localStorage.getItem('omni.hall.musicMuted') === 'true') return;
+  if (typeof window === 'undefined' || localStorage.getItem(STORAGE_KEYS.HALL_MUSIC_MUTED) === 'true') return;
 
   const audio = new Audio(HALL_SOUND_SOURCES[sound]);
   audio.volume = HALL_SOUND_VOLUMES[sound];

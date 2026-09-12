@@ -984,31 +984,6 @@ function stableJson(
   return serialize(value, 0);
 }
 
-function stableHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index++) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-function safeEventIdPart(value: unknown): string {
-  const source = typeof value === 'string' ? value.toLowerCase() : 'event';
-  const safe = source.replace(/[^a-z0-9_-]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-_]+|[-_]+$/g, '');
-  return safe || 'event';
-}
-
-function deriveLegacyEventId(
-  manifest: Manifest,
-  cardFile: unknown,
-  filePath: string,
-): string {
-  const hash = stableHash(`${String(readOwn(manifest, 'id') ?? '')}\u0000${stableJson(cardFile, filePath)}`);
-  const prefix = safeEventIdPart(readOwn(manifest, 'id'));
-  return `${prefix.slice(0, 64 - hash.length - 1)}-${hash}`;
-}
-
 function requireEventName(value: unknown, filePath: string, eventId?: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throwFileError(
@@ -1417,7 +1392,7 @@ function canonicalIndexFromEntries(
 
 /** Detects, migrates, validates, and idempotently writes all supported event-pack variants. */
 export function normalizeCardPackFiles(
-  manifest: Manifest,
+  _manifest: Manifest,
   inputFiles: Readonly<Record<string, unknown>>,
 ): CardPackNormalizationResult {
   const files = { ...inputFiles };
@@ -1425,37 +1400,34 @@ export function normalizeCardPackFiles(
   const hasEventsIndex = Object.prototype.hasOwnProperty.call(files, EVENTS_FILE_PATH);
   const hasCardFile = Object.prototype.hasOwnProperty.call(files, CARD_FILE_PATH);
 
-  if (!hasEventsIndex && !hasCardFile) {
-    throwFileError('INDEX_MISSING', 'Event pack has no event index or card file', EVENTS_FILE_PATH);
+  if (!hasEventsIndex) {
+    throwFileError(
+      'INDEX_MISSING',
+      hasCardFile
+        ? 'Standalone schema/card.json packs are older than the supported v1 migration window'
+        : 'Event pack has no schema/events.json index',
+      EVENTS_FILE_PATH,
+    );
   }
-
   let index: EventPackIndex;
   let workflows: CardWorkflowDefinition[];
   let legacy = false;
 
-  if (!hasEventsIndex) {
-    legacy = true;
-    const cardFile = parseJsonFile(files, CARD_FILE_PATH);
-    const eventName = requireEventName(readOwn(manifest, 'name'), 'manifest.json');
-    const eventId = deriveLegacyEventId(manifest, cardFile, CARD_FILE_PATH);
-    const workflow = migrateLegacyAtPath(cardFile, eventId, eventName, CARD_FILE_PATH);
-    index = canonicalIndexFromEntries(undefined, [{ id: eventId, name: eventName }]);
-    workflows = [workflow];
-  } else {
+  {
     const rawIndex = parseJsonFile(files, EVENTS_FILE_PATH);
     if (!isPlainRecord(rawIndex)) {
       throwFileError('INDEX_INVALID', 'Event index must be an object', EVENTS_FILE_PATH);
     }
     const version = readOwn(rawIndex, 'version');
     if (version === EVENT_PACK_INDEX_VERSION) {
-      index = readCanonicalIndex(rawIndex, EVENTS_FILE_PATH);
       if (hasCardFile) {
         throwFileError(
           'INPUT_CONFLICT',
-          'A legacy card file cannot be combined with a version-2 event index',
+          'Canonical v2 packs cannot contain the previous v1 schema/card.json workflow file',
           CARD_FILE_PATH,
         );
       }
+      index = readCanonicalIndex(rawIndex, EVENTS_FILE_PATH);
       workflows = index.events.map((entry) => {
         const filePath = `schema/event-${entry.id}.json`;
         if (!Object.prototype.hasOwnProperty.call(files, filePath)) {
@@ -1466,39 +1438,13 @@ export function normalizeCardPackFiles(
     } else {
       legacy = true;
       const legacyIndex = readLegacyIndex(rawIndex, EVENTS_FILE_PATH);
-      if (hasCardFile) {
-        if (legacyIndex.events.length !== 1) {
-          throwFileError(
-            'INPUT_CONFLICT',
-            'A legacy card file can only be assigned to one v1 event',
-            CARD_FILE_PATH,
-          );
-        }
-        const event = legacyIndex.events[0]!;
-        const filePath = `schema/event-${event.id}.json`;
-        const hasEmbedded = Object.prototype.hasOwnProperty.call(event.raw, 'cards') ||
-          Object.prototype.hasOwnProperty.call(event.raw, 'puck');
-        const hasPerEventFile = Object.prototype.hasOwnProperty.call(files, filePath);
-        if (hasEmbedded || hasPerEventFile) {
-          throwFileError(
-            'INPUT_CONFLICT',
-            'A legacy card file cannot be combined with another v1 workflow source',
-            CARD_FILE_PATH,
-            { eventId: event.id },
-          );
-        }
-      }
-      let fallbackCardFile: unknown;
-      const readFallbackCardFile = (): unknown => {
-        if (fallbackCardFile === undefined) {
-          fallbackCardFile = parseJsonFile(files, CARD_FILE_PATH);
-        }
-        return fallbackCardFile;
-      };
-      if (hasCardFile && legacyIndex.events.length === 0) {
+      const indexedCardWorkflow = hasCardFile && legacyIndex.events.length === 1
+        ? migrateLegacyAtPath(parseJsonFile(files, CARD_FILE_PATH), legacyIndex.events[0]!.id, legacyIndex.events[0]!.name, CARD_FILE_PATH)
+        : undefined;
+      if (hasCardFile && legacyIndex.events.length !== 1) {
         throwFileError(
           'INPUT_CONFLICT',
-          'A legacy card file cannot be reconciled with an empty event index',
+          'A v1 schema/card.json workflow is only unambiguous for a single indexed event',
           CARD_FILE_PATH,
         );
       }
@@ -1518,6 +1464,14 @@ export function normalizeCardPackFiles(
           ? migrateLegacyAtPath(parseJsonFile(files, filePath), id, name, filePath)
           : undefined;
 
+        if (indexedCardWorkflow && (embeddedWorkflow || fileWorkflow)) {
+          throwFileError(
+            'INPUT_CONFLICT',
+            `v1 pack mixes schema/card.json with another workflow source: ${id}`,
+            CARD_FILE_PATH,
+            { eventId: id },
+          );
+        }
         if (embeddedWorkflow && fileWorkflow) {
           if (
             stableJson(embeddedWorkflow, EVENTS_FILE_PATH, { eventId: id }) !==
@@ -1532,25 +1486,9 @@ export function normalizeCardPackFiles(
           }
         }
 
-        const workflow = fileWorkflow ?? embeddedWorkflow;
+        const workflow = fileWorkflow ?? embeddedWorkflow ?? indexedCardWorkflow;
         if (workflow) {
           return { id, name, description, workflow };
-        }
-        if (hasCardFile && legacyIndex.events.length === 1) {
-          return {
-            id,
-            name,
-            description,
-            workflow: migrateLegacyAtPath(readFallbackCardFile(), id, name, CARD_FILE_PATH),
-          };
-        }
-        if (hasCardFile) {
-          throwFileError(
-            'INPUT_CONFLICT',
-            'A single legacy card file cannot be assigned to multiple events',
-            CARD_FILE_PATH,
-            { eventId: id },
-          );
         }
         if (!hasEmbedded && !hasPerEventFile) {
           throwFileError('WORKFLOW_MISSING', `Missing workflow: ${filePath}`, filePath, { eventId: id });
@@ -1564,7 +1502,7 @@ export function normalizeCardPackFiles(
 
   const expectedPaths = new Set(workflows.map((workflow) => `schema/event-${workflow.id}.json`));
   const staleEventFiles = eventFilePaths.some((filePath) => !expectedPaths.has(filePath));
-  const migrated = legacy || hasCardFile || staleEventFiles;
+  const migrated = legacy || staleEventFiles;
   return {
     files: writeCanonicalFiles(files, index, workflows),
     index,

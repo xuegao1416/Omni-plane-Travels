@@ -1,12 +1,12 @@
-import { Clock, MapPin, Cloud, Heart, Zap, Swords } from 'lucide-react';
+import { Clock,MapPin,Cloud,Heart,Zap,Swords } from 'lucide-react';
 import type { GameState } from '../../../schema/variables';
-import type { WorldSystemData, ProgressionConfig, SurvivalRecipe, SurvivalModuleSchema, BusinessModuleSchema } from '../../../modules/schema';
+import type { WorldSystemData,ProgressionConfig,SurvivalRecipe,SurvivalModuleSchema,BusinessModuleSchema } from '../../../modules/schema';
 import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
-import { BaseStatsCard, SixDimCard, ProgressionCard, SurvivalCard, BusinessCard, TalentCard } from './modules';
+import { BaseStatsCard,SixDimCard,ProgressionCard,SurvivalCard,BusinessCard,TalentCard } from './modules';
 import { findWorldDef } from '../../../data/worldLoader';
 import { normalizeAssetStatus } from './businessOverlay/utils';
 import { CustomModulePanel } from './CustomModulePanel';
-import { formatWorldClock, getTimeSystemFromWorld } from '../../../time/worldClock';
+import { formatWorldClock,getTimeSystemFromWorld } from '../../../time/worldClock';
 import { toDisplayText } from '../../../utils/displayText';
 
 const COMBAT_RISK_LABELS = { easy: '简单', normal: '普通', hard: '困难', inferno: '炼狱' } as const;
@@ -71,8 +71,8 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0' }}>
       <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>{icon}</span>
       <span style={{ width: '32px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{label}</span>
-      <div style={{ flex: 1, height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '3px', transition: 'width 0.3s' }} />
+      <div className="game-status-meter" style={{ background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '999px', transition: 'width 0.3s' }} />
       </div>
       <span style={{ width: '50px', fontSize: 'var(--font-size-xs)', textAlign: 'right', color: 'var(--text-secondary)' }}>{safeValue}/{safeMax}</span>
     </div>
@@ -108,15 +108,15 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
     for (const mod of worldDef.modules) {
       if (!mod.enabled) continue;
       const key = keyMap[mod.moduleId];
-      if (key && (mod.moduleConfig || mod.data)) {
+      if (key && (mod.moduleConfig)) {
         if (mod.moduleId === 'survival' && runtimeRecipes?.length) {
           // 合并运行时配方（AI 生成）与静态配方（世界定义）
-          const survData = (mod.moduleConfig || mod.data) as SurvivalModuleSchema;
+          const survData = (mod.moduleConfig) as SurvivalModuleSchema;
           const staticRecipes = Array.isArray(survData.recipes) ? survData.recipes : [];
           (worldSystem as any)[key] = { ...survData, recipes: [...staticRecipes, ...runtimeRecipes] };
         } else if (mod.moduleId === 'business') {
           // 合并运行时经营数据（AI 通过 UpdateVariable 更新）与静态配置
-          const bizConfig = (mod.moduleConfig || mod.data) as BusinessModuleSchema;
+          const bizConfig = (mod.moduleConfig) as BusinessModuleSchema;
           const runtimeBiz = player.经营资产;
           if (runtimeBiz) {
             (worldSystem as any)[key] = {
@@ -151,7 +151,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             (worldSystem as any)[key] = bizConfig;
           }
         } else {
-          (worldSystem as any)[key] = mod.moduleConfig || mod.data;
+          (worldSystem as any)[key] = mod.moduleConfig;
         }
         if (mod.name) moduleNames[key] = mod.name;
       }

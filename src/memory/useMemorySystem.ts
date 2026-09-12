@@ -8,8 +8,6 @@ import { useMemoryStore } from './memoryStore';
 import type {
   MemorySystemConfig,
   NarrativeMemoryRuntime,
-  SummaryMemoryItem,
-  SummarySaveRecord,
   VectorFact,
   VectorMemoryItem,
   MemoryEntry,
@@ -656,7 +654,7 @@ export function useMemorySystem(): MemorySystemHook {
         : [];
 
       const normalized = factsArray
-        .map((item: unknown, index: number) => {
+        .map((item: unknown) => {
           const fact = normalizeVectorFact(item);
           if (!fact) return null;
           return {
@@ -774,7 +772,7 @@ export function useMemorySystem(): MemorySystemHook {
 
 // ─── 内部辅助 ───
 
-function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, playerName: string): string {
+function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, _playerName: string): string {
   const parts: string[] = [];
   if (runtime.sceneAnchor) {
     const sa = runtime.sceneAnchor;

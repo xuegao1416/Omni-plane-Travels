@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback,useEffect,useRef,useState } from 'react';
 import {
-  listPacks,
-  discoverPacks,
-  enablePack,
-  disablePack,
-  uninstallPack,
-  importPack as importPackFn,
-  exportPack as exportPackFn,
-  getEventDetail,
-  validateEvent as validateEventFn,
-  listCollections as listCollectionsFn,
-  createCollection as createCollectionFn,
-  removeCollection as removeCollectionFn,
-  updateCollection as updateCollectionFn,
+listPacks,
+discoverPacks,
+enablePack,
+disablePack,
+uninstallPack,
+importPack as importPackFn,
+exportPack as exportPackFn,
+getEventDetail,
+validateEvent as validateEventFn,
+listCollections as listCollectionsFn,
+createCollection as createCollectionFn,
+removeCollection as removeCollectionFn,
+updateCollection as updateCollectionFn,
 } from '../../modules/eventApi';
 import type {
-  EventRegistryEntry,
-  EventDetail,
-  EventMeta,
-  Manifest,
-  ValidationResult,
-  Collection,
+EventRegistryEntry,
+EventDetail,
+EventMeta,
+Manifest,
+ValidationResult,
+Collection,
 } from '../../modules/schema';
 
 export interface UseEventsResult {

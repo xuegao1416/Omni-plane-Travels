@@ -3,33 +3,11 @@
 // ============================================================
 import type {
   WorkflowDefinition, WorkflowExecutionContext, WorkflowExecutionResult,
-  NodeInstance, WorkflowConnection, PendingAction, EvaluateLimits,
+  NodeInstance, PendingAction, EvaluateLimits,
   NodeExecutorContext, NodeExecutorResult,
 } from './workflowSchema';
 import { DEFAULT_LIMITS } from './workflowSchema';
 import { getNodeDefinition, getNodeExecutor } from './nodeRegistry';
-
-// ─── NodeOutputCache（基于 hash 的简单缓存） ───
-
-class NodeOutputCache {
-  private cache = new Map<string, Record<string, unknown>>();
-
-  computeKey(typeId: string, inputs: Record<string, unknown>): string {
-    return `${typeId}:${JSON.stringify(inputs)}`;
-  }
-
-  get(key: string): Record<string, unknown> | undefined {
-    return this.cache.get(key);
-  }
-
-  set(key: string, outputs: Record<string, unknown>): void {
-    this.cache.set(key, outputs);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-}
 
 // ─── 主执行函数 ───
 
@@ -104,7 +82,6 @@ export function executeWorkflow(
   const nodeOutputs = new Map<string, Record<string, unknown>>();
   const allActions: PendingAction[] = [];
   const warnings: string[] = [];
-  const cache = new NodeOutputCache();
   let executedCount = 0;
 
   const execCtx: NodeExecutorContext = {

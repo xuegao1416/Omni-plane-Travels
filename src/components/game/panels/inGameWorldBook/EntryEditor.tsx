@@ -1,6 +1,7 @@
-import { Lock, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Lock,Trash2,ChevronDown,ChevronUp } from 'lucide-react';
 import { parseKeywordInput } from '../../../../utils/formatNormalize';
 import type { EditEntry } from './types';
+import type { WorldBookEntryType } from '../../../../data/worlds-schema';
 
 interface EntryEditorProps {
   entry: EditEntry;
@@ -90,6 +91,11 @@ export function EntryEditor({
 
           {/* 选项行 */}
           <div className="wbe-options-row">
+            <label className="wbe-field wbe-field-sm"><span className="wbe-label">分类</span>
+              <select className="wbe-input" value={entry.entryType ?? ''} disabled={isGlobal} onChange={e => onUpdate(entry.uid, { entryType: (e.target.value || undefined) as WorldBookEntryType | undefined })}>
+                <option value="">通用</option><option value="setting">设定</option><option value="rules">规则</option><option value="npcs">人物</option><option value="factions">势力</option><option value="lore">地点</option><option value="items">物品</option><option value="culture">文化</option><option value="economy">经济</option><option value="events">事件</option><option value="relationships">关系</option><option value="highlights">特色</option><option value="module_rule">模块规则</option>
+              </select>
+            </label>
             <label className="wbe-field wbe-field-sm">
               <span className="wbe-label">启用</span>
               <select
@@ -129,11 +135,12 @@ export function EntryEditor({
               <select
                 className="wbe-input"
                 value={entry.position ?? 'after_char'}
-                onChange={e2 => onUpdate(entry.uid, { position: e2.target.value as 'before_char' | 'after_char' })}
+                onChange={e2 => onUpdate(entry.uid, { position: e2.target.value as 'before_char' | 'after_char' | 'at_depth' })}
                 disabled={isGlobal}
               >
                 <option value="after_char">角色定义后</option>
                 <option value="before_char">角色定义前</option>
+                <option value="at_depth">指定深度(聊天历史)</option>
               </select>
             </label>
             <label className="wbe-field wbe-field-sm">

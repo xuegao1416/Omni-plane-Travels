@@ -178,14 +178,6 @@ export function applyAction(
       const path = `玩家.生存资源.${key}.数量`;
       const cur = Number(getGameplayPath(ctx as GameplayStateRoot, path) ?? 0);
       setGameplayPath(ctx as GameplayStateRoot, path, Math.max(0, cur + action.modifyResource.delta), false);
-    } else {
-      // 回退路径：ctx.resources[key].amount（兼容已有英文 mock 测试）
-      const res = (ctx as Record<string, any>).resources as Record<string, { amount: number }> | undefined;
-      if (res && res[key]) {
-        const path = `resources.${key}.amount`;
-        const cur = Number(getGameplayPath(ctx as GameplayStateRoot, path) ?? 0);
-        setGameplayPath(ctx as GameplayStateRoot, path, Math.max(0, cur + action.modifyResource.delta), false);
-      }
     }
     applied.push({ ruleId, kind: 'modifyResource', detail: action.modifyResource });
   } else if ('scheduleTick' in action) {

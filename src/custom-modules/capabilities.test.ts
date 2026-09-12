@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import {
-  buildCustomModuleAgentWorldContext,
-  buildCustomModuleCapabilityCatalog,
+buildCustomModuleAgentWorldContext,
+buildCustomModuleCapabilityCatalog,
 } from './capabilities';
 
 describe('custom module capability catalog', () => {

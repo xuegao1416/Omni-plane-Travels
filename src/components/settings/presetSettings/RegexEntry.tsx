@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronRight, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { ChevronDown,ChevronRight,Eye,EyeOff,Trash2 } from 'lucide-react';
 import type { RegexScript } from '@/utils/regexScripts';
 import { Field } from '../SettingsUIComponents';
-import { iconBtnStyle, inputStyle, chipStyle } from './constants';
+import { iconBtnStyle,inputStyle,chipStyle } from './constants';
 
 interface RegexEntryProps {
   script: RegexScript;

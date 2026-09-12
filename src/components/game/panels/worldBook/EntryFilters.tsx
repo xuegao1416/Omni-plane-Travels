@@ -1,15 +1,11 @@
-import { Search, Eye, EyeOff } from 'lucide-react';
+import { Search,Eye,EyeOff } from 'lucide-react';
 import type { EntryFiltersProps } from './types';
 
 /** Search bar and disabled-toggle button */
 export function EntryFilters({ search, onSearchChange, showDisabled, onToggleDisabled }: EntryFiltersProps) {
   return (
-    <div style={{
-      padding: '8px 16px',
-      borderBottom: '1px solid var(--border)',
-      display: 'flex', gap: '8px', alignItems: 'center',
-    }}>
-      <div style={{ flex: 1, position: 'relative' }}>
+    <div className="game-worldbook-filters">
+      <div className="game-worldbook-search">
         <Search size={14} style={{
           position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)',
           color: 'var(--text-muted)',

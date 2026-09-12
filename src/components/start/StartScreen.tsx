@@ -6,11 +6,12 @@ import CustomModuleAgentWorkspace from './CustomModuleAgentWorkspace';
 import EntryTransition from './EntryTransition';
 import WorldHallView from './WorldHallView';
 import WorldEditorForm from './WorldEditorForm';
-import { useState, useEffect, useRef } from 'react';
+import { useState,useEffect,useRef } from 'react';
 import { reportDepth } from '../../modules/playTracker';
 import { useConfigStore } from '../../stores/configStore';
 import { clearSegmentsCache } from '../../hooks/useCharacterHistory';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2,VolumeX } from 'lucide-react';
+import { STORAGE_KEYS } from '../../config/storageKeys';
 
 /** 大厅背景音乐 — 仅在 WorldHallView 可见时播放，首页/过场/向导/游戏过程不播放 */
 function HallMusic() {
@@ -18,7 +19,7 @@ function HallMusic() {
   const theme = useConfigStore(s => s.settings.theme);
   const musicSrc = theme === 'dark' ? '/audio/omni-hall-dawn-original.mp3' : '/scarborough-fair.mp3';
   const [muted, setMuted] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem('omni.hall.musicMuted') === 'true';
+    return typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEYS.HALL_MUSIC_MUTED) === 'true';
   });
 
   useEffect(() => {
@@ -34,18 +35,16 @@ function HallMusic() {
     if (audioRef.current) {
       audioRef.current.volume = muted ? 0 : 0.45;
     }
-    localStorage.setItem('omni.hall.musicMuted', String(muted));
+    localStorage.setItem(STORAGE_KEYS.HALL_MUSIC_MUTED, String(muted));
   }, [muted]);
 
   return (
     <button
+      className="entry-hall-music-toggle"
       onClick={() => setMuted(m => !m)}
       aria-label={muted ? '取消静音' : '静音'}
       title={muted ? '大厅音乐已静音' : '大厅音乐播放中'}
       style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
         zIndex: 100,
         width: '36px',
         height: '36px',
@@ -122,7 +121,6 @@ export default function StartScreen() {
             onOpenCustomModules={() => setCustomModuleOpen(true)}
             onOpenSettings={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('settings'); }}
             onOpenUserCenter={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('user-center'); }}
-            onOpenWorkshop={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); sessionStorage.setItem('omni.user-center.initial-tab', 'workshop'); h.navigate('user-center'); }}
               onOpenEditor={(world, step = 1) => { h.setEditingWorld(world); h.setWorldEditorInitialStep(step); h.setWorldEditorOpen(true); }}
             onDeleteWorld={h.handleDeleteWorld}
             onImportWorld={h.handleImportWorld}
@@ -163,7 +161,7 @@ export default function StartScreen() {
       <WizardShell
         step={h.step} setStep={h.setStep}
         onBackToMenu={() => { h.setView('main'); h.setStep(1); setEntryPhase('hall'); }}
-        title={h.t('start.title')} subtitle={h.t('start.subtitle')} t={h.t}
+        title={h.t('start.title')} subtitle={h.t('start.subtitle')}
         selectedWorld={h.selectedWorld}
         allWorlds={h.allWorlds} createdWorlds={h.createdWorlds} worldEntry={h.worldEntry}
         personalInfo={h.personalInfo} setPersonalInfo={h.setPersonalInfo}
@@ -174,10 +172,9 @@ export default function StartScreen() {
         hasApiConfig={!!h.apiConfig}
         onGenerateAll={h.handleGenerateAll} onRegenerateSegment={h.handleRegenerateSegment}
         onLoadPreset={h.handleLoadPreset}
-        buildInitialState={h.buildInitialState}
         onStartGame={h.handleStartGame}
         onSaveWorld={h.handleSaveWorld}
-        apiConfig={h.apiConfig} settings={h.settings}
+        apiConfig={h.apiConfig}
       />
     );
   })();
@@ -194,8 +191,8 @@ export default function StartScreen() {
           onSave={h.handleSaveWorld}
           onCancel={h.handleCancelWorldEditor}
           apiConfig={h.apiConfig}
-          settings={h.settings}
-          presentationMode="world-weave"
+         
+         
         />
       )}
       {h.DialogUI}

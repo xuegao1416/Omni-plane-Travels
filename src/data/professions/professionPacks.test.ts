@@ -39,7 +39,7 @@ describe('built-in profession packs', () => {
   test('keeps wuxia weapon paths in professions and life arts in free skills', () => {
     validatePack(WUXIA_CORE_PROFESSION_PACK);
     const professionAbilityIds = new Set(WUXIA_CORE_PROFESSION_PACK.professions.flatMap(item => item.abilities.map(ability => ability.id)));
-    expect(WUXIA_CORE_PROFESSION_PACK.freeSkillCatalog?.map(item => item.id)).toContain('medicine');
+    expect(WUXIA_CORE_PROFESSION_PACK.freeSkills?.map(item => item.id)).toContain('medicine');
     expect(professionAbilityIds.has('medicine')).toBe(false);
     validateDivineTalents(WUXIA_CORE_PROFESSION_PACK, ['天人合一', '剑心通明·神会', '宿命轮回']);
   });

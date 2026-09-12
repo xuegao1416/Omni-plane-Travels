@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Check, Sparkles, X } from 'lucide-react';
+import { useEffect,useMemo,useRef } from 'react';
+import { Check,Sparkles,X } from 'lucide-react';
 import type { AbilityProposal } from '../../gameplay/protocols';
 import { balanceAbilityProposal } from '../../gameplay/abilitySystem';
 

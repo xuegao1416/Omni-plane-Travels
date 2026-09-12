@@ -1,7 +1,7 @@
 // ============================================================
 //  卡片节点端口连接点 — 类型化颜色 + 连接验证
 // ============================================================
-import { Handle, Position, type HandleProps } from '@xyflow/react';
+import { Handle,Position } from '@xyflow/react';
 import type { CardSocketType } from '../../modules/schema';
 
 const SOCKET_COLORS: Record<CardSocketType, string> = {

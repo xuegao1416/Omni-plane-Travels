@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react';
-import { X, Rocket, HelpCircle } from 'lucide-react';
+import { useState,useCallback } from 'react';
+import { X,Rocket,HelpCircle } from 'lucide-react';
 import { TUTORIAL_STEPS } from './proxyTutorial/data';
 import { PROXY_CODE } from './proxyTutorial/constants';
 import { OverviewCard } from './proxyTutorial/OverviewCard';
 import { ImageTutorialCard } from './proxyTutorial/ImageTutorialCard';
 import { TutorialStepCard } from './proxyTutorial/TutorialStepCard';
 import { ProxyInput } from './proxyTutorial/ProxyInput';
-import { FAQItem, FAQ_ITEMS } from './proxyTutorial/FAQItem';
+import { FAQItem,FAQ_ITEMS } from './proxyTutorial/FAQItem';
 
 interface Props {
   onClose: () => void;

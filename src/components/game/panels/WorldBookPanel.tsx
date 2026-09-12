@@ -1,9 +1,9 @@
 // 世界书面板 — 展示当前世界的 worldBookEntries
-import { useState, useMemo, useCallback } from 'react';
-import { BookOpen, Pencil } from 'lucide-react';
+import { useState,useMemo,useCallback } from 'react';
+import { BookOpen,Pencil } from 'lucide-react';
 import InGameWorldBookEditor from './InGameWorldBookEditor';
 import type { WorldBookPanelProps } from './worldBook/types';
-import { mapEntries, filterEntries, groupEntries } from './worldBook/utils';
+import { mapEntries,filterEntries,groupEntries } from './worldBook/utils';
 import { EntryFilters } from './worldBook/EntryFilters';
 import { EntryList } from './worldBook/EntryList';
 
@@ -28,19 +28,13 @@ export default function WorldBookPanel({ worldId, engine }: WorldBookPanelProps)
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="game-worldbook-panel">
         {/* Header */}
-        <div style={{
-          padding: '12px 16px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: '8px',
-        }}>
+        <div className="game-worldbook-header">
           <BookOpen size={16} style={{ color: 'var(--accent)' }} />
-          <span style={{ fontWeight: '600', fontSize: 'var(--font-size-lg)' }}>世界书</span>
-          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-            {worldId} · {entries.length} 条
-          </span>
-          <div style={{ flex: 1 }} />
+          <span className="game-worldbook-title">世界书</span>
+          <span className="game-worldbook-meta">{worldId} · {entries.length} 条</span>
+          <div className="game-worldbook-header-spacer" />
           {engine && (
             <button
               onClick={() => setEditorOpen(true)}

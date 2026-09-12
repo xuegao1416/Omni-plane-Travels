@@ -15,18 +15,18 @@ import {
   stageAbilityProposal,
   stageAbilityProposalOnGameState,
 } from './abilitySystem';
-import { migrateGameStateToV3, normalizeAbilityProposal, migrateProfessionPack } from './protocols';
+import { normalizeGameStateV3, normalizeAbilityProposal, migrateProfessionPack } from './protocols';
 import { isProfessionModuleEnabled } from './profession/featureGate';
 import { BUILTIN_PROFESSION_PACKS, BUILTIN_PROFESSION_PACKS_V2, validateProfessionPack } from '../data/professions/professionLibrary';
 
 const effect: GameplayEffect = { add: { path: '玩家.生存状态.血量', delta: 2, min: 0 } };
 
 describe('unified ability system', () => {
-  test('adapts legacy profession, innate and free skill definitions to one mechanical protocol', () => {
-    const legacy: ProfessionAbilityDef = {
-      id: 'legacy-strike',
-      name: '旧式打击',
-      description: '保留旧字段的可执行能力。',
+  test('adapts current profession, innate and free-skill authoring definitions to the runtime protocol', () => {
+    const authored: ProfessionAbilityDef = {
+      id: 'authored-strike',
+      name: '结构化打击',
+      description: '当前职业编辑格式的可执行能力。',
       type: 'active',
       pointCost: 2,
       cooldownTicks: 3,
@@ -37,22 +37,22 @@ describe('unified ability system', () => {
       activation: {
         costs: [{ path: '玩家.能力系统.职业状态.能力点', amount: 1, label: '能力点' }],
         effects: [effect],
-        rewards: [{ id: 'legacy-reward', effects: [effect] }],
-        combatAction: { id: 'legacy-strike', name: '旧式打击', target: 'enemy', actionCost: 1, accuracy: 10, damage: 7 },
+        rewards: [{ id: 'authored-reward', effects: [effect] }],
+        combatAction: { id: 'authored-strike', name: '结构化打击', target: 'enemy', actionCost: 1, accuracy: 10, damage: 7 },
       },
       passiveEffects: [effect],
     };
-    const profession = abilityDefinitionFromProfessionAbility(legacy, 'warrior');
+    const profession = abilityDefinitionFromProfessionAbility(authored, 'warrior');
     const innate = abilityDefinitionFromInnateTalent({ id: 'born', name: '天生', description: '出生机制', cost: 1, effects: [effect] });
     const skill = abilityDefinitionFromSkill({ id: 'skill', name: '自由技', description: '熟练机制', rarity: '普通', cooldownTicks: 2, activation: { effects: [effect] }, proficiency: { gainPerUse: 2, thresholdPerRank: 5, maxRank: 3 } });
 
     expect(profession.category).toBe('profession');
     expect(profession.mechanics?.combatAction?.damage).toBe(7);
     expect(profession.prerequisiteMode).toBe('any');
-    expect(profession.mechanics?.costs).toEqual(legacy.activation?.costs);
-    expect(profession.mechanics?.effects).toEqual(legacy.activation?.effects);
-    expect(profession.mechanics?.rewards).toEqual(legacy.activation?.rewards);
-    expect(profession.mechanics?.passiveEffects).toEqual(legacy.passiveEffects);
+    expect(profession.mechanics?.costs).toEqual(authored.activation?.costs);
+    expect(profession.mechanics?.effects).toEqual(authored.activation?.effects);
+    expect(profession.mechanics?.rewards).toEqual(authored.activation?.rewards);
+    expect(profession.mechanics?.passiveEffects).toEqual(authored.passiveEffects);
     expect(profession.mechanics?.cooldownRounds).toBe(3);
     expect(innate.category).toBe('innate_talent');
     expect(skill.category).toBe('free_skill');
@@ -83,7 +83,7 @@ describe('unified ability system', () => {
     expect(explicit.mechanics?.costs).toEqual([{ path: 'health', amount: 5, label: '生命' }]);
   });
 
-  test('migrates v1 mechanics without loss and is idempotent', () => {
+  test('migrates the directly previous v1 profession pack into canonical v2 mechanics', () => {
     const source = {
       schemaVersion: 1,
       manifest: { id: 'legacy-pack', name: '旧包', version: '1.0.0', schemaVersion: 1 },
@@ -92,10 +92,9 @@ describe('unified ability system', () => {
           id: 'legacy-node', name: '旧节点', description: '旧节点', type: 'active', tier: 2,
           prerequisites: ['legacy-root'], exclusiveGroup: 'legacy-path', pointCost: 2,
           cooldownTicks: 4, diceModifier: 3, passiveEffects: [effect],
-          customLegacyField: { keep: true },
           activation: {
             costs: [{ path: '玩家.能力系统.职业状态.能力点', amount: 2, label: '能力点' }],
-            effects: [effect], rewards: [{ id: 'legacy-reward', effects: [effect] }],
+            effects: [effect], rewards: [{ id: 'authored-reward', effects: [effect] }],
             combatAction: { id: 'legacy-node', name: '旧节点', target: 'enemy', actionCost: 1, accuracy: 11, damage: 9 },
           },
         }],
@@ -112,12 +111,10 @@ describe('unified ability system', () => {
     expect(node.mechanics?.rewards?.[0].effects).toEqual([effect]);
     expect(node.mechanics?.passiveEffects).toEqual([effect]);
     expect(node.mechanics?.cooldownRounds).toBe(4);
-    expect(node.legacy?.activation).toBeDefined();
-    expect(node.legacy?.customLegacyField).toEqual({ keep: true });
     expect(migrateProfessionPack(migrated)).toEqual(migrated);
   });
 
-  test('keeps unified definitions, instances, and pending proposals in old saves', () => {
+  test('keeps unified definitions, instances, and pending proposals during current-state normalization', () => {
     const proposal = normalizeAbilityProposal({ id: 'saved-ability', name: '存档能力', description: '保留', category: 'dynamic', rarity: '普通', target: 'self', tags: [] })!;
     const definition = balanceAbilityProposal(proposal);
     const instance = createAbilityInstance(definition, 'dynamic', 10);
@@ -129,7 +126,7 @@ describe('unified ability system', () => {
       abilityInstances: { [definition.id]: instance },
       pendingAbilityProposals: { [proposal.id]: proposal },
     };
-    const migrated = migrateGameStateToV3(state);
+    const migrated = normalizeGameStateV3(state);
     expect(migrated.v3?.abilityDefinitions).toEqual({ [definition.id]: definition });
     expect(migrated.v3?.abilityInstances).toEqual({ [definition.id]: instance });
     expect(migrated.v3?.pendingAbilityProposals).toEqual({ [proposal.id]: proposal });
@@ -160,7 +157,7 @@ describe('unified ability system', () => {
   });
 
   test('stages semantic story abilities and only writes a locally balanced owned skill after confirmation', () => {
-    const state = migrateGameStateToV3(createDefaultGameState());
+    const state = normalizeGameStateV3(createDefaultGameState());
     const staged = stageAbilityProposalOnGameState(state, {
       id: 'story-flame', name: '余烬术', description: '在剧情中完成训练后掌握。', category: 'dynamic', rarity: '稀有', target: 'enemy', tags: ['火焰'],
       damage: 999999, cooldownRounds: 0,
@@ -207,7 +204,7 @@ describe('unified ability system', () => {
     for (const pack of BUILTIN_PROFESSION_PACKS) {
       expect(pack.manifest.schemaVersion).toBe(2);
       expect(pack.innateTalents.length).toBeGreaterThanOrEqual(12);
-      expect(pack.freeSkillCatalog?.length ?? 0).toBeGreaterThanOrEqual(12);
+      expect(pack.freeSkills?.length ?? 0).toBeGreaterThanOrEqual(12);
       for (const profession of pack.professions) {
         expect(new Set(profession.abilities.map(ability => ability.tier ?? 1))).toEqual(new Set([1, 2, 3, 4]));
         expect(profession.abilities.length).toBeGreaterThanOrEqual(8);

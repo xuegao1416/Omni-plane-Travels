@@ -1,4 +1,4 @@
-import type { PlayerProfile, WorldModule } from './types';
+import type { PlayerProfile,WorldModule } from './types';
 
 interface ProgressionInitEditorProps {
   worldModules?: WorldModule[];

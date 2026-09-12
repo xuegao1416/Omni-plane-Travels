@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { createDefaultGameState } from '../schema/variables';
-import type { ProfessionPack } from '../modules/schema';
 import {
   createDefaultV3FeatureFlags,
-  migrateGameStateToV3,
+  normalizeGameStateV3,
   migrateProfessionPack,
   normalizeAbilityProposal,
   normalizeCombatEncounterProposal,
@@ -12,7 +11,7 @@ import {
   synchronizeV3FeatureFlagsForWorld,
 } from './protocols';
 
-describe('v3 core protocols and additive migrations', () => {
+describe('v3 core protocols and direct-boundary normalization', () => {
   test('keeps AI ability proposals semantic and leaves mechanics to local balancing', () => {
     const proposal = normalizeAbilityProposal({
       id: 'new-skill', name: '星火', description: '一束短促的火光', category: 'dynamic',
@@ -24,7 +23,7 @@ describe('v3 core protocols and additive migrations', () => {
   });
 
   test('migrates a v1 profession pack without changing existing ability ids', () => {
-    const legacy: ProfessionPack = {
+    const legacy = {
       manifest: { id: 'legacy-pack', name: '旧包', version: '1.0.0', schemaVersion: 1 },
       professions: [{
         id: 'warrior', name: '战士', description: '旧职业', abilities: [{
@@ -62,38 +61,30 @@ describe('v3 core protocols and additive migrations', () => {
     })?.enemies).toHaveLength(5);
   });
 
-  test('gives a v2 combat session safe defaults and preserves inferno risk', () => {
-    const session = normalizeCombatSessionV2({
+  test('rejects incomplete combat-session payloads instead of reviving pre-v2 runtime shapes', () => {
+    expect(normalizeCombatSessionV2({
       id: 'session-1', riskMode: 'inferno', seed: 42,
       participants: [{ id: 'player', side: 'player', identity: '玩家' }],
-    });
-
-    expect(session).toMatchObject({ schemaVersion: 2, riskMode: 'inferno', seed: 42, round: 1 });
-    expect(session?.participants[0]).toMatchObject({ hp: 1, maxHp: 1, actedRound: 0, cooldowns: {}, items: [] });
-    expect(session?.preCombatCheckpoint.sessionId).toBe('session-1');
+    })).toBeUndefined();
   });
 
-  test('migrates old saves additively with combat and profession features disabled by default', () => {
-    const legacy = createDefaultGameState();
-    legacy.玩家.技能系统['旧技能'] = { 品质: '普通', 描述: '保留', 类型: '旧技能' };
+  test('normalizes a current GameState into the v3 runtime container', () => {
+    const state = createDefaultGameState();
+    state.玩家.技能系统['current-skill'] = { 品质: '普通', 描述: '保留', 类型: '技能' };
 
-    const migrated = migrateGameStateToV3(legacy);
+    const migrated = normalizeGameStateV3(state);
 
-    expect(migrated.玩家.技能系统['旧技能']).toBeDefined();
+    expect(migrated.玩家.技能系统['current-skill']).toBeDefined();
     expect(migrated.narrativeDecisions).toEqual([]);
     expect(createDefaultV3FeatureFlags()).toEqual({ professionsEnabled: false, combatEnabled: false, combatRiskMode: 'normal' });
   });
 
-  test('preserves easy risk through risk and combat-session normalization', () => {
+  test('preserves easy risk through risk normalization', () => {
     expect(normalizeCombatRiskMode('easy')).toBe('easy');
-    expect(normalizeCombatSessionV2({
-      id: 'easy-session', riskMode: 'easy', seed: 7,
-      participants: [{ id: 'player', side: 'player', identity: '玩家' }],
-    })?.riskMode).toBe('easy');
   });
 
-  test('reactivates optional v3 systems from the loaded world instead of preserving stale migration flags', () => {
-    const migrated = migrateGameStateToV3(createDefaultGameState());
+  test('synchronizes optional v3 feature flags from the loaded world', () => {
+    const migrated = normalizeGameStateV3(createDefaultGameState());
     migrated.v3!.featureFlags = { professionsEnabled: false, combatEnabled: false, combatRiskMode: 'hard' };
 
     const synchronized = synchronizeV3FeatureFlagsForWorld(migrated, {
@@ -105,24 +96,5 @@ describe('v3 core protocols and additive migrations', () => {
     expect(synchronized.v3?.featureFlags).toEqual({ professionsEnabled: true, combatEnabled: true, combatRiskMode: 'hard' });
   });
 
-  test('copies a legacy active combat into the additive v2 session slot', () => {
-    const legacy = createDefaultGameState();
-    legacy.combat = {
-      active: {
-        encounterId: 'legacy-encounter', encounterName: '旧遭遇', status: 'active', round: 2,
-        activeActorId: 'player', actionPoints: 1, actionPointsPerTurn: 1,
-        participants: [
-          { id: 'player', name: '玩家', side: 'player', hp: 8, maxHp: 10, armor: 0, initiative: 1, statuses: [], cooldowns: {} },
-          { id: 'enemy', name: '旧敌人', side: 'enemy', hp: 5, maxHp: 5, armor: 0, initiative: 0, statuses: [], cooldowns: {} },
-        ],
-        log: [],
-      },
-    };
 
-    const migrated = migrateGameStateToV3(legacy);
-
-    expect(migrated.combat?.active?.encounterId).toBe('legacy-encounter');
-    expect(migrated.v3?.combatSession?.id).toBe('legacy-encounter');
-    expect(migrated.v3?.combatSession?.participants).toHaveLength(2);
-  });
 });

@@ -4,7 +4,6 @@
 // - 尊重服务端 429 的 Retry-After（delta-seconds / HTTP-date）
 // ============================================================
 
-import type { ApiConfig } from './types';
 
 const DEFAULT_BUCKET = 'default';
 

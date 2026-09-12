@@ -2,7 +2,7 @@
  * 用户认证状态管理（邮箱 + 密码 / 验证码注册）
  */
 import { create } from 'zustand';
-import { API_ENDPOINTS, fetchWithAuth } from '../config/api';
+import { API_ENDPOINTS } from '../config/api';
 
 export interface User {
   id: string;

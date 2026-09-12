@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { getOverlayPortalTarget, shouldDismissOverlay } from './overlayPortalContract';
+import { describe,expect,test } from 'bun:test';
+import { getOverlayPortalTarget,shouldDismissOverlay } from './overlayPortalContract';
 
 describe('OverlayPortal contract', () => {
   test('does not attempt to access document during SSR', () => {

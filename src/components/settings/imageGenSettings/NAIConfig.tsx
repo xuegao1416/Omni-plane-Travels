@@ -1,18 +1,18 @@
 // NovelAI 引擎配置 — API Key、模型、采样器、分辨率、UC Preset、质量开关
 import { useState } from 'react';
 import {
-  SettingRow,
-  Toggle,
-  FieldGrid,
-  Field,
-  Select,
-  Button,
+SettingRow,
+Toggle,
+FieldGrid,
+Field,
+Select,
+Button,
 } from '../SettingsUIComponents';
 import {
-  NAI_MODELS,
-  NAI_SAMPLERS,
-  NAI_RESOLUTIONS,
-  UC_PRESETS,
+NAI_MODELS,
+NAI_SAMPLERS,
+NAI_RESOLUTIONS,
+UC_PRESETS,
 } from '@/api/imageGenTypes';
 import SharedFields from './SharedFields';
 import type { ConfigSectionProps } from './types';

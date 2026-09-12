@@ -1,5 +1,5 @@
-import type { BusinessModuleSchema, TransactionEntry } from '../../../modules/schema';
-import { ConditionListEditor, KeyValueListEditor } from './GameplayRuleEditors';
+import type { BusinessModuleSchema,TransactionEntry } from '../../../modules/schema';
+import { ConditionListEditor,KeyValueListEditor } from './GameplayRuleEditors';
 import { inputStyle } from './shared';
 
 export function BusinessModuleEditor({ data, onChange }: { data: BusinessModuleSchema; onChange: (d: Record<string, unknown>) => void }) {

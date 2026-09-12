@@ -1350,16 +1350,13 @@ function expectPackageFormatError(
 describe('normalizeCardPackFiles', () => {
   test('reports stable JSON depth overflow as a structured file error', () => {
     const error = getFormatError(() => normalizeCardPackFiles(normalizationManifest, {
-      'schema/card.json': JSON.stringify({
-        ...orderedLegacyCardFile,
-        deeplyNested: nestedObject(80),
-      }),
+      'schema/events.json': JSON.stringify({ version: 2, events: [], deeplyNested: nestedObject(80) }),
     }));
 
     expect(error.code).toBe('INPUT_LIMIT_EXCEEDED');
-    expect(error.filePath).toBe('schema/card.json');
+    expect(error.filePath).toBe('schema/events.json');
     expect(error.context).toMatchObject({
-      filePath: 'schema/card.json',
+      filePath: 'schema/events.json',
       limit: expect.any(Number),
       depth: expect.any(Number),
     });
@@ -1368,57 +1365,16 @@ describe('normalizeCardPackFiles', () => {
 
   test('reports oversized JSON text at the file input boundary', () => {
     const error = getFormatError(() => normalizeCardPackFiles(normalizationManifest, {
-      'schema/card.json': JSON.stringify({
-        ...orderedLegacyCardFile,
-        oversized: 'x'.repeat(4_200_000),
-      }),
+      'schema/events.json': JSON.stringify({ version: 2, events: [], oversized: 'x'.repeat(4_200_000) }),
     }));
 
     expect(error.code).toBe('INPUT_LIMIT_EXCEEDED');
-    expect(error.filePath).toBe('schema/card.json');
+    expect(error.filePath).toBe('schema/events.json');
     expect(error.context).toMatchObject({
-      filePath: 'schema/card.json',
+      filePath: 'schema/events.json',
       limit: expect.any(Number),
       observed: expect.any(Number),
     });
-  });
-
-  test('normalizes a single card file with a stable event ID and preserves binary assets', () => {
-    const asset = new Uint8Array([0, 1, 255]);
-    const files: Record<string, string | Uint8Array> = {
-      'manifest.json': JSON.stringify(normalizationManifest),
-      'schema/card.json': new TextEncoder().encode(JSON.stringify(orderedLegacyCardFile)),
-      'assets/opaque.bin': asset,
-    };
-    const originalFiles = { ...files };
-
-    const result = normalizeCardPackFiles(normalizationManifest, files);
-    const index = parseNormalizedJson(result.files, 'schema/events.json');
-    const entry = (index.events as Array<Record<string, unknown>>)[0];
-
-    expect(result.migrated).toBe(true);
-    expect(result.files).not.toBe(files);
-    expect(files).toEqual(originalFiles);
-    expect(result.files['schema/card.json']).toBeUndefined();
-    expect(entry.id).toMatch(/^[a-z0-9][a-z0-9_-]{0,63}$/);
-    expect(parseNormalizedJson(result.files, `schema/event-${String(entry.id)}.json`)).toMatchObject({
-      id: entry.id,
-      name: 'Legacy Pack',
-    });
-    expect(result.files['assets/opaque.bin']).toBe(asset);
-    const normalizedAgain = normalizeCardPackFiles(normalizationManifest, result.files);
-    expect(normalizedAgain.files).toEqual(result.files);
-    expect(normalizedAgain.index).toEqual(result.index);
-    expect(normalizedAgain.workflows).toEqual(result.workflows);
-    expect(normalizedAgain.migrated).toBe(false);
-
-    const secondInput = {
-      ...files,
-      'schema/card.json': new TextEncoder().encode(JSON.stringify(orderedLegacyCardFile)),
-    };
-    const legacyAgain = normalizeCardPackFiles(normalizationManifest, secondInput);
-    expect((parseNormalizedJson(legacyAgain.files, 'schema/events.json').events as Array<Record<string, unknown>>)[0].id)
-      .toBe(entry.id);
   });
 
   test('normalizes version-1 embedded cards and emits metadata-only version-2 index', () => {

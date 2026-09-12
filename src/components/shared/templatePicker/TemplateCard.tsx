@@ -1,8 +1,8 @@
 /**
  * 模板卡片 — 列表视图中的单个模板条目
  */
-import { Trash2, User, Users, BookOpen, Clock } from 'lucide-react';
-import type { NpcTemplate, PlayerPreset, HistoryPreset } from '../../../storage/templateStore';
+import { Trash2,User,Users,BookOpen,Clock } from 'lucide-react';
+import type { NpcTemplate,PlayerPreset,HistoryPreset } from '../../../storage/templateStore';
 import type { TemplateCardProps } from './types';
 import s from './styles.module.css';
 

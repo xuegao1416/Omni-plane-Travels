@@ -10,22 +10,50 @@
  *   import { getSimulationEngine } from '../simulation/SimulationApi';
  *   const engine = getSimulationEngine();
  *   engine.setWorldContext(worldCtx);
- *   await engine.tick(gameState, gameTime, round);
+ *   // 已提交正文经 directorReviews 生成提案并校验后提交。
  */
 
-import { WorldSimulationEngine } from './engine';
+import { DirectorRuntime } from './engine';
 import type { SimWorldContext, SimulationState, SimulationSnapshot } from './types';
 import type { ApiConfig } from '../api/types';
 import { createEmptySimState } from './types';
 import { useSimulationStore } from '../stores/simulationStore';
+import { DirectorReviewController } from '../director/review';
+import { useSaveStore } from '../stores/saveStore';
+
+export const directorReviews = new DirectorReviewController();
+type DirectorActions = { mainline: () => Promise<void>; background: () => Promise<void> };
+let directorActions: DirectorActions | undefined;
+export function registerDirectorActions(actions: DirectorActions): () => void {
+  directorActions = actions;
+  return () => { if (directorActions === actions) directorActions = undefined; };
+}
+export async function requestDirectorReview(branch: 'mainline' | 'background'): Promise<void> {
+  await directorActions?.[branch]();
+}
+
+/** Explicit player edits invalidate pending proposals and persist to this save, not only the global cache. */
+export function mutateBackgroundState(mutate: (state: SimulationState) => void, readOnly = false): boolean {
+  const saveStore = useSaveStore.getState();
+  if (readOnly || saveStore.savesMeta.find(save => save.id === saveStore.currentSaveId)?.lifecycle === 'ended') return false;
+  directorReviews.invalidate();
+  const engine = getSimulationEngine();
+  const next = structuredClone(engine.state);
+  mutate(next);
+  engine.state = next;
+  // saveState notifies the singleton's UI subscriber as well as persisting the cache.
+  engine.saveState();
+  saveStore.scheduleAutoSave();
+  return true;
+}
 
 // ─── 模块级单例 ───
 
-let _engine: WorldSimulationEngine | null = null;
+let _engine: DirectorRuntime | null = null;
 let _worldContext: SimWorldContext | null = null;
 
 /** 同步引擎状态到 Zustand UI store */
-function syncEngineToStore(engine: WorldSimulationEngine) {
+function syncEngineToStore(engine: DirectorRuntime) {
   useSimulationStore.getState().syncFromEngine(engine.state);
 }
 
@@ -33,9 +61,9 @@ function syncEngineToStore(engine: WorldSimulationEngine) {
  * 获取推演引擎单例
  * 首次调用时从 localStorage 恢复状态，后续调用返回同一实例
  */
-export function getSimulationEngine(): WorldSimulationEngine {
+export function getSimulationEngine(): DirectorRuntime {
   if (!_engine) {
-    _engine = new WorldSimulationEngine(WorldSimulationEngine.loadState());
+    _engine = new DirectorRuntime(DirectorRuntime.loadState());
     _engine.onStateChange = () => syncEngineToStore(_engine!);
   }
   return _engine;
@@ -45,17 +73,23 @@ export function getSimulationEngine(): WorldSimulationEngine {
  * 重置引擎（切换世界时调用）
  * 清除所有推演状态并重新初始化
  */
-export function resetSimulationEngine(): WorldSimulationEngine {
-  _engine = new WorldSimulationEngine(createEmptySimState());
+export function resetSimulationEngine(): DirectorRuntime {
+  directorReviews.invalidate();
+  useSimulationStore.getState().setLastError(null);
+  const previousConfig = _engine?.state.config ?? useSimulationStore.getState().simState.config;
+  const empty = createEmptySimState();
+  empty.config = { ...empty.config, ...previousConfig, lastAutoTickRound: 0, lastSimulatedTime: '' };
+  _engine = new DirectorRuntime(empty);
   _engine.onStateChange = () => syncEngineToStore(_engine!);
   _engine.saveState();
+  syncEngineToStore(_engine);
   _worldContext = null;
   return _engine;
 }
 
 /**
  * 设置当前世界的语义上下文
- * 引擎在 tick() 时会使用此上下文生成自适应层级标签
+ * 引擎请求后台提案时使用此上下文生成自适应层级标签
  */
 export function setWorldContext(ctx: SimWorldContext | null): void {
   _worldContext = ctx;
@@ -75,6 +109,8 @@ export function getWorldContext(): SimWorldContext | null {
  * 从存档恢复引擎状态
  */
 export function restoreEngineState(state: SimulationState): void {
+  directorReviews.invalidate();
+  useSimulationStore.getState().setLastError(null);
   const engine = getSimulationEngine();
   engine.replaceState(state);
   // 同步到 Zustand UI store
@@ -131,6 +167,7 @@ export function createSimulationSnapshot(
  * @returns 是否恢复成功
  */
 export function restoreSimulationSnapshot(snapshotId: string): boolean {
+  directorReviews.invalidate();
   const engine = getSimulationEngine();
   const success = engine.restoreSnapshot(snapshotId);
   if (success) {

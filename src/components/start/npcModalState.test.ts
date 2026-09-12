@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import { isNpcDraftDirty } from './npcModalState';
 import type { CustomNpc } from '../../storage/db';
 

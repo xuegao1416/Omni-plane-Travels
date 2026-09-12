@@ -3,13 +3,12 @@ import type { GameState } from '../schema/variables';
 import { createDefaultGameState } from '../schema/variables';
 import type { ApiConfig } from '../api/types';
 import { requestCompletion } from '../api/client';
-import { cloneDeep, get, set, merge, unset } from 'lodash-es';
+import { cloneDeep, get, set, merge } from 'lodash-es';
 import { formatWorldClock, normalizeTimeSystemConfig, normalizeWorldClockState, reconcileEditedWorldClock, type WorldClockConfig, type WorldClockState } from '../time/worldClock';
 import { toDisplayText } from '../utils/displayText';
 import {
   ensureGameplayRuntime,
   executeGameplayTransaction,
-  createGameplayStateDiff,
   type GameplayTransaction,
   type GameplayEffect,
 } from '../gameplay/kernel';
@@ -18,14 +17,16 @@ import { extractModulePartitions, materializeModulePartitions } from '../gamepla
 import { ModuleRuntimeRegistry } from '../gameplay/moduleRuntime/registry';
 import type { ModuleStateRecord } from '../gameplay/moduleRuntime/types';
 import { canRollbackCombat } from '../gameplay/protocols';
+import { ensureKnowledgeState } from '../director/knowledge';
+import { selectPlayerKnownNPCs } from './playerKnowledge';
+import { enforcePlayerIdentity } from '../director/initialIdentity';
 
 /** 原型污染防护 — 过滤危险路径段 */
 const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
-const CORE_OBJECT_PATHS = new Set([
-  '世界', '世界.时间系统', '世界.空间定位',
-  '玩家', '玩家.生存状态', '玩家.身份信息', '玩家.技能系统', '玩家.货币资源', '玩家.物品栏',
-  '人物档案',
-]);
+
+const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);
+const AI_TRANSACTION_KEYS = new Set(['id', 'moduleId', 'source', 'label', 'conditions', 'costs', 'effects', 'rewards', 'events']);
+const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -33,24 +34,69 @@ function isSafePath(path: string): boolean {
   return !path.split('.').some(seg => DANGEROUS_PATH_SEGMENTS.has(seg));
 }
 
-/** 递归检测对象树（含嵌套）是否含原型污染危险键（L-19）。用于 merge 前的源头净化校验 */
-function containsDangerousKey(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
+function isAllowedAiStatePath(path: unknown): boolean {
+  if (typeof path !== 'string' || !path.trim()) return false;
+  const normalized = path.trim().replace(/^\//, '').replaceAll('/', '.');
+  const segments = normalized.split('.');
+  return isSafePath(normalized)
+    && AI_STATE_ROOTS.has(segments[0])
+    && !segments.some(segment => AI_FORBIDDEN_FIELDS.has(segment));
+}
+
+function containsForbiddenAiField(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
   if (!value || typeof value !== 'object') return false;
-  if (seen.has(value as object)) return false; // 防循环引用死循环
+  if (seen.has(value as object)) return false;
   seen.add(value as object);
-  for (const key of Object.keys(value as object)) {
-    if (DANGEROUS_PATH_SEGMENTS.has(key)) return true;
-    const child = (value as Record<string, unknown>)[key];
-    if (child && typeof child === 'object' && containsDangerousKey(child, seen)) return true;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (AI_FORBIDDEN_FIELDS.has(key)) return true;
+    if (containsForbiddenAiField(child, seen)) return true;
   }
   return false;
 }
+
+function areAllowedAiEffects(value: unknown): boolean {
+  if (!Array.isArray(value)) return value === undefined;
+  return value.every(effect => {
+    if (!isRecord(effect)) return false;
+    for (const operation of ['set', 'add', 'append', 'remove'] as const) {
+      if (operation in effect) {
+        const payload = effect[operation];
+        return isRecord(payload)
+          && isAllowedAiStatePath(payload.path)
+          && !containsForbiddenAiField(payload.value);
+      }
+    }
+    return isRecord(effect.emit) || isRecord(effect.schedule);
+  });
+}
+
+function areAllowedAiConditions(value: unknown): boolean {
+  if (!Array.isArray(value)) return value === undefined;
+  const check = (condition: unknown): boolean => {
+    if (!isRecord(condition)) return false;
+    if (isRecord(condition.state)) return isAllowedAiStatePath(condition.state.path);
+    if (Array.isArray(condition.all)) return condition.all.every(check);
+    if (Array.isArray(condition.any)) return condition.any.every(check);
+    if (condition.not !== undefined) return check(condition.not);
+    return isRecord(condition.event);
+  };
+  return value.every(check);
+}
+
+function isAllowedAiTransaction(value: Record<string, unknown>): boolean {
+  if (!Object.keys(value).every(key => AI_TRANSACTION_KEYS.has(key))) return false;
+  if (!areAllowedAiConditions(value.conditions)) return false;
+  if (value.costs !== undefined && (!Array.isArray(value.costs) || !value.costs.every(cost => isRecord(cost) && isAllowedAiStatePath(cost.path)))) return false;
+  if (!areAllowedAiEffects(value.effects)) return false;
+  if (value.rewards !== undefined && (!Array.isArray(value.rewards) || !value.rewards.every(reward => isRecord(reward) && areAllowedAiEffects(reward.effects)))) return false;
+  return true;
+}
+
 import {
   resolveNpcId,
   warnIgnoredNpcPatchUpdate,
   canCreateNpcFromPatch,
   getCreatableNpcIdentifier,
-  isNpcCreationPayload,
   ensureNpcCategoryDefaults,
   ensureNpcChronicleDefaults,
   ensureNpcStructureDefaults,
@@ -68,7 +114,6 @@ export class VariableManager {
   private state: GameState;
   private readonly moduleRegistry: ModuleRuntimeRegistry;
   private worldClockConfig: WorldClockConfig;
-  private hasExplicitWorldClockConfig = false;
 
   constructor(initial?: GameState, moduleRuntime?: {
     saveId: string;
@@ -76,7 +121,6 @@ export class VariableManager {
     checkpoints?: readonly ModuleStateRecord[];
   }, worldClockConfig?: Partial<WorldClockConfig>) {
     this.worldClockConfig = normalizeTimeSystemConfig(worldClockConfig);
-    this.hasExplicitWorldClockConfig = !!worldClockConfig;
     this.moduleRegistry = new ModuleRuntimeRegistry(moduleRuntime?.saveId ?? 'runtime');
     for (const record of moduleRuntime?.checkpoints ?? []) this.moduleRegistry.importHistoryRecord(record);
     for (const record of moduleRuntime?.current ?? []) this.moduleRegistry.importRecord(record);
@@ -90,7 +134,6 @@ export class VariableManager {
 
   setWorldClockConfig(config: Partial<WorldClockConfig>): void {
     this.worldClockConfig = normalizeTimeSystemConfig(config);
-    this.hasExplicitWorldClockConfig = true;
     this.normalizeState();
   }
 
@@ -128,8 +171,7 @@ export class VariableManager {
   }
 
   /**
-   * 初始化笔记本（第0轮自动注入）
-   * 笔记本初始为空，由 AI 根据世界设定动态创建
+   * 初始化当前世界状态容器。
    */
   initializeWorldAndNotebook(): void {
     this.normalizeState();
@@ -155,29 +197,21 @@ export class VariableManager {
     set(this.state, path, value);
   }
 
-  // 规范化状态：确保NPC分类、事迹、结构默认值 + 纪事迁移 + 任务系统迁移 + 模块数值校验
+  // 规范化状态：确保核心容器、NPC、纪事、任务与模块数值保持当前结构
   private normalizeState(): void {
     this.repairCoreStateShape();
     ensureGameplayRuntime(this.state);
     const clock = (this.state.世界.时间系统 as any).时钟;
     if (clock && typeof clock === 'object') {
-      const legacyConfig = isRecord(clock) && isRecord((clock as any).calendar)
-        ? (clock as any).calendar as Partial<WorldClockConfig>
-        : undefined;
-      if (legacyConfig && !this.hasExplicitWorldClockConfig) {
-        this.worldClockConfig = normalizeTimeSystemConfig(legacyConfig);
-      }
       const normalizedClock = normalizeWorldClockState(clock, this.worldClockConfig);
       this.state.世界.时间系统.时钟 = normalizedClock;
-      // AI may still write the legacy display field. The structured clock always wins.
       this.state.世界.时间系统.当前时间 = formatWorldClock(normalizedClock, this.worldClockConfig);
     }
     ensureNpcCategoryDefaults(this.state);
     ensureNpcChronicleDefaults(this.state);
     ensureNpcStructureDefaults(this.state);
-    this.migrateNotebookToChronicle();
+    this.pruneEmptyInventoryEntries();
     this.normalizeChronicle();
-    this.migrateNotebookToTaskSystem();
     this.normalizeTaskSystem();
     this.validateAndClampModuleValues();
   }
@@ -187,16 +221,7 @@ export class VariableManager {
     return clock && typeof clock === 'object' ? cloneDeep(normalizeWorldClockState(clock, this.worldClockConfig)) : undefined;
   }
 
-  private restoreAuthoritativeClock(clock: WorldClockState | undefined): void {
-    if (!clock) return;
-    const state = this.state as any;
-    if (!isRecord(state.世界)) state.世界 = {};
-    if (!isRecord(state.世界.时间系统)) state.世界.时间系统 = {};
-    state.世界.时间系统.时钟 = cloneDeep(clock);
-    state.世界.时间系统.当前时间 = formatWorldClock(clock, this.worldClockConfig);
-  }
-
-  /** 修复旧存档或历史坏补丁留下的无效核心容器，避免后续轮次在构建快照时永久失败。 */
+  /** 防御性修复无效核心容器，避免异常输入让后续轮次永久失败。 */
   private repairCoreStateShape(): void {
     const defaults = createDefaultGameState();
     const state = this.state as unknown as Record<string, unknown>;
@@ -215,6 +240,8 @@ export class VariableManager {
     player.当前目标 = toDisplayText(player.当前目标);
 
     if (!isRecord(state.人物档案)) state.人物档案 = {};
+    enforcePlayerIdentity(state as unknown as GameState);
+    ensureKnowledgeState(this.state);
   }
 
   /**
@@ -224,86 +251,31 @@ export class VariableManager {
     // 世界系统已移除，属性范围约束由世界书条目中的提示词控制
   }
 
-
-  private migrateNotebookToChronicle(): void {
-    const notebook = this.state.玩家?.记事本 as any;
-    if (!notebook || typeof notebook !== 'object') return;
-
-    // 确保纪事系统存在
-    if (!this.state.玩家.纪事系统) {
-      this.state.玩家.纪事系统 = { 纪事: {} };
-    }
-    const chronicles = this.state.玩家.纪事系统.纪事;
-
-    // 迁移潜在危机
-    if (notebook.潜在危机 && typeof notebook.潜在危机 === 'object') {
-      for (const [name, c] of Object.entries(notebook.潜在危机) as [string, any][]) {
-        if (!chronicles[name]) {
-          chronicles[name] = {
-            标题: name,
-            类型: '风险',
-            描述: c.应对措施 || '',
-            状态: '活跃',
-            详情: {
-              严重程度: c.严重程度 || '',
-              预计影响时间: c.预计影响时间 || '',
-            },
-            $time: c.$time || Date.now(),
-          };
+  /**
+   * 清理数量归零的物品条目（玩家 + 全部 NPC 的 物品栏）。
+   * - AI 变量提取常把消耗品写成 数量:0（add 效果 min:0 的自然结果），战斗扣减同理；
+   *   若不清理会留下"空壳物品"，继续出现在下一回合快照与提示词中，污染叙事。
+   * - 物品栏不变式：任何条目 数量 >= 1；数量缺失/非数字视为遗留数据，保留不动。
+   */
+  private pruneEmptyInventoryEntries(): void {
+    const prune = (inventory: unknown): void => {
+      if (!isRecord(inventory)) return;
+      for (const [key, value] of Object.entries(inventory)) {
+        if (isRecord(value) && typeof (value as Record<string, unknown>).数量 === 'number'
+          && ((value as Record<string, unknown>).数量 as number) <= 0) {
+          delete (inventory as Record<string, unknown>)[key];
         }
       }
-      delete notebook.潜在危机;
-    }
-
-    // 迁移当前机遇
-    if (notebook.当前机遇 && typeof notebook.当前机遇 === 'object') {
-      for (const [name, o] of Object.entries(notebook.当前机遇) as [string, any][]) {
-        if (!chronicles[name]) {
-          chronicles[name] = {
-            标题: name,
-            类型: '机遇',
-            描述: o.行动计划 || '',
-            状态: '活跃',
-            详情: {
-              时效性: o.时效性 || '',
-              所需资源: o.所需资源 || '',
-            },
-            $time: o.$time || Date.now(),
-          };
-        }
+    };
+    prune((this.state.玩家 as unknown as Record<string, unknown> | undefined)?.物品栏);
+    const roster = this.state.人物档案;
+    if (isRecord(roster)) {
+      for (const npc of Object.values(roster)) {
+        prune((npc as unknown as Record<string, unknown> | undefined)?.物品栏);
       }
-      delete notebook.当前机遇;
     }
-
-    // 迁移待办事项到任务系统（保留原有逻辑）
-    if (notebook.待办事项 && typeof notebook.待办事项 === 'object') {
-      const todos = notebook.待办事项;
-      if (Object.keys(todos).length > 0) {
-        if (!this.state.玩家.任务系统) {
-          this.state.玩家.任务系统 = { 活跃任务: {}, 已完成任务: {}, 已失败任务: {} };
-        }
-        const taskSystem = this.state.玩家.任务系统;
-        for (const [name, todo] of Object.entries(todos) as [string, any][]) {
-          const status = todo.状态 === '已完成' ? '已完成' : todo.状态 === '已取消' ? '已放弃' : '进行中';
-          const target = status === '已完成' ? '已完成任务' : status === '已放弃' ? '已失败任务' : '活跃任务';
-          if (!taskSystem[target][name]) {
-            taskSystem[target][name] = {
-              任务名: name, 任务类型: '支线', 描述: name, 状态: status as any,
-              优先级: todo.优先级 || '中', 目标: name, 截止时间: todo.截止时间, $time: todo.$time || Date.now(),
-            };
-          }
-        }
-      }
-      delete notebook.待办事项;
-    }
-
-    // 清理空的旧记事本
-    if (Object.keys(notebook).length === 0) {
-      delete this.state.玩家.记事本;
-    }
-
-    console.log('[VariableManager] 已迁移旧记事本到纪事系统');
   }
+
 
   /** 纪事系统容量限制：最多 30 条，超出删除最旧的 */
   private normalizeChronicle(): void {
@@ -321,44 +293,6 @@ export class VariableManager {
         delete chronicleSystem.纪事[key];
       }
     }
-  }
-
-  /** 旧存档迁移：将 记事本.待办事项 迁移到 任务系统 */
-  private migrateNotebookToTaskSystem(): void {
-    const notebook = this.state.玩家?.记事本 as any;
-    if (!notebook?.待办事项 || typeof notebook.待办事项 !== 'object') return;
-
-    const todos = notebook.待办事项;
-    if (Object.keys(todos).length === 0) {
-      delete notebook.待办事项;
-      return;
-    }
-
-    // 确保任务系统存在
-    if (!this.state.玩家.任务系统) {
-      this.state.玩家.任务系统 = { 活跃任务: {}, 已完成任务: {}, 已失败任务: {} };
-    }
-    const taskSystem = this.state.玩家.任务系统;
-
-    for (const [name, todo] of Object.entries(todos) as [string, any][]) {
-      const status = todo.状态 === '已完成' ? '已完成' : todo.状态 === '已取消' ? '已放弃' : '进行中';
-      const target = status === '已完成' ? '已完成任务' : status === '已放弃' ? '已失败任务' : '活跃任务';
-      if (!taskSystem[target][name]) {
-        taskSystem[target][name] = {
-          任务名: name,
-          任务类型: '支线',
-          描述: name,
-          状态: status as any,
-          优先级: todo.优先级 || '中',
-          目标: name,
-          截止时间: todo.截止时间,
-          $time: todo.$time || Date.now(),
-        };
-      }
-    }
-
-    delete notebook.待办事项;
-    console.log(`[VariableManager] 已迁移 ${Object.keys(todos).length} 条待办事项到任务系统`);
   }
 
   /** 任务系统容量限制 */
@@ -382,19 +316,8 @@ export class VariableManager {
           continue;
         }
 
-        // 早期提示词允许把“目标”写成 { 描述, 阶段 }。这种旧数据会被 React
-        // 当作子节点直接渲染并触发 #31；在状态入口迁移为当前扁平结构。
-        const legacyGoal = isRecord(task.目标) ? task.目标 : undefined;
-        if (legacyGoal) {
-          task.目标 = typeof legacyGoal.描述 === 'string'
-            ? legacyGoal.描述
-            : typeof legacyGoal.名称 === 'string'
-              ? legacyGoal.名称
-              : key;
-          if (!Array.isArray(task.阶段) && Array.isArray(legacyGoal.阶段)) {
-            task.阶段 = legacyGoal.阶段;
-          }
-        }
+        // AI 经常尝试按索引写入阶段状态；确保每个任务都有阶段数组，避免 set 失败。
+        if (!Array.isArray(task.阶段)) task.阶段 = [];
 
         task.任务名 = toDisplayText(task.任务名, key);
         task.描述 = toDisplayText(task.描述, task.任务名 as string);
@@ -425,117 +348,10 @@ export class VariableManager {
     }
   }
 
-  // 批量应用补丁 (RFC 6902 风格) - NPC 感知版本。仅供兼容层在候选状态上执行。
-  private applyPatchesInPlace(patches: Array<{ op: string; path: string; value?: unknown }>) {
-    const authoritativeClock = this.captureAuthoritativeClock();
-    for (const patch of patches) {
-      let patchValue = patch.value;
-      const rawPath = patch.path.replace(/^\//, '').replace(/\//g, '.');
-      const pathParts = rawPath.split('.');
-
-      // NPC 感知逻辑：当路径涉及 人物档案.XXX 时
-      if (pathParts[0] === '人物档案' && pathParts.length >= 2) {
-        const npcResolution = resolveNpcId(pathParts[1], this.state);
-
-        if (!npcResolution.ok) {
-          if (canCreateNpcFromPatch(pathParts, patch.op, patchValue)) {
-            const creatableId = getCreatableNpcIdentifier(pathParts[1]);
-            if (!creatableId) {
-              warnIgnoredNpcPatchUpdate('RFC 补丁', pathParts[1], npcResolution);
-              continue;
-            }
-            pathParts[1] = creatableId;
-          } else {
-            warnIgnoredNpcPatchUpdate('RFC 补丁', pathParts[1], npcResolution);
-            continue;
-          }
-        } else {
-          pathParts[1] = npcResolution.npcId!;
-        }
-      }
-
-      const resolvedPath = pathParts.join('.');
-      if (!isSafePath(resolvedPath)) continue;
-      if (CORE_OBJECT_PATHS.has(resolvedPath)) {
-        if (patch.op === 'remove' || !isRecord(patch.value)) {
-          throw new Error(`拒绝破坏核心状态容器的变量补丁: ${resolvedPath}`);
-        }
-      }
-      switch (patch.op) {
-        case 'replace':
-        case 'add': {
-          // 好感度 delta 钳制（RFC 补丁路径）
-          if (pathParts[0] === '人物档案' && pathParts.length >= 4 &&
-              pathParts[2] === '关系数据' && pathParts[3] === '好感度' &&
-              (patch.op === 'replace' || patch.op === 'add')) {
-            const npcIdForClamp = pathParts[1];
-            const currentFavor = (this.state.人物档案[npcIdForClamp] as any)?.关系数据?.好感度;
-            if (typeof currentFavor === 'number' && Number.isFinite(currentFavor)) {
-              const newFavor = Number(patchValue);
-              if (Number.isFinite(newFavor)) {
-                const delta = newFavor - currentFavor;
-                if (Math.abs(delta) > 15) {
-                  patchValue = safeClamp(Math.round(currentFavor + Math.sign(delta) * 15), -100, 100, currentFavor);
-                  console.warn(`[VariableManager] RFC补丁好感度 delta ${delta} 超限，已钳制: ${currentFavor} → ${patchValue} (${npcIdForClamp})`);
-                } else {
-                  patchValue = safeClamp(newFavor, -100, 100, currentFavor);
-                }
-              }
-            }
-          }
-          set(this.state, resolvedPath, patchValue);
-          break;
-        }
-        case 'remove':
-          unset(this.state, resolvedPath);
-          break;
-      }
-    }
-
-    // Variable AI is allowed to update weather and world axes, but not the
-    // structured clock or its derived legacy display (including via parent replace).
-    this.restoreAuthoritativeClock(authoritativeClock);
-
-    // NPC 必填字段校验：在场 NPC 缺少当前想法/当前状态时警告
-    for (const [id, npc] of Object.entries(this.state.人物档案)) {
-      const npcRecord = npc as any;
-      if (npcRecord.人物分类 !== '在场') continue;
-      const missing: string[] = [];
-      const thoughts = npcRecord.个人信息?.当前想法;
-      if (!thoughts || thoughts === '暂无' || thoughts === '未知') missing.push('当前想法');
-      const status = npcRecord.个人信息?.当前状态;
-      if (!status || status === '暂无' || status === '未知') missing.push('当前状态');
-      if (missing.length > 0) {
-        console.warn(`[VariableManager] 在场NPC「${npcRecord.姓名 || id}」缺少必填字段: ${missing.join('、')}（辅助AI可能未返回完整更新）`);
-      }
-    }
-
-    this.normalizeState();
-  }
-
-  /**
-   * 公开 RFC 入口仍支持旧存档/旧导入格式，但最终必须经过 gameplay kernel。
-   * 兼容解析在候选状态上执行，避免旧补丁绕过日志、原子提交和回滚边界。
-   */
-  applyPatches(patches: Array<{ op: string; path: string; value?: unknown }>): boolean {
-    const candidate = new VariableManager(this.state, undefined, this.worldClockConfig);
-    try {
-      candidate.applyPatchesInPlace(patches);
-      if (!candidate.hasValidCoreStateShape()) return false;
-      return this.commitGameplayTransaction({
-        id: `rfc-update:${this.state.simulationRuntime?.tick ?? 0}:${(this.state.gameplay?.sequence ?? 0) + 1}`,
-        source: 'legacy:rfc',
-        label: '兼容 RFC 变量补丁',
-        effects: createGameplayStateDiff(this.state, candidate.state),
-      });
-    } catch {
-      return false;
-    }
-  }
-
   private commitGameplayTransaction(transaction: GameplayTransaction): boolean {
     const tick = this.state.simulationRuntime?.tick ?? 0;
-    const result = executeGameplayTransaction(this.state, transaction, { tick });
+    const isAiSource = transaction.source.startsWith('ai');
+    const result = executeGameplayTransaction(this.state, transaction, { tick, bestEffort: isAiSource });
     if (result.status === 'applied' && !this.hasValidCoreStateShape(result.state as GameState)) {
       // AI transactions must not be able to replace a core container with a
       // scalar/null value. Keep the original state and report rejection.
@@ -543,7 +359,9 @@ export class VariableManager {
     }
     // Failed/blocked results still carry the kernel log; preserve that state.
     this.state = result.state as GameState;
-    if (result.status === 'applied') this.normalizeState();
+    if (result.status === 'applied') {
+      this.normalizeState();
+    }
     return result.status === 'applied';
   }
 
@@ -575,7 +393,7 @@ export class VariableManager {
     }
   }
 
-  /** Normalize legacy display-name NPC paths before they enter the generic kernel. */
+  /** Normalize display-name NPC paths before they enter the generic kernel. */
   private normalizeCanonicalTransaction(payload: Record<string, unknown>): Record<string, unknown> | null {
     const transaction = cloneDeep(payload) as Record<string, any>;
     const chronicleCache = new Map<string, string[]>();
@@ -711,91 +529,28 @@ export class VariableManager {
     return transaction;
   }
 
-  private applyParsedLegacyUpdate(parsed: unknown): boolean {
-    if (Array.isArray(parsed)) {
-      this.applyPatchesInPlace(parsed as Array<{ op: string; path: string; value?: unknown }>);
-      if (!this.hasValidCoreStateShape()) throw new Error('变量补丁破坏了核心状态结构');
-      return true;
-    }
-    if (typeof parsed === 'object' && parsed !== null) {
-      this.applyMergeUpdate(parsed as Record<string, unknown>);
-      if (!this.hasValidCoreStateShape()) throw new Error('变量更新破坏了核心状态结构');
-      return true;
-    }
-    return false;
+  /**
+   * 变量 AI 只接受当前 GameplayTransaction。提示词与运行时共用同一份
+   * canonical 协议，历史 RFC/对象合并/path=value 不再形成第二套写入语义。
+   */
+  applyAiUpdateVariable(updateText: string): boolean {
+    return this.applyUpdateVariable(updateText);
   }
 
-  /**
-   * Parse both the canonical gameplay transaction payload and legacy AI
-   * object/RFC updates. Legacy semantics are evaluated on a candidate state,
-   * then committed through the same atomic kernel boundary.
-   */
-  // 从AI响应中的更新标签解析并应用更新
+  // 从 AI 响应中的更新标签解析并应用当前 GameplayTransaction。
   applyUpdateVariable(updateText: string): boolean {
     let parsed: unknown;
     try {
       parsed = JSON.parse(updateText);
     } catch {
-      const candidate = new VariableManager(this.state, undefined, this.worldClockConfig);
-      if (!candidate.applyLegacyKeyValueUpdate(updateText)) return false;
-      return this.commitGameplayTransaction({
-        id: `ai-legacy:${this.state.simulationRuntime?.tick ?? 0}:${(this.state.gameplay?.sequence ?? 0) + 1}`,
-        source: 'ai',
-        label: '兼容旧变量更新',
-        effects: createGameplayStateDiff(this.state, candidate.state),
-      });
-    }
-
-    if (isRecord(parsed) && (
-      Array.isArray(parsed.effects)
-      || Array.isArray(parsed.costs)
-      || Array.isArray(parsed.rewards)
-      || Array.isArray(parsed.events)
-      || Array.isArray(parsed.conditions)
-    )) {
-      return this.applyGameplayTransactionPayload(parsed);
-    }
-
-    const candidate = new VariableManager(this.state, undefined, this.worldClockConfig);
-    try {
-      if (!candidate.applyParsedLegacyUpdate(parsed)) return false;
-      return this.commitGameplayTransaction({
-        id: `ai-legacy:${this.state.simulationRuntime?.tick ?? 0}:${(this.state.gameplay?.sequence ?? 0) + 1}`,
-        source: 'ai',
-        label: '兼容旧变量更新',
-        effects: createGameplayStateDiff(this.state, candidate.state),
-      });
-    } catch {
       return false;
     }
-  }
+    if (!isRecord(parsed)) return false;
 
-  /** 兼容旧版 path=value 输出；同样以整批事务方式应用。 */
-  private applyLegacyKeyValueUpdate(updateText: string): boolean {
-    const lines = updateText.split('\n').filter(l => l.includes('='));
-    if (lines.length === 0) return false;
-
-    const previousState = cloneDeep(this.state);
-    const authoritativeClock = this.captureAuthoritativeClock();
-    try {
-      let appliedCount = 0;
-      for (const line of lines) {
-        const [path, ...rest] = line.split('=');
-        const value = rest.join('=').trim();
-        if (path && value) {
-          this.setVar(path.trim(), value);
-          appliedCount++;
-        }
-      }
-      if (appliedCount === 0) return false;
-      this.restoreAuthoritativeClock(authoritativeClock);
-      this.normalizeState();
-      if (!this.hasValidCoreStateShape()) throw new Error('旧版变量更新破坏了核心状态结构');
-      return true;
-    } catch {
-      this.state = previousState;
-      return false;
-    }
+    const canonical = ['conditions', 'costs', 'effects', 'rewards', 'events']
+      .some(key => Array.isArray(parsed[key]));
+    if (!canonical || !isAllowedAiTransaction(parsed)) return false;
+    return this.applyGameplayTransactionPayload(parsed);
   }
 
   /** 防止一次坏补丁把存档写成后续轮次无法读取的半损坏状态。 */
@@ -817,174 +572,50 @@ export class VariableManager {
       && isRecord(state.人物档案);
   }
 
-  // NPC 感知的合并更新
-  private applyMergeUpdate(patch: Record<string, unknown>): void {
-    const authoritativeClock = this.captureAuthoritativeClock();
-    // ★ 经营资产.资产列表 必须替换而非合并（lodash merge 会按索引覆盖而非追加）
-    let pendingAssetList: unknown[] | undefined;
-    const playerPatch = patch.玩家 as Record<string, unknown> | undefined;
-    const bizPatch = playerPatch?.经营资产 as Record<string, unknown> | undefined;
-    if (Array.isArray(bizPatch?.资产列表)) {
-      pendingAssetList = bizPatch.资产列表;
-      delete bizPatch.资产列表;
-      if (Object.keys(bizPatch).length === 0) {
-        delete playerPatch!.经营资产;
-      }
-      if (Object.keys(playerPatch!).length === 0) {
-        delete patch.玩家;
-      }
-    }
-
-    // 处理 人物档案 中的 NPC 数据
-    if (patch.人物档案 && typeof patch.人物档案 === 'object' && !Array.isArray(patch.人物档案)) {
-      const npcUpdates = patch.人物档案 as Record<string, unknown>;
-      for (const [identifier, data] of Object.entries(npcUpdates)) {
-        const npcResolution = resolveNpcId(identifier, this.state);
-
-        let npcId = npcResolution.npcId;
-        if (!npcResolution.ok) {
-          if (!isNpcCreationPayload(data)) {
-            warnIgnoredNpcPatchUpdate('合并补丁', identifier, npcResolution);
-            continue;
-          }
-          npcId = getCreatableNpcIdentifier(identifier);
-          if (!npcId) {
-            warnIgnoredNpcPatchUpdate('合并补丁', identifier, npcResolution);
-            continue;
-          }
-        }
-
-        if (!npcId) continue;
-        if (!isSafePath(npcId)) continue; // 防御原型污染：拒绝危险键作为 NPC 标识
-        if (!this.state.人物档案[npcId]) {
-          (this.state.人物档案 as any)[npcId] = {};
-        }
-        // 人物事迹：支持精细操作（chronicleOperations）或追加模式
-        const npcData = data as Record<string, unknown>;
-
-        // 优先处理 chronicleOperations（精细操作：add/replace/merge/remove）
-        const chronicleOps = (npcData as any).chronicleOperations;
-        if (Array.isArray(chronicleOps)) {
-          delete (npcData as any).chronicleOperations;
-          const existing = (this.state.人物档案[npcId] as any).人物事迹;
-          const working = Array.isArray(existing) ? [...existing] : [];
-
-          for (const op of chronicleOps) {
-            if (!op || typeof op !== 'object') continue;
-            const type = String(op.type || '').toLowerCase();
-
-            if (type === 'add' && op.value && !working.includes(String(op.value))) {
-              working.push(String(op.value));
-            } else if (type === 'replace' && typeof op.index === 'number' && op.value) {
-              if (op.index >= 0 && op.index < working.length) {
-                working[op.index] = String(op.value);
-              }
-            } else if (type === 'merge' && Array.isArray(op.indexes) && op.value) {
-              const indexes = op.indexes.map((i: unknown) => Number(i)).filter((i: number) => i >= 0 && i < working.length).sort((a: number, b: number) => a - b);
-              if (indexes.length > 0) {
-                working[indexes[0]] = String(op.value);
-                // 从后往前删除被合并的条目
-                for (let i = indexes.length - 1; i >= 1; i--) {
-                  working.splice(indexes[i], 1);
-                }
-              }
-            } else if (type === 'remove' && typeof op.index === 'number') {
-              if (op.index >= 0 && op.index < working.length) {
-                working.splice(op.index, 1);
-              }
-            }
-          }
-
-          // 去重（不截断，全量保留）
-          const deduped = working.filter((item, i) => working.indexOf(item) === i);
-          (this.state.人物档案[npcId] as any).人物事迹 = deduped;
-        }
-
-        // 兼容模式：人物事迹数组追加（去重，不截断）
-        const incomingChronicles = npcData.人物事迹;
-        if (Array.isArray(incomingChronicles)) {
-          delete npcData.人物事迹;
-          const existing = (this.state.人物档案[npcId] as any).人物事迹;
-          const existingArr = Array.isArray(existing) ? existing : [];
-          const newEntries = incomingChronicles.filter(c => !existingArr.includes(c));
-          (this.state.人物档案[npcId] as any).人物事迹 = [...existingArr, ...newEntries];
-        }
-        // 好感度 delta 钳制：防止 AI 输出极端值导致好感度乱跳
-        const MAX_FAVORABILITY_DELTA = 15;
-        const incomingRelation = (npcData as any).关系数据;
-        if (incomingRelation && typeof incomingRelation === 'object' && incomingRelation.好感度 !== undefined) {
-          const currentFavor = (this.state.人物档案[npcId] as any)?.关系数据?.好感度;
-          if (typeof currentFavor === 'number' && Number.isFinite(currentFavor)) {
-            const newFavor = Number(incomingRelation.好感度);
-            if (Number.isFinite(newFavor)) {
-              const delta = newFavor - currentFavor;
-              if (Math.abs(delta) > MAX_FAVORABILITY_DELTA) {
-                const clamped = Math.round(currentFavor + Math.sign(delta) * MAX_FAVORABILITY_DELTA);
-                incomingRelation.好感度 = safeClamp(clamped, -100, 100, currentFavor);
-                console.warn(`[VariableManager] 好感度 delta ${delta} 超限，已钳制: ${currentFavor} → ${incomingRelation.好感度} (${identifier})`);
-              } else {
-                incomingRelation.好感度 = safeClamp(newFavor, -100, 100, currentFavor);
-              }
-            }
-          }
-        }
-
-        // 原型污染防护（L-19）：源头含危险键则跳过合并，避免污染 this.state
-        if (!containsDangerousKey(npcData)) {
-          merge(this.state.人物档案[npcId], npcData);
-        }
-      }
-
-      // NPC 必填字段校验：在场 NPC 缺少当前想法/当前状态时警告
-      for (const [id, npc] of Object.entries(this.state.人物档案)) {
-        const npcRecord = npc as any;
-        if (npcRecord.人物分类 !== '在场') continue;
-        const missing: string[] = [];
-        const thoughts = npcRecord.个人信息?.当前想法;
-        if (!thoughts || thoughts === '暂无' || thoughts === '未知') missing.push('当前想法');
-        const status = npcRecord.个人信息?.当前状态;
-        if (!status || status === '暂无' || status === '未知') missing.push('当前状态');
-        if (missing.length > 0) {
-          console.warn(`[VariableManager] 在场NPC「${npcRecord.姓名 || id}」缺少必填字段: ${missing.join('、')}（辅助AI可能未返回完整更新）`);
-        }
-      }
-
-      // 从 patch 中移除已单独处理的 人物档案
-      const { 人物档案: _npcs, ...rest } = patch;
-      if (Object.keys(rest).length > 0) {
-        if (!containsDangerousKey(rest)) {
-          merge(this.state, rest);
-        }
-      }
-    } else {
-      // 没有 NPC 数据，普通合并
-      if (!containsDangerousKey(patch)) {
-        merge(this.state, patch);
-      }
-    }
-
-    // ★ 应用资产列表替换（已在前面从 patch 中提取）
-    if (pendingAssetList) {
-      if (!this.state.玩家.经营资产) {
-        this.state.玩家.经营资产 = { 资金: 0, 资产列表: [], 交易日志: [] };
-      }
-      this.state.玩家.经营资产.资产列表 = pendingAssetList as any;
-    }
-
-    this.restoreAuthoritativeClock(authoritativeClock);
-    this.normalizeState();
-  }
-
   // 创建供系统提示使用的安全快照
   createSafeSnapshotForPrompt(): GameState {
     const snapshot = cloneDeep(this.state);
-    // 对每个 NPC 创建安全快照
     const safeNpcs: Record<string, unknown> = {};
-    for (const [id, npc] of Object.entries(snapshot.人物档案)) {
+    for (const [id, npc] of Object.entries(selectPlayerKnownNPCs(snapshot))) {
       safeNpcs[id] = createPromptSafeNpcSnapshot(npc, id);
     }
     (snapshot as any).人物档案 = safeNpcs;
+    delete (snapshot as any).人物已知资料;
+    delete snapshot.playerKnowledge;
     return snapshot;
+  }
+
+  /**
+   * 删除一个 NPC（从 人物档案 中移除该条所有数据）。
+   * - 若该 NPC 不存在，返回 false。
+   * - 删除后，世界书条目是按需由 人物档案 动态抽取关键词生成的，
+   *   下一轮灌入世界书时会自动跳过已删除角色，无需手工清理世界书条目。
+   * - 调用方负责做好后续的 bumpVersion / scheduleAutoSave / 引用头像清理。
+   */
+  removeNpc(npcId: string): boolean {
+    if (!npcId) return false;
+    const roster = this.state.人物档案;
+    if (!roster || !Object.prototype.hasOwnProperty.call(roster, npcId)) return false;
+    delete roster[npcId];
+    if (this.state.playerKnowledge) delete this.state.playerKnowledge.characters[npcId];
+    return true;
+  }
+
+  /**
+   * 从主角物品栏中彻底删除一件物品（整条删除，含全部数量）。
+   * - itemKey: 物品的名称（Record 的 key，即物品名）
+   * - 若物品不存在或 key 为空，返回 false。
+   * - 真删除：不留数量递减、不留空壳条目，下一回合快照中不再出现。
+   * - 撤销途径：回滚到删除前的历史快照即可找回（快照包含 玩家.物品栏）。
+   * - 调用方负责做好后续的 bumpVersion / scheduleAutoSave。
+   */
+  removeInventoryItem(itemKey: string): boolean {
+    if (!itemKey) return false;
+    const items = (this.state.玩家 as unknown as Record<string, unknown>)?.物品栏 as Record<string, unknown> | undefined;
+    if (!items || !Object.prototype.hasOwnProperty.call(items, itemKey)) return false;
+
+    delete items[itemKey];
+    return true;
   }
 
   // 用主API总结NPC事迹，防止条目过多

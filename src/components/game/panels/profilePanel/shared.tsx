@@ -21,8 +21,8 @@ export function DetailModal({ title, quality, onClose, children, icon }: {
           border: `1px solid ${qColor}30`,
           borderRadius: '16px',
           maxWidth: '340px',
-          width: '92%',
-          overflow: 'hidden',
+          width: '92%', maxHeight: 'calc(100dvh - 24px)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
         {/* 头部 */}
@@ -57,7 +57,7 @@ export function DetailModal({ title, quality, onClose, children, icon }: {
           >✕</button>
         </div>
         {/* 内容 */}
-        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
           {children}
         </div>
       </div>

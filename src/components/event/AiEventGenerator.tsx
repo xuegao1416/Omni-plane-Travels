@@ -1,23 +1,23 @@
 // ============================================================
 //  AI 合集生成器 — 选世界后一键生成事件+规则合集
 // ============================================================
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback,useEffect,useRef,useState,useMemo } from 'react';
 import {
-  ArrowLeft, Sparkles, Loader2, Check, AlertTriangle,
-  RefreshCw, Wand2, BookOpen, ChevronDown,
+ArrowLeft,Sparkles,Loader2,Check,AlertTriangle,
+RefreshCw,Wand2,BookOpen,ChevronDown,
 } from 'lucide-react';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import { useConfigStore } from '../../stores/configStore';
 import { requestStreamWithRetry } from '../../api/client';
-import { getAllWorlds, findWorldDef } from '../../data/worldLoader';
+import { getAllWorlds,findWorldDef } from '../../data/worldLoader';
 import type { WorldDef } from '../../data/worlds-schema';
-import type { EventIndexEntry, Manifest, CardWorkflowDefinition } from '../../modules/schema';
+import type { EventIndexEntry,Manifest,CardWorkflowDefinition } from '../../modules/schema';
 import { putWebEvent } from '../../modules/eventDb';
 import type { WebEventRecord } from '../../modules/eventDb';
-import { buildCanonicalCardPackFiles, type CanonicalCardPackEvent } from '../../modules/webEventStore';
+import { buildCanonicalCardPackFiles,type CanonicalCardPackEvent } from '../../modules/webEventStore';
 import {
-  buildEventGeneratorPrompt,
-  buildEventGeneratorUserMessage,
+buildEventGeneratorPrompt,
+buildEventGeneratorUserMessage,
 } from '../../utils/prompts/event-generator';
 
 type GenState = 'input' | 'generating' | 'preview' | 'error';

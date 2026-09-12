@@ -435,9 +435,6 @@ function synthesizeResult(ctx: BuildContext): Record<string, unknown> {
       config: ctx.statConfig,
       initialState: ctx.statState,
     };
-  } else if (ctx.statData) {
-    // 兼容旧格式：直接使用原始数据
-    result.数值属性 = ctx.statData;
   }
 
   // 成长体系：配置 + 初始状态
@@ -449,23 +446,16 @@ function synthesizeResult(ctx: BuildContext): Record<string, unknown> {
         currentXP: 0,
       },
     };
-  } else if (ctx.progressionData) {
-    // 兼容旧格式：直接使用原始数据
-    result.成长体系 = ctx.progressionData;
   }
 
   // 生存资源：配置（占位）
   if (ctx.survivalConfig) {
     result.生存资源 = { config: ctx.survivalConfig };
-  } else if (ctx.survivalData) {
-    result.生存资源 = ctx.survivalData;
   }
 
   // 经营资产：配置（占位）
   if (ctx.businessConfig) {
     result.经营资产 = { config: ctx.businessConfig };
-  } else if (ctx.businessData) {
-    result.经营资产 = ctx.businessData;
   }
 
   // 天赋体系：包装成 { config } 格式
@@ -723,7 +713,7 @@ ${assetLines}${marketLines}
   if (ctx.selectedModules.includes('profession') && ctx.professionData?.professions?.length) {
     const professionNames = ctx.professionData.professions.map(item => item.name);
     const talentNames = ctx.professionData.innateTalents.map(item => item.name);
-    const freeSkillNames = (ctx.professionData.freeSkillCatalog ?? []).map(item => item.name);
+    const freeSkillNames = (ctx.professionData.freeSkills ?? []).map(item => item.name);
     entries.push({
       uid: -5011,
       comment: '[模块] 职业体系 - 规则',

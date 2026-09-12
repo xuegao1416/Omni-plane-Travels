@@ -1,10 +1,10 @@
 // 属性 id 选择器 —— 下拉规范键 + 自定义兜底,杜绝手打错 key 的沉默失败。
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect,useState,useMemo } from 'react';
 import type { GameState } from '../../schema/variables';
 import type { WorldDef } from '../../data/worlds-schema';
 import {
-  getStatOptionsFromState,
-  CUSTOM_STAT_SENTINEL,
+getStatOptionsFromState,
+CUSTOM_STAT_SENTINEL,
 } from '../../modules/canonicalStats';
 
 interface Props {

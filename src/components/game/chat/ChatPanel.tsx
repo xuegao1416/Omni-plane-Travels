@@ -1,13 +1,13 @@
-import { useEffect, useRef, useMemo, useState, useCallback, useLayoutEffect } from 'react';
+import { useEffect,useRef,useMemo,useState,useCallback,useLayoutEffect } from 'react';
 import { useUISettings } from '../../../context/UISettingsContext';
 import type { ChatMessage } from '../../../engine/types';
-import type { PipelineStatus as PipelineStatusType, PipelineTaskId } from '../../../engine/pipelineTypes';
-import type { WorldSystemData, DiceRoll } from '../../../modules/schema';
+import type { PipelineStatus as PipelineStatusType,PipelineTaskId } from '../../../engine/pipelineTypes';
+import type { WorldSystemData,DiceRoll } from '../../../modules/schema';
 import MessageBubble from './MessageBubble';
 import ErrorBoundary from '../../ErrorBoundary';
 import InputArea from './InputArea';
 import PipelineMonitorModal from './PipelineMonitorModal';
-import { getInitialMessageStart, getPreviousMessageStart } from './messageWindow';
+import { getInitialMessageStart,getPreviousMessageStart } from './messageWindow';
 
 interface Props {
   messages: ChatMessage[];

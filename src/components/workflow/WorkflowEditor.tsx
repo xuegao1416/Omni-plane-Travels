@@ -1,29 +1,28 @@
 // ============================================================
 //  工作流编辑器 — 类型化节点画布
 // ============================================================
-import { useCallback, useEffect, useMemo, useRef, useState, useReducer } from 'react';
+import { useCallback,useEffect,useMemo,useRef,useState,useReducer } from 'react';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import {
-  ReactFlow, Background, Controls, MiniMap, ReactFlowProvider,
-  useNodesState, useEdgesState, addEdge,
-  type Node, type Edge, type Connection, type NodeTypes, type EdgeTypes,
+ReactFlow,Background,Controls,MiniMap,ReactFlowProvider,
+useNodesState,useEdgesState,addEdge,
+type Node,type Edge,type Connection,type NodeTypes
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  ArrowLeft, Save, Undo2, Redo2, Play, ShieldCheck, Braces,
-  X, AlertTriangle, Check, LayoutDashboard, Plus, BookOpen, Lock,
-  PanelLeft, SlidersHorizontal,
+ArrowLeft,Save,Undo2,Redo2,Play,Braces,
+X,AlertTriangle,Check,LayoutDashboard,BookOpen,Lock,
+PanelLeft,SlidersHorizontal
 } from 'lucide-react';
-import { getWebEvent, putWebEvent } from '../../modules/eventDb';
-import { findWorldDef, getAllWorlds } from '../../data/worldLoader';
+import { getWebEvent,putWebEvent } from '../../modules/eventDb';
+import { findWorldDef,getAllWorlds } from '../../data/worldLoader';
 import { installWorldEventPacks } from '../../modules/webEventStore';
-import type { WorkflowDefinition, NodeInstance, WorkflowConnection, WorkflowExecutionContext } from '../../modules/workflowSchema';
+import type { WorkflowDefinition,NodeInstance,WorkflowConnection,WorkflowExecutionContext } from '../../modules/workflowSchema';
 import { SOCKET_COLORS } from '../../modules/workflowSchema';
-import { getNodeDefinition, getAllNodeDefinitions, validateConnection } from '../../modules/nodeRegistry';
+import { getNodeDefinition,validateConnection } from '../../modules/nodeRegistry';
 import { executeWorkflow } from '../../modules/workflowEngine';
-import { workflowToRuleFile } from '../../modules/workflowConverters';
 import { computeAutoLayout } from '../../modules/autoLayout';
-import { saveWorkflowToPack, loadWorkflowFromPack } from '../../modules/webEventStore';
+import { saveWorkflowToPack } from '../../modules/webEventStore';
 import TypedNodeComponent from './TypedNodeComponent';
 import NodePalette from './NodePalette';
 import { WorkflowProvider } from './WorkflowContext';
@@ -137,8 +136,8 @@ export default function WorkflowEditor({
     (async () => {
       try {
         const rec = await getWebEvent(eventPackId);
-        if (rec?.worldId) {
-          const found = findWorldDef(rec.worldId);
+        if (rec?.manifest.worldId) {
+          const found = findWorldDef(rec.manifest.worldId);
           if (found) { setLocalWorldDef(found); setWorldBound(true); }
         }
       } catch { /* ignore */ }
@@ -156,7 +155,11 @@ export default function WorkflowEditor({
       try {
         // 绑定世界到事件包
         const rec = await getWebEvent(eventPackId);
-        if (rec) { rec.worldId = found.id; await putWebEvent(rec); }
+        if (rec) {
+          rec.manifest = { ...rec.manifest, worldId: found.id };
+          rec.files['manifest.json'] = JSON.stringify(rec.manifest, null, 2);
+          await putWebEvent(rec);
+        }
         // 安装世界的事件包到 IndexedDB（让 EventIdSelect 能找到事件）
         await installWorldEventPacks(found);
         setLocalWorldDef(found);

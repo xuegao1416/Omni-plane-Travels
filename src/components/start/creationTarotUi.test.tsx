@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { InnateTalentDef, ProfessionDef, ProfessionModuleSchema } from '../../modules/schema';
+import type { InnateTalentDef,ProfessionDef,ProfessionModuleSchema } from '../../modules/schema';
 import StepAbilityAlloc from './StepAbilityAlloc';
 import { getTalentSelectionState } from './TalentCodexOverlay';
 import TarotCard from './professionTarot/TarotCard';

@@ -89,26 +89,11 @@ function takeItems<T>(arr: T[] | null | undefined, limit: number): T[] {
   return arr.slice(0, limit);
 }
 
-function createIdFactory(prefix: string) {
-  let counter = 0;
-  return (): string => {
-    counter += 1;
-    return `${prefix}_${counter}`;
-  };
-}
-
 // ─── 详情字段构建 ───
 
 interface DetailField {
   label: string;
   value: string;
-}
-
-function createDetailFields(fields: DetailField[]): string {
-  return fields
-    .filter((f) => f.value)
-    .map((f) => `**${f.label}:** ${f.value}`)
-    .join('<br/>');
 }
 
 function createNodeDetail(title: string, fields: DetailField[]): Record<string, unknown> {

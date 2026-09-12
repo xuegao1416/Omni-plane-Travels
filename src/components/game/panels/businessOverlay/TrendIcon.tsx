@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp,TrendingDown,Minus } from 'lucide-react';
 
 export function TrendIcon({ trend }: { trend: string }) {
   if (trend === 'up') return <TrendingUp size={13} color="var(--success)" />;

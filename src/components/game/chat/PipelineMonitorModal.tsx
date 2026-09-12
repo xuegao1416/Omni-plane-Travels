@@ -3,11 +3,11 @@
 // ============================================================
 
 import { useState } from 'react';
-import type { PipelineStatus as PipelineStatusType, PipelineStageResult, PipelineTaskId } from '../../../engine/pipelineTypes';
+import type { PipelineStatus as PipelineStatusType,PipelineStageResult,PipelineTaskId } from '../../../engine/pipelineTypes';
 import { STAGE_LABELS } from '../../../engine/pipelineTypes';
-import { STAGE_META, STAGE_ORDER, STATUS_CONFIG, formatMs } from './pipelineUI';
+import { STAGE_META,STAGE_ORDER,STATUS_CONFIG,formatMs } from './pipelineUI';
 import { RETRYABLE_STAGES } from '../../../engine/pipelineExecutor';
-import { X, ChevronDown, ChevronRight, RefreshCw, Copy } from 'lucide-react';
+import { X,ChevronDown,ChevronRight,RefreshCw,Copy } from 'lucide-react';
 
 interface Props {
   status: PipelineStatusType | null;

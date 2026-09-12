@@ -1,10 +1,10 @@
 // 记忆系统设置 — overlay（弹窗）/ inline（Tab 内嵌）两种模式
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState,useEffect,useCallback } from 'react';
 import { Brain } from 'lucide-react';
 import { useMemoryStore } from '../../../memory/memoryStore';
 import { loadPresets } from '../apiPresetUtils';
-import { Section, SettingRow, Select } from '../SettingsUIComponents';
+import { Section,SettingRow,Select } from '../SettingsUIComponents';
 import { WriteConfigPanel } from './WriteConfigPanel';
 import { VectorConfigPanel } from './VectorConfigPanel';
 import { RetrievalConfigPanel } from './RetrievalConfigPanel';
@@ -154,7 +154,7 @@ export function MemorySettingsOverlay({ visible, onClose, onSave, messages = [],
   const dialogs = (<>
     {exportPickerVisible && (
       <ExportPickerDialog onClose={() => setExportPickerVisible(false)}
-        store={store} vectorMemory={vectorMemory} memoryRuntime={memoryRuntime} />
+        vectorMemory={vectorMemory} memoryRuntime={memoryRuntime} />
     )}
     {vectorExtractVisible && (
       <VectorExtractDialog

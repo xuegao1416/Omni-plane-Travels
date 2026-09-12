@@ -1,4 +1,4 @@
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft,Check } from 'lucide-react';
 
 interface Props {
   mode: 'overlay' | 'inline';

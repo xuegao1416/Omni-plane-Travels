@@ -405,3 +405,106 @@
   }
 }
 
+
+/* Stage 2: balanced frame geometry. Back/close actions get a mirrored header slot,
+   while destructive/cancel and confirm actions occupy opposite footer edges. */
+.settings-screen__header {
+  display: grid;
+  grid-template-columns: var(--touch-min) minmax(0, 1fr) var(--touch-min);
+  align-items: center;
+  gap: 10px;
+  padding-inline: 34px;
+}
+.settings-screen__header::after {
+  content: '';
+  width: var(--touch-min);
+  height: var(--touch-min);
+}
+.settings-screen__header .settings-screen__back {
+  grid-column: 1;
+  margin: 0;
+  transform: none;
+}
+.settings-screen__header h1 {
+  grid-column: 2;
+  text-align: center;
+}
+.settings-screen__footer {
+  justify-content: space-between;
+  padding-inline: 34px;
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 640px) {
+  .settings-screen__header {
+    padding: 8px 20px 10px;
+  }
+  .settings-screen__header .settings-screen__back { transform: none; }
+  .settings-screen__frame > .dawn-frame-v4__content {
+    padding-bottom: 14px;
+  }
+  .settings-screen__footer {
+    padding: 10px 20px max(26px, env(safe-area-inset-bottom));
+    gap: 14px;
+  }
+  .settings-screen__footer button {
+    width: min(46%, 180px);
+    min-width: 0;
+  }
+  .settings-screen__footer .btn-primary { padding-inline: 16px; }
+}
+
+@media (max-width: 360px) {
+  .settings-screen__header { padding-inline: 16px; }
+  .settings-screen__footer { padding-inline: 16px; }
+}
+
+/* Stage 4 — mobile settings navigation: one calm, evenly-weighted control row.
+   Short mobile labels remove the cramped 2x2 dashboard feeling while keeping
+   the full desktop labels in the sidebar. */
+@media (max-width: 640px) {
+  .settings-screen .settings-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 2px 10px 10px;
+    padding: 6px;
+    overflow: visible;
+    border: 1px solid color-mix(in srgb, var(--creation-border, var(--border)) 66%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--creation-surface-muted, var(--bg-tertiary)) 42%, transparent);
+  }
+  .settings-screen .settings-mobile-tab {
+    min-width: 0;
+    min-height: 54px;
+    padding: 7px 4px 6px;
+    gap: 4px;
+    flex-direction: column;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+  .settings-screen .settings-mobile-tab svg {
+    width: 17px;
+    height: 17px;
+  }
+  .settings-screen .settings-mobile-tab.active {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--creation-accent, var(--accent)) 30%, transparent);
+  }
+  .settings-screen__scroll {
+    padding-top: 4px;
+  }
+}
+
+@media (max-width: 350px) {
+  .settings-screen .settings-mobile-tabs {
+    gap: 5px;
+    margin-inline: 6px;
+    padding: 5px;
+  }
+  .settings-screen .settings-mobile-tab {
+    min-height: 50px;
+    font-size: 11.5px;
+  }
+}

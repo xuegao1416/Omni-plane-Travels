@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState,useCallback,useRef } from 'react';
 import {
-  MIN_SCALE, MAX_SCALE, STEP_SCALE, SURFACE_PADDING, DRAG_THRESHOLD,
+MIN_SCALE,MAX_SCALE,STEP_SCALE,SURFACE_PADDING,DRAG_THRESHOLD,
 } from './mermaidInit';
 
 interface UsePanZoomParams {

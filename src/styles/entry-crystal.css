@@ -415,20 +415,6 @@ body {
 
 .entry-sliced-button__emblem { width: 17px; height: 17px; object-fit: contain; opacity: .9; }
 
-.entry-sliced-button__slice {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  opacity: .88;
-}
-
-.entry-sliced-button__slice--left { left: 0; width: 30px; }
-.entry-sliced-button__slice--middle { right: 28px; left: 28px; background-repeat: repeat-x; background-size: auto 100%; }
-.entry-sliced-button__slice--right { right: 0; width: 30px; }
 .entry-sliced-button--primary { background-color: rgba(55, 44, 25, .32); }
 .entry-sliced-button--icon-only { width: 36px; min-height: 36px; padding: 0; }
 .entry-sliced-button--icon-only .entry-sliced-button__content { justify-content: center; width: 100%; }
@@ -3473,9 +3459,10 @@ html[data-theme] .entry-default-theme.world-weave-editor-overlay .world-weave-ed
 
 .entry-hall--anchor-center .entry-hall-header__actions {
   position: fixed;
-  top: calc(var(--entry-hall-nav-y) * 100vh);
-  left: calc(var(--entry-hall-nav-x) * 100vw);
-  width: var(--entry-hall-nav-width);
+  top: clamp(calc(var(--entry-hall-nav-height) * .5 + 8px), calc(var(--entry-hall-nav-y) * 100dvh), calc(100dvh - var(--entry-hall-nav-height) * .5 - 8px));
+  left: clamp(calc(var(--entry-hall-nav-width) * .5 + 8px), calc(var(--entry-hall-nav-x) * 100vw), calc(100vw - var(--entry-hall-nav-width) * .5 - 8px));
+  width: min(var(--entry-hall-nav-width), calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
   height: var(--entry-hall-nav-height);
   box-sizing: border-box;
   transform: translate(-50%, -50%);
@@ -3493,11 +3480,11 @@ html[data-theme] .entry-default-theme.world-weave-editor-overlay .world-weave-ed
 
 .entry-hall--anchor-center .entry-hall-footer > .entry-sliced-button--dawn {
   position: fixed;
-  top: calc(var(--entry-hall-back-y) * 100vh - 25px);
-  left: calc(var(--entry-hall-back-x) * 100vw);
+  top: clamp(calc(var(--entry-hall-back-height) * .5 + 8px), calc(var(--entry-hall-back-y) * 100dvh - 25px), calc(100dvh - var(--entry-hall-back-height) * .5 - 8px));
+  left: clamp(calc(var(--entry-hall-back-width) * .5 + 8px), calc(var(--entry-hall-back-x) * 100vw), calc(100vw - var(--entry-hall-back-width) * .5 - 8px));
   right: auto;
   bottom: auto;
-  width: var(--entry-hall-back-width);
+  width: min(var(--entry-hall-back-width), calc(100vw - 16px));
   height: var(--entry-hall-back-height);
   box-sizing: border-box;
   transform: translate(-50%, -50%);
@@ -5967,4 +5954,120 @@ html[data-theme="dark"] .entry-default-theme.entry-hall .entry-hall-footer > .en
   background: rgba(18, 42, 76, .7) !important;
   border-color: rgba(188, 215, 230, .48) !important;
   color: #f3f7ef !important;
+}
+
+
+/* Stage 1b: hall utility controls share the same viewport-safe baseline. */
+.entry-hall-music-toggle{
+  position:fixed;
+  right:max(8px, env(safe-area-inset-right));
+  bottom:max(8px, env(safe-area-inset-bottom));
+}
+@media (min-width:641px){
+  .entry-hall-music-toggle{right:20px;bottom:20px}
+}
+@media (max-width:640px){
+  .entry-hall-music-toggle{
+    right:max(14px, env(safe-area-inset-right));
+    bottom:max(16px, env(safe-area-inset-bottom));
+    width:42px!important;height:42px!important;
+  }
+}
+
+/* Hall-only utility must disappear while a foreground workspace owns the frame. */
+body:has(.novel-import-workbench) .entry-hall-music-toggle,
+body:has(.custom-module-workspace) .entry-hall-music-toggle,
+body:has(.entry-hall-empty-choice) .entry-hall-music-toggle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Stage 3: archive/detail overlays reserve real visual collision space on narrow and short viewports. */
+body:has(.entry-archive-layer) .entry-hall-music-toggle,
+body:has(.entry-detail-layer) .entry-hall-music-toggle,
+body:has(.world-weave-editor-overlay) .entry-hall-music-toggle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .entry-archive-space {
+    min-height: 100dvh;
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+  }
+  .entry-archive-space__header {
+    justify-content: center;
+    padding: max(18px, calc(env(safe-area-inset-top) + 12px)) max(18px, calc(env(safe-area-inset-right) + 18px)) 0 max(18px, calc(env(safe-area-inset-left) + 18px));
+    text-align: center;
+  }
+  .entry-archive-space__header > div:first-child {
+    width: min(100%, 520px);
+  }
+  .entry-archive-space__kicker { justify-content: center; }
+  .entry-archive-space__header h2 {
+    margin-top: 8px;
+    font-size: clamp(23px, 7vw, 28px);
+    letter-spacing: .08em;
+  }
+  .entry-archive-space__header p { line-height: 1.5; }
+  .entry-archive-empty {
+    width: min(560px, calc(100vw - 24px));
+    min-height: 0;
+    margin: clamp(16px, 4vh, 34px) auto 0;
+    padding: clamp(34px, 6vh, 48px) clamp(22px, 7vw, 42px) max(34px, calc(env(safe-area-inset-bottom) + 26px));
+    box-sizing: border-box;
+  }
+  .entry-archive-empty__actions {
+    width: min(100%, 260px);
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .entry-archive-empty__actions .entry-sliced-button { width: 100%; }
+}
+
+@media (max-height: 640px) {
+  .entry-archive-space__header { padding-top: max(10px, env(safe-area-inset-top)); }
+  .entry-archive-space__header h2 { margin-top: 4px; }
+  .entry-archive-empty {
+    margin-top: 8px;
+    padding-top: 24px;
+    padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 18px));
+    gap: 9px;
+  }
+  .entry-archive-empty__mark { width: 60px; height: 60px; }
+  .entry-archive-empty__actions { margin-top: 6px; gap: 7px; }
+}
+
+@media (max-width: 900px) {
+  .entry-detail-layer {
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .entry-detail-layer .entry-detail-panel {
+    height: calc(100dvh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)));
+  }
+  .entry-detail-layer .entry-detail-panel > .entry-detail-close {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+  }
+  .entry-detail-layer .entry-detail-tabs {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    overscroll-behavior-inline: contain;
+  }
+  .entry-detail-layer .entry-detail-tabs button { flex: 0 0 auto; }
+}
+
+@media (max-width: 420px) {
+  .entry-detail-layer .entry-detail-visual {
+    height: auto;
+    min-height: 218px;
+    padding-top: 28px;
+  }
+  .entry-detail-layer .entry-detail-content {
+    padding-top: 22px;
+  }
 }

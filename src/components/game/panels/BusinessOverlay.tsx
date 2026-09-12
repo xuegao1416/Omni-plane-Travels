@@ -1,6 +1,6 @@
 // 经营管理覆盖层 — 纯展示（无操作按钮）
-import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, X, DollarSign, Building2, BarChart3, ScrollText, ArrowRight, Users, Package, Coins, ChevronDown, ShoppingCart } from 'lucide-react';
+import { useState,useEffect,useRef } from 'react';
+import { ArrowLeft,X,DollarSign,Building2,BarChart3,ScrollText,ArrowRight,Users,Package,Coins,ChevronDown,ShoppingCart } from 'lucide-react';
 import type { BusinessOverlayProps } from './businessOverlay/types';
 import { AssetCardExpandable } from './businessOverlay/AssetCard';
 import { MarketSection } from './businessOverlay/MarketSection';

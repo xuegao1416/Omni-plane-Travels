@@ -3,7 +3,7 @@
 // ============================================================
 import { test, expect, describe } from 'bun:test';
 import { executeCardWorkflow } from './cardWorkflowEngine';
-import { getAllCardWorkflowTemplates } from './cardWorkflowTemplates';
+import { getAllCardWorkflowTemplates } from './__fixtures__/cardWorkflowTemplates';
 import { getAllCardNodeDefinitions, getCardNodeDefinition, searchCardNodes } from './cardNodeRegistry';
 import type { CardWorkflowDefinition, CardExecutionContext } from './schema';
 

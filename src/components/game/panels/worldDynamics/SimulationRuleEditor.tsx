@@ -1,13 +1,12 @@
 /**
  * 世界动态配置编辑器 — 在 SimSettings 中显示。
  *
- * 注意：周期事件已迁出本面板，改为在「事件中心」作为世界内置事件包编辑
- * （见 src/components/event/PeriodicEventPackEditor）。本编辑器只负责
- * 世界动态的后台配置：安全护栏 + 配置导入导出。
+ * 注意：周期事件已迁出本面板，由事件/工作流系统统一管理。
+ * 本编辑器只负责世界动态的后台配置：安全护栏 + 配置导入导出。
  */
 
 import { useState } from 'react';
-import { Copy, ClipboardPaste, ChevronDown, ChevronRight } from 'lucide-react';
+import { Copy,ClipboardPaste,ChevronDown,ChevronRight } from 'lucide-react';
 import type { WorldDynamicsConfig } from '../../../../modules/schema';
 
 interface SimulationRuleEditorProps {

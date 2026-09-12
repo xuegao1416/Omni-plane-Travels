@@ -1,6 +1,6 @@
-import { Footprints, Package, Pause, Play, Shield, Sparkles, Target } from 'lucide-react';
+import { Footprints,Package,Pause,Play,Shield,Sparkles,Target } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { CombatActionKind, CombatSessionV2 } from '../../../gameplay/protocols';
+import type { CombatActionKind,CombatSessionV2 } from '../../../gameplay/protocols';
 import type { CombatAutoStrategy } from '../../../gameplay/combatV2';
 
 const strategyLabels: Record<CombatAutoStrategy, string> = { aggressive: '进攻', balanced: '均衡', defensive: '防守', support: '支援' };

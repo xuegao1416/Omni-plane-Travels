@@ -22,6 +22,7 @@ export const STORAGE_KEYS = {
   HISTORY_PRESETS: 'world_travel_guide_history_presets',
   NPC_TEMPLATES: 'world_travel_guide_npc_templates',
   CUSTOM_WORLDS: 'world_travel_guide_custom_worlds',
+  WORLD_DRAFTS: 'world_travel_guide_world_drafts',
 
   // 存档系统
   ACTIVE_SAVE: 'world_travel_guide_active_save_id',
@@ -50,7 +51,7 @@ export const STORAGE_KEYS = {
   SIM_API_PRESET: 'world_travel_guide_sim_api_preset',
 
   // 音频
-  AUDIO_MUTED: 'world_travel_guide_audio_muted',
+  HALL_MUSIC_MUTED: 'omni.hall.musicMuted',
 } as const
 
 export type StorageKey = keyof typeof STORAGE_KEYS

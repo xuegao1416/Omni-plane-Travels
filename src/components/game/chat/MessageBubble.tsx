@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { useState,useRef,useCallback,useEffect,memo } from 'react';
 import { useMediaQuery } from '../../../hooks/useIsMobile';
 import ContextMenu from './ContextMenu';
 import type { Props } from './messageBubble/types';
-import { useRenderedContent, useDisplayScripts } from './messageBubble/renderPipeline';
+import { useRenderedContent,useDisplayScripts } from './messageBubble/renderPipeline';
 import { useInlinePortals } from './messageBubble/InlinePortals';
 import EditMode from './messageBubble/EditMode';
 import { useMenuItems } from './messageBubble/useMenuItems';

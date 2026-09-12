@@ -6,13 +6,6 @@ export { downloadJSON } from './download';
 
 // ─── 导出 ───
 
-interface ExportEnvelope<T> {
-  type: string;
-  version: string;
-  exportedAt: number;
-  data: T;
-}
-
 export function exportPresetJSON(pack: PresetPack): string {
   // 导出为 SillyTavern 兼容格式
   const exportData: Record<string, unknown> = {
@@ -211,7 +204,7 @@ function normalizeRegexScript(raw: Record<string, unknown>): RegexScript | null 
 
 // ─── 正则单独导入/导出 ───
 
-export function exportRegexScriptsJSON(scripts: RegexScript[], name: string): string {
+export function exportRegexScriptsJSON(scripts: RegexScript[], _name: string): string {
   return JSON.stringify(scripts.map(s => ({
     id: s.id,
     scriptName: s.scriptName,

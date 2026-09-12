@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
-import { LockKeyhole, Play, Sparkles, Star } from 'lucide-react';
-import type { ProfessionAbilityDef, ProfessionModuleSchema, StatModuleSchema } from '../../../modules/schema';
+import { useCallback,useMemo,useState } from 'react';
+import { LockKeyhole,Play,Sparkles,Star } from 'lucide-react';
+import type { ProfessionAbilityDef,ProfessionModuleSchema,StatModuleSchema } from '../../../modules/schema';
 import type { GameState } from '../../../schema/variables';
-import { canUnlockProfessionAbility, describeProfessionAbilityMechanics } from '../../../gameplay/profession';
-import { professionEmblemSrc, resolveProfessionVisual } from '../../../data/professions/professionVisuals';
+import { canUnlockProfessionAbility,describeProfessionAbilityMechanics } from '../../../gameplay/profession';
+import { professionEmblemSrc,resolveProfessionVisual } from '../../../data/professions/professionVisuals';
 import '../../../styles/profession-library.css';
 import ProfessionBook from '../../profession/ProfessionBook';
 

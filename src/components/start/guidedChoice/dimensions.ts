@@ -1,6 +1,6 @@
 import {
-  Globe, ScrollText, Swords, Map, Flag, BookMarked, User,
-  type LucideIcon,
+Globe,ScrollText,Swords,Map,Flag,BookMarked,User,
+type LucideIcon,
 } from 'lucide-react';
 
 export interface GuidedDimConfig {

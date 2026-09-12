@@ -23,12 +23,18 @@ interface SimulationStore {
   isSimulating: boolean;
   /** 上次推演错误 */
   lastError: string | null;
+  /** 主线核对是否进行中 */
+  isMainlineReviewing: boolean;
+  /** 后台世界核对是否进行中 */
+  isBackgroundReviewing: boolean;
 
   // 操作
   updateConfig: (patch: Partial<SimConfig>) => void;
   setSimState: (state: SimulationState) => void;
   setIsSimulating: (v: boolean) => void;
   setLastError: (err: string | null) => void;
+  setMainlineReviewing: (v: boolean) => void;
+  setBackgroundReviewing: (v: boolean) => void;
   resetSimulation: () => void;
   loadFromStorage: () => void;
   /** 从引擎同步状态（仅更新 React state，不写 localStorage） */
@@ -75,6 +81,8 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   simState: loadSimState(),
   isSimulating: false,
   lastError: null,
+  isMainlineReviewing: false,
+  isBackgroundReviewing: false,
 
   updateConfig: (patch) =>
     set((s) => {
@@ -96,10 +104,12 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
 
   /** 从引擎同步状态（仅更新 React state，不写 localStorage，避免双写） */
   syncFromEngine: (state: SimulationState) =>
-    set({ simState: state }),
+    set({ simState: structuredClone(state) }),
 
   setIsSimulating: (v) => set({ isSimulating: v }),
   setLastError: (err) => set({ lastError: err }),
+  setMainlineReviewing: (v) => set({ isMainlineReviewing: v }),
+  setBackgroundReviewing: (v) => set({ isBackgroundReviewing: v }),
 
   resetSimulation: () =>
     set(() => {
@@ -107,7 +117,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       try {
         localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(empty));
       } catch { /* ignore */ }
-      return { simState: empty, lastError: null };
+      return { simState: empty, lastError: null, isMainlineReviewing: false, isBackgroundReviewing: false };
     }),
 
   loadFromStorage: () =>

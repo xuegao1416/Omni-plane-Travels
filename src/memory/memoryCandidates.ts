@@ -1,3 +1,4 @@
+import { projectMemoryRuntime, memoryVisibilityMetadata, type MemoryAudience } from './memoryVisibility';
 import type {
   MemoryEntry,
   MemoryEntryType,
@@ -21,6 +22,7 @@ function strings(...values: unknown[]): string[] {
 
 function provenance(value: MemoryProvenance): MemoryProvenance {
   return {
+    ...memoryVisibilityMetadata(value),
     sourceType: value.sourceType ?? 'unknown',
     layer: value.layer ?? 'fact',
     confidence: Number.isFinite(value.confidence) ? value.confidence : 0.5,
@@ -91,7 +93,8 @@ function summaryEntry(
 }
 
 /** Build the single retrieval pool used by keyword, planner and rerank stages. */
-export function collectMemoryEntries(runtime: NarrativeMemoryRuntime): MemoryEntry[] {
+export function collectMemoryEntries(runtime: NarrativeMemoryRuntime, audience: MemoryAudience = 'player'): MemoryEntry[] {
+  runtime = projectMemoryRuntime(runtime, audience);
   const memories: MemoryEntry[] = [];
   const currentRound = Math.max(0, Math.floor(Number(runtime.lastIngestCursor) || 0));
 
@@ -99,6 +102,7 @@ export function collectMemoryEntries(runtime: NarrativeMemoryRuntime): MemoryEnt
     if (!active(record, currentRound) || !record.summaryData) continue;
     const floor = record.sourceStartIndex ?? 0;
     const parentProvenance: MemoryProvenance = {
+      ...memoryVisibilityMetadata(record),
       sourceType: record.sourceType ?? 'summary',
       layer: record.layer ?? 'summary',
       confidence: record.confidence,

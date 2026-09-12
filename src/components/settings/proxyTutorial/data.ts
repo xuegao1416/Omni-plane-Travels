@@ -1,4 +1,4 @@
-import { Globe, Shield, Server, Zap, ExternalLink, Check, Terminal, Info } from 'lucide-react';
+import { Globe,Shield,Server,Zap,ExternalLink,Check,Terminal,Info } from 'lucide-react';
 import { PROXY_CODE } from './constants';
 
 export { PROXY_CODE };

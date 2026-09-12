@@ -1,8 +1,8 @@
 import type { GameState } from '../schema/variables';
-import { executeCustomModuleLifecycle, type CustomModuleLifecycle } from './runtime';
+import { executeCustomModuleLifecycle,type CustomModuleLifecycle } from './runtime';
 import { installCustomModuleState } from './stateStore';
 import { resolveCustomGameplayModulesForWorld } from './storage';
-import { buildCustomModuleHostContext, sanitizeCustomModuleEvent, type CustomModuleContextOptions } from './context';
+import { buildCustomModuleHostContext,sanitizeCustomModuleEvent,type CustomModuleContextOptions } from './context';
 
 export interface CustomModuleBridgeResult {
   activeModuleIds: string[];

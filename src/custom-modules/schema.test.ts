@@ -1,9 +1,6 @@
-import { describe, expect, test } from 'bun:test';
-import {
-  customGameplayModuleSchema,
-  parseCustomGameplayModule,
-  type CustomGameplayModule,
-} from './index';
+import { describe,expect,test } from 'bun:test';
+import { customGameplayModuleSchema,parseCustomGameplayModule } from './manifestSchema';
+import type { CustomGameplayModule } from './schema';
 
 const validModule: CustomGameplayModule = {
   kind: 'custom-gameplay-module',

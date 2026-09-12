@@ -714,12 +714,15 @@
 .journey-dossier-preview-closed button { padding: 8px 14px; }
 
 .game-journey__drawer.journey-dossier {
-  inset: 0 0 0 auto;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  right: auto;
   width: min(760px, calc(100vw - 72px));
-  transform: translateX(102%);
+  transform: translateX(calc(100vw + 50%));
   transition: transform 220ms cubic-bezier(.4, 0, .2, 1);
 }
-.game-journey__drawer.journey-dossier.is-open { transform: translateX(0); }
+.game-journey__drawer.journey-dossier.is-open { transform: translateX(-50%); }
 .game-journey__drawer.journey-dossier .journey-dossier__frame { height: 100%; }
 
 .mobile-overlay-panel.journey-dossier {
@@ -742,7 +745,8 @@
 
 @media (max-width: 640px) {
   .mobile-overlay-panel.journey-dossier { top: max(12px, env(safe-area-inset-top)); bottom: max(12px, env(safe-area-inset-bottom)); width: calc(100vw - 24px); }
-  .game-journey__drawer.journey-dossier { inset: 10px 12px; width: auto; }
+  .game-journey__drawer.journey-dossier { inset: 10px 12px; width: auto; transform: translateX(110%); }
+  .game-journey__drawer.journey-dossier.is-open { transform: translateX(0); }
   .journey-dossier__content { padding: 12px 12px 14px; }
   .journey-dossier__header h2 { font-size: 17px; }
   .journey-dossier-preview .journey-dossier { inset: 12px; height: calc(100dvh - 24px); }
@@ -1599,7 +1603,7 @@
   .inline-dice-core svg { width: 14px; height: 14px; right: 5px; bottom: 5px; }
 }
 
-@media (min-width: 641px) and (max-width: 900px) {
+@media (min-width: 641px) and (max-width: 1100px) {
   .game-journey__right-panel {
     position: fixed;
     top: 0;
@@ -1871,6 +1875,9 @@
   border: 1px solid var(--border);
   color: var(--journey-text, var(--creation-text, #304d45));
   box-shadow: 0 18px 46px color-mix(in srgb, var(--journey-glow, #c8e2d6) 34%, transparent);
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  box-sizing: border-box;
 }
 
 .game-journey__nested-panel--side {
@@ -1946,4 +1953,351 @@
   .pipeline-monitor__footer {
     padding: 9px 14px !important;
   }
+}
+
+
+/* Game shell responsive audit — preserve a centered mobile title, keep the
+   composer readable on the narrowest phones, and prevent action labels from
+   collapsing into vertical text on compact desktop widths. */
+.game-journey__send-button,
+.game-journey__cancel-button {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .game-journey__mobile-header {
+    position: relative;
+  }
+
+  .game-journey__mobile-header > .mobile-header-title {
+    position: absolute;
+    left: 50%;
+    max-width: calc(100% - 184px);
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .game-journey__mobile-actions {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 340px) {
+  .game-journey--mobile .game-journey__input-inner {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 6px 8px;
+    padding: 8px;
+  }
+
+  .game-journey--mobile .game-journey__input {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 50px;
+    max-height: 112px;
+  }
+
+  .game-journey--mobile .game-journey__monitor-button {
+    grid-column: 1;
+  }
+
+  .game-journey--mobile .game-journey__send-button,
+  .game-journey--mobile .game-journey__cancel-button {
+    grid-column: 2;
+    justify-self: end;
+    min-width: 78px;
+  }
+}
+
+/* ── Game UI responsive audit: notebook / variables / worldbook / director ── */
+.game-notebook-panel { min-width: 0; }
+.game-notebook-filters {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.game-notebook-filters > button { flex: 0 0 auto; white-space: nowrap; }
+
+.game-variable-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-primary);
+  position: relative;
+}
+.game-variable-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.game-variable-toolbar__heading,
+.game-variable-toolbar__actions { display: flex; align-items: center; min-width: 0; }
+.game-variable-toolbar__heading { gap: 10px; }
+.game-variable-toolbar__actions { gap: 8px; flex: 0 0 auto; }
+.game-variable-api-body { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+.game-variable-api-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.game-variable-api-select { width: min(160px, 58%); min-width: 0; }
+.game-variable-snapshot-list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px 16px; }
+.game-variable-snapshot-actions { margin-top: 8px; display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+
+.game-worldbook-panel { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; }
+.game-worldbook-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.game-worldbook-title { font-weight: 600; font-size: var(--font-size-lg); flex: 0 0 auto; }
+.game-worldbook-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-xs); color: var(--text-muted); }
+.game-worldbook-header-spacer { flex: 1 1 auto; min-width: 4px; }
+.game-worldbook-filters { padding: 8px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; min-width: 0; flex: 0 0 auto; }
+.game-worldbook-search { flex: 1 1 auto; min-width: 0; position: relative; }
+.game-worldbook-list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 16px; }
+
+.game-director-panel { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.game-director-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.game-director-header > strong { min-width: 0; }
+.game-director-header__spacer { flex: 1 1 auto; min-width: 4px; }
+.game-director-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  flex: 0 0 auto;
+  scrollbar-width: thin;
+}
+.game-director-tabs > button { flex: 0 0 auto; white-space: nowrap; }
+.game-director-body { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 10px; }
+
+@media (max-width: 520px) {
+  .game-notebook-filters { margin-inline: -2px; padding-inline: 2px; }
+
+  .game-variable-toolbar { padding: 10px 12px; gap: 8px; }
+  .game-variable-toolbar__heading { gap: 8px; }
+  .game-variable-toolbar__heading > div:first-child { width: 28px !important; height: 28px !important; }
+  .game-variable-toolbar__heading > div:last-child > div:last-child { display: none; }
+  .game-variable-toolbar__actions { gap: 4px; }
+  .game-variable-api-body { padding-inline: 12px; }
+  .game-variable-api-row { align-items: stretch; flex-direction: column; gap: 6px; }
+  .game-variable-api-select { width: 100%; }
+  .game-variable-snapshot-list { padding: 10px 10px 14px; }
+  .game-variable-snapshot-actions > span { line-height: 1.45 !important; flex: 1 1 150px; }
+
+  .game-worldbook-header { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  .game-worldbook-title { font-size: var(--font-size-base); }
+  .game-worldbook-meta { order: 3; width: 100%; font-size: 10px; }
+  .game-worldbook-header-spacer { min-width: 0; }
+  .game-worldbook-filters { padding: 8px 10px; }
+  .game-worldbook-list { padding: 8px 10px 12px; }
+
+  .game-director-header { align-items: flex-start; flex-wrap: wrap; padding: 8px 10px; gap: 5px 7px; }
+  .game-director-header > strong { flex: 1 1 calc(100% - 30px); font-size: var(--font-size-base) !important; }
+  .game-director-header > span:not(.game-director-header__spacer) { order: 3; flex: 1 1 150px; }
+  .game-director-header__spacer { display: none; }
+  .game-director-header > button { order: 4; margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
+  .game-director-tabs { padding-inline: 6px; }
+  .game-director-body { padding: 8px; }
+}
+
+/* Stage 3 follow-up: mobile dossier headings keep one readable line inside the
+   Dawn safe zone; horizontal tab rails scroll by touch without exposing a
+   native scrollbar through the decorative frame. */
+@media (max-width: 760px) {
+  .journey-dossier .journey-dossier__heading,
+  .journey-dossier-preview .journey-dossier__heading {
+    flex: 1 1 auto;
+    max-width: calc(100% - 42px);
+  }
+  .journey-dossier .journey-dossier__header h2,
+  .journey-dossier-preview .journey-dossier__header h2 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .game-director-tabs,
+  .game-notebook-filters {
+    scrollbar-width: none;
+  }
+  .game-director-tabs::-webkit-scrollbar,
+  .game-notebook-filters::-webkit-scrollbar { display: none; }
+}
+
+@media (max-width: 760px) {
+  .journey-dossier .journey-dossier__heading,
+  .journey-dossier-preview .journey-dossier__heading {
+    max-width: calc(100% - 68px);
+  }
+}
+
+@media (max-width: 760px) {
+  .journey-dossier .journey-dossier__emblem,
+  .journey-dossier-preview .journey-dossier__emblem {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+  }
+  .journey-dossier .journey-dossier__heading,
+  .journey-dossier-preview .journey-dossier__heading { gap: 6px; }
+}
+
+/* Game UI Stage 3 final: keep the mobile dossier close control in its own
+   right-side lane so short headings never visually collide with it. */
+@media (max-width: 760px) {
+  .journey-dossier .journey-dossier__close,
+  .journey-dossier-preview .journey-dossier__close {
+    right: 12px !important;
+  }
+}
+
+/* Stage 4 — detail-surface comfort pass. */
+.game-status-meter {
+  flex: 0 1 112px;
+  width: clamp(72px, 24vw, 112px);
+  height: 4px;
+  border-radius: 999px;
+}
+.game-status-meter--module {
+  flex-basis: 124px;
+  width: clamp(78px, 26vw, 124px);
+}
+
+.game-worldbook-entry__toggle {
+  min-height: 42px;
+  padding-block: 8px !important;
+}
+.game-worldbook-entry__detail {
+  padding: 14px !important;
+}
+.game-worldbook-entry__meta {
+  flex-wrap: wrap;
+  row-gap: 5px !important;
+  line-height: 1.5;
+}
+.game-worldbook-entry__content {
+  line-height: 1.72 !important;
+  padding: 11px !important;
+}
+.game-variable-snapshot-detail {
+  padding: 14px 16px 16px !important;
+}
+.game-variable-snapshot-editor {
+  min-height: 240px !important;
+  line-height: 1.72 !important;
+  padding: 12px !important;
+}
+
+@media (max-width: 640px) {
+  .game-status-meter {
+    flex-basis: 88px;
+    width: clamp(64px, 24vw, 88px);
+    height: 4px;
+  }
+  .game-status-meter--module {
+    flex-basis: 96px;
+    width: clamp(68px, 26vw, 96px);
+  }
+
+  .game-worldbook-entry {
+    border-radius: 8px !important;
+  }
+  .game-worldbook-entry__toggle {
+    min-height: 46px;
+    padding: 9px 10px !important;
+    gap: 7px !important;
+  }
+  .game-worldbook-entry__detail {
+    padding: 14px 12px 15px !important;
+  }
+  .game-worldbook-entry__meta {
+    gap: 6px 12px !important;
+    margin-bottom: 10px !important;
+  }
+  .game-worldbook-entry__content {
+    max-height: min(42dvh, 360px) !important;
+    padding: 12px !important;
+  }
+
+  .game-variable-snapshot-detail {
+    padding: 14px 12px 16px !important;
+  }
+  .game-variable-snapshot-editor {
+    min-height: 260px !important;
+    max-height: 52dvh !important;
+    font-size: max(var(--font-size-sm), 13px) !important;
+  }
+  .game-variable-snapshot-actions {
+    margin-top: 12px;
+    gap: 8px 10px;
+  }
+
+  .game-director-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 9px 8px 10px;
+    overflow: visible;
+  }
+  .game-director-tabs > button {
+    min-width: 0;
+    min-height: 36px;
+    padding-inline: 5px;
+    justify-content: center;
+    white-space: normal !important;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .game-director-body {
+    padding: 12px 10px 14px;
+  }
+}
+
+@media (max-width: 350px) {
+  .game-director-tabs {
+    gap: 5px;
+    padding-inline: 6px;
+  }
+  .game-director-tabs > button {
+    min-height: 34px;
+    font-size: 11px;
+  }
+}
+
+.game-director-error {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
 }

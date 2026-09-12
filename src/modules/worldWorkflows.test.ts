@@ -1,11 +1,7 @@
 import { expect, test } from 'bun:test';
 import { collectAddEventEvents } from './eventIntegration';
 import { executeWorkflowAsEvaluation } from './workflowBridge';
-import {
-  WORLD_WORKFLOWS,
-  normalizeBuiltinCardWorkflow,
-} from './worldWorkflows';
-import type { CardWorkflowDefinition } from './schema';
+import { WORLD_WORKFLOWS } from './worldWorkflows';
 import { WORLDS } from '../data/worldLoader';
 
 test('six built-in worlds expose paced workflows bound to their card packs', () => {
@@ -27,37 +23,14 @@ test('six built-in worlds expose paced workflows bound to their card packs', () 
   ]);
 });
 
-test('built-in card workflow repair keeps choices and stat effects executable', () => {
-  const workflow: CardWorkflowDefinition = {
-    version: 1,
-    id: 'legacy',
-    name: '旧事件',
-    nodes: [
-      {
-        id: 'choices', typeId: 'choice.static', position: { x: 0, y: 0 },
-        widgetValues: { options: '[{"label":"A"},{label:"B","aiNote":"继续"}]' },
-      },
-      {
-        id: 'effect', typeId: 'effect.stat', position: { x: 0, y: 100 },
-        widgetValues: { statKey: '体力值', delta: -1 },
-      },
-    ],
-    connections: [],
-  };
-
-  const repaired = normalizeBuiltinCardWorkflow(workflow);
-  expect(JSON.parse(String(repaired.nodes[0].widgetValues?.options))).toHaveLength(2);
-  expect(repaired.nodes[1].widgetValues?.statKey).toBe('attrB');
-});
-
-test('all 40 shipped cards normalize to valid choices and canonical stat keys', () => {
+test('all 40 shipped cards are stored with valid choices and canonical stat keys', () => {
   let count = 0;
   for (const world of WORLDS) {
     for (const pack of world.eventPacks ?? []) {
       for (const event of pack.events ?? []) {
-        const repaired = normalizeBuiltinCardWorkflow(event.workflow!);
+        const workflow = event.workflow!;
         count++;
-        for (const node of repaired.nodes) {
+        for (const node of workflow.nodes) {
           if (node.typeId === 'choice.static') {
             expect(() => JSON.parse(String(node.widgetValues?.options))).not.toThrow();
           }

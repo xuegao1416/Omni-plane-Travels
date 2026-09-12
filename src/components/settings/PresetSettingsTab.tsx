@@ -1,10 +1,10 @@
 // 预设管理 Tab — 预设列表 + 覆盖层编辑器（条目 + 正则一体化）
-import { useState, useRef, useCallback } from 'react';
-import { FileText, Upload } from 'lucide-react';
+import { useState,useRef,useCallback } from 'react';
+import { FileText,Upload } from 'lucide-react';
 import { usePresetStore } from '@/stores/presetStore';
-import { getBuiltinPresets, getBuiltinPreset } from '@/data/builtinPresets';
+import { getBuiltinPresets,getBuiltinPreset } from '@/data/builtinPresets';
 import type { PresetPack } from '@/data/builtinPresets';
-import { exportPresetJSON, parsePresetJSON, downloadJSON } from '@/utils/presetIO';
+import { exportPresetJSON,parsePresetJSON,downloadJSON } from '@/utils/presetIO';
 import { Button } from './SettingsUIComponents';
 import { useDialog } from '../shared/Dialog';
 import { PresetCard } from './presetSettings/PresetCard';

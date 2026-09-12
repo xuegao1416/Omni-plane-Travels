@@ -1,23 +1,23 @@
 // 生图 API 调用层 — 三种引擎的 fetch 逻辑
 
 import type {
-  ImageGenConfig,
-  ImageGenResult,
-  ComfyUIData,
-  ComfyWorkflowPreset,
-  WorkflowParamMapping,
-  WorkflowValidation,
-  DetectedNode,
+ImageGenConfig,
+ImageGenResult,
+ComfyUIData,
+ComfyWorkflowPreset,
+WorkflowParamMapping,
+WorkflowValidation,
+DetectedNode,
 } from './imageGenTypes';
 import {
-  DEFAULT_NEGATIVE_PROMPT,
-  NAI_RESOLUTIONS,
-  OPENAI_COMPATIBLE_IMAGE_PROVIDERS,
+DEFAULT_NEGATIVE_PROMPT,
+NAI_RESOLUTIONS,
+OPENAI_COMPATIBLE_IMAGE_PROVIDERS,
 } from './imageGenTypes';
 import {
-  applyRuntimeValuesToApiPrompt,
-  validateAndRepairComfyApiPromptResources,
-  formatComfyWorkflowResourceValidationError,
+applyRuntimeValuesToApiPrompt,
+validateAndRepairComfyApiPromptResources,
+formatComfyWorkflowResourceValidationError,
 } from './comfy/comfyWorkflow';
 import type { ApiPromptWorkflow } from './comfy/comfyWorkflow';
 import { getProxyUrl } from './client';
@@ -279,7 +279,6 @@ function resolveOpenAICompatibleSize(width: number, height: number) {
  * 用于验证 API 配置是否正确，以及让用户选择可用模型
  */
 export async function fetchOpenAICompatibleModels(config: Partial<ImageGenConfig>): Promise<string[]> {
-  const provider = config.openaiCompatibleProvider || 'custom';
   const apiUrl = String(config.openaiCompatibleApiUrl || '').trim();
   const apiKey = String(config.openaiCompatibleApiKey || '').trim();
 

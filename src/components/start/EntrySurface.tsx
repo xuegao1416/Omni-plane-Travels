@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes,ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 
@@ -6,11 +6,11 @@ export interface EntrySlicedButtonProps extends ButtonHTMLAttributes<HTMLButtonE
   icon?: LucideIcon;
   emblemSrc?: string;
   tone?: 'primary' | 'quiet';
-  frame?: 'legacy' | 'dawn-v4-compact' | 'dawn-v4-panel';
+  frame?: 'dawn-v4-compact' | 'dawn-v4-panel';
   children: ReactNode;
 }
 
-/** Entrance controls use the responsive V4 frame unless legacy art is explicitly requested. */
+/** Entrance controls use the current responsive Dawn V4 frame. */
 export function EntrySlicedButton({
   icon: Icon,
   emblemSrc,
@@ -33,14 +33,9 @@ export function EntrySlicedButton({
     <button
       {...buttonProps}
       type={type}
-      className={`entry-sliced-button entry-sliced-button--${tone}${frame !== 'legacy' ? ' entry-sliced-button--dawn entry-sliced-button--dawn-v4' : ''}${isCompactFrame ? ' entry-sliced-button--compact' : ''}${className ? ` ${className}` : ''}`}
+      className={`entry-sliced-button entry-sliced-button--${tone} entry-sliced-button--dawn entry-sliced-button--dawn-v4${isCompactFrame ? ' entry-sliced-button--compact' : ''}${className ? ` ${className}` : ''}`}
     >
-      {frame === 'legacy' ? <>
-        <span className="entry-sliced-button__slice entry-sliced-button__slice--left" aria-hidden="true" />
-        <span className="entry-sliced-button__slice entry-sliced-button__slice--middle" aria-hidden="true" />
-        <span className="entry-sliced-button__slice entry-sliced-button__slice--right" aria-hidden="true" />
-        {content}
-      </> : isCompactFrame ? content : (
+      {isCompactFrame ? content : (
         <DawnFrameV4
           mode={frame === 'dawn-v4-panel' ? 'panel' : 'compact'}
           borderLayer="front"

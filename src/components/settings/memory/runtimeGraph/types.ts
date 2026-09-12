@@ -1,4 +1,4 @@
-import type { MemorySystemConfig, NarrativeMemoryRuntime, VectorMemoryItem } from '../../../../memory/types';
+import type { MemorySystemConfig,NarrativeMemoryRuntime,VectorMemoryItem } from '../../../../memory/types';
 
 export interface RuntimeGraphPanelProps {
   config: MemorySystemConfig;

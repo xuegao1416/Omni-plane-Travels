@@ -1,7 +1,7 @@
 // 骰子检定只在正文中自动触发；侧栏仅提供只读记录。
 import { memo } from 'react';
-import { Dice6, Sparkles, XCircle } from 'lucide-react';
-import type { DiceModuleSchema, DiceRoll } from '../../../../modules/schema';
+import { Dice6,Sparkles,XCircle } from 'lucide-react';
+import type { DiceModuleSchema,DiceRoll } from '../../../../modules/schema';
 import { Collapsible } from '../../../shared/Collapsible';
 
 interface DiceCardProps {

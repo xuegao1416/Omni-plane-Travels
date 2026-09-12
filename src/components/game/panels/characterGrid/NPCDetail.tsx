@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useCallback,useState } from 'react';
 import {
-  User, BarChart3, Briefcase, MapPin, Sparkles, BookOpen, Brain, Dna,
-  Zap, Star, Shield, Swords, Backpack, ScrollText, Heart, Activity,
+User,BarChart3,Briefcase,MapPin,Sparkles,BookOpen,Brain,Dna,
+Zap,Star,Shield,Swords,Backpack,ScrollText
 } from 'lucide-react';
 import { ExcelRow } from '../../../shared/ExcelRow';
 import EmptyState from '../../../shared/EmptyState';
-import type { NPCData } from '../../../../schema/variables';
-import { DETAIL_TABS, favorClass } from './types';
+import type { KnownNPC } from '../../../../engine/playerKnowledge';
+import { DETAIL_TABS,favorClass } from './types';
 import type { DetailTab } from './types';
 import { GaugeBar } from './NPCCard';
-import { TagList, RecordGrid, Section } from './SharedUI';
+import { TagList,RecordGrid,Section } from './SharedUI';
 import { ListOrRecord } from './ListOrRecord';
 import { InventoryGrid } from './InventoryGrid';
 import { DeedsModal } from './DeedsModal';
@@ -101,19 +101,32 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
   );
 }
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, worldId, onPortraitChange }: {
-  npc: NPCData; npcId: string; onClose: () => void;
+export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
+  npc: KnownNPC; npcId: string; onClose: () => void;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  /** 删除该 NPC；返回 false 表示删除未生效。 */
+  onDeleteNpc?: (npcId: string) => boolean | Promise<boolean>;
   worldId?: string;
   onPortraitChange?: (npcId: string, url: string) => void;
+  /** 删除成功后的回调（用于关闭外层卡片选择状态）。 */
+  onDeleted?: () => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
 
   const ext = npc as any;
+  const handleDelete = useCallback(async () => {
+    if (!onDeleteNpc) return;
+    const ok = await onDeleteNpc(npcId);
+    if (ok) {
+      // 通知外层移除选中态；onDeleteNpc 内部已经做完存档 + 头像清理。
+      onDeleted?.();
+    }
+  }, [onDeleteNpc, onDeleted, npcId]);
+
   const chronicles = (ext.人物事迹 as string[] | undefined) ?? [];
-  const rd = npc.关系数据 ?? { 好感度: 0, 关系类型: '未知' };
+  const rd = npc.关系数据 ?? {};
   const sj = npc.社会身份 ?? { 职业: '', 社会地位: '' };
   const pi = npc.个人信息 ?? { 外貌: '', 表性格: '', 里性格: '', 当前想法: '', 当前穿着: '', 当前位置: '', 当前状态: '', 备注: '' };
 
@@ -128,7 +141,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
         width: '92%', maxWidth: '640px', height: '82vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} />
+        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} onDelete={onDeleteNpc ? () => handleDelete() : undefined} />
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <div style={{
@@ -158,25 +171,25 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
             {tab === 'overview' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <Section icon={User} title="基本信息">
-                  <ExcelRow label="姓名" value={npc.姓名} />
-                  <ExcelRow label="种族" value={npc.种族} />
-                  <ExcelRow label="性别" value={npc.性别} />
-                  <ExcelRow label="年龄" value={String(npc.年龄)} />
+                  <ExcelRow label="姓名" value={npc.姓名 ?? '未知'} />
+                  <ExcelRow label="种族" value={npc.种族 ?? '未知'} />
+                  <ExcelRow label="性别" value={npc.性别 ?? '未知'} />
+                  <ExcelRow label="年龄" value={npc.年龄 === undefined ? '未知' : String(npc.年龄)} />
                 </Section>
                 <Section icon={BarChart3} title="关系数据">
                   <div style={{ marginBottom: '8px' }}>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '2px' }}>好感度 {rd.好感度}</div>
-                    <GaugeBar value={rd.好感度} color={favorClass(rd.好感度).color} min={-100} max={100} />
+                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '2px' }}>好感度 {rd.好感度 ?? '未知'}</div>
+                    {rd.好感度 !== undefined && <GaugeBar value={rd.好感度} color={favorClass(rd.好感度).color} min={-100} max={100} />}
                   </div>
-                  <ExcelRow label="关系类型" value={rd.关系类型} />
+                  <ExcelRow label="关系类型" value={rd.关系类型 ?? '未知'} />
                 </Section>
                 <Section icon={Briefcase} title="社会身份">
-                  <ExcelRow label="职业" value={sj.职业} />
-                  <ExcelRow label="地位" value={sj.社会地位} />
+                  <ExcelRow label="职业" value={sj.职业 ?? '未知'} />
+                  <ExcelRow label="地位" value={sj.社会地位 ?? '未知'} />
                 </Section>
                 <Section icon={MapPin} title="状态">
-                  <ExcelRow label="位置" value={pi.当前位置} />
-                  <ExcelRow label="状态" value={pi.当前状态} />
+                  <ExcelRow label="位置" value={pi.当前位置 ?? '未知'} />
+                  <ExcelRow label="状态" value={pi.当前状态 ?? '未知'} />
                 </Section>
               </div>
             )}
@@ -184,10 +197,10 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
             {tab === 'dossier' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <Section icon={Sparkles} title="外貌与性格">
-                  <ExcelRow label="外貌" value={pi.外貌} />
-                  <ExcelRow label="表性格" value={pi.表性格} />
-                  <ExcelRow label="里性格" value={pi.里性格} />
-                  <ExcelRow label="穿着" value={pi.当前穿着} />
+                  <ExcelRow label="外貌" value={pi.外貌 ?? '未知'} />
+                  <ExcelRow label="表性格" value={pi.表性格 ?? '未知'} />
+                  <ExcelRow label="里性格" value={pi.里性格 ?? '未知'} />
+                  <ExcelRow label="穿着" value={pi.当前穿着 ?? '未知'} />
                 </Section>
                 {(ext.背景 || npc.背景) && (
                   <Section icon={BookOpen} title="背景">
@@ -292,7 +305,7 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
 
       {showDeeds && (
         <DeedsModal
-          npcId={npcId} npcName={npc.姓名 || npcId} chronicles={chronicles}
+          npcId={npcId} chronicles={chronicles}
           onClose={() => setShowDeeds(false)}
           onUpdate={onUpdateChronicles ?? (() => {})}
           onMerge={onMergeChronicles}

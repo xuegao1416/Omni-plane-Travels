@@ -270,12 +270,16 @@ class WIScanner {
     const primaryKeys = readEntryKeyList(entry, 'key');
     let primaryMatched = false;
 
-    if (primaryKeys.length === 0) {
-      // 没有主关键词：直接视为常驻模式
+    // constant 常驻条目：无视主/次关键词，始终激活（对齐 SillyTavern 语义，
+    // ST 中 constant=true 直接短路放行，关键词仅作展示参考）。
+    if (entry.constant === true) {
       primaryMatched = true;
+    } else if (primaryKeys.length === 0) {
+      // 没有主关键词且非常驻：没有任何触发途径，直接跳过，
+      // 避免整本世界书被无条件全量注入（曾导致单轮 prompt 携带 20 万字）。
+      return false;
     } else {
-      // 关键有主关键词时，一律走"关键词模式"匹配，
-      // 即使 constant=true 也强制要求扫描文本里命中关键词。
+      // 有关键词且非常驻：走"关键词模式"匹配。
       for (const k of primaryKeys) {
         if (matchWorldInfoKey(scanText, k, entry)) {
           primaryMatched = true;
@@ -285,8 +289,8 @@ class WIScanner {
       if (!primaryMatched) return false;
     }
 
-    // 3. 次级关键词 + selectiveLogic
-    if (entry.selective === true) {
+    // 3. 次级关键词 + selectiveLogic（constant 常驻条目跳过次级门控）
+    if (entry.constant !== true && entry.selective === true) {
       const secondary = readEntryKeyList(entry, 'keysecondary');
       if (secondary.length > 0) {
         const logic = Number.isFinite(entry.selectiveLogic) ? entry.selectiveLogic! : world_info_logic.AND_ANY;

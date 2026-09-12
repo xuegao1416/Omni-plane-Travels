@@ -1,9 +1,9 @@
 // ComfyUI 工作流编辑器 — 导入/验证面板
-import { XCircle, RefreshCw } from 'lucide-react';
-import { Collapsible, Field, Button, TextArea } from '../SettingsUIComponents';
+import { XCircle,RefreshCw } from 'lucide-react';
+import { Collapsible,Field,Button,TextArea } from '../SettingsUIComponents';
 import { ValidationPanel } from './ValidationPanel';
 import { MappingPanel } from './MappingPanel';
-import type { WorkflowValidation, DetectedNode, WorkflowParamMapping } from '@/api/imageGenTypes';
+import type { WorkflowValidation,DetectedNode,WorkflowParamMapping } from '@/api/imageGenTypes';
 
 export interface ImportPanelProps {
   editingPreset: string | null;

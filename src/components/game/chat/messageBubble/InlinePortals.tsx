@@ -1,7 +1,7 @@
-import { useRef, useEffect } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { useRef,useEffect } from 'react';
+import { createRoot,type Root } from 'react-dom/client';
 import type { ChatMessage } from '../../../../engine/types';
-import type { WorldSystemData, DiceRoll } from '../../../../modules/schema';
+import type { WorldSystemData,DiceRoll } from '../../../../modules/schema';
 import type { RenderedContent } from './renderPipeline';
 import { useImageStore } from '../../../../stores/imageStore';
 import { usePortraitStore } from '../../../../stores/portraitStore';
@@ -121,7 +121,6 @@ export function useInlinePortals(
           const root = createRoot(container);
           root.render(
             <InlineTalentCardComponent
-              id={talentData.id || ''}
               name={talentData.name || '未知天赋'}
               rarity={talentData.rarity || '普通'}
               description={talentData.description || ''}
@@ -158,13 +157,13 @@ export function useInlinePortals(
     const mountImageButtons = async () => {
       const { default: InlineImageGenButtonComponent } = await import('../InlineImageGenButton');
 
-      placeholders.forEach(el => {
+      placeholders.forEach((el, index) => {
         const promptText = el.getAttribute('data-prompt') || '';
         if (!promptText.trim()) return;
         const container = document.createElement('div');
         el.replaceWith(container);
         const root = createRoot(container);
-        root.render(<InlineImageGenButtonComponent prompt={promptText.trim()} msgId={message.id} />);
+        root.render(<InlineImageGenButtonComponent prompt={promptText.trim()} msgId={message.id} imageKey={`${message.id}:inline-image:${index}`} />);
         imageGenRootsRef.current.push(root);
       });
     };

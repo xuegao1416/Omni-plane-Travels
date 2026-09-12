@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { getBuiltinDisplayScripts, getBuiltinPreset } from '../../../data/builtinPresets';
+import { describe,expect,test } from 'bun:test';
+import { getBuiltinDisplayScripts,getBuiltinPreset } from '../../../data/builtinPresets';
 import { processRegexScripts } from '../../../utils/regexScripts';
 import { mergeDisplayScripts } from './messageBubble/renderPipeline';
 import { renderDialogueMarkup } from '../../../utils/dialogueMarkup';
@@ -42,8 +42,9 @@ describe('NPC dialogue display pipeline', () => {
     }
     const dialoguePreset = getBuiltinPreset('dialogue_avatar');
     expect(dialoguePreset.prompts.some(prompt => prompt.content.includes('[SPEAK]'))).toBe(true);
-    expect(dialoguePreset.systemPrompt).toContain('英文双引号必须写成 \\"');
-    expect(dialoguePreset.systemPrompt).toContain('不要另起“时间：”“地点：”“人物：”“摘要：”');
+    const dialoguePromptText = dialoguePreset.prompts.filter(prompt => prompt.enabled).map(prompt => prompt.content).join('\n\n');
+    expect(dialoguePromptText).toContain('英文双引号必须写成 \\"');
+    expect(dialoguePromptText).toContain('不要另起“时间：”“地点：”“人物：”“摘要：”');
   });
 
   test('never guesses metadata from visible prose and only strips explicit system tags', () => {

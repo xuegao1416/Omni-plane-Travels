@@ -1,6 +1,6 @@
 import type { ProgressionModuleSchema } from '../../../modules/schema';
-import { inputStyle, labelStyle, setPathInClone } from './shared';
-import { ConditionListEditor, CostListEditor, EffectListEditor } from './GameplayRuleEditors';
+import { inputStyle,labelStyle,setPathInClone } from './shared';
+import { ConditionListEditor,CostListEditor,EffectListEditor } from './GameplayRuleEditors';
 
 const TIER_STAT_FIELDS = [
   ['attrAMax', '生命上限'], ['attrBMax', '能量上限'],

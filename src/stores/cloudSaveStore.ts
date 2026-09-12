@@ -24,7 +24,7 @@ interface CloudSaveState {
 }
 
 /** 裁剪存档数据，去除云端不需要的字段 */
-function trimSaveData(save: any): any {
+export function trimSaveData(save: any): any {
   if (!save || typeof save !== 'object') return save;
 
   const trimmed = { ...save };
@@ -44,15 +44,12 @@ function trimSaveData(save: any): any {
     });
   }
 
-  // 裁剪 simulationState：只保留核心字段
+  // 裁剪 simulationState：保留可恢复的持久化状态，只移除历史运行时缓存。
+  // 旧实现仍按已废弃的 tick/isRunning 结构裁剪，会直接丢失事件、暗线、
+  // 主线进度和回滚快照，导致云端存档恢复后后台世界演化状态断裂。
   if (trimmed.simulationState && typeof trimmed.simulationState === 'object') {
-    const sim = trimmed.simulationState;
-    trimmed.simulationState = {
-      tick: sim.tick,
-      isRunning: sim.isRunning,
-      config: sim.config,
-      // 省略 worldStateCache / ruleResults 等运行时缓存
-    };
+    const { worldStateCache: _worldStateCache, ruleResults: _ruleResults, ...persistentState } = trimmed.simulationState;
+    trimmed.simulationState = persistentState;
   }
 
   return trimmed;

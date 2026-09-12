@@ -1,4 +1,4 @@
-import { Lock, MapPin, Layers } from 'lucide-react';
+import { Lock,MapPin,Layers } from 'lucide-react';
 import type { MappedEntry } from './types';
 import { EntryCard } from './EntryDetail';
 
@@ -57,7 +57,7 @@ export function EntryList({
   totalEntries, filteredEntries, constant, triggered, other, expandedIds, onToggle,
 }: EntryListProps) {
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '8px 16px' }}>
+    <div className="game-worldbook-list">
       {filteredEntries.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
           {totalEntries === 0 ? '当前世界没有世界书条目' : '没有匹配的条目'}

@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useEffect, type ReactNode } from 'react';
-import { useConfigStore, type UISettings, type Theme, type FontFamily, type FontSize, type LineHeight, type Language } from '../stores/configStore';
+import { createContext,useContext,useMemo,useEffect,type ReactNode } from 'react';
+import { useConfigStore,type UISettings,type Theme,type FontFamily,type FontSize,type LineHeight,type Language } from '../stores/configStore';
 
 export type { Theme, FontFamily, FontSize, LineHeight, Language, UISettings };
 

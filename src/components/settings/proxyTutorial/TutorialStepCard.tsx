@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight,ChevronDown } from 'lucide-react';
 import type { TutorialStep } from './data';
 import { StepContent } from './StepContent';
 

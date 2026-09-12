@@ -1,5 +1,5 @@
-import { useRef, useCallback } from 'react';
-import { Layers, Download, Upload, RefreshCw } from 'lucide-react';
+import { useRef,useCallback } from 'react';
+import { Layers,Download,Upload,RefreshCw } from 'lucide-react';
 import type { SnapshotLayer } from './types';
 import { ToolBtn } from './shared';
 
@@ -21,16 +21,8 @@ export function SnapshotToolbar({ snapshotLayers, onExport, onImport, onRefresh 
   }, [onImport]);
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '14px 16px',
-      borderBottom: '1px solid var(--border)',
-      background: 'var(--bg-secondary)',
-      flexShrink: 0,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className="game-variable-toolbar">
+      <div className="game-variable-toolbar__heading">
         <div style={{
           width: 32, height: 32, borderRadius: 'var(--radius-md)',
           background: 'var(--accent-dim)',
@@ -49,7 +41,7 @@ export function SnapshotToolbar({ snapshotLayers, onExport, onImport, onRefresh 
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="game-variable-toolbar__actions">
         <input
           ref={importRef}
           type="file"

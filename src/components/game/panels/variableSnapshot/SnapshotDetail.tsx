@@ -1,21 +1,19 @@
-import type { SnapshotLayer } from './types';
-
 interface Props {
-  layer: SnapshotLayer;
   editText: string;
   isLatest: boolean;
   onEditTextChange: (text: string) => void;
   onApply: () => void;
 }
 
-export function SnapshotDetail({ layer, editText, isLatest, onEditTextChange, onApply }: Props) {
+export function SnapshotDetail({ editText, isLatest, onEditTextChange, onApply }: Props) {
   return (
-    <div style={{
+    <div className="game-variable-snapshot-detail" style={{
       padding: '10px 14px',
       borderTop: '1px solid var(--border)',
       background: 'var(--bg-primary)',
     }}>
       <textarea
+        className="game-variable-snapshot-editor"
         value={editText}
         onChange={e => onEditTextChange(e.target.value)}
         readOnly={!isLatest}
@@ -37,7 +35,7 @@ export function SnapshotDetail({ layer, editText, isLatest, onEditTextChange, on
         }}
       />
       {isLatest && (
-        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+        <div className="game-variable-snapshot-actions">
           <button
             onClick={onApply}
             className="btn-primary btn-sm"

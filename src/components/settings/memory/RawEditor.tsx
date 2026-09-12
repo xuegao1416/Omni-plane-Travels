@@ -1,4 +1,4 @@
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle,X } from 'lucide-react';
 
 interface Props {
   tabKey: string;

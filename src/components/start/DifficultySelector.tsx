@@ -1,10 +1,10 @@
 import { ShieldCheck } from 'lucide-react';
 import type { CombatRiskMode } from '../../gameplay/protocols';
 import {
-  DIFFICULTY_LABELS,
-  DIFFICULTY_DESCRIPTIONS,
-  DIFFICULTY_POINT_DESCRIPTIONS,
-  computeCreationPool,
+DIFFICULTY_LABELS,
+DIFFICULTY_DESCRIPTIONS,
+DIFFICULTY_POINT_DESCRIPTIONS,
+computeCreationPool,
 } from '../../gameplay/creation/creationPoints';
 
 interface DifficultySelectorProps {

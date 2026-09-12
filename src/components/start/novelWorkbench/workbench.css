@@ -1,0 +1,101 @@
+.novel-import-workbench{position:fixed;inset:0;z-index:1500;display:grid;place-items:center;padding:clamp(8px,2vw,24px);color:var(--text-primary,#eee);outline:none}
+.novel-import-workbench__backdrop{position:absolute;inset:0;background:#090d17dc;backdrop-filter:blur(10px)}
+.novel-import-workbench,.novel-import-workbench *{box-sizing:border-box}
+.novel-import-workbench{--text-primary:#244943;--text-muted:#536a60;--border:#bec8b6;--bg-secondary:#fbfcf4;color:var(--text-primary)}
+.novel-import-workbench__layout,.novel-import-workbench__body,.novel-workbench-tabs{min-width:0;max-width:100%}
+.novel-workbench-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.novel-workbench-metrics>span{display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid #bec8b6;border-radius:9px;background:#f7f9ec;font-size:12px}
+.novel-workbench-metrics b{font-size:20px}
+.novel-import-workbench__grid{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:16px}
+.novel-workbench-select-list{list-style:none;padding:0;margin:12px 0}.novel-workbench-select-list button{width:100%;justify-content:flex-start;text-align:left;flex-wrap:wrap}.novel-workbench-select-list small{display:block;width:100%;color:var(--text-muted)}
+.novel-import-workbench__dropzone{width:100%;flex-direction:column;padding:25px!important;border-style:dashed!important}
+.novel-import-workbench__frame{position:relative;width:min(1180px,100%);height:min(920px,95dvh)}
+.novel-import-workbench__frame>.dawn-frame-v4__fill{background:#edf0e2!important;opacity:1;z-index:0!important}
+.novel-import-workbench__frame>.dawn-frame-v4__content{width:100%;height:100%;min-width:0;min-height:0;padding:0;position:relative;z-index:1!important}
+.novel-import-workbench__layout{position:relative;z-index:1;display:flex;flex:1;flex-direction:column;width:100%;height:100%;min-height:0;padding:clamp(18px,3vw,36px);gap:14px}
+.novel-import-workbench__header,.novel-import-workbench__footer,.novel-workbench-section-header,.novel-workbench-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.novel-import-workbench h2,.novel-import-workbench h3{margin:0 0 10px}.novel-import-workbench h2{font-size:24px}
+.novel-import-workbench button,.novel-import-workbench input,.novel-import-workbench select,.novel-import-workbench textarea{font:inherit;color:inherit;border:1px solid var(--border,#47505f);border-radius:8px;background:var(--bg-secondary,#171d2b);padding:9px 12px;max-width:100%}
+.novel-import-workbench button{display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;min-height:38px}.novel-import-workbench button:hover:not(:disabled){border-color:var(--accent,#bc9d68)}
+.novel-import-workbench button:disabled{opacity:.45;cursor:not-allowed}.novel-import-workbench :focus-visible{outline:2px solid var(--accent,#dec18e);outline-offset:3px}
+.novel-workbench-tabs{display:flex;gap:6px;overflow-x:auto;flex-shrink:0;padding:3px}.novel-workbench-tabs button{white-space:nowrap;flex:1}.novel-workbench-tabs button[aria-selected=true],.novel-workbench-tabs .is-active{background:#b29a632c;border-color:var(--accent,#dec18e)}
+.novel-import-workbench__body{flex:1;min-height:0;overflow:auto;padding:4px 8px 12px 2px;overscroll-behavior:contain}
+.novel-import-workbench__panel,.novel-import-workbench__settings,.novel-workbench-evidence{border:1px solid var(--border,#414858);border-radius:12px;background:#f7f9ecee;padding:18px;margin-bottom:14px}
+.novel-import-workbench__field{display:flex;flex-direction:column;gap:7px;margin:12px 0;min-width:0}.novel-import-workbench__field small,.novel-import-workbench__hint{color:var(--text-muted,#a6adba);font-size:13px;line-height:1.7}
+.novel-import-workbench__range-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.novel-import-workbench__structure-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.novel-import-workbench textarea{width:100%;box-sizing:border-box;min-height:180px;line-height:1.75;resize:vertical}.novel-workbench-prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
+.novel-import-workbench__footer{border-top:1px solid var(--border,#414858);padding-top:12px;flex-shrink:0}.novel-import-workbench__footer>div{display:flex;gap:8px;flex-wrap:wrap}
+.novel-import-workbench__primary{border-color:var(--accent,#dec18e)!important;background:#b29a632c!important}.novel-import-workbench__status{padding:9px 12px;border-left:3px solid var(--accent,#bc9d68);line-height:1.6;margin:0;overflow-wrap:anywhere}
+.novel-import-workbench__progress{height:6px;border-radius:6px;background:#ffffff15;overflow:hidden}.novel-import-workbench__progress span{display:block;height:100%;background:var(--accent,#dec18e)}
+.novel-workbench-facts{display:grid;gap:8px}.novel-workbench-facts>div{display:grid;grid-template-columns:90px 1fr;gap:10px}.novel-workbench-facts dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.novel-import-workbench pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto}.novel-import-workbench summary{cursor:pointer;padding:6px 0}.novel-import-workbench li{line-height:1.7;margin-bottom:6px}
+.novel-workbench-evidence{border-color:var(--accent,#bc9d68)}.novel-workbench-evidence blockquote{margin:14px 0;padding:10px 16px;border-left:3px solid var(--accent,#bc9d68);white-space:pre-wrap}
+@media(max-width:640px){.novel-import-workbench__range-fields{grid-template-columns:1fr;gap:0}.novel-import-workbench__layout{padding:18px 14px}.novel-import-workbench__footer>span{display:none}.novel-import-workbench__footer>div{width:100%}.novel-workbench-tabs button{padding:8px;font-size:13px}.novel-import-workbench__panel{padding:12px}}
+@media(max-width:800px){.novel-import-workbench__grid{grid-template-columns:1fr}.novel-workbench-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.novel-workbench-tabs{flex-wrap:wrap}.novel-workbench-tabs button{flex:1 0 28%}}
+
+/* Responsive frame safe-zone: decorative Dawn corners must never cover controls. */
+@media(max-width:640px){
+  .novel-import-workbench{padding:6px}
+  .novel-import-workbench__frame{width:100%;height:calc(100dvh - 12px);max-height:none}
+  .novel-import-workbench__layout{padding:24px 26px 32px;gap:12px}
+  .novel-import-workbench__heading{min-width:0;padding-right:18px}
+  .novel-import-workbench__heading p{overflow-wrap:anywhere}
+  .novel-import-workbench__close{flex:0 0 auto;margin-right:2px}
+  .novel-import-workbench__footer{padding-bottom:2px}
+  .novel-import-workbench__footer>div{min-width:0}
+}
+@media(max-width:360px){
+  .novel-import-workbench__layout{padding:24px 22px 30px}
+  .novel-workbench-tabs{gap:6px}
+  .novel-workbench-tabs button{min-width:0;padding:7px 6px;font-size:12px}
+  .novel-import-workbench__footer>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%}
+  .novel-import-workbench__footer button{width:100%;min-width:0;padding-inline:8px}
+}
+@media(max-height:620px){
+  .novel-import-workbench__layout{padding-top:20px;padding-bottom:28px}
+  .novel-import-workbench__header{gap:8px}
+  .novel-import-workbench__heading p{margin-bottom:0}
+}
+
+
+/* Stage 1b: visual balance. Keep the Dawn ornament as the outer frame, while controls
+   occupy symmetric safe zones instead of clustering in the lower-left corner. */
+.novel-import-workbench__header{position:relative;padding-right:54px}
+.novel-import-workbench__close{
+  position:absolute;top:0;right:0;z-index:4;width:42px;height:42px;padding:0!important;
+  border-radius:50%!important;background:rgba(247,249,236,.92)!important;
+}
+.novel-import-workbench__footer{display:block}
+.novel-import-workbench__footer>span{display:block;margin-bottom:8px;text-align:center}
+.novel-import-workbench__footer-actions{display:flex!important;align-items:center;justify-content:space-between;gap:18px;width:100%;min-width:0}
+.novel-import-workbench__footer-primary{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;flex-wrap:wrap}
+.novel-import-workbench__save-close{flex:0 0 auto}
+
+@media(max-width:640px){
+  .novel-import-workbench__header{padding-right:0;padding-top:4px}
+  .novel-import-workbench__close{
+    top:-18px;right:-12px;width:40px;height:40px;
+    /* sit on the frame's upper-right safe rail rather than consuming header flow */
+  }
+  .novel-import-workbench__heading{padding-right:24px}
+  .novel-import-workbench__footer{padding-top:10px}
+  .novel-import-workbench__footer-actions{gap:12px}
+  .novel-import-workbench__footer-primary{margin-left:auto;flex-wrap:nowrap}
+  .novel-import-workbench__footer-actions button{min-width:0;white-space:nowrap}
+}
+@media(max-width:390px){
+  .novel-import-workbench__footer-actions{gap:8px}
+  .novel-import-workbench__footer-primary{gap:6px}
+  .novel-import-workbench__footer-actions button{padding-inline:10px;font-size:13px}
+}
+@media(max-width:340px){
+  .novel-import-workbench__footer-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .novel-import-workbench__footer-primary{display:contents}
+  .novel-import-workbench__footer-actions button{width:100%}
+}
+
+/* Stage 1c: keep the close control visibly anchored in the frame header. */
+@media(max-width:640px){
+  .novel-import-workbench__close{top:0;right:0}
+  .novel-import-workbench__heading{padding-right:50px}
+}

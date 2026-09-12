@@ -7,7 +7,7 @@ import { TRIAL_API_CONFIG, isTrialApiConfig } from '@/api/trial';
 // ─── 类型 ───
 
 export type Theme = 'light' | 'dark' | 'metal' | 'green';
-export type FontFamily = 'yahei' | 'source' | 'menglong' | 'hanchan' | 'shanggu'; // 保留旧值以兼容存档
+export type FontFamily = 'yahei' | 'source';
 export type FontSize = '小' | '中' | '大';
 export type LineHeight = '紧凑' | '舒适' | '宽松';
 export type Language = 'zh-CN' | 'en';
@@ -42,10 +42,6 @@ const DEFAULT_SETTINGS: UISettings = {
 const FONT_MAP: Record<FontFamily, string> = {
   yahei: "'Microsoft YaHei', 'PingFang SC', sans-serif",
   source: "'Source Han Sans SC', 'Noto Sans SC', sans-serif",
-  // 以下为兼容旧存档的回退值
-  menglong: "'Microsoft YaHei', 'PingFang SC', sans-serif",
-  hanchan: "'Microsoft YaHei', 'PingFang SC', sans-serif",
-  shanggu: "'Microsoft YaHei', 'PingFang SC', sans-serif",
 };
 
 const UI_FONT_SIZE_MAP: Record<FontSize, string> = { '小': '12px', '中': '14px', '大': '16px' };
@@ -64,8 +60,7 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.lineHeight': '正文行距', 'settings.centeredNarrative': '居中行文',
     'settings.centeredNarrative.desc': '将对话收拢到屏幕中央，减少宽屏阅读时的视线偏移', 'settings.autoScroll': '正文自动滚动',
     'theme.light': '拂晓', 'theme.dark': '玄夜', 'theme.metal': '银灰', 'theme.green': '翠林',
-    'font.yahei': '雅黑', 'font.source': '思源黑体', 'font.menglong': '朦胧黑体',
-    'font.hanchan': '寒蝉半圆', 'font.shanggu': '尚古圆体',
+    'font.yahei': '雅黑', 'font.source': '思源黑体',
     'settings.provider': 'Provider', 'settings.baseUrl': 'Base URL', 'settings.baseUrl.desc': 'API 端点地址',
     'settings.apiKey': 'API Key', 'settings.apiKey.desc': '密钥',
     'settings.model': 'Model', 'settings.model.desc': '模型名称', 'settings.selectModel': '选择模型',
@@ -79,9 +74,9 @@ const translations: Record<Language, Record<string, string>> = {
     'common.cancel': '取消', 'common.confirm': '确定', 'common.save': '保存',
     'dialog.confirm': '确认', 'dialog.alert': '提示', 'dialog.info': '信息', 'dialog.gotIt': '知道了',
     'worldEditor.saveWorld': '保存世界',
-    'npcEditor.saveChanges': '保存修改', 'npcEditor.createNpc': '创建NPC',
+    'npcEditor.saveChanges': '保存修改', 'npcEditor.createNpc': '创建NPC', 'npc.delete': '删除', 'npc.delete.confirm': '确定删除该 NPC 吗？该角色档案及其当前头像将被永久移除。', 'npc.delete.success': '已删除 {name}', 'npc.delete.fail': '删除失败：未找到该 NPC', 'npc.delete.title': '删除 NPC', 'npc.delete.button': '删除 NPC',
     'nav.home': '主页', 'nav.profile': '档案', 'nav.characters': '人物',
-    'nav.tasks': '任务', 'nav.chronicle': '纪事', 'nav.notebook': '纪事', 'nav.business': '商业', 'nav.variables': '变量管理', 'nav.worldbook': '世界书', 'nav.dynamics': '世界动态', 'nav.memory': '记忆系统', 'nav.modules': '模块',
+    'nav.tasks': '任务', 'nav.chronicle': '纪事', 'nav.notebook': '纪事', 'nav.business': '商业', 'nav.variables': '变量管理', 'nav.worldbook': '世界书', 'nav.dynamics': '剧情导演', 'nav.memory': '记忆系统', 'nav.modules': '模块',
     'nav.saves': '存档', 'nav.save': '存档', 'nav.settings': '设置',
     'saves.title': '存档管理', 'saves.select': '选择存档', 'saves.empty': '暂无存档',
     'saves.save': '保存当前', 'saves.saving': '保存中...', 'saves.delete': '删除',
@@ -103,8 +98,7 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.lineHeight': 'Line Height', 'settings.centeredNarrative': 'Centered Reading',
     'settings.centeredNarrative.desc': 'Center the conversation in a comfortable reading column on wide screens', 'settings.autoScroll': 'Auto Scroll',
     'theme.light': 'Dawn', 'theme.dark': 'Nocturne', 'theme.metal': 'Silver', 'theme.green': 'Forest',
-    'font.yahei': 'YaHei', 'font.source': 'Source Han', 'font.menglong': 'Menglong',
-    'font.hanchan': 'Hanchan', 'font.shanggu': 'Shanggu',
+    'font.yahei': 'YaHei', 'font.source': 'Source Han',
     'settings.provider': 'Provider', 'settings.baseUrl': 'Base URL', 'settings.baseUrl.desc': 'API endpoint URL',
     'settings.apiKey': 'API Key', 'settings.apiKey.desc': 'Secret key',
     'settings.model': 'Model', 'settings.model.desc': 'Model name', 'settings.selectModel': 'Select Model',
@@ -118,7 +112,7 @@ const translations: Record<Language, Record<string, string>> = {
     'common.cancel': 'Cancel', 'common.confirm': 'Confirm', 'common.save': 'Save',
     'dialog.confirm': 'Confirm', 'dialog.alert': 'Alert', 'dialog.info': 'Info', 'dialog.gotIt': 'Got it',
     'worldEditor.saveWorld': 'Save World',
-    'npcEditor.saveChanges': 'Save Changes', 'npcEditor.createNpc': 'Create NPC',
+    'npcEditor.saveChanges': 'Save Changes', 'npcEditor.createNpc': 'Create NPC', 'npc.delete': 'Delete', 'npc.delete.confirm': 'Delete this NPC? The character record and its current portrait will be permanently removed.', 'npc.delete.success': 'Deleted {name}', 'npc.delete.fail': 'Delete failed: NPC not found', 'npc.delete.title': 'Delete NPC', 'npc.delete.button': 'Delete NPC',
     'nav.home': 'Home', 'nav.profile': 'Profile', 'nav.characters': 'Characters',
     'nav.tasks': 'Tasks', 'nav.chronicle': 'Chronicle', 'nav.notebook': 'Chronicle', 'nav.business': 'Business', 'nav.variables': 'Variables', 'nav.worldbook': 'World Book', 'nav.dynamics': 'World Dynamics', 'nav.memory': 'Memory', 'nav.modules': 'Modules',
     'nav.saves': 'Saves', 'nav.save': 'Save', 'nav.settings': 'Settings',

@@ -1,5 +1,5 @@
 // ComfyUI 工作流编辑器 — 预设卡片
-import { CheckCircle, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { CheckCircle,XCircle,AlertTriangle,Trash2 } from 'lucide-react';
 import { Button } from '../SettingsUIComponents';
 import type { ComfyWorkflowPreset } from '@/api/imageGenTypes';
 

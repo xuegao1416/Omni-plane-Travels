@@ -1,17 +1,17 @@
 import { requestStreamWithRetry } from '../api/client';
-import type { ApiConfig, CompletionResult, Message, StreamOptions } from '../api/types';
+import type { ApiConfig,CompletionResult,Message,StreamOptions } from '../api/types';
 import {
-  applyCustomModuleAgentTurn,
-  createCustomModuleAgentSession,
-  createEmptyCustomModuleDesignBrief,
-  type CustomModuleAgentEnvelope,
-  type CustomModuleAgentPhase,
-  type CustomModuleAgentSession,
-  type CustomModuleAgentWorldContext,
-  type CustomModuleConversationMessage,
+applyCustomModuleAgentTurn,
+createCustomModuleAgentSession,
+createEmptyCustomModuleDesignBrief,
+type CustomModuleAgentEnvelope,
+type CustomModuleAgentPhase,
+type CustomModuleAgentSession,
+type CustomModuleAgentWorldContext,
+type CustomModuleConversationMessage,
 } from './agentSession';
 import { buildCustomModuleCapabilityCatalog } from './capabilities';
-import type { CustomGameplayModuleDefinition, ModuleValidationIssue } from './schema';
+import type { CustomGameplayModuleDefinition,ModuleValidationIssue } from './schema';
 import { validateCustomGameplayModule } from './validator';
 
 export type { CustomModuleAgentWorldContext } from './agentSession';

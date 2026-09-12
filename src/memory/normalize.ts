@@ -14,7 +14,7 @@ export function ensureStrArray(val: unknown): string[] {
 export function normalizeProvenance<T extends Record<string, unknown>>(obj: T): T {
   if (!obj || typeof obj !== 'object') return obj;
   const result = { ...obj } as Record<string, unknown>;
-  const sourceTypes = new Set(['world_fact', 'plot_fact', 'system_state', 'player_statement', 'npc_statement', 'player_inference', 'summary', 'unknown']);
+  const sourceTypes = new Set(['offscreen_event', 'world_fact', 'plot_fact', 'system_state', 'player_statement', 'npc_statement', 'player_inference', 'summary', 'unknown']);
   const layers = new Set(['fact', 'state', 'inference', 'summary']);
   const conflictStatuses = new Set(['none', 'disputed', 'superseded', 'rejected']);
   const sourceType = String(result.sourceType ?? '').trim();

@@ -6,7 +6,6 @@ import type { WorldBookManager } from '../worldbook/index';
 import type { ParsedResponse } from './responseExtractor';
 import type { ApiConfig } from '../api/types';
 import { runVariableExtraction } from './variableExtraction';
-import { eventBus, EVENTS } from './eventBus';
 import { waitForRateLimit } from '../api/rateLimiter';
 
 /** 管线执行回调 */
@@ -172,7 +171,7 @@ export class PipelineExecutor {
   ): Promise<void> {
     switch (taskId) {
       case 'variable':
-        return this.executeVariable(config, varMgr, mainResult, userText, mainApiConfig, worldBook, worldId);
+        return this.executeVariable(config, varMgr, mainResult, userText, mainApiConfig, worldBook, worldId, signal);
       case 'memory_write':
         return this.executeMemoryTask('memory_write', config.memoryEnabled, memoryTasks?.write, memoryTasks?.debugLogger);
       case 'memory_summary':
@@ -239,6 +238,7 @@ export class PipelineExecutor {
     mainApiConfig: ApiConfig,
     worldBook: WorldBookManager | null,
     worldId: string,
+    signal: AbortSignal,
   ): Promise<void> {
     if (!config.variableEnabled || !mainResult) {
       this.updateStage('variable', { status: 'skipped', skipped: true });
@@ -259,6 +259,7 @@ export class PipelineExecutor {
         worldId,
         delayMs: config.variableDelayMs,
         maxRetries: config.variableMaxRetries,
+        signal,
       });
 
       this.updateStage('variable', {

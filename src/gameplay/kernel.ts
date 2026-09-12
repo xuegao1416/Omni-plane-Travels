@@ -8,15 +8,12 @@ import type {
   GameplayExecutionContext,
   GameplayExecutionResult,
   GameplayValue,
+  GameplayScalar,
   GameplayLiteral,
   GameplayLogEntry,
   GameplayRuntimeState,
   GameplayStateRoot,
   GameplayTransaction,
-  GameplayStatModifier,
-  GameplayStatRuntime,
-  GameplaySurvivalRuntime,
-  GameplayBusinessRuntime,
 } from './types';
 
 export type {
@@ -27,13 +24,10 @@ export type {
   GameplayEventInput,
   GameplayExecutionContext,
   GameplayExecutionResult,
+  GameplayScalar,
   GameplayRuntimeState,
   GameplayStateRoot,
   GameplayTransaction,
-  GameplayStatModifier,
-  GameplayStatRuntime,
-  GameplaySurvivalRuntime,
-  GameplayBusinessRuntime,
 } from './types';
 
 export const GAMEPLAY_SCHEMA_VERSION = 1;
@@ -181,7 +175,6 @@ export function createDefaultGameplayRuntime(): GameplayRuntimeState {
     eventHistory: [],
     scheduledEvents: [],
     logs: [],
-    appliedMigrations: [],
     settlementKeys: {},
     stat: { modifiers: {}, base: {}, derived: {} },
     survival: { unlockedRecipes: [], statuses: {} },
@@ -201,7 +194,6 @@ export function ensureGameplayRuntime(state: GameplayStateRoot): GameplayRuntime
   if (!Array.isArray(existing.eventHistory)) existing.eventHistory = [];
   if (!Array.isArray(existing.scheduledEvents)) existing.scheduledEvents = [];
   if (!Array.isArray(existing.logs)) existing.logs = [];
-  if (!Array.isArray(existing.appliedMigrations)) existing.appliedMigrations = [];
   if (!existing.settlementKeys || typeof existing.settlementKeys !== 'object') existing.settlementKeys = {};
   if (!existing.stat || typeof existing.stat !== 'object') existing.stat = { modifiers: {}, base: {}, derived: {} };
   if (!existing.stat.modifiers || typeof existing.stat.modifiers !== 'object') existing.stat.modifiers = {};
@@ -263,9 +255,14 @@ function finishResult<TState extends GameplayStateRoot>(
     reason,
     changes,
     eventIds: events.map(event => event.id),
+    warnings: warnings.length > 0 ? [...warnings] : undefined,
   };
   appendLog(runtime, log);
   return { state, status, reason, changes, events, warnings, log };
+}
+
+function isAppendableScalar(value: unknown): value is GameplayScalar {
+  return value !== null && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean');
 }
 
 function applyEffect(
@@ -278,6 +275,7 @@ function applyEffect(
   context: GameplayExecutionContext,
   sequence: number,
   warnings: string[],
+  bestEffort = false,
 ): void {
   if ('set' in effect) {
     const before = clone(getGameplayPath(state, effect.set.path));
@@ -287,24 +285,37 @@ function applyEffect(
   }
   if ('add' in effect) {
     const current = getGameplayPath(state, effect.add.path);
-    if (current === undefined && !effect.add.create) throw new Error(`数值路径不存在：${effect.add.path}`);
+    const shouldCreate = bestEffort || effect.add.create === true;
+    if (current === undefined && !shouldCreate) throw new Error(`数值路径不存在：${effect.add.path}`);
     const before = current === undefined ? 0 : Number(current);
     if (!Number.isFinite(before) || !Number.isFinite(effect.add.delta)) throw new Error(`数值路径无效：${effect.add.path}`);
     let after = before + effect.add.delta;
     if (effect.add.min !== undefined) after = Math.max(effect.add.min, after);
     if (effect.add.max !== undefined) after = Math.min(effect.add.max, after);
-    if (!setGameplayPath(state, effect.add.path, after, effect.add.create === true)) throw new Error(`无法写入路径 ${effect.add.path}`);
+    if (!setGameplayPath(state, effect.add.path, after, shouldCreate)) throw new Error(`无法写入路径 ${effect.add.path}`);
     changes.push({ path: effect.add.path, operation: 'add', before, after });
     return;
   }
   if ('append' in effect) {
-    const current = getGameplayPath(state, effect.append.path);
-    if (current === undefined && !effect.append.create) throw new Error(`数组路径不存在：${effect.append.path}`);
-    if (current !== undefined && !Array.isArray(current)) throw new Error(`路径不是数组：${effect.append.path}`);
+    const rawCurrent = getGameplayPath(state, effect.append.path);
+    const shouldCreate = bestEffort || effect.append.create === true;
+    let current: unknown[] | undefined;
+    if (rawCurrent === undefined || rawCurrent === null) {
+      if (!shouldCreate) throw new Error(`数组路径不存在：${effect.append.path}`);
+      current = undefined;
+    } else if (Array.isArray(rawCurrent)) {
+      current = rawCurrent;
+    } else if (bestEffort && isAppendableScalar(rawCurrent)) {
+      // AI 经常把原本是标量的字段当成数组来追加；bestEffort 下自动包装成数组
+      current = [rawCurrent];
+      warnings.push(`路径 ${effect.append.path} 原值为标量，已自动转为数组`);
+    } else {
+      throw new Error(`路径不是数组：${effect.append.path}`);
+    }
     const before = clone(current ?? []);
-    const next = [...(current as unknown[] | undefined ?? []), clone(effect.append.value)];
+    const next = [...(current ?? []), clone(effect.append.value)];
     const limited = effect.append.limit && effect.append.limit > 0 ? next.slice(-effect.append.limit) : next;
-    if (!setGameplayPath(state, effect.append.path, limited, effect.append.create === true)) throw new Error(`无法写入路径 ${effect.append.path}`);
+    if (!setGameplayPath(state, effect.append.path, limited, shouldCreate)) throw new Error(`无法写入路径 ${effect.append.path}`);
     changes.push({ path: effect.append.path, operation: 'append', before, after: clone(limited) });
     return;
   }
@@ -335,8 +346,10 @@ function applyEffect(
 }
 
 /**
- * Execute one all-or-nothing gameplay transaction against a cloned state.
- * A blocked or failed command never commits costs/effects/rewards.
+ * Execute one gameplay transaction against a cloned state.
+ * 默认严格模式：任一 effect 失败即回滚全部 costs/effects/rewards。
+ * 当 context.bestEffort 为 true 时（如 AI 变量更新），单个 effect/cost 失败仅记录警告，
+ * 不影响其余内容继续应用。
  */
 export function executeGameplayTransaction<TState extends GameplayStateRoot>(
   stateIn: TState,
@@ -370,10 +383,17 @@ export function executeGameplayTransaction<TState extends GameplayStateRoot>(
 
   try {
     for (const cost of transaction.costs ?? []) {
-      const before = Number(getGameplayPath(state, cost.path));
-      const after = before - cost.amount;
-      if (!setGameplayPath(state, cost.path, after, false)) throw new Error(`无法扣除消耗 ${cost.path}`);
-      changes.push({ path: cost.path, operation: 'cost', before, after, label: cost.label });
+      const applyOneCost = () => {
+        const before = Number(getGameplayPath(state, cost.path));
+        const after = before - cost.amount;
+        if (!setGameplayPath(state, cost.path, after, false)) throw new Error(`无法扣除消耗 ${cost.path}`);
+        changes.push({ path: cost.path, operation: 'cost', before, after, label: cost.label });
+      };
+      if (context.bestEffort) {
+        try { applyOneCost(); } catch (err) { warnings.push(err instanceof Error ? err.message : String(err)); }
+      } else {
+        applyOneCost();
+      }
     }
 
     const eventInputs = [...(transaction.events ?? [])];
@@ -382,7 +402,15 @@ export function executeGameplayTransaction<TState extends GameplayStateRoot>(
       ...(transaction.rewards ?? []).flatMap(reward => reward.effects),
     ];
     for (const effect of effects) {
-      applyEffect(state, effect, changes, eventInputs, runtime, transaction, context, sequence, warnings);
+      if (context.bestEffort) {
+        try {
+          applyEffect(state, effect, changes, eventInputs, runtime, transaction, context, sequence, warnings, true);
+        } catch (err) {
+          warnings.push(err instanceof Error ? err.message : String(err));
+        }
+      } else {
+        applyEffect(state, effect, changes, eventInputs, runtime, transaction, context, sequence, warnings, false);
+      }
     }
 
     const events = eventInputs.map((input, index) => buildEvent(input, sequence, index, transaction, context));

@@ -20,7 +20,7 @@ describe('build pipeline progression normalization', () => {
     expect(config.tiers?.[1]).toMatchObject({ xpRequired: 100, statBonuses: { attrAMax: 150 } });
   });
 
-  test('repairs zeroed legacy caps cumulatively without corrupting stat modules', () => {
+  test('repairs zeroed previous-version progression caps without rewriting current stat modules', () => {
     const config = normalizeProgressionConfig({
       mode: 'tiered',
       xpFormula: { baseXP: 100, exponent: 1, scaleFactor: 1 },
@@ -35,9 +35,10 @@ describe('build pipeline progression normalization', () => {
 
     const stat = normalizeModule({
       moduleId: 'stat', name: '数值属性', enabled: true,
-      data: { attrA: { name: '生命', current: 80, max: 100 } },
-    } as any);
+      moduleConfig: { attrA: { name: '生命', max: 100 } },
+      initialState: { attrA: 80 },
+    });
     expect(stat.moduleConfig).toMatchObject({ attrA: { name: '生命', max: 100 } });
-    expect(stat.moduleConfig).not.toHaveProperty('mode');
+    expect(stat.initialState).toEqual({ attrA: 80 });
   });
 });

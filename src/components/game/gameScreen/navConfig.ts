@@ -1,5 +1,5 @@
-import { Home, User, Users, Settings, Layers, Brain, Globe, Package, Target, Swords, ScrollText, Map } from 'lucide-react';
-import type { NavButton, OverlayPanel, Screen } from './types';
+import { Home,User,Users,Settings,Layers,Brain,Globe,Package,Target,Swords,ScrollText,Map } from 'lucide-react';
+import type { NavButton,OverlayPanel,Screen } from './types';
 import { themeEmblem } from '../../../data/themeEmblemCatalog';
 
 export const navButtons: NavButton[] = [
@@ -25,7 +25,7 @@ const NAV_LABELS: Record<string, string> = {
   notebook: '纪事',
   variables: '变量',
   worldbook: '世界书',
-  dynamics: '世界动态',
+  dynamics: '剧情导演',
   memory: '记忆',
   modules: '模块',
   settings: '设置',

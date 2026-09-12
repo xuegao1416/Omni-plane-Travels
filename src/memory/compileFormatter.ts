@@ -1,3 +1,4 @@
+import { projectMemoryRuntime } from './memoryVisibility';
 // 双层编译格式化器 — 将 NarrativeMemoryRuntime 编译为主AI可消费的上下文文本
 
 import type {
@@ -248,6 +249,7 @@ export function formatRuntimeToCompiledText(
   budget: CompileSectionBudget = DEFAULT_COMPILE_BUDGET,
   resourceState?: ResourceSnapshot[],
 ): CompiledOutput {
+  runtime = projectMemoryRuntime(runtime);
   const hotSections: string[] = [];
   const focusedSections: string[] = [];
   const sections: Record<string, string> = {};

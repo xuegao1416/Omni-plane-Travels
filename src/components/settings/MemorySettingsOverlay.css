@@ -400,3 +400,49 @@
 .game-journey__overlay-panel .ms-textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--journey-focus) 22%, transparent) !important;
 }
+
+/* Stage 4 — deep memory surface: keep the long mobile settings page readable
+   without squeezing controls or cards into desktop-density spacing. */
+@media (max-width: 520px) {
+  .game-journey__overlay-panel .ms-scroll,
+  .ms-scroll {
+    padding: 16px 14px 22px;
+  }
+  .game-journey__overlay-panel .ms-block,
+  .ms-block {
+    gap: 18px;
+    min-width: 0;
+  }
+  .game-journey__overlay-panel .ms-config-grid,
+  .game-journey__overlay-panel .ms-config-grid.simple-mode,
+  .ms-config-grid,
+  .ms-config-grid.simple-mode {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    min-width: 0;
+  }
+  .game-journey__overlay-panel .ms-section-header,
+  .ms-section-header {
+    padding: 13px 14px;
+  }
+  .game-journey__overlay-panel .ms-action-bar,
+  .ms-action-bar {
+    gap: 10px;
+    padding: 12px 14px max(14px, env(safe-area-inset-bottom));
+  }
+  .game-journey__overlay-panel .ms-action-btn,
+  .ms-action-btn {
+    min-height: 40px;
+    padding-inline: 14px;
+  }
+  .game-journey__overlay-panel .ms-editor-card,
+  .ms-editor-card {
+    width: calc(100% - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .game-journey__overlay-panel .ms-editor-body,
+  .ms-editor-body {
+    padding: 14px;
+    gap: 16px;
+  }
+}

@@ -29,6 +29,7 @@ const NPC_DEATH_KEYWORDS = ['死亡', '已死', 'dead', '尸体', '已阵亡', '
 export function isNpcDead(npc: Record<string, unknown> | NPCData | undefined | null): boolean {
   if (!npc || typeof npc !== 'object') return false;
   const n = npc as any;
+  if (n.战斗状态 === '死亡') return true;
   // 血量检查
   const hp = n.生存状态?.血量;
   if (typeof hp === 'number' && hp <= 0) return true;
@@ -645,4 +646,3 @@ export function formatSnapshotForMainAI(state: GameState, configInput?: WorldClo
 
   return lines.join('\n');
 }
-

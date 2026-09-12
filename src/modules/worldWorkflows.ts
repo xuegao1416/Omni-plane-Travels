@@ -1,4 +1,3 @@
-import type { CardWorkflowDefinition } from './schema';
 import type { NodeInstance, WorkflowConnection, WorkflowDefinition } from './workflowSchema';
 
 export interface WorldWorkflowEvent { id: string; name: string }
@@ -57,41 +56,6 @@ function createWorldWorkflow(worldId: string): WorldWorkflowFactory {
       connections,
       metadata: { author: '内置', tags: ['内置世界', '事件触发'] },
     };
-  };
-}
-
-const STAT_ALIASES: Record<string, string> = {
-  '生命': 'attrA', '生命值': 'attrA', '血量': 'attrA',
-  '能量': 'attrB', '体力': 'attrB', '体力值': 'attrB',
-};
-
-function repairChoiceOptions(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  try {
-    JSON.parse(value);
-    return value;
-  } catch {
-    let repaired = value.replace(/([{,]\s*)(label|aiNote|effect)\s*:/g, '$1"$2":');
-    // A legacy generator also omitted the final option object's closing brace.
-    if (/"\]$/.test(repaired)) repaired = repaired.replace(/"\]$/, '"}]');
-    try { return JSON.stringify(JSON.parse(repaired)); } catch { return value; }
-  }
-}
-
-/** Repairs legacy built-in card data at installation without touching user packs. */
-export function normalizeBuiltinCardWorkflow(workflow: CardWorkflowDefinition): CardWorkflowDefinition {
-  return {
-    ...workflow,
-    nodes: workflow.nodes.map((node) => {
-      const widgetValues = { ...(node.widgetValues ?? {}) };
-      if (node.typeId === 'choice.static') widgetValues.options = repairChoiceOptions(widgetValues.options);
-      if (node.typeId === 'effect.stat') {
-        const key = String(widgetValues.statKey ?? '');
-        if (STAT_ALIASES[key]) widgetValues.statKey = STAT_ALIASES[key];
-      }
-      return { ...node, widgetValues };
-    }),
-    connections: workflow.connections.map((connection) => ({ ...connection })),
   };
 }
 

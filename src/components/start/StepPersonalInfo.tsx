@@ -1,22 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import NpcEditorModal from './NpcEditorModal';
 import TemplatePickerDialog from '../shared/TemplatePickerDialog';
 import { useDialog } from '../shared/Dialog';
 import {
-  User, Briefcase, Wand2, Loader, Save, Download, Upload, ChevronDown, BookMarked,
+User,Briefcase,Wand2,Loader,Save,Download,Upload,ChevronDown,BookMarked,
 } from 'lucide-react';
-import { savePlayerPreset, downloadJSON, exportPlayerPresetJSON } from '../../storage/templateStore';
-import type { StepPersonalInfoProps, PlayerProfile, CustomNpc } from './stepPersonalInfo/types';
+import { savePlayerPreset,downloadJSON,exportPlayerPresetJSON } from '../../storage/templateStore';
+import type { StepPersonalInfoProps,PlayerProfile,CustomNpc } from './stepPersonalInfo/types';
 import { PERSPECTIVE_OPTIONS } from './stepPersonalInfo/types';
-import { ProgressionInitEditor, SkillsTab, ItemsTab, NpcsTab, DropdownItem } from './stepPersonalInfo/index';
+import { ProgressionInitEditor,SkillsTab,ItemsTab,NpcsTab,DropdownItem } from './stepPersonalInfo/index';
 import StepAbilityAlloc from './StepAbilityAlloc';
 import useCreationAllocations from './useCreationAllocations';
 import {
-  clampPointScale,
-  computeCreationSpending,
-  resolveCreationStatConfig,
+clampPointScale,
+computeCreationSpending,
+resolveCreationStatConfig,
 } from '../../gameplay/creation/creationPoints';
 import type { ProfessionModuleSchema } from '../../modules/schema';
+import DirectorRoleSelector from './DirectorRoleSelector';
 
 const EMPTY_PROFESSION_CONFIG: ProfessionModuleSchema = {
   professions: [],
@@ -31,6 +32,7 @@ export default function StepPersonalInfo({
   onNext, onPrev, onModalStateChange, phase = 'identity', showNavigation = true, hasProfessionStep, difficultyContent,
 }: StepPersonalInfoProps) {
   const [npcEditorOpen, setNpcEditorOpen] = useState(false);
+  const [directorReady, setDirectorReady] = useState(true);
   const [editingNpc, setEditingNpc] = useState<CustomNpc | null>(null);
   const [npcPickerOpen, setNpcPickerOpen] = useState(false);
   const [playerPickerOpen, setPlayerPickerOpen] = useState(false);
@@ -125,6 +127,7 @@ export default function StepPersonalInfo({
 
   const renderIdentity = () => (
     <div className="ritual-identity-sections">
+      <DirectorRoleSelector world={allWorlds?.find(world => world.id === selectedWorld)} profile={personalInfo} onChange={setPersonalInfo} onReady={setDirectorReady} />
       <section className="ritual-form-section">
         <div className="ritual-form-section__heading"><span>基本信息</span><small>先确定旅者是谁</small></div>
         <div className="ritual-field-grid ritual-field-grid--name">
@@ -211,7 +214,7 @@ export default function StepPersonalInfo({
       {showNavigation && (
         <div className="personal-info-nav">
           <button type="button" className="btn-secondary" onClick={onPrev}>← 上一步</button>
-          <button type="button" className="btn-primary" onClick={onNext} disabled={!personalInfo.name.trim() || !personalInfo.gender || !personalInfo.age.trim()} title={!personalInfo.name.trim() || !personalInfo.gender || !personalInfo.age.trim() ? '请填写姓名、性别和年龄' : undefined}>下一步 →</button>
+          <button type="button" className="btn-primary" onClick={onNext} disabled={!directorReady || !personalInfo.name.trim() || !personalInfo.gender || !personalInfo.age.trim()} title={!personalInfo.name.trim() || !personalInfo.gender || !personalInfo.age.trim() ? '请填写姓名、性别和年龄' : undefined}>下一步 →</button>
         </div>
       )}
 

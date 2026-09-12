@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { Settings,ChevronDown,ChevronRight } from 'lucide-react';
 import { loadPresets } from '../../../settings/apiPresetUtils';
 
 interface Props {
@@ -31,14 +31,13 @@ export function ApiSettingsSection({ varApiPresetId, onPresetIdChange, onSave }:
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </button>
       {expanded && (
-        <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="game-variable-api-body">
+          <div className="game-variable-api-row">
             <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>API 预设</span>
             <select
               value={varApiPresetId}
               onChange={e => onPresetIdChange(e.target.value)}
-              className="input-field"
-              style={{ width: '160px' }}
+              className="input-field game-variable-api-select"
             >
               <option value="">跟随主 API</option>
               {apiPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

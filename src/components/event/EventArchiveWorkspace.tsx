@@ -1,25 +1,23 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect,useMemo,useState,type ReactNode } from 'react';
 import {
-  AlertTriangle,
-  Archive,
-  ArrowLeft,
-  BookOpen,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ExternalLink,
-  FilePlus,
-  FolderOpen,
-  MoreHorizontal,
-  PackageOpen,
-  Plus,
-  RefreshCw,
-  Sparkles,
-  Trash2,
-  Upload,
+AlertTriangle,
+Archive,
+ArrowLeft,
+BookOpen,ChevronLeft,
+ChevronRight,
+Download,
+ExternalLink,
+FilePlus,
+FolderOpen,
+MoreHorizontal,
+PackageOpen,
+Plus,
+RefreshCw,
+Sparkles,
+Trash2,
+Upload
 } from 'lucide-react';
-import type { EventDetail, EventPackType, EventRegistryEntry } from '../../modules/schema';
+import type { EventDetail,EventPackType,EventRegistryEntry } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
 import EventSwitch from './EventSwitch';
 import { resolveEventIcon } from './eventIcons';

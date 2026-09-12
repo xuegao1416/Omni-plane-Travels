@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
-import { ArrowLeft, Save, Trash2, User, MessageSquare, FolderOpen, Download, Upload, Edit3, Check, X, AlertTriangle } from 'lucide-react';
+import { useState,useRef } from 'react';
+import { ArrowLeft,Save,Trash2,User,FolderOpen,Download,Upload,Edit3,Check,X,AlertTriangle } from 'lucide-react';
 import EmptyState from '../shared/EmptyState';
-import type { SaveMeta, GameSave } from '../../storage/db';
+import type { SaveMeta,GameSave } from '../../storage/db';
 import { loadGame as loadGameFromDb } from '../../storage/db';
 
 /** 格式化字节数为可读字符串 */

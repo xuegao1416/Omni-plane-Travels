@@ -1,7 +1,7 @@
 // 提示词组装器 —— 从结构化 prompts[] 构建完整的系统提示
 // 替代 useGameEngine.ts 中的内联字符串拼接
 
-import type { PresetPack, PresetPromptEntry } from '../data/builtinPresets';
+import type { PresetPack } from '../data/builtinPresets';
 import { getEnabledPrompts, filterTriggeredPrompts } from '../data/builtinPresets';
 import type { MacroEngine } from './macroEngine';
 
@@ -57,8 +57,8 @@ export interface AssemblerContext {
   macroEngine: MacroEngine;
   /** 编译后的记忆上下文（来自记忆系统） */
   compiledMemoryContext?: string;
-  /** 世界模拟简报（世界动态 + 角色暗线摘要，来自 WorldSimulationEngine） */
-  simulationBrief?: string;
+  /** 剧情导演指导；只描述未来意图和限制，不代表事实。 */
+  directorBrief?: string;
   /** 玩家决策记录（选择卡路径 C 的 aiNote，喂给下一轮 AI 叙事） */
   playerDecisionContext?: string;
   /** 世界书 atDepth 条目（需要插入到聊天历史中的指定深度） */
@@ -88,7 +88,7 @@ export interface AssembleResult {
  * 2. 玩家档案 (playerProfileBlock)
  * 3. 角色认知防火墙 (firewall)
  * 4. 编译后的记忆上下文 (compiledMemoryContext)
- * 5. 世界模拟简报 (simulationBrief) — 后台推演引擎产出的世界动态
+ * 5. 剧情导演指导 (directorBrief) — 未来意图，不是已发生事实
  * 6. 预设提示词条目（按 order 排序，过滤 enabled + 触发模式）
  *
  * 每个条目的 content 在拼接前通过 macroEngine.resolve() 解析宏
@@ -159,7 +159,8 @@ export function assembleSystemPrompt(
   const parts: string[] = [];
 
   if (ctx.wbInjection) {
-    parts.push(ctx.wbInjection);
+    // 世界书注入内容同样走宏引擎（{{user}} 等宏在第三方世界书中常见）
+    parts.push(ctx.macroEngine.resolve(ctx.wbInjection));
   }
 
   if (ctx.playerProfileBlock) {
@@ -175,9 +176,9 @@ export function assembleSystemPrompt(
     parts.push(ctx.compiledMemoryContext);
   }
 
-  // 注入世界模拟简报（世界动态 + 角色暗线摘要）
-  if (ctx.simulationBrief) {
-    parts.push(ctx.simulationBrief);
+  // 注入剧情导演指导。指导不是事实，放在记忆之后、玩家决策之前。
+  if (ctx.directorBrief) {
+    parts.push(ctx.directorBrief);
   }
 
   // 注入玩家决策记录（选择卡路径 C 的 aiNote，不影响既有人格/世界书逻辑）

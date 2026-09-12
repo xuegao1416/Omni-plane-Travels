@@ -1,5 +1,5 @@
 // 生产构建脚本 - 打包 + 复制静态资源
-import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import { copyDirectoryContents } from './scripts/copyStaticAssets';
@@ -107,39 +107,7 @@ const prodHtml = htmlTemplate
 writeFileSync(join(DIST, 'index.html'), prodHtml);
 console.log(`   ✅ index.html (cache-bust: ${buildHash})`);
 
-// 5. 复制 PWA 资源
-console.log('📱 复制 PWA 资源...');
-if (existsSync('./manifest.json')) {
-  copyFileSync('./manifest.json', join(DIST, 'manifest.json'));
-  console.log('   ✅ manifest.json');
-}
-
-if (existsSync('./icon.png')) {
-  copyFileSync('./icon.png', join(DIST, 'icon.png'));
-  console.log('   ✅ icon.png');
-}
-if (existsSync('./scarborough-fair.mp3')) {
-  copyFileSync('./scarborough-fair.mp3', join(DIST, 'scarborough-fair.mp3'));
-  console.log('   ✅ scarborough-fair.mp3');
-}
-
-// 6. 复制代理教程图片
-console.log('📷 复制代理教程图片...');
-if (existsSync('./proxy-tutorial-images')) {
-  const { mkdirSync, readdirSync, statSync } = await import('fs');
-  const { join: pjoin } = await import('path');
-  const srcDir = './proxy-tutorial-images';
-  const destDir = join(DIST, 'proxy-tutorial-images');
-  mkdirSync(destDir, { recursive: true });
-  for (const file of readdirSync(srcDir)) {
-    const srcPath = pjoin(srcDir, file);
-    const destPath = pjoin(destDir, file);
-    if (statSync(srcPath).isFile()) {
-      copyFileSync(srcPath, destPath);
-      console.log(`   ✅ proxy-tutorial-images/${file}`);
-    }
-  }
-}
+// 5. PWA、音频与教程图片均由 public/ 在构建开始时统一复制。
 
 console.log('\n✨ 构建完成！dist/ 目录结构：');
 console.log('   dist/');
@@ -148,4 +116,4 @@ console.log('   ├── main.js');
 console.log('   ├── main.css');
 console.log('   ├── manifest.json (PWA 配置)');
 console.log('   ├── icon.png (应用图标)');
-console.log('   └── proxy-tutorial-images/ (代理教程图片 9 张)');
+console.log('   └── public/ 静态资源（PWA / 音频 / 教程图片 / 美术）');

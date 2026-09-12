@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 const workshop = readFileSync(new URL('./WorkshopSettingsTab.tsx', import.meta.url), 'utf8');

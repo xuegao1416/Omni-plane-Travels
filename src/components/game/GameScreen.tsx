@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState,useEffect,useCallback,useMemo,useRef } from 'react';
 import { useGame } from '../../context/GameContext';
 import { useUISettings } from '../../context/UISettingsContext';
 import { useConfigStore } from '../../stores/configStore';
@@ -14,56 +14,55 @@ import WorldBookPanel from './panels/WorldBookPanel';
 import RightPanel from './panels/RightPanel';
 import BusinessOverlay from './panels/BusinessOverlay';
 import SurvivalOverlay from './panels/SurvivalOverlay';
-import CombatOverlay from './panels/CombatOverlay';
 import CombatWireframe from './CombatWireframe';
-import CombatEncounterDecisionCard, { type CombatEncounterDecision } from './CombatEncounterDecisionCard';
+import CombatEncounterDecisionCard,{ type CombatEncounterDecision } from './CombatEncounterDecisionCard';
 import AbilityProposalCard from './AbilityProposalCard';
 import { MemorySettingsOverlay } from '../settings/memory/MemorySettingsOverlay';
 import WorldDynamicsPanel from './panels/WorldDynamicsPanel';
 import { findWorldDef } from '../../data/worldLoader';
 import { resolveWorldArtwork } from '../../data/worldArtwork';
-import { eventBus, EVENTS } from '../../engine/eventBus';
-import type { WorldSystemData, DiceRoll, BusinessModuleSchema, CombatModuleSchema, ProfessionModuleSchema, ProgressionConfig, StatModuleSchema, WorldDynamicsConfig, PeriodicRule, ModuleEffects, EventRule, RuleFile } from '../../modules/schema';
+import { eventBus,EVENTS } from '../../engine/eventBus';
+import type { WorldSystemData,DiceRoll,BusinessModuleSchema,ProfessionModuleSchema,ProgressionConfig,StatModuleSchema,WorldDynamicsConfig,PeriodicRule,EventRule,RuleFile } from '../../modules/schema';
 import { recordDiceRoll } from '../../gameplay/modules/dice';
 import { allocateStatPoints } from '../../gameplay/modules/stat';
 import { breakthroughProgression } from '../../gameplay/modules/progression';
-import { awakenAbility, equipAbility, learnSkill, respecAbilities, unequipAbility, unlockTalent, useSkill } from '../../gameplay/modules/talent';
-import { resolveProfessionBonuses, synchronizeProfessionAbilities, unlockProfessionAbility, useProfessionAbility } from '../../gameplay/profession';
-import { resolveProfessionBinding, resolveProfessionCombatActions } from '../../data/professions';
+import { awakenAbility,equipAbility,learnSkill,respecAbilities,unequipAbility,unlockTalent,useSkill } from '../../gameplay/modules/talent';
+import { resolveProfessionBonuses,synchronizeProfessionAbilities,unlockProfessionAbility,useProfessionAbility } from '../../gameplay/profession';
+import { resolveProfessionBinding } from '../../data/professions';
 import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
 import { resolveCombatRuleset } from '../../gameplay/combatRulesets';
 import { createDefaultDiceModule } from '../../modules/defaults';
 import { useSaveStore } from '../../stores/saveStore';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
 import { installWorldEventPacks } from '../../modules/webEventStore';
-import { getRuntimePack, listPacks, type EventRuntimePack } from '../../modules/eventApi';
+import { getRuntimePack,listPacks,type EventRuntimePack } from '../../modules/eventApi';
 import { selectRuntimePacksForWorld } from '../../modules/eventRuntime';
 import { installWorldCardWorkflows } from '../../modules/cardWorldBindings';
 import CardOverlay from '../event/CardOverlay';
 import EventConfigPanel from '../event/EventConfigPanel';
 import type { OverlayPanel } from './gameScreen/types';
-import { navButtons, buildMobileNavItems } from './gameScreen/navConfig';
+import { navButtons,buildMobileNavItems } from './gameScreen/navConfig';
 import DesktopLayout from './gameScreen/DesktopLayout';
 import MobileLayout from './gameScreen/MobileLayout';
 import { useSimulation } from './gameScreen/hooks/useSimulation';
 import { useSurvivalCraft } from './gameScreen/hooks/useSurvivalCraft';
 import { useSurvivalSettlement } from './gameScreen/hooks/useSurvivalSettlement';
 import { useBusinessSettlement } from './gameScreen/hooks/useBusinessSettlement';
-import { assignBusinessStaff, purchaseBusinessAsset, upgradeBusinessAsset } from '../../gameplay/modules/business';
-import { performCombatAction, endCombat } from '../../gameplay/combat';
+import { assignBusinessStaff,purchaseBusinessAsset,upgradeBusinessAsset } from '../../gameplay/modules/business';
 import { normalizeAssetStatus } from './panels/businessOverlay/utils';
 import JourneyDossierContent from './shared/JourneyDossierContent';
-import { DOSSIER_META, normalizeDossierPanel } from './shared/journeyDossierMeta';
+import { DOSSIER_META,normalizeDossierPanel } from './shared/journeyDossierMeta';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 import { useMemoryStore } from '../../memory/memoryStore';
 import { usePortraitStore } from '../../stores/portraitStore';
+import { imageDb } from '../../storage/imageDb';
 import { getEngineState } from '../../simulation/SimulationApi';
-import { normalizeCombatEncounterRequest, type CombatCommandInputV2, type CombatEncounterRequest } from '../../gameplay/protocols';
-import { applyNarrativeDecision, createNarrativeDecisionRecord, type NarrativeDecisionRecord } from '../../gameplay/narrativeDecision';
+import { normalizeCombatEncounterRequest,type CombatCommandInputV2,type CombatEncounterRequest } from '../../gameplay/protocols';
+import { applyNarrativeDecision,createNarrativeDecisionRecord,type NarrativeDecisionRecord } from '../../gameplay/narrativeDecision';
 import { resolveAbilityProposalOnGameState } from '../../gameplay/abilitySystem';
-import { chooseAutomaticCommand, prepareCombatEncounterRequest, type CombatAutoStrategy, type CombatStatRanges } from '../../gameplay/combatV2';
-import { CombatNarrationCoordinator, applyV3CombatCommand, buildLocalCombatContinuation, isCombatFeatureEnabled, isCombatInteractionPaused, preserveCombatOwnedState, requestFromNarrativeAction, retryV3Combat, startV3Combat } from '../../gameplay/combatRuntime';
+import { chooseAutomaticCommand,prepareCombatEncounterRequest,type CombatAutoStrategy,type CombatStatRanges } from '../../gameplay/combatV2';
+import { CombatNarrationCoordinator,applyV3CombatCommand,buildLocalCombatContinuation,isCombatFeatureEnabled,isCombatInteractionPaused,preserveCombatOwnedState,requestFromNarrativeAction,retryV3Combat,startV3Combat } from '../../gameplay/combatRuntime';
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
@@ -114,8 +113,8 @@ export default function GameScreen() {
   }, []);
   // 窄视口自动折叠右侧面板
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)');
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => { if (e.matches) setRightCollapsed(true); };
+    const mq = window.matchMedia('(max-width: 1100px)');
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => { setRightCollapsed(e.matches); };
     handler(mq);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
@@ -139,7 +138,6 @@ export default function GameScreen() {
     return result;
   }, [gameState, savedPortraits, state.personalInfo?.portrait]);
   const hasBusinessModule = !!worldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
-  const hasSurvivalModule = !!worldDef?.modules?.some(m => m.moduleId === 'survival' && m.enabled);
   const hasProfessionModule = isProfessionModuleEnabled(worldDef);
   const combatV3Enabled = isCombatFeatureEnabled(gameState);
   const readOnly = engine.isReadOnly;
@@ -155,8 +153,8 @@ export default function GameScreen() {
       if (!mod.enabled) continue;
       if (mod.moduleId === 'profession' && !isProfessionModuleEnabled(worldDef)) continue;
       const key = keyMap[mod.moduleId];
-      if (!key || (!(mod.moduleConfig || mod.data) && mod.moduleId !== 'dice')) continue;
-      const config = (mod.moduleConfig || mod.data || createDefaultDiceModule()) as Record<string, any>;
+      if (!key || (!(mod.moduleConfig) && mod.moduleId !== 'dice')) continue;
+      const config = (mod.moduleConfig || createDefaultDiceModule()) as Record<string, any>;
       if (mod.moduleId === 'stat') {
         const live = gameState.玩家?.生存状态 ?? {};
         const statConfig: Record<string, any> = { ...config };
@@ -212,26 +210,6 @@ export default function GameScreen() {
       resource: stat?.attrB?.name?.trim() || '能量',
     };
   }, [worldSystem.数值属性]);
-  const combatConfig = useMemo((): CombatModuleSchema | undefined => {
-    const base = worldSystem.战斗系统 as CombatModuleSchema | undefined;
-    if (!base) return undefined;
-    const professionConfig = worldSystem.职业体系 as ProfessionModuleSchema | undefined;
-    const professionActions = resolveProfessionCombatActions(gameState, professionConfig);
-    const bonuses = resolveProfessionBonuses(gameState, professionConfig).combat;
-    const actions = [...(base.playerActions ?? []), ...professionActions];
-    const playerActions = [...new Map(actions.map(action => [action.id, action])).values()].map(action => ({
-      ...action,
-      ...((action.damage ?? 0) > 0 && bonuses.damage ? { damage: (action.damage ?? 0) + bonuses.damage } : {}),
-      ...((action.healing ?? 0) > 0 && bonuses.healing ? { healing: (action.healing ?? 0) + bonuses.healing } : {}),
-      ...(bonuses.accuracy ? { accuracy: (action.accuracy ?? 10) + bonuses.accuracy } : {}),
-    }));
-    return {
-      ...base,
-      playerActions,
-      playerArmor: Math.max(0, Number(base.playerArmor ?? 0) + bonuses.armor),
-      playerInitiative: Number(base.playerInitiative ?? 0) + bonuses.initiative,
-    };
-  }, [worldSystem, gameState, stateVersion]);
   // ── Extracted hooks ──
   const bumpVersion = useCallback(() => setStateVersion(v => v + 1), []);
   const { isSimulating, handleManualTick } = useSimulation(engine, worldDef, apiConfig);
@@ -508,34 +486,7 @@ export default function GameScreen() {
       }
       if (cancelled) return;
 
-      // 2. 兼容旧自定义世界：moduleConfig.periodicEvents → 临时注册
-      const hasWorldPacks = (worldDef?.eventPacks?.length ?? 0) > 0;
-      if (!hasWorldPacks) {
-        const legacy = (worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled)?.moduleConfig as Record<string, unknown> | undefined)?.periodicEvents as Array<Record<string, unknown>> | undefined;
-        if (legacy && legacy.length > 0) {
-          const periodicRules: PeriodicRule[] = legacy.map((p) => ({
-            id: String(p.id ?? `legacy_${Math.random().toString(36).slice(2)}`),
-            name: typeof p.name === 'string' ? p.name : undefined,
-            intervalTicks: Number(p.intervalTicks ?? 1),
-            offsetTicks: typeof p.offsetTicks === 'number' ? p.offsetTicks : undefined,
-            effects: (p.effects as ModuleEffects) ?? {},
-            description: typeof p.description === 'string' ? p.description : undefined,
-            narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
-          }));
-          const savedRuntime0 = gameState.simulationRuntime?.eventRuntimes?.['world:periodic'];
-          eventWorldEvolution.registerPack({
-            eventPackId: 'world:periodic',
-            rules: [],
-            periodicRules,
-            permissions: ['modify_world_state'],
-            runtime: savedRuntime0 ?? { onceFired: {}, cooldownRemaining: {} },
-            displayName: '世界周期事件（自定义）',
-            source: 'world',
-          });
-        }
-      }
-
-      // 3. 确定本局要注册的事件包列表（二级开关优先，否则用全局已启用列表）
+      // 2. 确定本局要注册的事件包列表（二级开关优先，否则用全局已启用列表）
       let enabledIds: string[];
       if (sessionActivePacks !== undefined) {
         enabledIds = sessionActivePacks;
@@ -552,32 +503,6 @@ export default function GameScreen() {
 
       // 防残留：先清空再按当前绑定注册
       eventWorldEvolution.clear();
-
-      // 重新注册旧自定义世界的周期事件（上面 clear 了）
-      if (!hasWorldPacks) {
-        const legacy = (worldDef?.modules?.find(m => m.moduleId === 'simulation' && m.enabled)?.moduleConfig as Record<string, unknown> | undefined)?.periodicEvents as Array<Record<string, unknown>> | undefined;
-        if (legacy && legacy.length > 0) {
-          const periodicRules: PeriodicRule[] = legacy.map((p) => ({
-            id: String(p.id ?? `legacy_${Math.random().toString(36).slice(2)}`),
-            name: typeof p.name === 'string' ? p.name : undefined,
-            intervalTicks: Number(p.intervalTicks ?? 1),
-            offsetTicks: typeof p.offsetTicks === 'number' ? p.offsetTicks : undefined,
-            effects: (p.effects as ModuleEffects) ?? {},
-            description: typeof p.description === 'string' ? p.description : undefined,
-            narrateToAI: typeof p.narrateToAI === 'boolean' ? p.narrateToAI : undefined,
-          }));
-          const savedRuntime0b = gameState.simulationRuntime?.eventRuntimes?.['world:periodic'];
-          eventWorldEvolution.registerPack({
-            eventPackId: 'world:periodic',
-            rules: [],
-            periodicRules,
-            permissions: ['modify_world_state'],
-            runtime: savedRuntime0b ?? { onceFired: {}, cooldownRemaining: {} },
-            displayName: '世界周期事件（自定义）',
-            source: 'world',
-          });
-        }
-      }
 
       const runtimePacks: EventRuntimePack[] = [];
       for (const id of enabledIds) {
@@ -637,7 +562,7 @@ export default function GameScreen() {
     handleSurvivalCraft, handleSurvivalUnlockRecipe, handleSurvivalGather, handleSurvivalGenerateRecipe, handleSurvivalDeleteRecipe,
   } = useSurvivalCraft(engine, apiConfig, worldDef, setNotification, bumpVersion);
   useBusinessSettlement(engine, worldDef, bumpVersion);
-  const { getChangeLog: getSurvivalChangeLog, clearChangeLog: clearSurvivalChangeLog } = useSurvivalSettlement(engine, worldDef, bumpVersion);
+  const { getChangeLog: getSurvivalChangeLog } = useSurvivalSettlement(engine, worldDef, bumpVersion);
   // ── Event effects ──
   useEffect(() => {
     const onUpdate = () => setStateVersion(v => v + 1);
@@ -739,18 +664,6 @@ export default function GameScreen() {
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldSystem, bumpVersion]);
-  const combatContext = useCallback(() => ({ tick: engine.variableManager.getState().simulationRuntime?.tick ?? 0, enabledModules: ['combat'] as const }), [engine]);
-  const commitCombatResult = useCallback((result: ReturnType<typeof performCombatAction>) => {
-    if (engine.isReadOnly) return;
-    if (result.status !== 'applied') {
-      setNotification(result.reason ?? result.summary ?? '战斗行动未执行');
-      return;
-    }
-    engine.variableManager.setState(result.state);
-    if (result.summary) setNotification(result.summary);
-    bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
-  }, [engine, bumpVersion]);
   const businessConfig = useMemo(() => worldDef?.modules?.find(module => module.moduleId === 'business' && module.enabled)?.moduleConfig as BusinessModuleSchema | undefined, [worldDef]);
   const commitBusinessResult = useCallback((result: ReturnType<typeof purchaseBusinessAsset>) => {
     if (engine.isReadOnly) return;
@@ -772,13 +685,7 @@ export default function GameScreen() {
   const handleBusinessStaff = useCallback((assetId: string, count: number, efficiency?: number) => {
     commitBusinessResult(assignBusinessStaff(engine.variableManager.getState(), assetId, count, efficiency, businessContext()));
   }, [engine, businessContext, commitBusinessResult]);
-  const handleCombatAction = useCallback((actionId: string, targetId: string) => {
-    if (!combatConfig) return;
-    commitCombatResult(performCombatAction(engine.variableManager.getState(), combatConfig, actionId, targetId, combatContext()));
-  }, [engine, combatConfig, combatContext, commitCombatResult]);
-  const handleCombatEnd = useCallback(() => {
-    commitCombatResult(endCombat(engine.variableManager.getState(), combatContext()));
-  }, [engine, combatContext, commitCombatResult]);
+
 
   const continueCombatNarration = useCallback(async () => {
     if (combatNarrationInFlightRef.current) return;
@@ -949,6 +856,35 @@ export default function GameScreen() {
     if (ok) bumpVersion();
     return ok;
   }, [engine, apiConfig, bumpVersion]);
+  const handleDeleteNpc = useCallback((npcId: string) => {
+    if (engine.isReadOnly) return false;
+    if (!npcId) return false;
+    const s = engine.variableManager.getState();
+    const npc = s.人物档案?.[npcId];
+    if (!npc) {
+      setNotification(t('npc.delete.fail'));
+      return false;
+    }
+    const npcName = (npc as any).姓名 || npcId;
+    const removed = engine.variableManager.removeNpc(npcId);
+    if (!removed) {
+      setNotification(t('npc.delete.fail'));
+      return false;
+    }
+    // 清理头像 blob（PortraitHeader 写入的稳定 key 是 portrait-）；
+    // 同时清理 npc 自身记录里可能另存的 portraitBlobKey。
+    const portraitKey = 'portrait-' + npcId;
+    imageDb.deleteBlob(portraitKey).catch(() => { /* 没有头像时静默 */ });
+    const ext = npc as any;
+    if (ext.portraitBlobKey && ext.portraitBlobKey !== portraitKey) {
+      imageDb.deleteBlob(ext.portraitBlobKey).catch(() => { /* 同上 */ });
+    }
+    usePortraitStore.getState().clearPortrait(npcId);
+    bumpVersion();
+    useSaveStore.getState().scheduleAutoSave();
+    setNotification(t('npc.delete.success').replace('{name}', npcName));
+    return true;
+  }, [engine, bumpVersion, t]);
   // ── Simulation rules change handler ──
   const handleSimulationRulesChange = useCallback((rules: WorldDynamicsConfig) => {
     if (!worldDef || engine.isReadOnly) return;
@@ -961,8 +897,8 @@ export default function GameScreen() {
     } else {
       modules.push({
         moduleId: 'simulation',
-        name: '世界动态',
-        description: '当前世界的世界动态规则覆盖',
+        name: '剧情导演',
+        description: '当前世界的剧情导演兼容规则覆盖',
         enabled: true,
         moduleConfig: rules as unknown as Record<string, unknown>,
       });
@@ -979,8 +915,8 @@ export default function GameScreen() {
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
     const content = (() => {
       switch (panel) {
-        case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} />;
-        case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} />;
+        case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} variableManager={engine.variableManager} />;
+        case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} onDeleteNpc={readOnly ? undefined : handleDeleteNpc} />;
         case 'tasks': return <TaskPanel gameState={gameState} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} />;
         case 'profession': return <ProfessionTreePanel config={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} gameState={gameState} currentTick={gameState.simulationRuntime?.tick ?? 0} onUnlock={id => applyProfessionAction('unlock', id)} onUse={id => applyProfessionAction('use', id)} />;
         case 'notebook': return <NotebookPanel gameState={gameState} />;
@@ -988,7 +924,7 @@ export default function GameScreen() {
         case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
         case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => useSaveStore.getState().scheduleAutoSave()} messages={engine.messages} mode="inline" />;
         case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={readOnly ? async () => undefined : handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} onUseAction={readOnly ? undefined : text => { handleUseWorldDynamicsAction(text); onClose(); }} />;
-        case 'modules': return <EventConfigPanel onClose={onClose} worldDef={worldDef} />;
+        case 'modules': return <EventConfigPanel worldDef={worldDef} />;
         default: return null;
       }
     })();
@@ -1097,7 +1033,7 @@ export default function GameScreen() {
           worldName={worldDef?.name || '世界漫游指南'}
           isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen}
           showLeftOverlay={showLeftOverlay} onShowLeftOverlay={setShowLeftOverlay}
-          mobileNavItems={mobileNavItems} t={t}
+          mobileNavItems={mobileNavItems}
           showRightOverlay={showRightOverlay} onShowRightOverlay={setShowRightOverlay}
           mobileActivePanel={mobileActivePanel} onMobileActivePanelChange={setMobileActivePanel}
           panelTitle={getPanelTitle(mobileActivePanel)}
@@ -1108,7 +1044,7 @@ export default function GameScreen() {
       ) : (
         <DesktopLayout
           navButtons={activeNavButtons} overlay={overlay} onOverlayChange={setOverlay}
-          onNavigate={navigate} t={t}
+          onNavigate={navigate}
           isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen}
           drawerTitle={getPanelTitle(overlay)}
           drawerEmblemSrc={getPanelEmblem(overlay)}
@@ -1132,7 +1068,6 @@ export default function GameScreen() {
         changeLog={getSurvivalChangeLog()}
         onClose={() => setSurvivalOverlayOpen(false)}
       />}
-      {!readOnly && !combatV3Enabled && gameState.combat?.active && combatConfig && <CombatOverlay state={gameState.combat} gameState={gameState} config={combatConfig} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} onAction={handleCombatAction} onEnd={handleCombatEnd} />}
       {combatV3Enabled && gameState.v3?.combatSession && (gameState.v3.combatSession.lifecycle !== 'terminal' || gameState.v3.combatSession.result?.narration.status !== 'succeeded') && <CombatWireframe
         session={gameState.v3.combatSession}
         statLabels={combatStatLabels}
@@ -1162,7 +1097,7 @@ export default function GameScreen() {
         error={abilityError}
         onResolve={handleAbilityProposal}
       />}
-      {!readOnly && !isCombatInteractionPaused(gameState) && <CardOverlay gameState={gameState} onChoice={handleCustomModuleChoice} onDecisionApplied={handleNarrativeDecisionApplied} />}
+      {!readOnly && !isCombatInteractionPaused(gameState) && <CardOverlay gameState={gameState} apiConfig={apiConfig} onChoice={handleCustomModuleChoice} onDecisionApplied={handleNarrativeDecisionApplied} />}
       {readOnly && <div className="game-readonly-banner" role="status">此旅程已在炼狱风险中封存：可以回顾与导出，但不能继续、编辑或回滚。</div>}
       {notification && (
         <button type="button" aria-label="关闭提示" onClick={() => setNotification(null)} style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 200, animation: 'fadeIn 0.2s ease', cursor: 'pointer' }}>

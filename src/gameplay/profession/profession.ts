@@ -8,7 +8,7 @@ import type {
 } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
 import { abilityDefinitionFromInnateTalent, abilityDefinitionFromProfessionAbility, abilityDefinitionFromSkill, abilityRankCost, createAbilityInstance } from '../abilitySystem';
-import { combatStatLabel, describeCombatActionFormula } from '../combat';
+import { combatStatLabel, describeCombatActionFormula } from '../combatMath';
 import {
   executeGameplayTransaction,
   type GameplayExecutionContext,
@@ -165,7 +165,7 @@ export function synchronizeProfessionAbilities(source: GameState, config: Profes
       Math.max(0, (owned.冷却至轮次 ?? 0) - (state.simulationRuntime?.tick ?? 0)),
     );
   }
-  for (const skill of config.freeSkillCatalog ?? config.freeSkills ?? []) {
+  for (const skill of config.freeSkills ?? []) {
     const owned = abilityState?.已掌握技能?.[skill.id];
     if (!owned) continue;
     attach(

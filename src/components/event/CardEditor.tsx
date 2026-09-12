@@ -3,26 +3,22 @@
 //  遵循项目模式：EventsScreen 创建包并传入 eventPackId，
 //  CardEditor 只负责编辑事件内容。
 // ============================================================
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect,useState,useCallback } from 'react';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import {
-  ArrowLeft, Save, Download, Trash2, Plus, Settings, MoreHorizontal,
-  Layers, Loader2, Lock, Check, AlertTriangle, LayoutDashboard,
-  PanelLeft, SlidersHorizontal,
+ArrowLeft,Save,Download,Trash2,Plus,Settings,Layers,Loader2,Lock,Check,AlertTriangle,LayoutDashboard
 } from 'lucide-react';
 import JSZip from 'jszip';
 import type {
-  CardWorkflowDefinition, EventIndexEntry, Manifest, ValidationIssue,
+CardWorkflowDefinition,EventIndexEntry,Manifest,ValidationIssue,
 } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
-import { getWebEvent, putWebEvent } from '../../modules/eventDb';
-import { saveEventToPack, listEventsInPack, savePackMeta, deleteEventFromPack } from '../../modules/webEventStore';
-import { findWorldDef, getAllWorlds } from '../../data/worldLoader';
+import { getWebEvent,putWebEvent } from '../../modules/eventDb';
+import { saveEventToPack,listEventsInPack,savePackMeta,deleteEventFromPack } from '../../modules/webEventStore';
+import { findWorldDef,getAllWorlds } from '../../data/worldLoader';
 import type { WorldDef } from '../../data/worlds-schema';
 import CardWorkflowEditor from '../card-workflow/CardWorkflowEditor';
 import CardNodePalette from '../card-workflow/CardNodePalette';
-
-const APP_VERSION = '2.8.1';
 
 function newEventId(): string {
   return `evt-${Math.random().toString(36).slice(2, 8)}`;
@@ -86,8 +82,6 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
   const [saved, setSaved] = useState(true);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [showPalette, setShowPalette] = useState(!isPhone);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [mobileNodePanel, setMobileNodePanel] = useState(false);
   const [mobileEventList, setMobileEventList] = useState(false);
   const [toast, setToast] = useState<string | null>(null);

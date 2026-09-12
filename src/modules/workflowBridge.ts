@@ -3,7 +3,7 @@
 //  把 WorkflowExecutionResult 转成 EvaluateResult，
 //  让游戏引擎能直接消费工作流的执行结果。
 // ============================================================
-import type { WorkflowDefinition, WorkflowExecutionContext, WorkflowExecutionResult, PendingAction } from './workflowSchema';
+import type { WorkflowDefinition, WorkflowExecutionContext, PendingAction } from './workflowSchema';
 import { executeWorkflow } from './workflowEngine';
 import type { EvaluateResult } from './ruleEngine';
 import type { WorldContext, EventRuntimeState, Literal } from './schema';
@@ -30,7 +30,7 @@ export function executeWorkflowAsEvaluation(
   ctx: WorldContext,
   tick: number,
   events: Array<{ type: string; where?: Record<string, Literal> }>,
-  runtime: EventRuntimeState,
+  _runtime: EventRuntimeState,
   eventPackId: string,
   permissions: string[],
 ): EvaluateResult {

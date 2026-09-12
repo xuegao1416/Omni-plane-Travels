@@ -235,3 +235,10 @@
 @media (prefers-reduced-motion: reduce) {
   .event-archive-screen * { animation: none !important; transition: none !important; }
 }
+
+/* Stage 2: mobile headers keep mirrored action slots so titles do not drift. */
+@media (max-width: 640px) {
+  .event-archive-header { grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; }
+  .event-archive-heading { text-align: center; }
+  .event-archive-header-spacer { display: block; width: 44px; height: 44px; }
+}

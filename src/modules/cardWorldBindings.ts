@@ -54,7 +54,6 @@ export async function installWorldCardWorkflows(worldDef: WorldDef): Promise<voi
       status: 'installed',
       installedAt: new Date().toISOString(),
       builtin: true,
-      worldId: worldDef.id,
       files,
     };
 

@@ -1,4 +1,4 @@
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { RotateCcw,Sparkles } from 'lucide-react';
 import type { CombatSessionV2 } from '../../../gameplay/protocols';
 
 export default function CombatResult({ session, saving, readOnly, onContinueNarration, onRetry }: { session: CombatSessionV2; saving: boolean; readOnly: boolean; onContinueNarration: () => void; onRetry: () => void }) {

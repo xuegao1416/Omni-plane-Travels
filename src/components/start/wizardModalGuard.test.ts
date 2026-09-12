@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 
 const wizardSource = readFileSync(new URL('./WizardShell.tsx', import.meta.url), 'utf8');
 const stepSource = readFileSync(new URL('./StepPersonalInfo.tsx', import.meta.url), 'utf8');

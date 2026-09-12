@@ -1,8 +1,8 @@
-import type { WorldArtwork, WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
+import type { WorldArtwork,WorldDef,WorldBookEntryDef } from '../../../data/worlds-schema';
 import {
-  createDefaultStatModule, createDefaultProgressionModule, createDefaultSurvivalModule,
-  createDefaultBusinessModule, createDefaultDiceModule, createDefaultTalentModule,
-  createDefaultProfessionBinding, createDefaultCombatBinding,
+createDefaultStatModule,createDefaultProgressionModule,createDefaultSurvivalModule,
+createDefaultBusinessModule,createDefaultDiceModule,createDefaultTalentModule,
+createDefaultProfessionBinding,createDefaultCombatBinding,
 } from '../../../modules/defaults';
 import { createBuildContext } from '../../../modules/buildContext';
 import { generateWorldBookEntries } from '../../../modules/buildPipeline';
@@ -11,6 +11,7 @@ import { inferWorldClockConfig } from '../../../time/worldClock';
 import { resolveProfessionBinding } from '../../../data/professions';
 
 export type FormState = {
+  directorSource?: WorldDef['directorSource'];
   name: string; description: string; icon: string; coverColor: string; tags: string; difficulty: string;
   artwork?: WorldArtwork;
   overview: string; timePeriod: string; location: string; atmosphere: string;
@@ -21,6 +22,7 @@ export type FormState = {
   presetNPCs: Array<{ name: string; role: string; description: string; personality: string }>;
   highlights: string;
   locations: Array<{ name: string; description: string }>;
+  items: Array<{ name: string; description: string }>;
   culture: string;
   modules: WorldDef['modules'];
 };
@@ -33,7 +35,7 @@ export const defaultForm: FormState = {
   currencyName: '', currencySymbol: '', currencyDesc: '', priceLevel: '',
   calendar: '', startTime: '', timeSpeed: '', timeSystem: undefined,
   factions: [], presetNPCs: [], highlights: '',
-  locations: [], culture: '', modules: undefined,
+  locations: [], items: [], culture: '', modules: undefined,
 };
 
 export const DEFAULT_MODULE_FACTORIES: Record<string, () => unknown> = {
@@ -72,6 +74,7 @@ export function worldToForm(w: WorldDef): FormState {
   return {
     name: w.name || '', description: w.description || '', icon: w.icon || '', coverColor: w.coverColor || '#3b82f6',
     artwork: w.artwork,
+    directorSource: w.directorSource,
     tags: w.tags?.join(', ') || '', difficulty: w.difficulty || 'medium',
     overview: entries?.find(e => e.entryType === 'setting')?.content || '',
     timePeriod: settingMeta?.timePeriod || '', location: settingMeta?.location || '', atmosphere: settingMeta?.atmosphere || '',
@@ -84,13 +87,56 @@ export function worldToForm(w: WorldDef): FormState {
     presetNPCs: allNPCs.map((n: any) => ({ name: n.name || '', role: n.role || '', description: n.description || '', personality: typeof n.personality === 'string' ? n.personality : '' })),
     highlights: highlightsMeta?.highlights?.join(', ') || '',
     locations: loreEntries.map(e => ({ name: e.comment || '', description: e.content || '' })),
+    items: (entries?.filter(e => e.entryType === 'items') ?? []).map(e => ({ name: e.comment, description: e.content })),
     culture: cultureEntry?.content || '', modules: w.modules,
   };
 }
 
 /** 将表单转换为 WorldDef */
+function applyManualFormEdits(entries: WorldBookEntryDef[], form: FormState, baseline: FormState): WorldBookEntryDef[] {
+  const groups: Array<[WorldBookEntryDef['entryType'], Array<keyof FormState>, boolean]> = [
+    ['setting', ['overview', 'timePeriod', 'location', 'atmosphere'], false],
+    ['rules', ['powerSystem', 'socialStructure', 'specialRules'], false],
+    ['economy', ['currencyName', 'currencySymbol', 'currencyDesc', 'priceLevel', 'calendar', 'startTime', 'timeSpeed', 'timeSystem'], false],
+    ['highlights', ['highlights'], false], ['culture', ['culture'], false],
+    ['factions', ['factions'], true], ['npcs', ['presetNPCs'], true],
+    ['lore', ['locations'], true], ['items', ['items'], true],
+  ];
+  const changed = groups.filter(([, fields]) => fields.some(key => JSON.stringify(form[key]) !== JSON.stringify(baseline[key])));
+  if (!changed.length) return entries;
+  const generated = formToWorldDef(form, null, []).worldBookEntries ?? [];
+  let nextUid = entries.reduce((max, item) => Math.max(max, item.uid), 0);
+  let result = [...entries];
+  for (const [type, fields, multiple] of changed) {
+    const old = entries.filter(item => item.entryType === type);
+    const fresh = generated.filter(item => item.entryType === type);
+    const oldRows = baseline[fields[0]!] as Array<{ name: string }>;
+    const newRows = form[fields[0]!] as Array<{ name: string }>;
+    const used = new Set<number>();
+    const replacements = fresh.map((item, index) => {
+      let oldIndex = multiple ? old.findIndex((candidate, i) => !used.has(i) && candidate.comment === item.comment) : 0;
+      if (oldIndex < 0 && Array.isArray(oldRows) && oldRows.length === newRows.length && !used.has(index)) oldIndex = index;
+      const previous = old[oldIndex];
+      if (!previous) return { ...item, uid: ++nextUid };
+      used.add(oldIndex);
+      if (multiple && JSON.stringify(oldRows[oldIndex]) === JSON.stringify(newRows[index])) return previous;
+      return { ...previous, content: item.content, comment: multiple ? item.comment : previous.comment,
+        key: multiple ? Array.from(new Set([item.comment, ...previous.key.filter(key => key !== previous.comment)])) : previous.key,
+        meta: { ...previous.meta, ...item.meta } };
+    });
+    const affected = new Set((multiple ? old : old.slice(0, 1)).map(item => item.uid));
+    const first = result.findIndex(item => affected.has(item.uid));
+    result = result.filter(item => !affected.has(item.uid));
+    result.splice(first < 0 ? result.length : first, 0, ...replacements);
+  }
+  return result;
+}
+
 export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, refinedEntries: WorldBookEntryDef[]): WorldDef {
+  if (!refinedEntries.length && initialWorld?.worldBookEntries?.length) refinedEntries = initialWorld.worldBookEntries;
   if (refinedEntries.length > 0) {
+    const baseline = worldToForm(initialWorld ?? { id: '', name: '', description: '', worldBookEntries: refinedEntries });
+    refinedEntries = applyManualFormEdits(refinedEntries, form, baseline);
     const economy = refinedEntries.find(entry => entry.entryType === 'economy');
     const economyMeta = economy?.meta || {};
     const inheritedTimeSystem = economyMeta.timeSystem;
@@ -115,7 +161,9 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
         timeSystem: fallbackTimeSystem,
       },
     };
-    const normalizedEntries: WorldBookEntryDef[] = economy
+    const normalizedEntries: WorldBookEntryDef[] = initialWorld?.novelSource || refinedEntries.some(entry => entry.novelProvenance)
+      ? refinedEntries
+      : economy
       ? refinedEntries.map(entry => entry === economy ? {
         ...entry,
         meta: {
@@ -128,10 +176,12 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
       } : entry)
       : [...refinedEntries, fallbackEconomy];
     return {
+      ...initialWorld,
       id: initialWorld?.id || `custom_${Date.now()}`,
-      name: form.name.trim(), description: form.description.trim(), entryId: null,
+      name: form.name.trim(), description: form.description.trim(),
       icon: form.icon || undefined, coverColor: form.coverColor || undefined,
       artwork: form.artwork ?? initialWorld?.artwork,
+      directorSource: form.directorSource,
       tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
       difficulty: (form.difficulty as any) || undefined, worldBookEntries: normalizedEntries, modules: form.modules,
       author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),
@@ -141,8 +191,14 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
   const entries: WorldBookEntryDef[] = [];
   let uid = 1;
 
-  if (form.overview) {
-    entries.push({ uid: uid++, key: [], constant: true, comment: '世界设定', content: form.overview, order: 1, position: 'before_char', entryType: 'setting', meta: { location: form.location || undefined, timePeriod: form.timePeriod || undefined, atmosphere: form.atmosphere || undefined } });
+  if (form.overview || form.timePeriod || form.location || form.atmosphere) {
+    const settingContent = [
+      form.overview,
+      form.timePeriod ? `时间背景：${form.timePeriod}` : '',
+      form.location ? `地理位置：${form.location}` : '',
+      form.atmosphere ? `氛围：${form.atmosphere}` : '',
+    ].filter(Boolean).join('\n');
+    entries.push({ uid: uid++, key: [], constant: true, comment: '世界设定', content: settingContent, order: 1, position: 'before_char', entryType: 'setting', meta: { location: form.location || undefined, timePeriod: form.timePeriod || undefined, atmosphere: form.atmosphere || undefined } });
   }
   if (form.powerSystem || form.socialStructure || form.specialRules) {
     const rulesContent = [form.powerSystem ? `力量体系：${form.powerSystem}` : '', form.socialStructure ? `社会结构：${form.socialStructure}` : '', form.specialRules ? `特殊规则：${form.specialRules}` : ''].filter(Boolean).join('\n');
@@ -162,14 +218,17 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
   const highlightList = form.highlights ? form.highlights.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
   if (highlightList.length > 0) { entries.push({ uid: uid++, key: [], constant: true, comment: '核心特色', content: highlightList.join('、'), order: 6, position: 'before_char', entryType: 'highlights', meta: { highlights: highlightList } }); }
   for (const loc of form.locations.filter(l => l.name.trim())) { entries.push({ uid: uid++, key: [loc.name.trim()], constant: false, comment: loc.name.trim(), content: loc.description.trim(), order: 7, position: 'before_char', entryType: 'lore' }); }
+  for (const item of (form.items ?? []).filter(item => item.name.trim())) { entries.push({ uid: uid++, key: [item.name.trim()], constant: false, comment: item.name.trim(), content: item.description.trim(), order: 7, position: 'before_char', entryType: 'items' }); }
   if (form.culture.trim()) { entries.push({ uid: uid++, key: ['文化', '风俗', '传统'], constant: false, comment: '文化风俗', content: form.culture.trim(), order: 8, position: 'before_char', entryType: 'culture' }); }
 
   const existingEntries = initialWorld?.worldBookEntries?.filter(e => e.entryType && e.entryType !== 'module_rule' && e.entryType !== 'setting' && e.entryType !== 'factions' && e.entryType !== 'npcs' && e.entryType !== 'lore' && e.entryType !== 'culture' && e.entryType !== 'economy' && e.entryType !== 'rules' && e.entryType !== 'highlights') ?? [];
 
   return {
-    id: initialWorld?.id || `custom_${Date.now()}`, name: form.name.trim(), description: form.description.trim(), entryId: null,
+    ...initialWorld,
+    id: initialWorld?.id || `custom_${Date.now()}`, name: form.name.trim(), description: form.description.trim(),
     icon: form.icon || undefined, coverColor: form.coverColor || undefined,
     artwork: form.artwork ?? initialWorld?.artwork,
+    directorSource: form.directorSource,
     tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
     difficulty: (form.difficulty as any) || undefined, worldBookEntries: [...entries, ...existingEntries], modules: form.modules,
     author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),
@@ -177,14 +236,14 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
 }
 
 /** 为 world 生成 module_rule 世界书条目 */
-export function injectModuleRuleEntries(world: WorldDef, form: FormState, refinedEntries: WorldBookEntryDef[]) {
-  if (refinedEntries.length > 0 || !world.modules?.some(m => m.enabled)) return;
+export function injectModuleRuleEntries(world: WorldDef, form: FormState, _refinedEntries: WorldBookEntryDef[]) {
+  if (!world.modules?.some(m => m.enabled)) return;
   try {
     const enabledModules = world.modules.filter(m => m.enabled).map(m => m.moduleId);
     const worldDesc = form.overview || form.name;
     const buildCtx = createBuildContext(worldDesc, enabledModules);
     for (const mod of world.modules.filter(m => m.enabled)) {
-      const mc = (mod.moduleConfig || mod.data) as any;
+      const mc = (mod.moduleConfig) as any;
       if (!mc) continue;
       if (mod.moduleId === 'stat') buildCtx.statData = mc;
       if (mod.moduleId === 'progression') buildCtx.progressionData = mc;

@@ -1,3 +1,4 @@
+import { memoryVisibilityMetadata } from './memoryVisibility';
 // ============================================================
 // AI 返回值解析器
 // 移植自 yijiekkk useMemorySystem.js 中的解析相关函数
@@ -156,7 +157,7 @@ function enumValue<T extends string>(value: unknown, allowed: readonly T[], fall
 }
 
 function parseProvenance(raw: Record<string, unknown>, fallbackSource: MemorySourceType = 'plot_fact'): MemoryProvenance {
-  const sourceTypes = new Set<MemorySourceType>(['world_fact', 'plot_fact', 'system_state', 'player_statement', 'npc_statement', 'player_inference', 'summary', 'unknown']);
+  const sourceTypes = new Set<MemorySourceType>(['offscreen_event', 'world_fact', 'plot_fact', 'system_state', 'player_statement', 'npc_statement', 'player_inference', 'summary', 'unknown']);
   const layers = new Set<MemoryLayer>(['fact', 'state', 'inference', 'summary']);
   const requestedSource = String(raw.sourceType ?? '').trim() as MemorySourceType;
   const source = sourceTypes.has(requestedSource) ? requestedSource : fallbackSource;
@@ -165,6 +166,7 @@ function parseProvenance(raw: Record<string, unknown>, fallbackSource: MemorySou
   const round = (value: unknown): number | null => value === null || value === undefined || value === '' ? null : Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : null;
   return {
     sourceType: source,
+    ...memoryVisibilityMetadata(raw),
     layer: layers.has(layer) ? layer : source === 'player_inference' ? 'inference' : source === 'system_state' ? 'state' : source === 'summary' ? 'summary' : 'fact',
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,
     evidence: normalizeStringArray(raw.evidence, 8),
@@ -424,6 +426,7 @@ export function parseNarrativeSummaryResult(rawContent: string): NarrativeSummar
         sourceEndIndex: item.sourceEndIndex ?? null,
         savedAt: item.savedAt,
         sourceType: item.sourceType,
+        ...memoryVisibilityMetadata(item),
         layer: item.layer,
         confidence: item.confidence,
         evidence: item.evidence,

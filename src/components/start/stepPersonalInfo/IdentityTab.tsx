@@ -1,4 +1,3 @@
-import React from 'react';
 import type { PlayerProfile } from './types';
 
 interface IdentityTabProps {

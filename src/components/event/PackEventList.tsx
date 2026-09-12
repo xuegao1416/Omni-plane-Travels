@@ -11,12 +11,12 @@
 //   - 只读存储，不修改任何数据（getWebEvent 为 eventDb 既有 API）。
 //   - 懒加载：仅在父级展开时由 effect 触发一次 fetch。
 //   - 容错：索引解析失败不影响其它；包未安装 / 无内容均有明确空态。
-//   - EventListRow（已装）/ EventLibrary（发现）共用本组件，行为一致。
+//   - 事件中心 / EventLibrary 共用本组件，行为一致。
 // ============================================================
-import { useEffect, useState } from 'react';
-import { Loader2, Layers, AlertTriangle, PackageX, ListTree, ChevronRight } from 'lucide-react';
+import { useEffect,useState } from 'react';
+import { Loader2,Layers,AlertTriangle,PackageX,ListTree,ChevronRight } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
-import type { CardWorkflowDefinition, EventIndexEntry, PeriodicRule, RuleFile } from '../../modules/schema';
+import type { CardWorkflowDefinition,EventIndexEntry,PeriodicRule,RuleFile } from '../../modules/schema';
 import { readCanonicalEventPack } from '../../modules/eventPackFormat';
 
 interface PackEventEntry {

@@ -7,7 +7,7 @@ export function selectRuntimePacksForWorld(
 ): EventRuntimePack[] {
   if (!worldId) return [...packs];
   return packs.filter((pack) => {
-    const boundWorldId = pack.worldId ?? pack.manifest.worldId;
+    const boundWorldId = pack.manifest.worldId;
     return !boundWorldId || boundWorldId === worldId;
   });
 }

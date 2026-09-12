@@ -1,23 +1,21 @@
 import type { PlayerProfile } from '../../storage/db';
-import type { GameState } from '../../schema/variables';
 import type { CombatRiskMode } from '../../gameplay/protocols';
 import type { SegmentDef } from './StepCharacterHistory';
 import {
-  ShieldCheck, User, Users, ScrollText,
+ShieldCheck,User,Users,ScrollText,
 } from 'lucide-react';
 import {
-  DIFFICULTY_LABELS,
-  DIFFICULTY_DESCRIPTIONS,
-  DIFFICULTY_POINT_DESCRIPTIONS,
-  computeCreationPool,
-  type CreationSpending,
+DIFFICULTY_LABELS,
+DIFFICULTY_DESCRIPTIONS,
+DIFFICULTY_POINT_DESCRIPTIONS,
+computeCreationPool,
+type CreationSpending,
 } from '../../gameplay/creation/creationPoints';
 
 interface StepConfirmProps {
   personalInfo: PlayerProfile;
   segmentDefs: SegmentDef[];
   segments: Record<string, string>;
-  buildInitialState: () => GameState;
   selectedWorldName?: string;
   worldSummary?: string;
   portraitSource?: string;
@@ -33,7 +31,7 @@ interface StepConfirmProps {
 }
 
 export default function StepConfirm({
-  personalInfo, segmentDefs, segments, buildInitialState, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true, hasProfession = false, hasCombat = false, showDifficulty = false, combatRiskMode = 'normal', pointScale = 1, creationSpending,
+  personalInfo, segmentDefs, segments, selectedWorldName, worldSummary, portraitSource, onStartGame, onPrev, showNavigation = true, hasProfession = false, hasCombat = false, showDifficulty = false, combatRiskMode = 'normal', pointScale = 1, creationSpending,
 }: StepConfirmProps) {
   const npcCount = personalInfo.customNpcs.length;
   const skillCount = hasProfession ? 0 : Object.keys(personalInfo.initialSkills).length;

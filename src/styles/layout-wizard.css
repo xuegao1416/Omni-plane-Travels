@@ -294,13 +294,6 @@
   min-width: 0;
   min-height: 0;
 }
-.world-editor-panel > .world-editor-legacy-frame {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
 .world-weave-editor-content {
   display: flex;
   flex-direction: column;
@@ -317,9 +310,6 @@
 .world-weave-editor-content .world-editor-body { min-height: 0; padding: 18px 20px; }
 .world-weave-editor-content .world-editor-header { border-color: color-mix(in srgb, var(--border) 70%, transparent); }
 .world-weave-editor-content .world-editor-footer { border-color: color-mix(in srgb, var(--border) 70%, transparent); }
-.world-editor-legacy-frame .dawn-frame-v4__border,
-.world-editor-legacy-frame .dawn-frame-v4__fill { display: none; }
-.world-editor-legacy-frame .dawn-frame-v4__content { display: block; width: 100%; height: 100%; }
 
 .world-weave-preview-closed { min-height: 100dvh; display: grid; place-content: center; gap: 12px; color: var(--text-primary); text-align: center; }
 .world-weave-preview-closed button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; }
@@ -2046,383 +2036,6 @@
 }
 
 /* ═══════════════════════════════════════════════
-   WorldCard 外部世界徽章
-   ═══════════════════════════════════════════════ */
-
-.world-card-external-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: 6px;
-  padding: 1px 6px;
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg-tertiary);
-  border-radius: 3px;
-  vertical-align: middle;
-}
-
-/* ═══════════════════════════════════════════════
-   WorldBookEditor — 外部世界条目编辑器
-   ═══════════════════════════════════════════════ */
-
-.wbe-root {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.wbe-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: 10px 20px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
-.wbe-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-  flex-wrap: wrap;
-}
-
-.wbe-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.wbe-badge-global {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-}
-
-.wbe-badge-trigger {
-  background: var(--success-bg);
-  color: var(--success);
-}
-
-.wbe-hint {
-  color: var(--text-muted);
-  opacity: 0.65;
-  font-size: var(--font-size-xs);
-}
-
-.wbe-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.wbe-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-4);
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  min-height: 36px;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-  white-space: nowrap;
-}
-
-.wbe-btn-primary {
-  background: var(--accent);
-  color: var(--color-on-accent);
-}
-.wbe-btn-primary:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-.wbe-btn-primary:active {
-  transform: translateY(0);
-}
-
-.wbe-btn-outline {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-}
-.wbe-btn-outline:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  transform: translateY(-1px);
-}
-.wbe-btn-outline:active {
-  transform: translateY(0);
-}
-
-.wbe-btn-ghost {
-  background: transparent;
-  color: var(--text-secondary);
-}
-.wbe-btn-ghost:hover {
-  color: var(--accent);
-  background: var(--accent-dim);
-}
-.wbe-btn-ghost:active {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-
-.wbe-import-msg {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--space-2) var(--space-5);
-  font-size: var(--font-size-xs);
-  background: var(--success-bg-soft);
-  color: var(--success);
-  flex-shrink: 0;
-}
-
-.wbe-import-msg-error {
-  background: var(--danger-bg-soft);
-  color: var(--danger);
-}
-
-/* 条目列表 —— 用 block 布局，避免 flex shrink 塌陷 */
-.wbe-entries {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-4) var(--space-5);
-}
-
-.wbe-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  padding: 60px 20px;
-  color: var(--text-muted);
-  font-size: var(--font-size-base);
-}
-
-/* 单条条目卡片 */
-.wbe-entry {
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  transition: border-color 0.15s, box-shadow 0.15s;
-  margin-bottom: 10px;
-}
-.wbe-entry:last-child { margin-bottom: 0; }
-
-.wbe-entry:hover {
-  border-color: var(--accent);
-}
-
-.wbe-entry-global {
-  border-left: 4px solid #3b82f6;
-}
-
-.wbe-entry-expanded {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 2px 12px rgba(0,0,0,0.08);
-}
-
-.wbe-entry-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  cursor: pointer;
-  user-select: none;
-  gap: var(--space-3);
-  min-height: 48px;
-}
-
-.wbe-entry-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  flex: 1;
-}
-
-.wbe-entry-order {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-muted);
-  min-width: 28px;
-  text-align: center;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
-  padding: 2px 6px;
-}
-
-.wbe-entry-lock {
-  color: #3b82f6;
-  display: flex;
-  flex-shrink: 0;
-}
-
-.wbe-entry-type-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-md);
-  background: var(--success);
-  flex-shrink: 0;
-}
-
-.wbe-entry-title {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wbe-entry-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.wbe-tag-locked {
-  font-size: 11px;
-  padding: 2px 10px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-}
-
-.wbe-entry-delete {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.wbe-entry-delete:hover {
-  background: var(--danger-bg-soft);
-  color: var(--danger);
-}
-
-/* 条目展开内容 —— 单列布局，宽松舒展 */
-.wbe-entry-body {
-  padding: 0 18px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
-}
-
-.wbe-field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.wbe-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.wbe-input {
-  padding: 9px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.wbe-input:focus {
-  border-color: var(--accent);
-}
-
-.wbe-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: var(--bg-tertiary);
-}
-
-.wbe-textarea {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-  font-family: inherit;
-  line-height: 1.65;
-  outline: none;
-  resize: vertical;
-  min-height: 120px;
-  transition: border-color 0.15s;
-}
-
-.wbe-textarea:focus {
-  border-color: var(--accent);
-}
-
-.wbe-textarea:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: var(--bg-tertiary);
-}
-
-/* 选项行 —— 用 flex-wrap 平铺，自动换行 */
-.wbe-options-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3) var(--space-5);
-}
-
-.wbe-options-row .wbe-field-sm {
-  flex: 1 1 160px;
-  min-width: 140px;
-  max-width: 240px;
-}
-
-.wbe-global-hint {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 10px 14px;
-  font-size: 12px;
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.07);
-  border-radius: var(--radius-sm);
-  line-height: 1.5;
-}
-
-/* ═══════════════════════════════════════════════
    世界编织仪式：真实四步 WorldEditorForm presentation
    ═══════════════════════════════════════════════ */
 .world-weave-preview {
@@ -2965,3 +2578,70 @@
 .world-weave-editor-content .world-weave-arrival-list > div { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 10px; padding: 12px 14px; text-align: left; }
 .world-weave-editor-content .world-weave-arrival-list > div span { color: var(--weave-muted); font-size: 12px; }
 .world-weave-editor-content .world-weave-arrival-list > div strong { color: var(--weave-copy); }
+
+/* Stage 3: world-weave editor keeps frame controls and footer actions collision-safe. */
+@media (max-width: 760px) {
+  .world-weave-editor-overlay {
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .world-weave-editor-panel {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+  }
+  .world-weave-editor-content {
+    min-height: 0;
+    padding: 22px 18px max(14px, env(safe-area-inset-bottom));
+  }
+  .world-weave-editor-content .world-editor-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-right: 0;
+  }
+  .world-weave-header-actions {
+    align-self: start;
+    justify-self: end;
+  }
+  .world-weave-close {
+    transform: none;
+    width: 40px;
+    height: 40px;
+  }
+  .world-weave-editor-content .world-editor-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 0 max(4px, env(safe-area-inset-bottom));
+  }
+  .world-weave-footer-actions {
+    display: grid;
+    grid-template-columns: auto auto;
+    margin-left: 0;
+    justify-content: end;
+    gap: 8px;
+  }
+  .world-weave-footer-actions .btn-secondary { justify-self: start; }
+  .world-weave-footer-actions .btn-primary { justify-self: end; }
+}
+
+@media (max-width: 430px) {
+  .world-weave-editor-content { padding-inline: 14px; }
+  .world-weave-editor-content .world-editor-footer { grid-template-columns: 1fr; }
+  .world-weave-footer-actions {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+  .world-weave-footer-actions button {
+    min-width: 0;
+    justify-content: center;
+  }
+  .world-weave-footer-actions > :only-child { grid-column: 1 / -1; }
+}
+
+@media (max-height: 640px) and (max-width: 900px) {
+  .world-weave-editor-content { padding-top: 14px; }
+  .world-weave-editor-content .world-editor-header { padding-bottom: 8px; }
+  .world-weave-stepbar { margin-top: 6px; }
+  .world-weave-editor-content .world-editor-body { padding-top: 10px; padding-bottom: 10px; }
+  .world-weave-editor-content .world-editor-footer { padding-top: 8px; }
+}

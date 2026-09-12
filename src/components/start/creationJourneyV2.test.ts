@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
@@ -38,7 +38,7 @@ describe('creation journey v2 integration', () => {
     const start = read('./StartScreen.tsx');
 
     expect(shell).toContain('ProfessionLibraryWorkspace');
-    expect(shell).toContain('extractLegacyProfessionPack');
+    expect(shell).toContain('isProfessionBinding');
     expect(shell).toContain('creationDrawnTalentIds: undefined');
     expect(shell).toContain('onSaveWorld?.(updatedWorld)');
     expect(start).toContain('onSaveWorld={h.handleSaveWorld}');

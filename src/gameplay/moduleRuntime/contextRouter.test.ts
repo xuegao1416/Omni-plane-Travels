@@ -11,15 +11,7 @@ const world = {
     { moduleId: 'survival', enabled: true, moduleConfig: { resources: [{ id: 'water', name: '清水' }] } },
     { moduleId: 'business', enabled: true },
     { moduleId: 'dice', enabled: true },
-    { moduleId: 'profession', enabled: true, moduleConfig: {
-      professions: [
-        { id: 'warrior', name: '战士', description: '', abilities: [
-          { id: 'slash', name: '重斩', description: '强力斩击', type: 'active', activation: { combatAction: { id: 'slash', name: '重斩', damage: 3, actionCost: 1, scaling: [{ statId: 'dim1', coefficient: 0.08, appliesTo: 'damage' }] } } },
-          { id: 'guard', name: '铁壁', description: '稳固防守', type: 'passive' },
-        ] },
-        { id: 'mage', name: '法师', description: '', abilities: [{ id: 'fireball', name: '火球术', description: '发射火球', type: 'active' }] },
-      ], innateTalents: [], creationTalentBudget: 0,
-    } },
+    { moduleId: 'profession', enabled: true, moduleConfig: { packIds: ['fantasy-core'], professionsEnabled: true } },
   ],
 } as any;
 
@@ -31,7 +23,7 @@ function richState() {
   state.玩家.经营资产 = { 资金: 800, 资产列表: [] };
   state.玩家.能力系统 = {
     天赋点: 0, 技能点: 0, 已解锁天赋: {}, 已掌握技能: {},
-    职业状态: { 职业ID: 'warrior', 职业名称: '战士', 职业等级: 1, 能力点: 1, 已解锁能力: { slash: { 名称: '重斩', 类型: 'active', 等级: 1, 解锁轮次: 1 } } },
+    职业状态: { 职业ID: 'warrior', 职业名称: '战士', 职业等级: 1, 能力点: 1, 已解锁能力: { power_strike: { 名称: '蓄力猛击', 类型: 'active', 等级: 1, 解锁轮次: 1 } } },
   };
   state.玩家.技能系统 = {};
   state.dice = { history: [] };
@@ -71,11 +63,10 @@ describe('ModuleContextRouter', () => {
   });
 
   test('projects only the current profession tree when profession context is relevant', () => {
-    const result = buildModuleContextProjection({ state: richState(), worldDef: world, userText: '我使用重斩', target: 'main' });
-    expect(result.professionDetail).toContain('重斩');
-    expect(result.professionDetail).toContain('伤害追加');
-    expect(result.professionDetail).toContain('dim1');
-    expect(result.professionDetail).not.toContain('铁壁');
-    expect(result.professionDetail).not.toContain('火球术');
+    const result = buildModuleContextProjection({ state: richState(), worldDef: world, userText: '我使用蓄力猛击', target: 'main' });
+    expect(result.professionDetail).toContain('蓄力猛击');
+    expect(result.professionDetail).toContain('牺牲速度换取一次强力攻击');
+    expect(result.professionDetail).not.toContain('守护姿态');
+    expect(result.professionDetail).not.toContain('火焰箭');
   });
 });

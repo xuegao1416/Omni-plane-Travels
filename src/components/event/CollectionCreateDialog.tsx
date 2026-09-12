@@ -3,33 +3,29 @@
 //   Step 1: 名称 + 封面色 + 图标
 //   Step 2: 多选已安装的事件包/规则包
 // ============================================================
-import { useMemo, useState } from 'react';
+import { useMemo,useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ChevronLeft,
-  ChevronRight,
-  FolderPlus,
-  Check,
-  X,
-  FileText,
-  Spline,
-  BookOpen,
-  Boxes,
-  Package,
-  Layers,
-  Star,
-  Zap,
-  Shield,
-  Crown,
-  Heart,
-  Gem,
-  Compass,
-  Feather,
-  Globe,
-  Map,
-  Swords,
-  Wand2,
-  type LucideIcon,
+ChevronLeft,
+ChevronRight,
+FolderPlus,
+Check,
+X,Boxes,
+Package,
+Layers,
+Star,
+Zap,
+Shield,
+Crown,
+Heart,
+Gem,
+Compass,
+Feather,
+Globe,
+Map,
+Swords,
+Wand2,
+type LucideIcon
 } from 'lucide-react';
 import type { EventRegistryEntry } from '../../modules/schema';
 import { textOn } from './colorUtils';

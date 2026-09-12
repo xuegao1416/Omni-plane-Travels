@@ -6,8 +6,7 @@ const world = (id: string, tags: string[] = []) => ({
   id,
   name: id,
   description: '',
-  entryId: null,
-  tags,
+    tags,
 });
 
 describe('resolveAdaptiveTheme', () => {

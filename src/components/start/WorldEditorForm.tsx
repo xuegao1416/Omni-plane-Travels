@@ -1,25 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState,useEffect,useRef } from 'react';
+import { useDialog } from '../shared/Dialog';
 import type { ChangeEvent } from 'react';
-import type { WorldDef, WorldBookEntryDef } from '../../data/worlds-schema';
-import { createPresetArtwork, getDefaultArtworkPreset, processWorldArtworkFile, resolveWorldArtwork, WORLD_ARTWORK_PRESETS } from '../../data/worldArtwork';
+import type { WorldDef,WorldBookEntryDef } from '../../data/worlds-schema';
+import { saveWorldDraft,promoteDraftToCustomWorld,type WorldDraft } from '../../data/worldLoader';
+import { createPresetArtwork,getDefaultArtworkPreset,processWorldArtworkFile,resolveWorldArtwork,WORLD_ARTWORK_PRESETS } from '../../data/worldArtwork';
 import { requestStreamWithRetry } from '../../api/client';
-import ModuleSelector, { expandModuleDependencies, getDefaultSelectedModules } from './ModuleSelector';
+import ModuleSelector,{ expandModuleDependencies,getDefaultSelectedModules } from './ModuleSelector';
 import { useConfigStore } from '../../stores/configStore';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import type { ProfessionModuleSchema, ProfessionPack, ProfessionWorldBinding, TalentModuleSchema } from '../../modules/schema';
-import { buildStatGenPrompt, buildProgressionGenPrompt, buildSurvivalGenPrompt, buildBusinessGenPrompt } from '../../modules/prompts';
+import type { ProfessionPack,ProfessionWorldBinding,TalentModuleSchema } from '../../modules/schema';
+import { buildStatGenPrompt,buildProgressionGenPrompt,buildSurvivalGenPrompt,buildBusinessGenPrompt } from '../../modules/prompts';
 import { normalizeProgressionConfig } from '../../modules/xpAlgorithm';
 import { clampPointScale } from '../../gameplay/creation/creationPoints';
-import { buildProfessionPackGenerationPrompt, extractLegacyProfessionPack, isProfessionBinding, parseGeneratedProfessionPack } from '../../data/professions';
+import { buildProfessionPackGenerationPrompt,isProfessionBinding,parseGeneratedProfessionPack } from '../../data/professions';
 import ProfessionLibraryWorkspace from '../profession/ProfessionLibraryWorkspace';
 import GuidedChoiceOverlay from './GuidedChoiceOverlay';
-import { ManualEditForm, type ManualEditSection } from './worldEditorForm/ManualEditForm';
+import { ManualEditForm,type ManualEditSection } from './worldEditorForm/ManualEditForm';
 import {
-  type FormState, defaultForm, worldToForm, formToWorldDef, injectModuleRuleEntries,
-  DEFAULT_MODULE_FACTORIES, MODULE_NAME_MAP, MUTEX,
+type FormState,defaultForm,worldToForm,formToWorldDef,injectModuleRuleEntries,
+DEFAULT_MODULE_FACTORIES,MODULE_NAME_MAP,MUTEX,
 } from './worldEditorForm/types';
-import { X, Cpu, Pencil, Sparkles, Loader, Download, Save, Check, ChevronLeft, ChevronRight, AlertTriangle, Map, ScrollText, Flag, User, BarChart3, Upload } from 'lucide-react';
+import { X,Cpu,Pencil,Sparkles,Download,Save,Check,ChevronLeft,ChevronRight,AlertTriangle,Map,ScrollText,Flag,User,BarChart3,Upload } from 'lucide-react';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
+import DirectorAuthorEditor from './worldEditorForm/DirectorAuthorEditor';
+import { collectDirectorDependencies } from '../../director/dependencies';
 
 const WEAVE_STEPS = ['世界种子', '世界法则', '世界编年', '降临预览'];
 const clampWeaveStep = (value: number) => Math.min(4, Math.max(1, Math.round(value) || 1));
@@ -33,15 +37,14 @@ interface WorldEditorFormProps {
   onSave: (world: WorldDef) => void;
   onCancel: () => void;
   apiConfig: any;
-  settings: any;
-  presentationMode?: 'world-weave' | 'legacy';
   initialStep?: number;
   previewMode?: 'create' | 'edit';
 }
 
-export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiConfig, presentationMode = 'legacy', initialStep, previewMode }: WorldEditorFormProps) {
+export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiConfig, initialStep, previewMode }: WorldEditorFormProps) {
   const t = useConfigStore(s => s.t);
   const [form, setForm] = useState<FormState>(() => editorFormForWorld(initialWorld));
+  const [directorWorkspaceId] = useState(() => initialWorld?.id ?? `custom_${crypto.randomUUID()}`);
   const [worldIntentPrompt, setWorldIntentPrompt] = useState(() => initialWorld?.description || '');
 
   useEffect(() => {
@@ -49,14 +52,13 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     setWorldIntentPrompt(initialWorld?.description || '');
   }, [initialWorld]);
 
-  const [aiGenName, setAiGenName] = useState('');
-  const [survivalGenDesc, setSurvivalGenDesc] = useState('');
+  const [aiGenName] = useState('');
   const [isGeneratingWorld, setIsGeneratingWorld] = useState(false);
   const [isGeneratingTalent, setIsGeneratingTalent] = useState(false);
   const [generatingModule, setGeneratingModule] = useState<string | null>(null);
-  const [pipelineStage, setPipelineStage] = useState('');
+  const [pipelineStage] = useState('');
   const [refinedEntries, setRefinedEntries] = useState<WorldBookEntryDef[]>([]);
-  const [genError, setGenError] = useState('');
+  const [, setGenError] = useState('');
   const [artworkError, setArtworkError] = useState('');
   const [isProcessingArtwork, setIsProcessingArtwork] = useState(false);
   const [selectedModules, setSelectedModules] = useState<Set<string>>(() => {
@@ -71,10 +73,64 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   const isEditing = previewMode === 'create' ? false : (previewMode === 'edit' || !!initialWorld);
   const [editorMode, setEditorMode] = useState<'manual' | 'ai'>(isEditing ? 'manual' : 'ai');
+  const dialog = useDialog();
+
+  const isDraft = (initialWorld as any)?.isDraft === true;
+  // Refs for draft auto-save
+  const savedRef = useRef(false);          // true once draft has been promoted via handleSave
+  const formSnapshotRef = useRef<FormState | null>(null); // captures form at mount for draft update
 
   useEffect(() => {
-    if (presentationMode === 'world-weave' && initialStep !== undefined) setWeaveStep(clampWeaveStep(initialStep));
-  }, [initialStep, presentationMode]);
+    if (initialStep !== undefined) setWeaveStep(clampWeaveStep(initialStep));
+  }, [initialStep]);
+
+  // Auto-save draft every 30s when editing a draft
+  useEffect(() => {
+    if (!isDraft) return;
+    formSnapshotRef.current = form;
+    const interval = setInterval(() => {
+      if (savedRef.current) return;
+      const current = formSnapshotRef.current;
+      if (!current?.name?.trim()) return;
+      const base = initialWorld as WorldDraft;
+      const draft: WorldDraft = {
+        ...base,
+        name: current.name,
+        description: current.description,
+        tags: current.tags ? current.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        coverColor: current.coverColor,
+        difficulty: current.difficulty as WorldDef['difficulty'],
+        modules: current.modules,
+        directorSource: current.directorSource,
+        worldBookEntries: refinedEntries.length > 0 ? refinedEntries : base.worldBookEntries,
+        draftUpdatedAt: Date.now(),
+      };
+      saveWorldDraft(draft);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [isDraft, form, refinedEntries, initialWorld]);
+
+  // Cleanup: save draft on unmount (if not yet promoted)
+  useEffect(() => {
+    return () => {
+      if (!isDraft || savedRef.current) return;
+      if (!form?.name?.trim()) return;
+      const base = initialWorld as WorldDraft;
+      const draft: WorldDraft = {
+        ...base,
+        name: form.name,
+        description: form.description,
+        tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        coverColor: form.coverColor,
+        difficulty: form.difficulty as WorldDef['difficulty'],
+        modules: form.modules,
+        directorSource: form.directorSource,
+        worldBookEntries: refinedEntries.length > 0 ? refinedEntries : base.worldBookEntries,
+        draftUpdatedAt: Date.now(),
+      };
+      saveWorldDraft(draft);
+    };
+  }, [isDraft, form, refinedEntries, initialWorld]);
 
   // 互斥计算
   const disabledByConflict = new Set<string>();
@@ -145,17 +201,15 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     const existing = new globalThis.Map((form.modules ?? []).map(module => [module.moduleId, module] as const));
     return [...selectedModules].map(moduleId => {
       const source = generated.get(moduleId) ?? existing.get(moduleId);
-      let moduleConfig = source?.moduleConfig ?? source?.data ?? DEFAULT_MODULE_FACTORIES[moduleId]?.();
+      let moduleConfig = source?.moduleConfig ?? DEFAULT_MODULE_FACTORIES[moduleId]?.();
       // 世界 AI 的返回不能覆盖独立资产引用。职业与战斗只采用编辑器已有绑定或稳定默认值。
       if (moduleId === 'profession') {
-        const existingConfig = existing.get(moduleId)?.moduleConfig ?? existing.get(moduleId)?.data;
+        const existingConfig = existing.get(moduleId)?.moduleConfig;
         if (isProfessionBinding(existingConfig)) moduleConfig = existingConfig;
-        else if (existingConfig && Array.isArray((existingConfig as unknown as ProfessionModuleSchema).professions)) {
-          moduleConfig = extractLegacyProfessionPack(existingConfig as unknown as ProfessionModuleSchema, `${form.name || initialWorld?.name || '旧世界'} · 职业包`);
-        } else moduleConfig = DEFAULT_MODULE_FACTORIES.profession?.();
+        else moduleConfig = DEFAULT_MODULE_FACTORIES.profession?.();
       }
       if (moduleId === 'combat') {
-        const existingConfig = existing.get(moduleId)?.moduleConfig ?? existing.get(moduleId)?.data;
+        const existingConfig = existing.get(moduleId)?.moduleConfig;
         moduleConfig = existingConfig && typeof (existingConfig as Record<string, unknown>).rulesetId === 'string'
           ? existingConfig
           : DEFAULT_MODULE_FACTORIES.combat?.();
@@ -170,13 +224,12 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
         description: source?.description || '',
         enabled: true,
         moduleConfig: moduleConfig as Record<string, unknown> | undefined,
-        data: undefined,
       };
     });
   };
 
   const handleAIGenerate = async () => {
-    const promptText = isWeave ? worldIntentPrompt : aiGenName;
+    const promptText = worldIntentPrompt;
     if (!promptText.trim()) { setGenError('请输入世界描述'); return; }
     if (!apiConfig) { setGenError('请先在设置中配置API'); return; }
     setGenError(''); setIsGeneratingWorld(true);
@@ -209,42 +262,6 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   };
 
   const handleGuidedComplete = (worldDef: WorldDef) => applyGeneratedWorld(worldDef);
-
-  const handleWeaveGenerate = async () => {
-    if (isGeneratingWorld) return;
-    if (!worldIntentPrompt.trim()) { setGenError('请先写下世界意图，再开始编织。'); return; }
-    if (!apiConfig) {
-      setGenError('');
-      setWeaveValidation('未配置 AI，可继续手动编织。');
-      setWeaveStep(3);
-      return;
-    }
-    setGenError(''); setIsGeneratingWorld(true); setPipelineStage('解析种子');
-    const ctrl = new AbortController(); aiAbortRef.current = ctrl;
-    try {
-      const selected = enabledModules.map(module => module.id).join(', ');
-      const prompt = `你是世界编织助手。请根据以下世界意图和已选法则，一次生成可编辑的 WorldDef JSON。\n世界意图：${worldIntentPrompt.trim()}\n可选名称：${form.name.trim() || '请生成一个简洁名称'}\n题材/标签：${form.tags || '未指定'}\n氛围基调：${form.atmosphere || '未指定'}\n初始场景偏好：${form.location || '未指定'}\n已选模块：${selected || '无额外模块'}\n\n输出必须是 JSON，不要 Markdown。字段至少包含 name、description、tags、difficulty、worldBookEntries、modules；worldBookEntries 使用真实 entryType（setting、rules、factions、npcs、lore、culture、economy、highlights），modules 只包含已选模块。职业典藏与战斗规则是独立资产，禁止生成 professions、abilities、innateTalents、combat encounters 或 Combat 字段；它们由编辑器保留稳定引用。economy 条目的 meta 必须包含完整 timeSystem：mode、calendarName、eraName、start（年月日时分）、months（全部月份名称和天数）、weekdays、defaultTurnMinutes；无法确定时使用 relative 旅历安全默认值。`;
-      const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompt }], { signal: ctrl.signal, onDelta: text => { if (text.length > 80) setPipelineStage('编织法则'); } });
-      setPipelineStage('生成编年');
-      const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);
-      if (!jsonMatch) throw new Error('AI 没有返回可识别的世界数据');
-      const parsed = JSON.parse(jsonMatch[1].trim()) as WorldDef;
-      if (!parsed.name || !parsed.description) throw new Error('AI 返回的数据缺少世界名称或简介');
-      setPipelineStage('校验');
-      const normalized: WorldDef = { ...parsed, id: initialWorld?.id || parsed.id || `custom_${Date.now()}`, entryId: null, source: undefined, modules: normalizeSelectedWorldModules(parsed.modules) };
-      applyGeneratedWorld(normalized);
-      setGenError('');
-      setWeaveStep(3);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setGenError(`编织失败：${err instanceof Error ? err.message : String(err)}`);
-      setPipelineStage('');
-      return;
-    } finally {
-      setIsGeneratingWorld(false);
-      aiAbortRef.current = null;
-    }
-  };
 
   const handleTalentAiGenerate = async (categoryIndex: number, count: number) => {
     if (!apiConfig) return;
@@ -304,9 +321,6 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     : { packIds: [] };
 
   const openProfessionLibrary = () => {
-    if (professionModuleConfig && !isProfessionBinding(professionModuleConfig) && Array.isArray((professionModuleConfig as unknown as ProfessionModuleSchema).professions)) {
-      updateModuleDataByModuleId('profession', extractLegacyProfessionPack(professionModuleConfig as unknown as ProfessionModuleSchema, `${form.name || initialWorld?.name || '旧世界'} · 职业包`) as unknown as Record<string, unknown>);
-    }
     setProfessionLibraryOpen(true);
   };
 
@@ -318,17 +332,26 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   const handleSave = () => {
     if (!form.name.trim()) return;
-    const world = formToWorldDef(form, initialWorld, refinedEntries);
+    let world = formToWorldDef(form, initialWorld, refinedEntries);
+    if (!initialWorld) world.id = directorWorkspaceId;
     world.modules = normalizeSelectedWorldModules(world.modules);
     injectModuleRuleEntries(world, form, refinedEntries);
+    if (isDraft) {
+      savedRef.current = true;
+      world = promoteDraftToCustomWorld({ ...initialWorld as WorldDraft, ...world } as WorldDraft);
+    }
     onSave(world);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const world = formToWorldDef(form, initialWorld, refinedEntries);
+    if (!initialWorld) world.id = directorWorkspaceId;
     world.modules = normalizeSelectedWorldModules(world.modules);
     injectModuleRuleEntries(world, form, refinedEntries);
-    const blob = new Blob([JSON.stringify(world, null, 2)], { type: 'application/json' });
+    let directorDefinitions;
+    try { directorDefinitions = await collectDirectorDependencies({ customWorld: world as unknown as Record<string, unknown> }); }
+    catch (error) { await dialog.alert(`世界导出失败：${error instanceof Error ? error.message : String(error)}`); return; }
+    const blob = new Blob([JSON.stringify({ ...world, directorDefinitions }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `${world.name || 'world'}.json`; a.click(); URL.revokeObjectURL(url);
   };
@@ -357,7 +380,6 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   const selectedScene = selectedArtwork.src;
   const previewName = form.name.trim() || initialWorld?.name || '未命名世界';
   const previewDescription = form.description.trim() || '尚未写下世界简介，完成后可在降临前继续补充。';
-  const isWeave = presentationMode === 'world-weave';
 
   const renderManualSections = (sections: ManualEditSection[]) => (
     <ManualEditForm
@@ -372,10 +394,17 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     />
   );
 
-  const handleWeaveBack = () => {
+  const handleWeaveBack = async () => {
     setWeaveValidation('');
-    if (weaveStep === 1) onCancel();
-    else setWeaveStep(step => step - 1);
+    if (weaveStep === 1) {
+      if (isDraft) {
+        const confirmed = await dialog.confirm('确定要取消吗？草稿将保留。', { confirmText: '取消编辑', cancelText: '继续编辑' });
+        if (!confirmed) return;
+      }
+      onCancel();
+    } else {
+      setWeaveStep(step => step - 1);
+    }
   };
 
   const handleWeaveNext = () => {
@@ -435,6 +464,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
           <div className="world-weave-section-heading"><div><span className="world-weave-kicker">STEP 03 · CHRONICLE</span><h4 id="world-weave-chronicle-title">编织世界的地理、历史与人物</h4></div><span className="world-weave-completion"><span>{chronicleSignals}</span> 项已填写</span></div>
           <p className="world-weave-step-lead">每组只承载一类真实字段；打开一组不会关闭其他组。基础名称、主题与系统模块选择由上方步骤轨道管理。</p>
           <div className="world-weave-chronicle-groups">
+            <DirectorAuthorEditor workspaceId={initialWorld?.id ?? directorWorkspaceId} title={form.name} binding={form.directorSource} novelDatasetId={initialWorld?.novelSource?.datasetId} apiConfig={apiConfig} onBind={binding => setForm(previous => ({ ...previous, directorSource: binding }))} />
             <details className="world-weave-accordion" open>
               <summary><Map size={16} /><span>地理与世界观</span><em>{chronicleCounts.geography} 项已填写</em><ChevronRight size={15} /></summary>
               <div className="world-weave-accordion-body">{renderManualSections(['geography'])}</div>
@@ -510,25 +540,25 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   return (
     <>
-      <div className={`entry-default-theme world-editor-overlay${presentationMode === 'world-weave' ? ' world-weave-editor-overlay' : ''}`}>
-        <div className={`world-editor-panel${presentationMode === 'world-weave' ? ' world-weave-editor-panel' : ''}`} onClick={e => e.stopPropagation()}>
-          <DawnFrameV4 mode="panel" withFill className={presentationMode === 'world-weave' ? 'world-weave-editor-frame' : 'world-editor-legacy-frame'} ariaLabel={presentationMode === 'world-weave' ? '世界编织仪式' : undefined}>
+      <div className="entry-default-theme world-editor-overlay world-weave-editor-overlay">
+        <div className="world-editor-panel world-weave-editor-panel" onClick={e => e.stopPropagation()}>
+          <DawnFrameV4 mode="panel" withFill className="world-weave-editor-frame" ariaLabel="世界编织仪式">
             <div className="world-weave-editor-content">
           <div className="world-editor-header">
             <div className="world-weave-header-main">
-              <span className="world-weave-kicker">{isWeave ? (isEditing ? 'EDIT WORLD · DAWN V4' : 'CREATE WORLD · DAWN V4') : 'WORLD EDITOR'}</span>
-              <h3 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700 }}>{isWeave ? '世界编织仪式' : initialWorld ? '编辑世界' : '新建世界'}</h3>
+              <span className="world-weave-kicker">{isEditing ? 'EDIT WORLD · DAWN V4' : 'CREATE WORLD · DAWN V4'}</span>
+              <h3 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700 }}>世界编织仪式</h3>
             </div>
             <div className="world-weave-header-actions">
               <button type="button" className="world-weave-header-export" onClick={handleExport} aria-label="导出世界副本" title="导出世界副本"><Download size={15} /></button>
               <button type="button" className="world-weave-close" onClick={onCancel} aria-label="关闭世界编织仪式"><X size={18} /></button>
             </div>
-            {isWeave && <div className="world-weave-stepbar" role="tablist" aria-label="世界编织步骤">
+            <div className="world-weave-stepbar" role="tablist" aria-label="世界编织步骤">
               {WEAVE_STEPS.map((label, index) => { const number = index + 1; return <button type="button" role="tab" key={label} aria-selected={number === weaveStep} className={number === weaveStep ? 'is-current' : number < weaveStep ? 'is-complete' : ''} disabled={number > weaveStep} onClick={() => number <= weaveStep && setWeaveStep(number)}><span>{number < weaveStep ? <Check size={13} /> : number}</span><b>{label}</b></button>; })}
-            </div>}
+            </div>
           </div>
           <div className={`world-editor-body${showGuidedChoice ? ' has-guided-choice' : ''}`}>
-          {isWeave ? (showGuidedChoice ? (
+          {showGuidedChoice ? (
             <GuidedChoiceOverlay
               visible={showGuidedChoice}
               userDesc={worldIntentPrompt}
@@ -537,65 +567,10 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
               onComplete={handleGuidedComplete}
               onClose={() => setShowGuidedChoice(false)}
             />
-          ) : weaveStepContent) : (
-          <>
-            {!isEditing && (
-              <div className="mode-toggle">
-                <button className={editorMode === 'ai' ? 'active' : ''} onClick={() => setEditorMode('ai')}><Cpu size={15} style={{ marginRight: 4, flexShrink: 0 }} /> AI 生成</button>
-                <button className={editorMode === 'manual' ? 'active' : ''} onClick={() => setEditorMode('manual')}><Pencil size={15} style={{ marginRight: 4, flexShrink: 0 }} /> 手动编辑</button>
-              </div>
-            )}
-            {editorMode === 'ai' && !isEditing && (
-              <div className="world-form-section" style={{ marginBottom: 20 }}>
-                <h4><Cpu size={15} style={{ marginRight: 4, flexShrink: 0 }} /> AI 一键生成</h4>
-                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: 10 }}>输入世界描述，AI 将自动生成创意名称和完整的世界设定，你可以在"手动编辑"中修改细节</p>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <input type="text" value={aiGenName} onChange={e => setAiGenName(e.target.value)} placeholder="例如：一个被僵尸占领的末日废土世界..." style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)', fontSize: 'var(--font-size-md)' }} onKeyDown={e => e.key === 'Enter' && !isGeneratingWorld && handleAIGenerate()} />
-                  <button className="btn-primary" onClick={handleAIGenerate} disabled={isGeneratingWorld} style={{ padding: '8px 20px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>{isGeneratingWorld ? <><Loader size={14} className="animate-spin" /> 生成中...</> : <><Sparkles size={14} style={{ flexShrink: 0 }} /> 生成</>}</button>
-                  {isGeneratingWorld && <button className="btn-ghost" onClick={() => aiAbortRef.current?.abort()} style={{ padding: '8px 12px', color: 'var(--danger)' }}>{t('common.cancel')}</button>}
-                </div>
-                <ModuleSelector selected={selectedModules} onToggle={toggleModule} disabledByConflict={disabledByConflict} />
-                {selectedModules.has('survival') && (
-                  <div style={{ marginTop: 8 }}>
-                    <input type="text" value={survivalGenDesc} onChange={e => setSurvivalGenDesc(e.target.value)} placeholder="描述你想要的生存资源系统（如：荒岛求生，需要淡水/食物/木材/药草，初期紧张后期富足...）" style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }} />
-                  </div>
-                )}
-                {genError && <div style={{ color: 'var(--danger)', fontSize: 'var(--font-size-sm)', marginTop: 8 }}>{genError}</div>}
-                {isGeneratingWorld && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)' }}>
-                      <div className="ai-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
-                      <span style={{ fontSize: 'var(--font-size-base)' }}>AI 正在构建世界...</span>
-                    </div>
-                    {pipelineStage && <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', paddingLeft: 28, display: 'block', marginTop: 4 }}>{pipelineStage}</span>}
-                  </div>
-                )}
-              </div>
-            )}
-            {editorMode === 'manual' && (
-              <ManualEditForm
-                form={form} update={update} selectedModules={selectedModules} onToggleModule={toggleModule} disabledByConflict={disabledByConflict}
-                updateModuleData={updateModuleData} onTalentAiGenerate={handleTalentAiGenerate} isGeneratingTalent={isGeneratingTalent}
-                onModuleAiFill={handleModuleAiFill} generatingModule={generatingModule}
-                onOpenProfessionLibrary={openProfessionLibrary}
-                addFaction={addFaction} removeFaction={removeFaction} updateFaction={updateFaction}
-                addNPC={addNPC} removeNPC={removeNPC} updateNPC={updateNPC}
-                addLocation={addLocation} removeLocation={removeLocation} updateLocation={updateLocation}
-              />
-            )}
-          </>
-          )}
+          ) : weaveStepContent}
           </div>
           <div className="world-editor-footer">
-            {isWeave ? (showGuidedChoice ? null : weaveFooter) : (
-            <>
-            <button className="btn-ghost" onClick={handleExport} style={{ padding: '8px 14px', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-sm)' }}><Download size={14} style={{ flexShrink: 0 }} /> 导出</button>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-secondary" onClick={onCancel} style={{ padding: '8px 20px' }}>{t('common.cancel')}</button>
-              <button className="btn-primary" onClick={handleSave} disabled={!form.name.trim()} style={{ padding: '8px 24px', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Save size={14} style={{ flexShrink: 0 }} /> {t('worldEditor.saveWorld')}</button>
-            </div>
-            </>
-            )}
+            {showGuidedChoice ? null : weaveFooter}
           </div>
             </div>
           </DawnFrameV4>

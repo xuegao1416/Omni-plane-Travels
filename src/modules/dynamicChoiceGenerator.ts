@@ -172,7 +172,7 @@ export function buildDynamicChoicePrompt(input: DynamicChoicePromptInput): strin
 // ─── 响应解析 ───
 
 /** 从 AI 响应中解析选项列表 */
-export function parseDynamicChoices(raw: string, config: DynamicChoiceConfig): ChoiceOption[] {
+export function parseDynamicChoices(raw: string, _config: DynamicChoiceConfig): ChoiceOption[] {
   if (!raw || typeof raw !== 'string') return [];
 
   let jsonStr = raw.trim();
