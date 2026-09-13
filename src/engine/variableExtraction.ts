@@ -119,6 +119,7 @@ export function createVariableExtractionSnapshot(state: GameState, narrativeText
       const npcInventory = (npc as unknown as Record<string, unknown>).物品栏;
       const hasInventory = !!npcInventory && typeof npcInventory === 'object' && !Array.isArray(npcInventory)
         && Object.keys(npcInventory as Record<string, unknown>).length > 0;
+      // 技能列表/物品列表/装备列表属静态定义，按既有约定不进提取快照（见 variableExtractionSnapshot.test.ts）
       const cleaned = Object.fromEntries(Object.entries({
         姓名: npc.姓名,
         种族: npc.种族,
