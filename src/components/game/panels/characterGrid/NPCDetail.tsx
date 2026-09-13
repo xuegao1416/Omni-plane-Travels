@@ -6,9 +6,11 @@ Zap,Star,Shield,Swords,Backpack,ScrollText
 import { ExcelRow } from '../../../shared/ExcelRow';
 import EmptyState from '../../../shared/EmptyState';
 import type { KnownNPC } from '../../../../engine/playerKnowledge';
+import type { NPCData } from '../../../../schema/variables';
 import { DETAIL_TABS,favorClass } from './types';
 import type { DetailTab } from './types';
 import { GaugeBar } from './NPCCard';
+import { RevealRow } from './RevealRow';
 import { TagList,RecordGrid,Section } from './SharedUI';
 import { ListOrRecord } from './ListOrRecord';
 import { InventoryGrid } from './InventoryGrid';
@@ -101,8 +103,10 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
   );
 }
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
+export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
   npc: KnownNPC; npcId: string; onClose: () => void;
+  /** 幕后真相：只用于读者点开眼睛查看，不会同步给玩家扮演的角色。 */
+  truth?: NPCData;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
   /** 删除该 NPC；返回 false 表示删除未生效。 */
@@ -129,6 +133,8 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
   const rd = npc.关系数据 ?? {};
   const sj = npc.社会身份 ?? { 职业: '', 社会地位: '' };
   const pi = npc.个人信息 ?? { 外貌: '', 表性格: '', 里性格: '', 当前想法: '', 当前穿着: '', 当前位置: '', 当前状态: '', 备注: '' };
+  // 眼睛按钮点开的是幕后真相：只给屏幕前的读者看，不写回玩家认知、不进提示词。
+  const truthPi = truth?.个人信息;
 
   return (
     <div className="game-journey__nested-overlay" style={{
@@ -199,19 +205,17 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                 <Section icon={Sparkles} title="外貌与性格">
                   <ExcelRow label="外貌" value={pi.外貌 ?? '未知'} />
                   <ExcelRow label="表性格" value={pi.表性格 ?? '未知'} />
-                  <ExcelRow label="里性格" value={pi.里性格 ?? '未知'} />
+                  <RevealRow label="里性格" known={pi.里性格} hidden={truthPi?.里性格} />
                   <ExcelRow label="穿着" value={pi.当前穿着 ?? '未知'} />
                 </Section>
-                {(ext.背景 || npc.背景) && (
-                  <Section icon={BookOpen} title="背景">
-                    <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: '1.6', color: 'var(--text-secondary)' }}>{ext.背景 || npc.背景}</div>
-                  </Section>
-                )}
+                <Section icon={BookOpen} title="背景">
+                  <RevealRow label="背景" known={ext.背景 || npc.背景} hidden={truth?.背景} />
+                </Section>
                 <Section icon={Brain} title="内心世界">
-                  <ExcelRow label="当前想法" value={pi.当前想法 || ext.内心想法} />
+                  <RevealRow label="当前想法" known={pi.当前想法 || ext.内心想法} hidden={truthPi?.当前想法 || truth?.内心想法} />
                   <ExcelRow label="当前行动" value={ext.当前行动} />
-                  <ExcelRow label="短期目标" value={ext.短期目标} />
-                  <ExcelRow label="长期目标" value={ext.长期目标} />
+                  <RevealRow label="短期目标" known={ext.短期目标} hidden={truth?.短期目标} />
+                  <RevealRow label="长期目标" known={ext.长期目标} hidden={truth?.长期目标} />
                 </Section>
                 {(ext.种族描述 || ext.种族效果 || (ext.种族特性 && ext.种族特性.length > 0)) && (
                   <Section icon={Dna} title="种族信息">
@@ -225,11 +229,9 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                     )}
                   </Section>
                 )}
-                {pi.备注 && (
-                  <Section icon={BookOpen} title="备注">
-                    <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: '1.5', color: 'var(--text-secondary)' }}>{pi.备注}</div>
-                  </Section>
-                )}
+                <Section icon={BookOpen} title="备注">
+                  <RevealRow label="备注" known={pi.备注} hidden={truthPi?.备注} />
+                </Section>
                 <Section icon={ScrollText} title="人物事迹">
                   <button onClick={() => setShowDeeds(true)} style={{
                     width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
