@@ -49,8 +49,18 @@ test('正文里出现的新角色会被投影进面板，秘密字段仍留在�
   // 秘密字段不得随投影泄露
   expect(known?.个人信息?.里性格).toBeUndefined();
   expect(known?.个人信息?.当前想法).toBeUndefined();
+  // 社会身份/年龄等属于"被介绍才知道"，仍要等正文披露（职业栏为空是设计，不是 bug）
+  expect(known?.社会身份).toBeUndefined();
   // 正文没提到的离场角色不会被动刷新
   expect(collectSceneObservations(vm.getState(), '与那位旅人无关的一段旁白。').some(o => o.npcId === 'old')).toBe(false);
+  // 姓名在正文里没出现的新建角色不会被凭空放进面板
+  const phantom = vm.applyAiUpdateVariable(JSON.stringify({
+    id: 't2', source: 'ai', label: '变量裁定', effects: [
+      { set: { path: '人物档案.裁缝', value: { 姓名: '裁缝', 种族: '人类', 人物分类: '在场', 社会身份: { 职业: '裁缝' } } } },
+    ],
+  }));
+  expect(phantom).toBe(true);
+  expect(collectSceneObservations(vm.getState(), text).some(o => o.npcId === '裁缝')).toBe(false);
 });
 
 test('开局自建角色（setInitialNPCs 路径）会登记为玩家已知', () => {
