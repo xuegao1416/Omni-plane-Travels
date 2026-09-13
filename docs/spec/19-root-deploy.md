@@ -21,7 +21,7 @@
 | 路径 | 职责 |
 |---|---|
 | `wrangler.toml` | Workers/Wrangler 配置 |
-| `src/server/` | Worker 后端业务（认证、云存档、试用、工坊等） |
+| `src/server/` | Worker 后端业务（认证、云存档、工坊等） |
 | `functions/api/[[route]].ts` | Pages Functions 入口 |
 | `migrations/` | D1 SQL 迁移历史（0001–0009） |
 
@@ -33,8 +33,8 @@
 
 ## 19.4 Tauri
 
-`package.json` 保留 Tauri 2 桌面/Android 命令与依赖。当前 clean 传递包未包含生成型 `src-tauri/` 目录；完整原生构建需要完整仓库中的 native 工程或重新执行初始化命令。
+`package.json` 提供 Tauri 2 桌面/Android 命令与依赖，仓库内包含 `src-tauri/` 原生工程，可直接执行构建。
 
 ## 19.5 工具脚本
 
-当前 `scripts/` 只保留实际维护/构建所需脚本；历史一次性宝可梦转换脚本和运行报告已从源码包清理。
+`scripts/` 提供构建、静态资源复制、小说数据与检索校验、发布元数据和本地测试辅助脚本。

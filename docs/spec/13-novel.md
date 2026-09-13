@@ -40,5 +40,3 @@ worldFactory.ts 区分不可用、仅静态、部分、完整资料。worldBookA
 bun test src/novel 覆盖导入、来源、迁移、批次恢复、取消、档案保留及原生世界兼容。scripts/novel-validate.ts 从环境变量读取真实 API；scripts/novel-retrieval-validate.ts 接收外部标注，验证基础、真实向量和降级检索。脚本不包含指定小说或密钥特判。
 
 本机 LM Studio 服务为 http://127.0.0.1:1234/v1，模型 ID novel-bge-m3，BGE-M3 Q8_0，1024 维，GPU 加载约 605 MiB。服务开启 CORS 供浏览器调用。用户可直接关闭 embedding，不要求安装 LM Studio。
-
-2026-09-12：小说拆解与剧情导演已完成本次交付。用户确认小说世界开局、剧情绑定和首轮回复正常，并确认跨设备导入续玩、新回复落盘后主线版本和阶段保持。

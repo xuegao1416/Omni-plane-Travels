@@ -3,7 +3,7 @@
 
 ## 1、核心引擎系统
 
-### 1.1 游戏引擎核心 — `src/engine/useGameEngine.ts` (1673行)
+### 1.1 游戏引擎核心 — `src/engine/useGameEngine.ts`
 
 **文件路径**: `src/engine/useGameEngine.ts`
 
@@ -51,15 +51,6 @@ interface GameEngine {
   DialogUI: ReactNode;                // 全局对话框(选项卡/骰子/战斗结算)
 }
 ```
-
-> **逐字节核对(2026-09-08)**:已修正以下差异(对照 `src/engine/types.ts`):
->
-> - `worldBook: WorldBookManager` → `WorldBookManager | null`(可空)
-> - `pipelineStatus: PipelineStatus` → `PipelineStatus | null`(可空)
-> - `resendFromMessage` / `resendFromAssistantMessage` 返回 `Promise<void>`(文档原标 `void`)
-> - `rollbackToSnapshot(msgId: string)` → `rollbackToSnapshot(msgIndex: number)`(参数名 + 类型)
-> - `loadSave(save) => Promise<void>` → `loadSave(save) => void`(同步)
-> - `restoreCombatCheckpoint(saveId: string) => Promise<void>` → `restoreCombatCheckpoint(restore: CombatCheckpointRestore, saveId?: string) => void`(入参是 restore 对象,saveId 可选,同步)
 
 #### 1.1.1 状态定义
 
@@ -124,7 +115,7 @@ interface LatestPipelineContext {
 }
 ```
 
-#### 1.1.3 sendMessage 核心流程 (~522行，第926-1448行)
+#### 1.1.3 sendMessage 核心流程
 
 ```
 用户输入
@@ -308,7 +299,7 @@ optimizeSnapshots() — 清理冗余快照
 #### 1.1.4 回合终结后处理（内联于 sendMessage，无独立 finalizeNormalTurn 函数，等效 ~95行逻辑）
 
 ```typescript
-// 以下逻辑在 sendMessage 内联执行（代码中原无独立 finalizeNormalTurn 函数；2026-09-08 核对）
+// 以下逻辑在 sendMessage 内联执行
 function finalizeNormalTurn( // 仅文档示意，实际内联
   ctx: LatestPipelineContext,
   status: PipelineStatus,
@@ -459,7 +450,7 @@ function rollbackAndTruncate(truncateAt: number): void {
   setMessages(prev => prev.slice(0, truncateAt));
 }
 
-// rollbackToSnapshot（实际为 useCallback 闭包，非 async 函数；2026-09-08 核对）
+// rollbackToSnapshot（useCallback 闭包，同步）
 // 回滚到特定AI消息的快照，保留该消息本身
 function rollbackToSnapshot(msgIndex: number): void {
   const messages = messagesRef.current;
@@ -486,7 +477,7 @@ function rollbackToSnapshot(msgIndex: number): void {
 #### 1.1.7 加载存档
 
 ```typescript
-// loadSave（实际为 useCallback 闭包，同步执行，非 async；2026-09-08 核对 types.ts）
+// loadSave（useCallback 闭包，同步执行）
 function loadSave(save: GameSave): void {
   // 1. 失效演化评审
   evolutionReviews.invalidate();
@@ -549,14 +540,14 @@ function loadSave(save: GameSave): void {
 
 ### 1.2 管线执行与上下文管理
 
-#### 1.2.1 管线执行器 — `src/engine/pipelineExecutor.ts` (315行)
+#### 1.2.1 管线执行器 — `src/engine/pipelineExecutor.ts`
 
 **文件路径**: `src/engine/pipelineExecutor.ts`
 
 **职责**: 11阶段管线的编排器，支持同层并行/层间串行执行。
 
 ```typescript
-// 核心类（非 interface，2026-09-08 核对）
+// 核心类（非 interface）
 export class PipelineExecutor {
   constructor(round: number, callbacks: PipelineCallbacks);   // callbacks.onUpdate: () => void
   getStatus(): PipelineStatus;
@@ -641,7 +632,7 @@ execute()
 
 ---
 
-### 1.3 变量管理器 — `src/engine/variableManager.ts` (1626行)
+### 1.3 变量管理器 — `src/engine/variableManager.ts`
 
 **文件路径**: `src/engine/variableManager.ts`
 
@@ -663,9 +654,9 @@ class VariableManager {
   getVar(path: string, defaultValue?: unknown): unknown           // "玩家.生存状态.血量"
   setVar(path: string, value: unknown, forceReplace?: boolean): void
   
-  // Patch操作（RFC 6902风格，入参为轻量补丁数组，返回是否应用成功）
-  applyPatches(patches: Array<{ op: string; path: string; value?: unknown }>): boolean
-  // ❌ 不存在 applyPatch / createPatch 方法(2026-09-08 核对)
+  // 变量更新（解析 AI 文本 / 事务载荷并应用到状态）
+  applyUpdateVariable(updateText: string): boolean
+  applyAiUpdateVariable(updateText: string): boolean
   
   // 快照
   createSnapshot(): GameState
@@ -684,9 +675,6 @@ class VariableManager {
   
   // 存档持久化
   createModulePersistenceBundle(saveId: string): ModulePersistenceBundle
-  
-  // NPC感知路径解析
-  // ❌ resolveNpcPath 方法**实际不存在**(2026-09-08 核对)
 }
 ```
 
@@ -809,49 +797,26 @@ interface NPCData {
 #### 1.3.3 安全机制详解
 
 ```typescript
-// 危险路径段(原型链污染防护)— 实际 3 项,不是 7 项
+// 危险路径段（原型链污染防护）
 const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
-// 核心对象路径保护(禁止直接替换)— 实际 10 项,不是 4 项
-const CORE_OBJECT_PATHS = new Set([
-  '世界', '世界.时间系统', '世界.空间定位',
-  '玩家', '玩家.生存状态', '玩家.身份信息', '玩家.技能系统', '玩家.货币资源', '玩家.物品栏',
-  '人物档案',
-]);
-const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);
+// AI 写入白名单相关常量
+const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);        // AI 可写入的状态根
 const AI_TRANSACTION_KEYS = new Set(['id', 'moduleId', 'source', 'label', 'conditions', 'costs', 'effects', 'rewards', 'events']);
-const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);
-
-// 好感度变化上限 — 实际是数字常量,不是对象
-const MAX_FAVORABILITY_DELTA = 15;  // 单次交互不超过±15
-// 实际钳位在代码里:const clamped = Math.round(currentFavor + Math.sign(delta) * MAX_FAVORABILITY_DELTA);
-// ❌ 不存在 FAVORABILITY_CLAMP 对象
-// ❌ 不存在独立的 clampStat 函数
+const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);              // 事务中禁止出现的字段
 ```
 
 #### 1.3.4 快照机制详解
 
 ```typescript
-// 创建快照时排除的字段
-const EXCLUDED_FROM_SNAPSHOT = [
-  '人物档案',  // 整个NPC档案不进入快照
-];
+// createSafeSnapshotForPrompt() — 供提示词使用的净化快照
+// 复制 state 后，用 selectPlayerKnownNPCs + createPromptSafeNpcSnapshot 重建人物档案，
+// 并删除 人物已知资料 / playerKnowledge，避免 {{getvar}} 读到 NPC 内心想法。
 
-// 但人物档案中的以下字段可以进入快照（浅层数据）
-const NPC_INCLUDE_IN_SNAPSHOT = [
-  '姓名', '种族', '性别', '年龄', '社会身份',
-  '外貌', '性格', '背景', '纪事',
-  '技能列表', '物品栏', '生存状态', '当前段位索引',
-];
-
-// 排除的NPC私密字段（每次想法等）
-const NPC_EXCLUDED_FROM_SNAPSHOT = [
-  '当前想法', '当前状态', '当前地点',
-  '隐藏性格', '短期目标', '长期目标',
-];
-
-// createSafeSnapshotForPrompt — 用于提示词的净化快照
-// 与createSnapshot区别：排除更多NPC私密数据，防止AI通过{{getvar}}读取NPC内心想法
+// _slimForSnapshot() — 存档快照瘦身（私有）
+// 人物档案的长文本字段超过 200 字截断：
+//   背景 / 外貌 / 表性格 / 里性格 / 当前想法 / 当前穿着 / 当前状态 / 内心想法 / 备注；
+// 并移除 portraitUrl 等大型缓存字段。
 ```
 
 ---
@@ -881,12 +846,12 @@ settleProgressionAction(manager, config, userText, baseline) → ProgressionSett
 sendMessage 内联后处理 → bumpVersion
 ```
 
-**`runVariableExtraction` 说明（2026-09-08 核对：源码中无 VariableExtractionResult 结构）**:
+**`runVariableExtraction` 说明**:
 
 - 签名：`runVariableExtraction(params: { varMgr, parsed, round, userText, mainApiConfig, worldBook, worldId, delayMs, maxRetries, signal?, isCurrent? }): Promise<void>`
-- 行为：直接对 `varMgr` 做变量解析与 `applyPatches`，**返回 void**，不产出 patch 数组；源码中不存在 `VariableExtractionResult` 接口、`extractVariables` 函数或 `variableExtraction.run` 方法。
+- 行为：直接对 `varMgr` 做变量解析并调用 `applyUpdateVariable`，**返回 void**，不产出结果对象；源码中不存在 `VariableExtractionResult` 接口、`extractVariables` 函数或 `variableExtraction.run` 方法。
 
-### 1.5 宏引擎 — `src/engine/macroEngine.ts` (186行)
+### 1.5 宏引擎 — `src/engine/macroEngine.ts`
 
 **文件路径**: `src/engine/macroEngine.ts`
 
@@ -907,7 +872,7 @@ sendMessage 内联后处理 → bumpVersion
 
 ---
 
-### 1.6 提示词组装器 — `src/engine/promptAssembler.ts` (225行)
+### 1.6 提示词组装器 — `src/engine/promptAssembler.ts`
 
 **文件路径**: `src/engine/promptAssembler.ts`
 

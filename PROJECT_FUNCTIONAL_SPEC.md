@@ -3,8 +3,6 @@
 > 项目总地图 / Agent 索引。实际代码是最终依据；子系统细节按需打开 `docs/spec/` 对应章节。
 >
 > 技术栈：React 19 + TypeScript 6 + Zustand + Bun 1.3.14 + Cloudflare Workers/D1 + Tauri 2 工具链。
->
-> 当前清理基线：内置世界 6 个；世界定义、内置事件数据和运行时读取已统一到 canonical 格式；历史格式只允许停留在明确的导入/加载迁移边界。生产 `src/` 已清除静态不可达文件与 TypeScript 可检测的未使用局部/导入（`src/novel/` 独立子系统除外）。
 
 ## 0. 使用原则
 
@@ -60,6 +58,8 @@ IndexedDB save + module state + optional Cloudflare services
 | 22 | 关键设计决策 | 多模块 | `docs/spec/22-design-decisions.md` |
 | 23 | GameContext / 存档桥 | `src/context/` + `src/storage/` | `docs/spec/23-gamecontext-bridge.md` |
 
+> 本索引到子系统级别；`src/constants/`、`src/types/`、`src/dev/`、`src/__tests__/` 及各子系统内的测试文件未单列分册，统一见 §4 仓库结构。
+
 ## 3. 当前 canonical 边界
 
 ### 3.1 世界定义
@@ -108,7 +108,7 @@ IndexedDB save + module state + optional Cloudflare services
 - internal save v3 → v4
 - SillyTavern 世界书 / 预设的外部字段别名
 
-## 4. 仓库结构（当前清理包）
+## 4. 仓库结构
 
 ```text
 src/
@@ -120,30 +120,38 @@ src/
 ├─ director/        固定剧情 / 因果计划 / 指导与落实 / 幕后提案
 ├─ simulation/      导演运行状态 / 世界上下文 / 快照接入
 ├─ custom-modules/  自定义 gameplay 模块
-├─ api/             模型/API 客户端
+├─ api/             模型 / API 客户端
 ├─ storage/         IndexedDB / 模块状态
 ├─ stores/          Zustand stores
 ├─ server/          Cloudflare Worker 后端
+├─ schema/          GameState / PlayerState / NPCData 类型
 ├─ components/      React UI
 ├─ context/         GameContext 等
 ├─ hooks/           React hooks
 ├─ data/            6 个内置世界、预设、职业数据
 ├─ novel/           小说拆解与资料系统
 ├─ time/            世界时钟 / 周期
-├─ worldgen/        世界生成类型/选择逻辑
+├─ worldgen/        世界生成类型 / 选择逻辑
+├─ security/        密钥库与安全工具
+├─ config/          存储键与运行配置
+├─ constants/       运行时常量
+├─ types/           补充类型定义
 ├─ theme/ styles/   主题与样式
+├─ dev/             开发辅助（布局校准）
+├─ __tests__/       跨模块测试
 └─ utils/           导入、格式化、文本、世界书工具
 
-public/             PWA 与美术/音频静态资源
-functions/          Pages Functions
-migrations/         D1 SQL 历史迁移（9 个）
-scripts/            构建/维护脚本
+public/             PWA 与美术 / 音频静态资源
+functions/          Cloudflare Pages Functions
+migrations/         D1 SQL 迁移（9 个）
+scripts/            构建 / 维护 / 校验脚本
+src-tauri/          Tauri 2 原生工程（桌面 / Android）
 server.ts           Bun dev server
 build.ts            Bun production build
-package.json         Bun/npm/Tauri/Cloudflare 脚本与依赖
+package.json        Bun / npm / Tauri / Cloudflare 脚本与依赖
 ```
 
-> 当前传递用 clean 包未包含生成型 `src-tauri/` 工程，但 `package.json` 仍保留 Tauri 2 桌面/Android 工具链命令；原生工程需由完整仓库或 `tauri android init` 提供。
+> `src-tauri/` 原生工程随仓库提供，`package.json` 中的 Tauri 2 桌面 / Android 命令可直接使用。
 
 ## 5. 文档维护规则
 

@@ -29,9 +29,7 @@
 
 ### 22.2 安全机制
 
-详见 §1.3.3 变量管理器安全机制(`DANGEROUS_PATH_SEGMENTS` / `CORE_OBJECT_PATHS` / `MAX_FAVORABILITY_DELTA` / `EXCLUDED_FROM_SNAPSHOT` / `NPC_INCLUDE_IN_SNAPSHOT` / `NPC_EXCLUDED_FROM_SNAPSHOT` / `createSafeSnapshotForPrompt`)。
-
-> 注(2026-09-08):`FAVORABILITY_CLAMP` 对象和 `clampStat` 函数**实际不存在** — 实际使用 `MAX_FAVORABILITY_DELTA` 常量 + 内联 `Math.round(...)`。
+详见 §1.3.3 变量管理器安全机制（`DANGEROUS_PATH_SEGMENTS` / `AI_STATE_ROOTS` / `AI_TRANSACTION_KEYS` / `AI_FORBIDDEN_FIELDS` / `createSafeSnapshotForPrompt`）。
 
 ### 22.3 性能优化
 

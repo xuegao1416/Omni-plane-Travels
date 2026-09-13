@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { ApiConfig } from '@/api/types';
 import { STORAGE_KEYS } from '@/config/storageKeys';
 import { seal, unseal, isSealed } from '@/security/keyVault';
-import { TRIAL_API_CONFIG, isTrialApiConfig } from '@/api/trial';
 
 // ─── 类型 ───
 
@@ -190,12 +189,9 @@ interface ConfigState {
   settings: UISettings;
   // API 配置
   apiConfig: ApiConfig | null;
-  trialMode: boolean;
   // Actions
   updateSettings: <K extends keyof UISettings>(key: K, value: UISettings[K]) => void;
   setApiConfig: (config: ApiConfig) => void;
-  enableTrial: () => void;
-  disableTrial: () => void;
   /** 应用启动时异步加载（解密）已持久化的 API 配置 */
   initApiConfig: () => void;
   t: (key: string) => string;
@@ -206,7 +202,6 @@ interface ConfigState {
 export const useConfigStore = create<ConfigState>((set, get) => ({
   settings: loadUISettings(),
   apiConfig: null, // 由 initApiConfig 异步加载（解密）
-  trialMode: false,
 
   updateSettings: (key, value) => {
     set(state => {
@@ -218,33 +213,16 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   setApiConfig: async (config) => {
-    if (isTrialApiConfig(config)) {
-      localStorage.setItem(STORAGE_KEYS.TRIAL_ENABLED, 'true');
-      set({ apiConfig: TRIAL_API_CONFIG, trialMode: true });
-      return;
-    }
-    localStorage.removeItem(STORAGE_KEYS.TRIAL_ENABLED);
     // 落库前加密 apiKey（明文仅保留在内存）
     const sealed: ApiConfig = { ...config, apiKey: await seal(config.apiKey) };
     localStorage.setItem(API_STORAGE_KEY, JSON.stringify(sealed));
     set({ apiConfig: config });
   },
 
-  enableTrial: () => {
-    localStorage.setItem(STORAGE_KEYS.TRIAL_ENABLED, 'true');
-    set({ apiConfig: TRIAL_API_CONFIG, trialMode: true });
-  },
-
-  disableTrial: () => {
-    localStorage.removeItem(STORAGE_KEYS.TRIAL_ENABLED);
-    set({ apiConfig: null, trialMode: false });
-  },
-
   initApiConfig: () => {
     loadApiConfig()
       .then((cfg) => {
-        if (cfg) set({ apiConfig: cfg, trialMode: false });
-        else if (localStorage.getItem(STORAGE_KEYS.TRIAL_ENABLED) === 'true') set({ apiConfig: TRIAL_API_CONFIG, trialMode: true });
+        if (cfg) set({ apiConfig: cfg });
       })
       .catch((err) => console.warn('[configStore] 初始化 API 配置失败:', err));
   },

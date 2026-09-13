@@ -63,7 +63,6 @@
 - 支持多存档、自动保存、快照回滚和 JSON 迁移。
 - 可选云存档、创意工坊与邮箱验证码账号体系。
 - 记忆检索可选择远程 Embedding、应用内 WASM 端侧模型或外部本地服务；不可用时自动降级到关键词召回。
-- 服务端可配置不可由客户端重置的三轮匿名体验额度，上游失败不会消耗次数。
 - 移动端使用响应式面板与抽屉布局；当前交付为 Web/PWA，Tauri 原生适配入口保留，但本版源码不包含 `src-tauri` 工程。
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/image.svg" width="20" height="20" /> 设计与流程图

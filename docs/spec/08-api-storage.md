@@ -3,13 +3,9 @@
 
 ## 8、API 与存储系统
 
-> ### 逐字节核对(2026-09-08)
->
-> §8/§9 已按 `src/api/` `src/storage/` `src/stores/` `src/server/` `src/components/` 实际源码核对,本节所有行数、字段、路由、export 名称均与代码一致。
-
 ### 8.1 API 客户端 — `src/api/`
 
-#### 8.1.1 核心客户端 — `src/api/client.ts` (723行)
+#### 8.1.1 核心客户端 — `src/api/client.ts`
 
 **文件路径**: `src/api/client.ts`
 
@@ -55,12 +51,11 @@ requestStreamWithRetry(config, messages, options)      // :400
 
 | 文件                                            | 职责                                       |
 | --------------------------------------------- | ---------------------------------------- |
-| `trial.ts`                                    | 试用 API(免费额度 + 自动选择 backend)              |
 | `auxiliaryApi.ts`                             | 辅助 API(嵌入/补全/翻译)                         |
 | `imageGen.ts`                                 | 图像生成 API                                 |
 | `imageGenTypes.ts`                            | 图像生成类型                                   |
 | `rateLimiter.ts`                              | 限流器(滑动窗口 + token bucket)                 |
-| `types.ts`                                    | API 层共享类型(51 行)                          |
+| `types.ts`                                    | API 层共享类型                                 |
 | `comfy/comfyWorkflow.ts`                      | ComfyUI 工作流客户端(本地 SD),`comfy/` 下仅此 1 个文件 |
 | `client.test.ts` / `client.embedding.test.ts` | 客户端测试                                    |
 
@@ -83,7 +78,7 @@ requestStreamWithRetry(config, messages, options)      // :400
 
 ### 8.2 IndexedDB 存储层 — `src/storage/`
 
-#### 8.2.1 数据库 — `src/storage/db.ts` (1411行)
+#### 8.2.1 数据库 — `src/storage/db.ts`
 
 **文件路径**: `src/storage/db.ts`
 
@@ -95,8 +90,6 @@ requestStreamWithRetry(config, messages, options)      // :400
 - v6:`novel_datasets`(timestamp 索引) + `novel_chapters` + `novel_segments`(datasetId_index) + `novel_chunks`(datasetId_index) + `novel_jobs`(datasetId_index)。
 - v9:对 `novel_chapters` / `novel_segments` / `novel_chunks` / `novel_jobs` / `novel_archives` / `novel_checkpoints` 补 `datasetId` 索引;`novel_segments` 的 `datasetId_index` 改为复合 `[datasetId, index]`;新增 `novel_sources` store。
 - v10: 当前结构还包含 `novel_materials`、`director_definitions`、`director_jobs`。
-
-> **注(2026-09-08)**:`v7→v8 升级` 在文档旧版中被虚构。**实际无 v7/v8 分支**(无 novel_progress 删除逻辑,无 v8 新增 4 个 novel store 的处理)。`novel_archives` / `novel_checkpoints` 在 v9 才被纳入迁移路径;它们在 ≤v8 数据库里首次出现是在 v9 的 `createObjectStore` 兜底分支。
 
 **16 个 store 清单**:
 
@@ -212,7 +205,7 @@ export async function saveGameIncremental(
 
 ### 8.3 全局 Zustand Stores — `src/stores/`
 
-#### 8.3.1 存档 Store — `src/stores/saveStore.ts` (426行)
+#### 8.3.1 存档 Store — `src/stores/saveStore.ts`
 
 **`SaveState` 实际状态字段**(saveStore.ts:33):`savesMeta: SaveMeta[]`、`currentSaveId: string | null`、`currentSaveName: string`、`sessionActivePacks: string[] | undefined`。
 
@@ -255,20 +248,20 @@ let _autoSaveBuilder: (() => GameSave | null) | null = null;
 
 #### 8.3.2 全局 Stores 索引
 
-`src/stores/` 共 **11 个 store 文件**(含 §8.3.1 的 `saveStore.ts`)。下表按逐字节核对源码后的**实际状态字段名**列出(旧版文档此表字段名几乎全错,已整体重写):
+`src/stores/` 共 **10 个 store 文件**（含 §8.3.1 的 `saveStore.ts`）。下表列出各 store 的职责、状态字段与 actions：
 
-| Store                 | 行数  | 职责             | 实际状态字段                                                                                                               | 实际 actions                                                                                                                                                                               |
-| --------------------- | --- | -------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `saveStore.ts`        | 426 | 存档 CRUD + 自动存档 | `savesMeta`, `currentSaveId`, `currentSaveName`, `sessionActivePacks`                                                | 见 §8.3.1                                                                                                                                                                                 |
-| `presetStore.ts`      | 207 | API 预设管理       | `userPresets`(**非** `presets`), `activePresetId`, `builtinOverrides`, `builtinContentOverrides`                      | `savePreset`, `deletePreset`, `setActivePreset`, `resetToDefault`, `saveBuiltinOverride`, `saveBuiltinContentOverride`, `restoreBuiltinDefaults`, `getActivePreset`, `getUserPresetById` |
-| `authStore.ts`        | 119 | 用户认证           | `user: User \| null`, `isLoading`, `isAuthenticated`(**无** `token` / `mode`)                                         | `checkAuth`, `sendCode`, `register`, `login`, `resetPassword`, `logout`                                                                                                                  |
-| `cloudSaveStore.ts`   | 203 | 云存档槽位          | `slots: CloudSaveSlot[]`(**非** `cloudSaves`), `isLoading`, `error`(**无** `syncing`)                                  | `fetchSlots`, `uploadSave`, `downloadSave`, `deleteSave`                                                                                                                                 |
-| `configStore.ts`      | 270 | 全局 UI/API 配置   | `settings: UISettings`(**非** `config`), `apiConfig: ApiConfig \| null`, `trialMode: boolean`(**无** `dirty`)          | `updateSettings`, `setApiConfig`, `enableTrial`, `disableTrial`, `initApiConfig`, `t`, `initialize`                                                                                      |
-| `imageStore.ts`       | 118 | 图像生成配置与任务队列    | `config: ImageGenConfig`, `tasks: ImageTask[]`, `comfyData`(**无** `images: Map`)                                     | `updateConfig`, `setConfig`, `initImageConfig`, `addTask`, `updateTask`, `removeTask`, `setTasks`, `setComfyData`                                                                        |
-| `novelConfigStore.ts` | 36  | 小说工作台配置        | `config: NovelWorkbenchConfig`, `loaded: boolean`(**非** `progress`)                                                  | `initialize`, `save`                                                                                                                                                                     |
-| `portraitStore.ts`    | 27  | NPC 头像 URL 映射  | `portraits: Record<string, string>`(npcId → objectURL,**非** `Map<npcId, blob>`)                                      | `setPortrait`, `clearPortrait`                                                                                                                                                           |
-| `simulationStore.ts`  | 115 | 世界推演运行时        | `simState: SimulationState`, `isSimulating: boolean`, `lastError: string \| null`(**无** `tick` / `activeStorylines`) | `updateConfig`, `setSimState`, `setIsSimulating`, `setLastError`, `resetSimulation`, `loadFromStorage`, `syncFromEngine`                                                                 |
-| `workshopStore.ts`    | 218 | 工作坊资产浏览/发布     | `items: WorkshopItem[]`, `total`, `page`, `pageSize: 20`, `isLoading`, `error`(**无** `installedPacks` / `editing`)   | `fetchItems`, `fetchItem`, `downloadItem`, `createItem`, `deleteItem`, `checkInstall`, `getInstallPlan`                                                                                  |
+| Store                 | 职责             | 实际状态字段                                                                                                               | 实际 actions                                                                                                                                                                               |
+| --------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `saveStore.ts`        | 存档 CRUD + 自动存档 | `savesMeta`, `currentSaveId`, `currentSaveName`, `sessionActivePacks`                                                | 见 §8.3.1                                                                                                                                                                                 |
+| `presetStore.ts`      | API 预设管理       | `userPresets`(**非** `presets`), `activePresetId`, `builtinOverrides`, `builtinContentOverrides`                      | `savePreset`, `deletePreset`, `setActivePreset`, `resetToDefault`, `saveBuiltinOverride`, `saveBuiltinContentOverride`, `restoreBuiltinDefaults`, `getActivePreset`, `getUserPresetById` |
+| `authStore.ts`        | 用户认证           | `user: User \| null`, `isLoading`, `isAuthenticated`(**无** `token` / `mode`)                                         | `checkAuth`, `sendCode`, `register`, `login`, `resetPassword`, `logout`                                                                                                                  |
+| `cloudSaveStore.ts`   | 云存档槽位          | `slots: CloudSaveSlot[]`(**非** `cloudSaves`), `isLoading`, `error`(**无** `syncing`)                                  | `fetchSlots`, `uploadSave`, `downloadSave`, `deleteSave`                                                                                                                                 |
+| `configStore.ts`      | 全局 UI/API 配置   | `settings: UISettings`(**非** `config`), `apiConfig: ApiConfig \| null`          | `updateSettings`, `setApiConfig`, `initApiConfig`, `t`, `initialize`                                                                                      |
+| `imageStore.ts`       | 图像生成配置与任务队列    | `config: ImageGenConfig`, `tasks: ImageTask[]`, `comfyData`(**无** `images: Map`)                                     | `updateConfig`, `setConfig`, `initImageConfig`, `addTask`, `updateTask`, `removeTask`, `setTasks`, `setComfyData`                                                                        |
+| `novelConfigStore.ts` | 小说工作台配置        | `config: NovelWorkbenchConfig`, `loaded: boolean`(**非** `progress`)                                                  | `initialize`, `save`                                                                                                                                                                     |
+| `portraitStore.ts`    | NPC 头像 URL 映射  | `portraits: Record<string, string>`(npcId → objectURL,**非** `Map<npcId, blob>`)                                      | `setPortrait`, `clearPortrait`                                                                                                                                                           |
+| `simulationStore.ts`  | 世界推演运行时        | `simState: SimulationState`, `isSimulating: boolean`, `lastError: string \| null`(**无** `tick` / `activeStorylines`) | `updateConfig`, `setSimState`, `setIsSimulating`, `setLastError`, `resetSimulation`, `loadFromStorage`, `syncFromEngine`                                                                 |
+| `workshopStore.ts`    | 工作坊资产浏览/发布     | `items: WorkshopItem[]`, `total`, `page`, `pageSize: 20`, `isLoading`, `error`(**无** `installedPacks` / `editing`)   | `fetchItems`, `fetchItem`, `downloadItem`, `createItem`, `deleteItem`, `checkInstall`, `getInstallPlan`                                                                                  |
 
 **`configStore.ts` 导出类型**:`Theme = 'light' \| 'dark' \| 'metal' \| 'green'`、`FontFamily = 'yahei' \| 'source' \| 'menglong' \| 'hanchan' \| 'shanggu'`、`FontSize = '小' \| '中' \| '大'`、`LineHeight = '紧凑' \| '舒适' \| '宽松'`、`Language = 'zh-CN' \| 'en'`、`UISettings`(8 字段:`language` / `theme` / `font` / `uiFontSize` / `bodyFontSize` / `lineHeight` / `centeredNarrative` / `autoScroll`)。
 
@@ -280,20 +273,19 @@ let _autoSaveBuilder: (() => GameSave | null) | null = null;
 
 `src/server/` 实际共 **14 个文件** = 10 个源文件 + 4 个测试:
 
-| 源文件             | 行数  | 职责           |
-| --------------- | --- | ------------ |
-| `index.ts`      | 295 | Worker 路由总入口 |
-| `db.ts`         | 63  | D1 访问封装      |
-| `saves.ts`      | 151 | 云存档槽位 API    |
-| `session.ts`    | 125 | 会话/令牌        |
-| `trial.ts`      | 277 | 试用额度与预占租约    |
-| `playStats.ts`  | 145 | 游玩统计         |
-| `workshop.ts`   | 631 | 工作坊资产/依赖安装计划 |
-| `crypto.ts`     | 104 | 密码哈希/加密工具    |
-| `email-auth.ts` | 265 | 邮箱验证码认证      |
-| `types.ts`      | 118 | 后端共享类型       |
+| 源文件             | 职责           |
+| --------------- | ------------ |
+| `index.ts`      | Worker 路由总入口 |
+| `db.ts`         | D1 访问封装      |
+| `saves.ts`      | 云存档槽位 API    |
+| `session.ts`    | 会话/令牌        |
+| `playStats.ts`  | 游玩统计         |
+| `workshop.ts`   | 工作坊资产/依赖安装计划 |
+| `crypto.ts`     | 密码哈希/加密工具    |
+| `email-auth.ts` | 邮箱验证码认证      |
+| `types.ts`      | 后端共享类型       |
 
-测试文件(4 个):`playStats.test.ts`、`trial.test.ts`、`trial.migration.test.ts`、`workshop.test.ts`。
+测试文件(2 个):`playStats.test.ts`、`workshop.test.ts`。
 
 - 部署入口:根目录 `server.ts` + `wrangler.toml` + `functions/api/[[route]].ts`
 - 9 个 D1 SQL 迁移 `migrations/0001_init.sql` ~ `0009_trial_reservation_leases.sql`(详见 §19.3)

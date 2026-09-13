@@ -1134,7 +1134,6 @@ ${perspectiveInstruction}
           const result = await requestStreamWithRetry(narrativeApiConfig, apiMessages, {
             signal: controller.signal,
             onDelta: (_delta, acc) => { accumulated = acc; updateMessage(aiMsgId, { rawText: applyCombatBoundary(acc) }); },
-            trialPurpose: apiConfig.provider === 'custom' && apiConfig.baseUrl.replace(/\/+$/, '').endsWith('/api/trial') ? 'conversation' : undefined,
             ...presetRequestOpts,
           });
 
