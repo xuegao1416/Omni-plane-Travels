@@ -145,9 +145,13 @@ function SkillsBlock({ data, worldId }: { data: Record<string, any>; worldId?: s
 }
 
 /** 物品页签内容块：同 SkillsBlock，可渲染已知或幕后版本。 */
-function ItemsBlock({ data }: { data: Record<string, any> }) {
+export function ItemsBlock({ data }: { data: Record<string, any> }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* 物品栏是剧情中会真正增减的那一栏（AI 通过 add/set/remove 维护），与静态的物品列表分开呈现 */}
+      {data.物品栏 && (
+        <Section icon={Backpack} title="随身物品栏"><InventoryGrid data={data.物品栏} /></Section>
+      )}
       {data.物品列表 && (
         <Section icon={Backpack} title="物品列表"><InventoryGrid data={data.物品列表} /></Section>
       )}
@@ -194,8 +198,8 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
   // 技能/物品成块呈现：玩家已知就直出，只有幕后版本才压在迷雾下，两者皆空才显示暂无。
   const hasKnownSkills = hasBlockContent(ext.特殊能力, ext.生存状态, ext.成长状态, ext.天赋, ext.技能列表);
   const hasTruthSkills = hasBlockContent(truthExt?.特殊能力, truthExt?.生存状态, truthExt?.成长状态, truthExt?.天赋, truthExt?.技能列表);
-  const hasKnownItems = hasBlockContent(ext.物品列表, ext.装备列表);
-  const hasTruthItems = hasBlockContent(truthExt?.物品列表, truthExt?.装备列表);
+  const hasKnownItems = hasBlockContent(ext.物品栏, ext.物品列表, ext.装备列表);
+  const hasTruthItems = hasBlockContent(truthExt?.物品栏, truthExt?.物品列表, truthExt?.装备列表);
 
   return (
     <div className="game-journey__nested-overlay" style={{
