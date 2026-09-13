@@ -18,7 +18,7 @@ import { isCombatAllyNpc } from '../gameplay/combatV2';
 import type { StatModuleSchema } from '../modules/schema';
 import { ensureNpcModuleDefaults } from '../utils/npcStats';
 import { getNpcCategoryValue } from '../utils/npcHelpers';
-import { applyPlayerObservations, type PlayerObservation } from './playerKnowledge';
+import { applyPlayerObservations, collectSceneObservations, type PlayerObservation } from './playerKnowledge';
 
 export function extractPlayerObservations(input: unknown): PlayerObservation[] {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return [];
@@ -230,8 +230,10 @@ async function callAuxiliaryApiForEngine(
     hasEnabledCombatModule(worldDef, gameState) ? COMBAT_ENCOUNTER_CONTRACT_PROMPT : ''
   }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}
 【玩家观察记录】
-在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"observed|disclosed",introduces:false}]。
-只记录本轮已提交正文中玩家亲眼观察或明确获告知的具体字段，quote 必须逐字引用正文并能够支持该字段。不能从变量快照、读者视角或幕后叙述补充玩家不知道的内容。见面不等于获知全部资料，未获知的字段省略。内心想法、真实目标、里性格等秘密仅当正文明确向玩家披露时用 disclosed。新认识人物先提供姓名字段和 introduces:true。人物必须使用人物档案中的规范 ID，path 为字段路径，例如 个人信息.当前状态；不得直接修改 playerKnowledge。没有实际观察则省略。
+在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"disclosed",introduces:false}]。
+公开字段（姓名、种族、性别、人物分类、外貌、表性格、当前穿着、当前位置、当前状态、当前行动、关系数据）由系统按本轮正文自动同步，不必输出。
+这里只需要补充"正文明确向玩家披露的秘密"：当前想法、里性格、真实目标（短期/长期）、背景、备注、生存状态数值、技能与天赋等，mode 用 disclosed。
+quote 必须逐字引用正文并能够支持该字段；不能从变量快照、读者视角或幕后叙述补充玩家不知道的内容。人物必须使用人物档案中的规范 ID；不得直接修改 playerKnowledge。没有被披露的秘密则省略该字段。
 【机械结算只读边界】
 simulationRuntime 及其 effectLog 属于本地规则运行记录，不是允许修改的变量路径。下面是最近已结算记录，快照数值已包含这些变化，不得因为正文再次提及而重复加减。不要输出主线进度、候选事件或未来剧情为实际状态；只提取这轮正文已经发生且尚未结算的事实。
 ${JSON.stringify(gameState.simulationRuntime?.effectLog?.slice(-12) ?? []).slice(0, 5000)}`;
@@ -358,13 +360,22 @@ export async function runVariableExtraction(params: {
           varMgr.setState(proposalState);
         }
         if (encounter) eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, encounter);
+        let hash = 2166136261;
+        for (let i = 0; i < parsed.content.length; i++) hash = Math.imul(hash ^ parsed.content.charCodeAt(i), 16777619);
+        const eventId = `narrative:${worldId}:${round}:${(hash >>> 0).toString(36)}`;
         if (observations.length) {
-          let hash = 2166136261;
-          for (let i = 0; i < parsed.content.length; i++) hash = Math.imul(hash ^ parsed.content.charCodeAt(i), 16777619);
-          const eventId = `narrative:${worldId}:${round}:${(hash >>> 0).toString(36)}`;
           const result = applyPlayerObservations(varMgr.getState(), { id: `observation:${eventId}`, turnId: eventId, eventId, turnNumber: round, committed: true, text: parsed.content, observations });
           assertCurrent();
           varMgr.setState(result.state);
+        }
+        // 兜底投影：本轮正文里出现过的角色，其公开字段（含好感度）直接同步给玩家，
+        // 避免 AI 漏输出 playerObservations 时人物/任务面板永久停在旧值。
+        const committedText = `${userText}\n${parsed.content}`;
+        const sceneObservations = collectSceneObservations(varMgr.getState(), committedText);
+        if (sceneObservations.length) {
+          const sceneResult = applyPlayerObservations(varMgr.getState(), { id: `scene:${eventId}`, turnId: eventId, eventId, turnNumber: round, committed: true, text: committedText, observations: sceneObservations });
+          assertCurrent();
+          varMgr.setState(sceneResult.state);
         }
       }
 
