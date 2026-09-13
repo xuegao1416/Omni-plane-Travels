@@ -1,21 +1,17 @@
-import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 
 /**
  * 整片迷雾：用于技能/物品这类成块的内容。
  *
- * 角色无从知晓的整块资料默认被迷雾盖住，点眼睛才展开。
- * 展开时内容才真正渲染——迷雾期间真相不在 DOM 里，不是视觉遮罩。
+ * 真实内容照常渲染，上面糊一层高斯模糊的毛玻璃；展开后玻璃消失。
  * 这是给屏幕前的读者看的，不写回玩家认知，AI 提示词依旧只见角色已知内容。
+ * 展开状态由外层的一键开关统一控制。
  */
-export function FogPanel({ label, children }: { label: string; children: ReactNode }) {
-  const [revealed, setRevealed] = useState(false);
-
+export function FogPanel({ label, revealed, children }: { label: string; revealed: boolean; children: ReactNode }) {
   return (
     <div style={{
-      border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-      background: 'var(--bg-primary)', overflow: 'hidden',
+      position: 'relative', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-sm)', overflow: 'hidden',
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -30,28 +26,29 @@ export function FogPanel({ label, children }: { label: string; children: ReactNo
             }}>角色尚不知</span>
           )}
         </span>
-        <button
-          type="button"
-          onClick={() => setRevealed(v => !v)}
-          title={revealed ? '收起幕后内容' : '查看幕后内容（角色并不知道）'}
-          aria-label={revealed ? '收起幕后内容' : '查看幕后内容'}
-          aria-pressed={revealed}
+      </div>
+      <div style={{ position: 'relative' }}>
+        <div
+          aria-hidden={!revealed}
           style={{
-            width: '22px', height: '22px', padding: 0, border: 'none', background: 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            color: revealed ? 'var(--accent)' : 'var(--text-muted)',
+            padding: '10px',
+            filter: revealed ? 'none' : 'blur(6px)',
+            opacity: revealed ? 1 : 0.85,
+            userSelect: revealed ? 'auto' : 'none',
+            pointerEvents: revealed ? 'auto' : 'none',
+            transition: 'filter 0.15s ease',
           }}
         >
-          {revealed ? <EyeOff size={14} strokeWidth={1.5} /> : <Eye size={14} strokeWidth={1.5} />}
-        </button>
-      </div>
-      <div style={{ padding: '10px' }}>
-        {revealed ? children : (
-          <div aria-hidden style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-            {[72, 48, 60, 36].map((width, index) => (
-              <div key={index} style={{ height: '10px', width: `${width}%`, borderRadius: '4px', background: 'var(--bg-tertiary)' }} />
-            ))}
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', letterSpacing: '2px' }}>••••••</div>
+          {children}
+        </div>
+        {!revealed && (
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'color-mix(in srgb, var(--bg-primary) 30%, transparent)',
+            backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+            pointerEvents: 'none',
+          }}>
+            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', letterSpacing: '3px' }}>••••••</span>
           </div>
         )}
       </div>

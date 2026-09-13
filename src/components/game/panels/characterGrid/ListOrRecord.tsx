@@ -2,6 +2,21 @@ import { useState } from 'react';
 import { getQualityColor } from '../../../shared/qualityUtils';
 import { extractFields,FieldDetailModal } from './SharedUI';
 
+/** 数组元素可能是字符串，也可能是 {技能名, 品质} 这类对象；对象不能直接当 React 子节点渲染。 */
+export function toLabel(item: unknown): string {
+  if (item === null || item === undefined) return '—';
+  if (typeof item !== 'object') return String(item);
+  const record = item as Record<string, unknown>;
+  for (const key of ['名称', '技能名', '名字', '标题', 'name', 'title']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  for (const value of Object.values(record)) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return JSON.stringify(record);
+}
+
 export function ListOrRecord({ data, emptyText }: {
   data: string[] | Record<string, unknown> | undefined;
   emptyText?: string;
@@ -14,7 +29,7 @@ export function ListOrRecord({ data, emptyText }: {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {data.map((item, i) => (
-          <div key={i} style={{ padding: '3px 0', fontSize: 'var(--font-size-sm)', borderBottom: '1px solid var(--border)' }}>• {item}</div>
+          <div key={i} style={{ padding: '3px 0', fontSize: 'var(--font-size-sm)', borderBottom: '1px solid var(--border)' }}>• {toLabel(item)}</div>
         ))}
       </div>
     );

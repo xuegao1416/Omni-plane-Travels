@@ -1,7 +1,7 @@
 import { useCallback,useState } from 'react';
 import {
 User,BarChart3,Briefcase,MapPin,Sparkles,BookOpen,Brain,Dna,
-Zap,Star,Shield,Swords,Backpack,ScrollText
+Zap,Star,Shield,Swords,Backpack,ScrollText,Eye,EyeOff
 } from 'lucide-react';
 import { ExcelRow } from '../../../shared/ExcelRow';
 import EmptyState from '../../../shared/EmptyState';
@@ -177,6 +177,8 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
+  /** 读者视角总开关：一键展开/收起本页全部幕后内容。 */
+  const [readerView, setReaderView] = useState(false);
 
   const ext = npc as any;
   const handleDelete = useCallback(async () => {
@@ -239,13 +241,30 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
           </div>
 
           <div style={{ flex: 1, padding: '14px 18px', overflowY: 'auto', fontSize: 'var(--font-size-base)', lineHeight: '1.6' }}>
+            <button
+              type="button"
+              onClick={() => setReaderView(v => !v)}
+              title="查看角色尚不知情的幕后内容（仅屏幕前的你看得到）"
+              aria-pressed={readerView}
+              style={{
+                width: '100%', marginBottom: '12px', padding: '5px 10px',
+                border: `1px solid ${readerView ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)',
+                background: readerView ? 'var(--accent-dim)' : 'var(--bg-primary)',
+                color: readerView ? 'var(--accent)' : 'var(--text-muted)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                fontSize: 'var(--font-size-xs)', transition: 'all 0.15s',
+              }}
+            >
+              {readerView ? <EyeOff size={13} strokeWidth={1.5} /> : <Eye size={13} strokeWidth={1.5} />}
+              {readerView ? '收起幕后内容' : '查看幕后内容'}
+            </button>
             {tab === 'overview' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <Section icon={User} title="基本信息">
                   <ExcelRow label="姓名" value={npc.姓名 ?? '未知'} />
                   <ExcelRow label="种族" value={npc.种族 ?? '未知'} />
                   <ExcelRow label="性别" value={npc.性别 ?? '未知'} />
-                  <RevealRow label="年龄" known={npc.年龄} hidden={truth?.年龄} />
+                  <RevealRow label="年龄" known={npc.年龄} hidden={truth?.年龄} revealed={readerView} />
                 </Section>
                 <Section icon={BarChart3} title="关系数据">
                   <div style={{ marginBottom: '8px' }}>
@@ -255,8 +274,8 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
                   <ExcelRow label="关系类型" value={rd.关系类型 ?? '未知'} />
                 </Section>
                 <Section icon={Briefcase} title="社会身份">
-                  <RevealRow label="职业" known={sj.职业} hidden={truth?.社会身份?.职业} />
-                  <RevealRow label="地位" known={sj.社会地位} hidden={truth?.社会身份?.社会地位} />
+                  <RevealRow label="职业" known={sj.职业} hidden={truth?.社会身份?.职业} revealed={readerView} />
+                  <RevealRow label="地位" known={sj.社会地位} hidden={truth?.社会身份?.社会地位} revealed={readerView} />
                 </Section>
                 <Section icon={MapPin} title="状态">
                   <ExcelRow label="位置" value={pi.当前位置 ?? '未知'} />
@@ -270,17 +289,17 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
                 <Section icon={Sparkles} title="外貌与性格">
                   <ExcelRow label="外貌" value={pi.外貌 ?? '未知'} />
                   <ExcelRow label="表性格" value={pi.表性格 ?? '未知'} />
-                  <RevealRow label="里性格" known={pi.里性格} hidden={truthPi?.里性格} />
+                  <RevealRow label="里性格" known={pi.里性格} hidden={truthPi?.里性格} revealed={readerView} />
                   <ExcelRow label="穿着" value={pi.当前穿着 ?? '未知'} />
                 </Section>
                 <Section icon={BookOpen} title="背景">
-                  <RevealRow label="背景" known={ext.背景 || npc.背景} hidden={truth?.背景} />
+                  <RevealRow label="背景" known={ext.背景 || npc.背景} hidden={truth?.背景} revealed={readerView} />
                 </Section>
                 <Section icon={Brain} title="内心世界">
-                  <RevealRow label="当前想法" known={pi.当前想法 || ext.内心想法} hidden={truthPi?.当前想法 || truth?.内心想法} />
+                  <RevealRow label="当前想法" known={pi.当前想法 || ext.内心想法} hidden={truthPi?.当前想法 || truth?.内心想法} revealed={readerView} />
                   <ExcelRow label="当前行动" value={ext.当前行动} />
-                  <RevealRow label="短期目标" known={ext.短期目标} hidden={truth?.短期目标} />
-                  <RevealRow label="长期目标" known={ext.长期目标} hidden={truth?.长期目标} />
+                  <RevealRow label="短期目标" known={ext.短期目标} hidden={truth?.短期目标} revealed={readerView} />
+                  <RevealRow label="长期目标" known={ext.长期目标} hidden={truth?.长期目标} revealed={readerView} />
                 </Section>
                 {(ext.种族描述 || ext.种族效果 || (ext.种族特性 && ext.种族特性.length > 0)) && (
                   <Section icon={Dna} title="种族信息">
@@ -295,7 +314,7 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
                   </Section>
                 )}
                 <Section icon={BookOpen} title="备注">
-                  <RevealRow label="备注" known={pi.备注} hidden={truthPi?.备注} />
+                  <RevealRow label="备注" known={pi.备注} hidden={truthPi?.备注} revealed={readerView} />
                 </Section>
                 <Section icon={ScrollText} title="人物事迹">
                   <button onClick={() => setShowDeeds(true)} style={{
@@ -317,7 +336,7 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
               hasKnownSkills
                 ? <SkillsBlock data={ext} worldId={worldId} />
                 : hasTruthSkills
-                  ? <FogPanel label="技能与状态（幕后）"><SkillsBlock data={truth as unknown as Record<string, any>} worldId={worldId} /></FogPanel>
+                  ? <FogPanel label="技能与状态（幕后）" revealed={readerView}><SkillsBlock data={truth as unknown as Record<string, any>} worldId={worldId} /></FogPanel>
                   : <EmptyState icon={Swords} message="暂无技能数据" />
             )}
 
@@ -325,7 +344,7 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
               hasKnownItems
                 ? <ItemsBlock data={ext} />
                 : hasTruthItems
-                  ? <FogPanel label="随身物品（幕后）"><ItemsBlock data={truth as unknown as Record<string, any>} /></FogPanel>
+                  ? <FogPanel label="随身物品（幕后）" revealed={readerView}><ItemsBlock data={truth as unknown as Record<string, any>} /></FogPanel>
                   : <EmptyState icon={Backpack} message="暂无物品数据" />
             )}
           </div>
