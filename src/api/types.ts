@@ -21,13 +21,20 @@ export interface Message {
   content: string;
 }
 
+export interface JsonSchemaResponseFormat {
+  type: 'json_schema';
+  name: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
+}
+
 export interface RequestOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
   signal?: AbortSignal;
   stream?: boolean;
-  responseFormat?: 'json' | 'text';
+  responseFormat?: 'json' | 'text' | JsonSchemaResponseFormat;
 }
 
 export interface StreamOptions extends RequestOptions {

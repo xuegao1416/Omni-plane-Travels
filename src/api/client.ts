@@ -92,6 +92,16 @@ function buildRequestBody(config: ApiConfig, messages: Message[], options: Reque
   if (config.topK != null) body.top_k = config.topK;
   if (config.reasoningEffort && config.reasoningEffort !== '关闭') body.reasoning_effort = config.reasoningEffort;
   if (options.responseFormat === 'json') body.response_format = { type: 'json_object' };
+  else if (typeof options.responseFormat === 'object' && options.responseFormat.type === 'json_schema') {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: options.responseFormat.name,
+        strict: options.responseFormat.strict ?? true,
+        schema: options.responseFormat.schema,
+      },
+    };
+  }
   // Google不支持某些参数
   if (config.provider === 'google') {
     delete body.frequency_penalty;
@@ -365,12 +375,14 @@ async function requestWithFallback(
   }
   try {
     const result = await requestCompletionStream(config, messages, options);
-    // 内容过短（≤5字符）视为异常响应（429被包装成200、内容审核截断等），触发重试
-    if (!result.text || result.text.trim().length <= 5) {
-      console.warn(`[API] 流式响应内容过短（${result.text.length} 字符），降级到非流式重试`);
+    // 空响应可以重试；简短但有效的回答不应被当作限流或审核失败。
+    if (!result.text?.trim()) {
+      if (result.finishReason === 'content_filter' || result.finishReason === 'content-filter') throw new Error('模型服务明确拒绝了本次请求');
+      console.warn('[API] 流式响应为空，降级到非流式重试');
       const fallback = await requestCompletion(config, messages, options);
-      if (!fallback.text || fallback.text.trim().length <= 5) {
-        throw new Error(`API 429: 流式和非流式均返回过短响应，疑似限流或内容审核`);
+      if (!fallback.text?.trim()) {
+        if (fallback.finishReason === 'content_filter' || fallback.finishReason === 'content-filter') throw new Error('模型服务明确拒绝了本次请求');
+        throw new Error('模型服务返回空响应，请重试或检查模型配置');
       }
       return fallback;
     }
