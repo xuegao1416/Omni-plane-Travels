@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { requestStructuredCompletion, StructuredOutputValidationError } from '../api/structuredOutput';
+import { requestStructuredCompletion } from '../api/structuredOutput';
 import type { ApiConfig } from '../api/types';
 import { readDirectorPath } from './align';
 import type { DirectorReadContext, DirectorState, PlotPlan } from './types';
@@ -75,23 +75,14 @@ export async function requestDirectorDecision(state: DirectorState, context: Dir
     committedNarrative: context.narrative, memories: context.memories.slice(-60),
     variables: { 世界: context.variableProjection.世界, 玩家: context.variableProjection.玩家,
       人物档案: Object.fromEntries(Object.entries(context.variableProjection.人物档案).map(([id, npc]) => [id, { 姓名: npc.姓名, 人物分类: npc.人物分类, 个人信息: npc.个人信息, 短期目标: npc.短期目标, 长期目标: npc.长期目标, 内心想法: npc.内心想法 }])) } };
-  try {
-    return await requestStructuredCompletion({
-      config,
-      messages: [{ role: 'system', content: DIRECTOR_INSTRUCTIONS }, { role: 'user', content: JSON.stringify(input) }],
-      schema: decisionSchema,
-      schemaName: 'director_decision',
-      temperature: 0.3,
-      maxTokens: 6000,
-      signal,
-      repairAttempts: 1,
-    });
-  } catch (error) {
-    // 结构协议连续失败不应阻塞正文或污染导演状态；网络/API 错误仍按原路径上抛。
-    if (error instanceof StructuredOutputValidationError) {
-      console.warn('[Director] 本轮结构化决策连续校验失败，安全跳过新增导演提案:', error.issues);
-      return { conditions: [], plans: [], offscreen: [] };
-    }
-    throw error;
-  }
+  return requestStructuredCompletion({
+    config,
+    messages: [{ role: 'system', content: DIRECTOR_INSTRUCTIONS }, { role: 'user', content: JSON.stringify(input) }],
+    schema: decisionSchema,
+    schemaName: 'director_decision',
+    temperature: 0.3,
+    maxTokens: 6000,
+    signal,
+    repairAttempts: 1,
+  });
 }

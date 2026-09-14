@@ -5,7 +5,8 @@ import type { SimulationState } from '../simulation/types';
 import { EvolutionTurnCoordinator, evolutionFactVersion } from '../simulation/turnCoordinator';
 import { alignDirectorPlans } from './align';
 import { reconcileDirectorActors } from './actorIdentity';
-import { applyDirectorDecision, requestDirectorDecision } from './client';
+import { applyDirectorDecision, requestDirectorDecision, type DirectorDecision } from './client';
+import { StructuredOutputValidationError } from '../api/structuredOutput';
 import type { OffscreenMemoryPort } from './memoryConsumer';
 import { retryPendingOffscreenMemories, submitOffscreenEvent } from './offscreenPipeline';
 import { evaluateDirectiveOutcome } from './outcome';
@@ -53,6 +54,14 @@ export class DirectorReviewController {
   async retryMainline(): Promise<void> { if (!this.foregroundBusy && this.lastInput) await this.run({ ...this.lastInput, signal: undefined }); }
   async retryBackground(): Promise<void> { if (!this.foregroundBusy && this.lastInput) await this.run({ ...this.lastInput, signal: undefined }, { backgroundOnly: true }); }
 
+  /** 结构协议连续失败时本轮只沿用既有计划，但必须让调用方察觉，避免失败静默。 */
+  private notifyDegraded(issues: string[]): void {
+    const message = `本轮导演指导未生成，已沿用既有计划：${issues.join('；')}`;
+    const report = this.lastInput?.onBackgroundError;
+    if (report) report(message);
+    else console.warn(`[Director] ${message}`);
+  }
+
   /** Await before narrative assembly; respects the current player input, including turn zero. */
   async prepareForTurn(input: {
     engine: DirectorStateHost; context: DirectorReadContext; world: WorldDef; config: ApiConfig;
@@ -65,7 +74,15 @@ export class DirectorReviewController {
     alignDirectorPlans(director, input.context);
     refreshSourceExhaustion(director);
     if (simulation.config.enabled) {
-      const decision = await this.requestDecision(director, input.context, input.world.description || input.world.name, input.config, input.signal);
+      let decision: DirectorDecision;
+      try {
+        decision = await this.requestDecision(director, input.context, input.world.description || input.world.name, input.config, input.signal);
+      } catch (error) {
+        // 正文不能被结构协议失败拖住；本轮降级为沿用既有计划，但必须让调用方看到。
+        if (!(error instanceof StructuredOutputValidationError)) throw error;
+        this.notifyDegraded(error.issues);
+        decision = { conditions: [], plans: [], offscreen: [] };
+      }
       if (input.signal?.aborted || !input.isCurrent()) return undefined;
       applyDirectorDecision(director, decision, input.context);
       alignDirectorPlans(director, input.context);
