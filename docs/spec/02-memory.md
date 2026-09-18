@@ -12,7 +12,7 @@
 - `memoryPipeline.regression.test.ts` — 记忆管线回归测试
 - `memoryStore.checkpoint.test.ts` — 记忆 store 检查点测试
 
-### 2.1 9 阶段管线 — `src/memory/memoryPipeline.ts` (1202行)
+### 2.1 9 阶段管线 — `src/memory/memoryPipeline.ts`
 
 **文件路径**: `src/memory/memoryPipeline.ts`
 
@@ -65,7 +65,7 @@ interface NarrativeObject {
   relatedObjects: string[]; // 相关对象ID
 }
 
-// 调用 memoryPrompts.writePrompt 构建提示词
+// 使用 narrativePromptTemplates.ingest 构建提示词
 // 调用 API（writeConfig）提取叙事对象
 // 结果写入 memoryStore.runtime.narrativeObjects
 ```
@@ -82,7 +82,7 @@ interface NarrativeSummary {
   importantFacts: string[]; // 重要事实
 }
 
-// 调用 memoryPrompts.summaryPrompt
+// 使用 narrativePromptTemplates.summary
 // 结果写入 memoryStore.runtime.summarySaveHistory
 ```
 
@@ -128,7 +128,7 @@ interface VectorFact {
 }
 // VectorMemoryItem = VectorFact & { id: string; searchText?; embeddingTimestamp? }
 
-// 调用 memoryPrompts.vectorExtractPrompt
+// 使用 narrativePromptTemplates.vectorExtract
 // 结果写入 memoryStore.vectorMemory
 // 同时调用 fetchEmbeddingBatch 向量化
 ```
@@ -145,7 +145,7 @@ interface QueryRewriteResult {
   timeContext: string;       // 时间上下文
 }
 
-// 调用 memoryPrompts.queryRewritePrompt
+// 使用 narrativePromptTemplates.queryRewrite
 // 结果写入 memCtx.queryRewriteResult
 ```
 
@@ -161,7 +161,7 @@ interface RetrievePlan {
   estimatedTokens: number;       // 预估token消耗
 }
 
-// 调用 memoryPrompts.retrievePlanPrompt
+// 使用 narrativePromptTemplates.retrievePlanner
 ```
 
 #### 2.1.6 multi_round阶段 — 多轮补充检索
@@ -170,7 +170,7 @@ interface RetrievePlan {
 // 基于检索结果，进行多轮补充检索
 // 每轮检索可能发现新的相关记忆
 // 最多5轮迭代（防止无限循环）
-// 调用 memoryPrompts.multiRoundPrompt
+// 使用 narrativePromptTemplates.multiRoundRetrievePlanner
 ```
 
 #### 2.1.7 rerank阶段 — 重排序
@@ -184,7 +184,7 @@ interface RerankedMemory {
   injectionPosition: 'before' | 'after' | 'replace';
 }
 
-// 调用 memoryPrompts.rerankPrompt
+// 使用 narrativePromptTemplates.rerank
 ```
 
 #### 2.1.8 finalize阶段 — 最终化
@@ -208,15 +208,15 @@ interface CompiledMemoryContext {
   injectionPoints: Array<{ position: string; content: string }>;
 }
 
-// 调用 memoryPrompts.compilePrompt
+// 编译阶段由 compileFormatter 生成注入文本
 // 结果写入 memoryStore.lastCompiledContext
 ```
 
-#### 2.1.10 降级机制（2026-09-08 核对：源码中无 withDegradationCheck 函数，降级由各 executeMemoryX 阶段直接 push 到 ctx.\_degradedStages 实现）
+#### 2.1.10 降级机制
 
 ```typescript
-// 每个阶段失败时（如向量化失败）向 ctx._degradedStages 追加阶段标识；源码中无 withDegradationCheck 包装函数
-function withDegradationCheck( // ❌ 实际不存在此函数，仅示意降级思路
+// 每个阶段失败时（如向量化失败）向 ctx._degradedStages 追加阶段标识
+function withDegradationCheck(
   memCtx: MemoryPipelineContext,
   label: string,
   task: () => Promise<void>,
@@ -255,12 +255,12 @@ class StagedMemoryStore ❌ 实际未找到此 export 类名(可能已废弃或�
 
 ---
 
-### 2.2 记忆 Store — `src/memory/memoryStore.ts` (975行)
+### 2.2 记忆 Store — `src/memory/memoryStore.ts`
 
 **文件路径**: `src/memory/memoryStore.ts`
 
 ```typescript
-// 实际接口 — `src/memory/memoryStore.ts`(2026-09-08 核对)
+// 实际接口 — `src/memory/memoryStore.ts`
 interface MemoryStore {
   // 状态(13 个，完整定义见 memory/types.ts MemoryStoreState)
   config: MemorySystemConfig;
@@ -288,7 +288,7 @@ interface MemoryStore {
   resetMemoryRuntime: () => void;
   bumpRuntimeVersion: () => void;
 
-  // Checkpoint（实际存在，2026-09-08 核对 memoryStore.ts 确认）
+  // Checkpoint
   createCheckpoint: () => NarrativeCheckpoint | null;
   restoreCheckpoint: (checkpointId: string) => boolean;
 
@@ -300,7 +300,7 @@ interface MemoryStore {
   upsertStateSlot: (slot: NarrativeStateSlot) => void;
   // ... 等
 
-  // 文档曾误列但实际不存在的方法(2026-09-08 核对 memoryStore.ts 源码确认):
+  // 实际不存在的方法:
   // ❌ addNarrativeObject / addVectorFact / updateThreadStatus / archiveThread
   // ❌ search / getRecentFacts / compileContext
   // ❌ getCheckpoint（注意：createCheckpoint / restoreCheckpoint 实际存在，见上）
@@ -310,7 +310,7 @@ interface MemoryStore {
 }
 ```
 
-#### 2.2.1 NarrativeMemoryRuntime 结构（2026-09-08 核对：完整定义见 memory/types.ts；下列为节选，实际还含 version/bankId/mutationLog/sourceEvents/lastSummarySave/lastRetrievePlan 等字段，且 SceneAnchor、NarrativeThread 等子结构字段以源码为准）
+#### 2.2.1 NarrativeMemoryRuntime 结构（完整定义见 `memory/types.ts`；下列为节选，实际还含 version/bankId/mutationLog/sourceEvents/lastSummarySave/lastRetrievePlan 等字段，且 SceneAnchor、NarrativeThread 等子结构字段以源码为准）
 
 ```typescript
 interface NarrativeMemoryRuntime {
@@ -421,7 +421,7 @@ interface NarrativeMemoryRuntime {
 }
 ```
 
-#### 2.2.2 VectorFact 结构（2026-09-08 核对：以 memory/types.ts 为准）
+#### 2.2.2 VectorFact 结构（以 `memory/types.ts` 为准）
 
 ````typescript
 ```typescript
@@ -475,7 +475,7 @@ export interface VectorFact {
 
 ### 2.3 向量与嵌入运行时
 
-#### 2.3.1 向量工具 — `src/memory/vectorUtils.ts` (309行)
+#### 2.3.1 向量工具 — `src/memory/vectorUtils.ts`
 
 **文件路径**: `src/memory/vectorUtils.ts`
 
@@ -540,7 +540,7 @@ function searchBySimilarity(
 
 ---
 
-### 2.4 提示词模板 — `src/memory/memoryPrompts.ts` (545行)
+### 2.4 提示词模板 — `src/memory/memoryPrompts.ts`
 
 **文件路径**: `src/memory/memoryPrompts.ts`
 
@@ -640,10 +640,10 @@ const rerankPrompt = `对检索到的记忆进行相关性打分...
 ## 待评分记忆
 {memories}`;
 
-// compilePrompt — 上下文编译
-// 输入: rerankedMemories, userQuery, budget
-// 输出: { fullText, tokenCount, memoryCount }
-const compilePrompt = `将记忆片段编译成连贯的上下文文本...
+// 编译注入文本（由 compileFormatter 生成）
+// 输入: runtime, queryKeywords, budget, resourceState
+// 输出: string
+const compiledText = `将记忆片段编译成连贯的上下文文本...
 
 ## 记忆片段
 {memories}
@@ -659,20 +659,20 @@ const compilePrompt = `将记忆片段编译成连贯的上下文文本...
 
 ### 2.5 编译/叙事/候选
 
-| 文件                                                                | 行数   | 职责                                                           |
-| ----------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
-| `src/memory/compileFormatter.ts`                                  | 369  | 把 `RerankedMemory[]` 编译成最终注入文本(`fullText`),控制 token 预算与排版    |
-| `src/memory/narrativeGraph.ts` (1355行)),用于 `multi_round` 阶段遍历相关记忆 |      |                                                              |
-| `src/memory/narrativeParsers.ts`                                  | 575  | 从 AI 响应解析叙事对象,补充 `write` 阶段提取不到的实体引用                         |
-| `src/memory/narrativePng.ts`                                      | 505  | 叙事图 PNG 导出(可视化调试,可选)                                         |
-| `src/memory/memoryCandidates.ts`                                  | 163  | 候选记忆去重/合并策略(`entities`/`keywords`/`primaryType` 重叠检测)        |
-| `src/memory/memoryConfig.ts`                                      | 277  | 记忆系统配置 schema(嵌入模型/管线预算/降级策略)                                |
-| `src/memory/normalize.ts`                                         | 187  | 记忆数据标准化(版本兼容/字段合并)                                           |
-| `src/memory/types.ts` (710行)                                      | ~300 | `NarrativeMemoryRuntime` / `VectorFact` / `Checkpoint` 等类型定义 |
+| 文件                                                                | 职责                                                           |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| `src/memory/compileFormatter.ts`                                  | 把 `RerankedMemory[]` 编译成最终注入文本(`fullText`),控制 token 预算与排版    |
+| `src/memory/narrativeGraph.ts` | `multi_round` 阶段遍历相关记忆 |
+| `src/memory/narrativeParsers.ts`                                  | 从 AI 响应解析叙事对象,补充 `write` 阶段提取不到的实体引用                         |
+| `src/memory/narrativePng.ts`                                      | 叙事图 PNG 导出(可视化调试,可选)                                         |
+| `src/memory/memoryCandidates.ts`                                  | 候选记忆去重/合并策略(`entities`/`keywords`/`primaryType` 重叠检测)        |
+| `src/memory/memoryConfig.ts`                                      | 记忆系统配置 schema(嵌入模型/管线预算/降级策略)                                |
+| `src/memory/normalize.ts`                                         | 记忆数据标准化(版本兼容/字段合并)                                           |
+| `src/memory/types.ts`                                      | `NarrativeMemoryRuntime` / `VectorFact` / `Checkpoint` 等类型定义 |
 
 **`compileFormatter` 与 `compile` 阶段的关系**:
 
-- `memoryPipeline.compile()` 调用 `compileFormatter.format(reranked, query, budget)` 生成 `fullText`
+- 编译阶段 `executeMemoryCompile` 调用 `compileFormatter.formatRuntimeToCompiledText(runtime, queryKeywords, budget, resourceState)` 生成注入文本
 - 输出写入 `memoryStore.lastCompiledContext`,供下次 `mainTask` 步骤 6 使用
 - 失败兜底:返回空字符串,不阻塞主线(但会触发 `_degradedStages` 标记)
 

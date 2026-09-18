@@ -101,11 +101,15 @@ export function rebuildNovelDatasetSegments(
     }
     return Object.fromEntries(Object.entries(row).map(([key, item]) => [key, rebase(item)]));
   };
-  const previous = new Map(dataset.segments.map(segment => [segment.inputHash, segment]));
+  // Recompute structural identity: older analysis runs overwrote inputHash with
+  // the model fingerprint. Evidence/plot caches have their own dedicated hashes.
+  const previous = new Map(dataset.segments.map(segment => [
+    hashNovelText(`${segment.chapterIds.join('|')}\n${(segment.sourceText ?? '').trim()}`), segment,
+  ]));
   const segments = buildNovelSegments(dataset.id, normalized, options).map(segment => {
-    const old = previous.get(segment.inputHash);
+    const old = segment.inputHash ? previous.get(segment.inputHash) : undefined;
     if (!old || old.title !== segment.title || old.sourceText !== segment.sourceText) return segment;
-    return { ...rebase(old) as typeof old, datasetId: dataset.id, index: segment.index, sourceRanges: segment.sourceRanges,
+    return { ...rebase(old) as typeof old, datasetId: dataset.id, index: segment.index, inputHash: segment.inputHash, sourceRanges: segment.sourceRanges,
       status: old.status === 'processing' ? 'pending' as const : old.status };
   });
   const changed = segments.length !== dataset.segments.length || segments.some((segment, index) => segment.id !== dataset.segments[index]?.id);

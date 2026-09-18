@@ -370,7 +370,6 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       try {
         segment = {
           ...segment,
-          inputHash: sourceHash,
           status: 'processing',
           evidenceStatus: 'processing',
           error: undefined,

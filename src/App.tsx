@@ -31,7 +31,9 @@ function AppContent() {
     const previousScreen = state.screenHistory[state.screenHistory.length - 1];
     return (
       <div className="settings-route">
-        {previousScreen === 'game' ? <GameScreen /> : <StartScreen />}
+        <div className="settings-route__background" aria-hidden="true" inert>
+          {previousScreen === 'game' ? <GameScreen /> : <StartScreen />}
+        </div>
         <SettingsScreen />
       </div>
     );

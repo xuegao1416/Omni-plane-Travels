@@ -69,23 +69,31 @@ function findField(module: CustomGameplayModuleDefinition, path: string): StateF
   return field;
 }
 
-function isRuntimeValueCompatible(field: StateFieldDefinition, value: JsonValue): boolean {
+export function isRuntimeValueCompatible(field: StateFieldDefinition, value: JsonValue): boolean {
   switch (field.type) {
-    case 'number': return typeof value === 'number' && Number.isFinite(value);
+    case 'number': return typeof value === 'number' && Number.isFinite(value)
+      && (field.min === undefined || value >= field.min) && (field.max === undefined || value <= field.max);
     case 'string': return typeof value === 'string' && (field.maxLength === undefined || value.length <= field.maxLength);
     case 'boolean': return typeof value === 'boolean';
     case 'enum': return typeof value === 'string' && field.values.includes(value);
     case 'array': return Array.isArray(value)
+      && JSON.stringify(value).length <= field.maxSize && valueDepth(value) <= field.maxDepth
       && value.length <= field.maxItems
       && value.every((item) => isRuntimeValueCompatible(field.items, item));
     case 'object': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
       const entries = Object.entries(value);
       return entries.length <= field.maxProperties
+        && JSON.stringify(value).length <= field.maxSize && valueDepth(value) <= field.maxDepth
         && entries.every(([key, item]) => Boolean(field.fields[key]) && isRuntimeValueCompatible(field.fields[key], item))
         && Object.keys(field.fields).every((key) => Object.prototype.hasOwnProperty.call(value, key));
     }
   }
+}
+
+function valueDepth(value: JsonValue): number {
+  if (!value || typeof value !== 'object') return 0;
+  return 1 + Math.max(0, ...Object.values(value).map(valueDepth));
 }
 
 function equal(a: JsonValue, b: JsonValue): boolean {
@@ -178,4 +186,3 @@ export function executeCustomModuleActions(
   if (actions.length > maxActions) warnings.push(`动作数量超过上限，已截断为 ${maxActions} 条`);
   return { nextState, applied, warnings };
 }
-

@@ -7,10 +7,10 @@
 
 ### 5.1 内核与类型
 
-| 文件                       | 行数  | 职责                                               |
-| ------------------------ | --- | ------------------------------------------------ |
-| `src/gameplay/kernel.ts` | 539 | 玩法内核主入口(条件求值/状态机/事件分发)                           |
-| `src/gameplay/types.ts`  | 166 | `GameplayStateRoot` / `Condition` / `Action` 等类型 |
+| 文件                       | 职责                                               |
+| ------------------------ | ------------------------------------------------ |
+| `src/gameplay/kernel.ts` | 玩法内核主入口(条件求值/状态机/事件分发)                           |
+| `src/gameplay/types.ts`  | `GameplayStateRoot` / `Condition` / `Action` 等类型 |
 
 **`kernel.ts` 提供**(均为实际导出符号;无 `applyGameplayAction` / `registerGameplayModule`):
 

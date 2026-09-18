@@ -1,269 +1,177 @@
-import { useEffect,useMemo,useRef,useState } from 'react';
-import {
-AlertTriangle,ArrowUpRight,Check,ChevronDown,Download,GitBranch,Link2,
-Loader2,Send,SlidersHorizontal,Sparkles,Square,Target,Upload,X,Zap,
-} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Download, History, Loader2, MessageSquare, Pencil, Plus, RotateCcw, Save, Send, Sparkles, Square, Trash2, Upload, X } from 'lucide-react';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 import { useConfigStore } from '../../stores/configStore';
-import { findWorldDef,getAllWorlds } from '../../data/worldLoader';
-import { WorldIcon } from '../shared/worldIcons';
-import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
-import {
-parseCustomModuleDraft,
-runCustomModuleAgentTurn,
-} from '../../custom-modules/agent';
-import {
-applyCustomModuleAgentTurn,
-createCustomModuleAgentSession,
-restoreCustomModuleAgentSessionForWorld,
-type CustomModuleAgentQuestion,
-type CustomModuleConversationMessage,
-type CustomModuleAgentSession,
-} from '../../custom-modules/agentSession';
-import { buildCustomModuleAgentWorldContext } from '../../custom-modules/capabilities';
-import {
-bindCustomGameplayModule,
-loadCustomModuleAgentSession,
-saveCustomGameplayModule,
-saveCustomModuleAgentSession,
-} from '../../custom-modules/storage';
-import '../../styles/custom-modules.css';
 import { useWorkshopStore } from '../../stores/workshopStore';
+import { findWorldDef, getAllWorlds } from '../../data/worldLoader';
+import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
+import { WorldIcon } from '../shared/worldIcons';
+import { buildCustomModuleAgentWorldContext } from '../../custom-modules/capabilities';
+import { useModuleWorkshopStore } from '../../custom-modules/workshopStore';
+import type { WorkshopMessage } from '../../custom-modules/workshopSession';
+import { bindCustomGameplayModule, saveCustomGameplayModule } from '../../custom-modules/storage';
+import { WorkshopModulePanel } from './WorkshopModulePanel';
+import '../../styles/custom-modules.css';
 
-interface Props {
-  onClose: () => void;
+interface Props { onClose: () => void }
+
+function messageText(message: WorkshopMessage): string {
+  return message.parts.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n');
 }
 
-const WELCOME_MESSAGE = '你好，我是自定义模块 Agent。先告诉我你想让这个模块解决什么问题；如果信息还不够，我会继续追问。';
+function Markdown({ text }: { text: string }) {
+  const html = useMemo(() => DOMPurify.sanitize(marked.parse(text, { async: false }), {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'del', 'code', 'pre', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'hr', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a'],
+    ALLOWED_ATTR: ['href', 'title'],
+  }), [text]);
+  return <div className="mws-markdown" dangerouslySetInnerHTML={{ __html: html }} />;
+}
 
-const BLUEPRINT_ITEMS = [
-  { label: '目标', detail: '模块要解决什么问题', Icon: Target },
-  { label: '触发', detail: '何时开始或推进', Icon: Zap },
-  { label: '输入', detail: '需要哪些状态字段', Icon: SlidersHorizontal },
-  { label: '规则', detail: '如何安全地改变自身状态', Icon: GitBranch },
-  { label: '输出', detail: '前端卡片或后台结果', Icon: ArrowUpRight },
-  { label: '冲突 / 绑定', detail: '校验与目标世界', Icon: Link2 },
-];
+const toolLabels: Record<string, string> = {
+  capabilities: '查询可用能力', getCapabilities: '查询可用能力', readDraft: '读取当前草稿',
+  createDraft: '创建模块草稿', patchDraft: '修改模块草稿', validateDraft: '校验模块', simulate: '模拟运行',
+};
 
 export default function CustomModuleAgentWorkspace({ onClose }: Props) {
   const apiConfig = useConfigStore((state) => state.apiConfig);
-  const createWorkshopItem = useWorkshopStore((state) => state.createItem);
+  const publish = useWorkshopStore((state) => state.createItem);
+  const workshop = useModuleWorkshopStore();
   const worlds = useMemo(() => getAllWorlds(), []);
-  const [selectedWorldId, setSelectedWorldId] = useState(() => worlds[0]?.id || '');
-  const world = useMemo(() => selectedWorldId ? findWorldDef(selectedWorldId) : undefined, [selectedWorldId]);
-  const [conversation, setConversation] = useState<CustomModuleConversationMessage[]>([{ role: 'assistant', content: WELCOME_MESSAGE }]);
+  const [worldId, setWorldId] = useState(() => worlds[0]?.id ?? '');
+  const world = useMemo(() => findWorldDef(worldId), [worldId]);
+  const session = workshop.sessions.find((item) => item.id === workshop.activeSessionId);
+  const revision = session?.revisions.find((item) => item.number === session.currentRevision);
   const [input, setInput] = useState('');
-  const [streamingText, setStreamingText] = useState('');
-  const [session, setSession] = useState<CustomModuleAgentSession>(() => createCustomModuleAgentSession(
-    buildCustomModuleAgentWorldContext(worlds[0] ?? { id: '', name: '', modules: [] }),
-  ));
-  const [activeQuestion, setActiveQuestion] = useState<CustomModuleAgentQuestion>();
-  const [requestError, setRequestError] = useState<{ errors: Array<{ path: string[]; message: string }>; raw?: string } | null>(null);
-  const [lastRaw, setLastRaw] = useState('');
-  const [revisionSummary, setRevisionSummary] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [loadingSession, setLoadingSession] = useState(true);
+  const [editId, setEditId] = useState<string>();
+  const [editText, setEditText] = useState('');
+  const [renameId, setRenameId] = useState<string>();
+  const [renameText, setRenameText] = useState('');
+  const [deleteId, setDeleteId] = useState<string>();
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
   const [notice, setNotice] = useState('');
-  const [mobileTab, setMobileTab] = useState<'conversation' | 'blueprint'>('conversation');
-  const abortRef = useRef<AbortController | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  const draftModule = session.lastValidDraft;
-  const stateEntries = draftModule ? Object.entries(draftModule.state) : [];
-  const activeRules = draftModule ? Object.entries(draftModule.logic).filter(([, rules]) => rules.length > 0) : [];
-  const workspaceStatus = loadingSession ? '加载中' : busy ? '生成中' : notice ? '已保存' : requestError ? '本轮未应用' : draftModule ? (session.revision > 1 ? '修订中' : '草案就绪') : session.brief.goal ? '需求探索' : '等待描述';
-
-  useEffect(() => {
-    if (!selectedWorldId) return;
-    let cancelled = false;
-    const worldContext = buildCustomModuleAgentWorldContext(world ?? {
-      id: selectedWorldId, name: selectedWorldId, modules: [],
-    });
-    const fresh = createCustomModuleAgentSession(worldContext);
-    setLoadingSession(true);
-    setSession(fresh);
-    setConversation([{ role: 'assistant', content: WELCOME_MESSAGE }]);
-    setActiveQuestion(undefined);
-    setRequestError(null);
-    setLastRaw('');
-    setRevisionSummary([]);
-    void loadCustomModuleAgentSession(selectedWorldId)
-      .then((saved) => {
-        if (cancelled) return;
-        const restored = restoreCustomModuleAgentSessionForWorld(saved, worldContext);
-        setSession(restored);
-        setConversation(restored.conversation.length ? restored.conversation : [{ role: 'assistant', content: WELCOME_MESSAGE }]);
-      })
-      .catch(() => undefined)
-      .finally(() => { if (!cancelled) setLoadingSession(false); });
-    return () => { cancelled = true; };
-  }, [selectedWorldId, world]);
+  const [actionError, setActionError] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'sessions' | 'chat' | 'module'>('chat');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  const scopeRef = useRef(0);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); abortRef.current?.abort(); onClose(); } };
-    window.addEventListener('keydown', handleKeyDown);
-    closeButtonRef.current?.focus();
-    return () => { window.removeEventListener('keydown', handleKeyDown); abortRef.current?.abort(); };
+    if (world) void workshop.openWorld(buildCustomModuleAgentWorldContext(world));
+    return () => useModuleWorkshopStore.getState().stop();
+  }, [world, workshop.openWorld]);
+
+  useEffect(() => {
+    scopeRef.current += 1;
+    setInput(''); setEditId(undefined); setDeleteId(undefined); setRenameId(undefined);
+    setNotice(''); setActionError(''); setImportOpen(false); setImportText('');
+    stickToBottom.current = true;
+  }, [worldId, workshop.activeSessionId]);
+
+  useEffect(() => {
+    const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); useModuleWorkshopStore.getState().stop(); onClose(); }
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled), summary, a[href], [tabindex="0"]') ?? []).filter((element) => element.getClientRects().length > 0);
+      const first = focusable[0]; const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => { window.removeEventListener('keydown', handleKey); scopeRef.current += 1; useModuleWorkshopStore.getState().stop(); priorFocus?.focus(); };
   }, [onClose]);
 
-  const appendAssistantMessage = (
-    message: string,
-    base: CustomModuleConversationMessage[] = conversation,
-    sessionValue: CustomModuleAgentSession = session,
-  ) => {
-    const next = [...base, { role: 'assistant' as const, content: message }];
-    const nextSession = { ...sessionValue, conversation: next };
-    setConversation(next);
-    setSession(nextSession);
-    void saveCustomModuleAgentSession(nextSession);
-    return next;
-  };
+  useEffect(() => {
+    if (stickToBottom.current && historyRef.current) historyRef.current.scrollTop = historyRef.current.scrollHeight;
+  }, [session?.messages]);
 
-  const applyEnvelope = (envelope: Parameters<typeof applyCustomModuleAgentTurn>[1], raw: string): CustomModuleAgentSession | null => {
-    const before = session.lastValidDraft;
-    const applied = applyCustomModuleAgentTurn(session, envelope);
-    if (!applied.accepted) {
-      setRequestError({ errors: applied.errors, raw });
-      return null;
-    }
-    setSession(applied.session);
-    setRequestError(null);
-    setLastRaw(raw);
-    if (before && applied.session.lastValidDraft) {
-      const changed = Object.keys(applied.session.lastValidDraft).filter((key) => JSON.stringify((before as unknown as Record<string, unknown>)[key]) !== JSON.stringify((applied.session.lastValidDraft as unknown as Record<string, unknown>)[key]));
-      setRevisionSummary(changed.length ? changed.map((key) => `已更新 ${key}`) : ['保留现有设计，仅应用本轮要求']);
-    } else setRevisionSummary([]);
-    return applied.session;
+  const runAction = async (action: () => Promise<unknown>, success?: string) => {
+    if (actionBusy) return;
+    const scope = scopeRef.current;
+    setActionBusy(true); setNotice(''); setActionError('');
+    try { await action(); if (scope === scopeRef.current && success) setNotice(success); }
+    catch (error) { if (scope === scopeRef.current) setActionError(error instanceof Error ? error.message : String(error)); }
+    finally { setActionBusy(false); }
   };
-
-  const updateRevisionSummary = (before: CustomModuleAgentSession['lastValidDraft'], after: CustomModuleAgentSession['lastValidDraft']) => {
-    if (!before || !after) {
-      setRevisionSummary([]);
-      return;
-    }
-    const changed = Object.keys(after).filter((key) => JSON.stringify((before as unknown as Record<string, unknown>)[key]) !== JSON.stringify((after as unknown as Record<string, unknown>)[key]));
-    setRevisionSummary(changed.length ? changed.map((key) => `已更新 ${key}`) : ['保留现有设计，仅应用本轮要求']);
-  };
-
-  const handleSend = async () => {
+  const disabled = workshop.loading || actionBusy;
+  const send = () => {
     const text = input.trim();
-    if (!text || busy || loadingSession || !world) return;
-    const userMessage: CustomModuleConversationMessage = { role: 'user', content: text };
-    const nextConversation = [...conversation, userMessage];
-    setConversation(nextConversation); setInput(''); setNotice(''); setRequestError(null); setActiveQuestion(undefined);
-
-    // 开发者可以直接粘贴 JSON，走本地协议校验，不依赖 API。
-    if (text.startsWith('{')) {
-      const local = parseCustomModuleDraft(text);
-      if (local.ok) {
-        const appliedSession = applyEnvelope({ message: 'JSON 草案已通过本地校验，可以确认安装。', phase: 'draft_ready', brief: session.brief, module: local.module }, text);
-        appendAssistantMessage('JSON 草案已通过本地校验，可以确认安装。', nextConversation, appliedSession ?? session);
-      } else { setRequestError({ errors: local.errors, raw: text }); setLastRaw(text); appendAssistantMessage('这份 JSON 还不能安装；上一份有效草案已保留。', nextConversation); }
-      return;
-    }
-    if (!apiConfig) { appendAssistantMessage('当前还没有配置 API。你可以先到设置里配置，或者直接粘贴符合协议的 JSON。', nextConversation); return; }
-
-    const controller = new AbortController(); abortRef.current = controller; setBusy(true); setStreamingText('');
-    try {
-      const result = await runCustomModuleAgentTurn(apiConfig, session, text, { signal: controller.signal, conversation: nextConversation, onText: setStreamingText });
-      if (result.ok) {
-        if (result.session) updateRevisionSummary(session.lastValidDraft, result.session.lastValidDraft);
-        setLastRaw(result.raw);
-        setRequestError(null);
-        const nextQuestion = result.phase === 'draft_ready' ? undefined : result.question;
-        setActiveQuestion(nextQuestion);
-        const questionText = nextQuestion?.text.trim();
-        const sameText = questionText?.replace(/\s+/g, ' ') === result.message.trim().replace(/\s+/g, ' ');
-        const assistantMessage = questionText && !sameText ? `${result.message}\n\n${questionText}` : result.message;
-        const completedConversation = [...nextConversation, { role: 'assistant' as const, content: assistantMessage }];
-        const completedSession = { ...(result.session ?? session), conversation: completedConversation };
-        setConversation(completedConversation);
-        setSession(completedSession);
-        void saveCustomModuleAgentSession(completedSession);
-      } else {
-        setActiveQuestion(undefined);
-        setRequestError({ errors: result.errors, raw: result.raw });
-        appendAssistantMessage('这轮回复没有通过本地校验；已保留当前需求和上一份有效草案。', nextConversation, result.session ?? session);
-      }
-    } catch (error) { if (error instanceof Error && error.name === 'AbortError') return; appendAssistantMessage(error instanceof Error ? error.message : String(error), nextConversation); }
-    finally { setBusy(false); setStreamingText(''); abortRef.current = null; }
+    if (!text || workshop.busy || disabled || !apiConfig || !session) return;
+    setInput(''); stickToBottom.current = true;
+    void runAction(() => workshop.send(text, apiConfig));
+  };
+  const exportModule = () => {
+    if (!revision) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(revision.module, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${revision.module.id}.json`; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice('模块已导出。');
+  };
+  const install = () => {
+    if (!revision || !world) return;
+    const module = revision.module;
+    void runAction(async () => {
+      await saveCustomGameplayModule(module); await bindCustomGameplayModule(module.id, world.id);
+      window.dispatchEvent(new Event('custom-modules-changed'));
+    }, `已保存并绑定到「${world.name}」，新游戏将使用此版本。`);
+  };
+  const publishModule = () => {
+    if (!revision) return;
+    const module = revision.module;
+    void runAction(() => publish({
+      type: 'gameplay_module', contentType: 'gameplay_module', title: module.name,
+      description: module.description || '通过玩法模块工坊创作的模块。', tags: ['玩法模块'], data: module,
+      version: module.version, category: 'gameplay', dependencies: module.dependencies ?? [], compatibility: { moduleSchema: module.schemaVersion },
+    }), '模块已发布到创意工坊。');
   };
 
-  const handleInstall = async () => {
-    if (!session.lastValidDraft || !world) return;
-    setBusy(true); setNotice('');
-    try {
-      await saveCustomGameplayModule(session.lastValidDraft); await bindCustomGameplayModule(session.lastValidDraft.id, world.id); window.dispatchEvent(new Event('custom-modules-changed'));
-      setNotice(`“${session.lastValidDraft.name}” 已安装并绑定到「${world.name}」。`); appendAssistantMessage('安装完成。开始这个世界的新游戏后，它会按照模块规则运行。');
-    } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
-    finally { setBusy(false); }
-  };
-
-  const handleExport = () => {
-    const module = session.lastValidDraft;
-    if (!module) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(module, null, 2)], { type: 'application/json' }));
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${module.id}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setNotice('模块 JSON 已导出。');
-  };
-
-  const handlePublish = async () => {
-    const module = session.lastValidDraft;
-    if (!module) return;
-    setBusy(true); setNotice('');
-    try {
-      await createWorkshopItem({
-        type: 'gameplay_module', contentType: 'gameplay_module', title: module.name,
-        description: module.description || '由自定义模块 Agent 创建的玩法模块。',
-        tags: ['玩法模块', ...(module.dependencies?.length ? ['含依赖'] : [])], data: module,
-        version: '1.0.0', category: 'gameplay', dependencies: module.dependencies || [],
-        compatibility: { moduleSchema: module.schemaVersion },
-      });
-      setNotice('模块已发布到创意工坊。');
-      appendAssistantMessage('发布完成。其他玩家可以从创意工坊发现并安装这个模块。');
-    } catch (error) { setNotice(error instanceof Error ? error.message : String(error)); }
-    finally { setBusy(false); }
-  };
-
-  return <div className="entry-default-theme custom-module-workspace" role="dialog" aria-modal="true" aria-label="模块工坊">
-    <div className="custom-module-workspace-backdrop" onClick={onClose} />
+  return <div className="entry-default-theme custom-module-workspace" role="dialog" aria-modal="true" aria-labelledby="module-workshop-title" ref={dialogRef}>
+    <div className="custom-module-workspace-backdrop" />
     <div className="custom-module-workspace-shell">
-      <DawnFrameV4 mode="panel" withFill className="custom-module-workspace-frame" ariaLabel="晨光模块工坊">
+      <DawnFrameV4 mode="panel" withFill className="custom-module-workspace-frame" ariaLabel="玩法模块工坊">
         <div className="custom-module-workspace-inner">
-          <header className="custom-module-workspace-header">
-            <div className="custom-module-workspace-title"><Sparkles size={20} /><div><span>DAWN WORKSHOP · CUSTOM MODULES</span><h2>模块工坊</h2><p>和 Agent 一起把想法编织成可审查、可绑定的玩法模块</p></div></div>
-            <div className="custom-module-workspace-header-actions">
-              <label className="custom-module-world-picker"><WorldIcon name={world?.icon || 'Globe'} size={18} /><span>绑定世界</span><select value={selectedWorldId} onChange={(event) => setSelectedWorldId(event.target.value)} disabled={busy || loadingSession}>{worlds.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-              <button ref={closeButtonRef} type="button" className="custom-module-icon-button" onClick={onClose} aria-label="关闭模块工坊"><X size={19} /></button>
-            </div>
+          <header className="mws-header">
+            <div className="mws-title"><Sparkles size={23} /><div><span>DAWN · GAMEPLAY WORKSHOP</span><h2 id="module-workshop-title">玩法模块工坊</h2><p>聊出想法，修改规则，亲手试玩。</p></div></div>
+            <div className="mws-header-actions"><label className="mws-world"><WorldIcon name={world?.icon || 'Globe'} size={17} /><span className="mws-sr-only">创作世界</span><select aria-label="创作世界" value={worldId} onChange={(event) => { workshop.stop(); setWorldId(event.target.value); }} disabled={workshop.loading || actionBusy && !workshop.busy}>{worlds.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button ref={closeRef} type="button" className="mws-icon" onClick={() => { workshop.stop(); onClose(); }} aria-label="关闭玩法模块工坊"><X size={20} /></button></div>
           </header>
-          <div className="custom-module-workshop-tabs" role="tablist" aria-label="模块工坊视图">
-            <button type="button" role="tab" aria-selected={mobileTab === 'conversation'} onClick={() => setMobileTab('conversation')}>共创对话</button>
-            <button type="button" role="tab" aria-selected={mobileTab === 'blueprint'} onClick={() => setMobileTab('blueprint')}>模块蓝图{draftModule ? ' · 1' : ''}</button>
-          </div>
-          <main className="custom-module-workspace-body">
-            <section className={`custom-module-chat-column${mobileTab === 'blueprint' ? ' mobile-hidden' : ''}`} aria-label="共创对话">
-              <div className="custom-module-column-heading"><div><span className="custom-module-kicker">CO-CREATION</span><h3>共创对话</h3></div><span className={`custom-module-state custom-module-state--${busy || loadingSession ? 'busy' : draftModule ? 'ready' : requestError ? 'error' : 'idle'}`}>{workspaceStatus}</span></div>
-              <div className="custom-module-suggestion-row" aria-label="建议提示"><button type="button" onClick={() => setInput('做一个记录每日目标的可视模块')}>每日目标</button><button type="button" onClick={() => setInput('做一个后台累计资源变化的模块')}>后台累计</button><button type="button" onClick={() => setInput('直接粘贴 JSON 草案进行校验')}>校验 JSON</button></div>
-              <div className="custom-module-chat-history" aria-live="polite">
-                {!conversation.length && <div className="custom-module-chat-empty"><Sparkles size={22} /><strong>从一个玩法意图开始</strong><p>你可以描述目标、触发方式，或直接粘贴模块 JSON。</p></div>}
-                {conversation.map((message, index) => <div key={`${message.role}-${index}`} className={`custom-module-chat-message ${message.role}`}><div className="custom-module-chat-role">{message.role === 'assistant' ? 'MODULE AGENT' : '你'}</div><div className="custom-module-chat-bubble">{message.content}</div></div>)}
-                {streamingText && <div className="custom-module-chat-message assistant"><div className="custom-module-chat-role">MODULE AGENT</div><div className="custom-module-chat-bubble streaming">{streamingText}<Loader2 size={13} className="spin" /></div></div>}
-              </div>
-              {activeQuestion?.choices && activeQuestion.choices.length > 0 && <div className="custom-module-suggestion-row custom-module-question-choices" aria-label="追问快捷选项">{activeQuestion.choices.map((choice) => <button type="button" key={choice} onClick={() => setInput(choice)}>{choice}</button>)}</div>}
-              <div className="custom-module-composer"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void handleSend(); } }} placeholder="告诉 Agent 你想做什么……也可以直接粘贴 JSON" rows={3} disabled={busy || loadingSession} aria-label="模块描述输入" /><div className="custom-module-composer-footer"><span>Ctrl/⌘ + Enter 发送 · 先追问，再生成</span><div>{busy && <button type="button" className="custom-module-ghost-button" onClick={() => abortRef.current?.abort()}><Square size={13} />停止</button>}<button type="button" className="custom-module-send-button" onClick={() => void handleSend()} disabled={busy || loadingSession || !input.trim() || !world}><Send size={14} />发送</button></div></div></div>
-            </section>
-            <aside className={`custom-module-draft-column${mobileTab === 'conversation' ? ' mobile-hidden' : ''}`} aria-label="模块蓝图">
-              <div className="custom-module-column-heading"><div><span className="custom-module-kicker">BLUEPRINT</span><h3>模块蓝图</h3></div>{draftModule && <span className="custom-module-draft-status"><Check size={13} /> 已通过校验</span>}</div>
-              {!draftModule && <div className="custom-module-draft-empty"><div className="custom-module-blueprint-list">{BLUEPRINT_ITEMS.map(({ label, detail, Icon }, index) => <div className="custom-module-blueprint-item" key={label}><span className="custom-module-blueprint-index">0{index + 1}</span><Icon size={16} /><div><strong>{label}</strong><span>{detail}</span></div></div>)}</div><p>{session.brief.goal ? '需求正在收敛；右侧蓝图会在确认后变为可安装模块。' : '对话推进后，Agent 会把结构化需求整理成一份模块草案。'}</p><div className="custom-module-brief-preview"><strong>已理解</strong><p>{session.brief.goal || '尚未记录目标'}</p>{session.brief.unresolved.length > 0 && <><strong>仍待确认</strong><p>{session.brief.unresolved.join('、')}</p></>}{session.brief.assumptions.length > 0 && <><strong>Agent 假设</strong><p>{session.brief.assumptions.join('、')}</p></>}</div></div>}
-              {requestError && <div className="custom-module-agent-errors"><strong><AlertTriangle size={15} /> 本轮未应用</strong>{requestError.errors.map((error, index) => <div key={index}>{error.path.join('.') || '模块'}：{error.message}</div>)}{draftModule && <p>上一份有效草案仍在上方，可继续修订或保存。</p>}</div>}
-              {draftModule && <div className="custom-module-blueprint-content"><div className="custom-module-draft-summary"><span className="custom-module-kicker">{session.revision > 1 ? 'REVISION READY' : 'DRAFT READY'}</span><strong>{draftModule.name}</strong><span>{draftModule.view ? '可视模块' : '后台模块'} · V{draftModule.schemaVersion} · revision {session.revision}</span><small>{draftModule.description || '暂无描述'}</small></div><div className="custom-module-flow"><div><span>触发</span><strong>{activeRules.map(([name]) => name.replace('on', '')).join(' · ') || '等待游戏事件'}</strong></div><div><span>规则</span><strong>{activeRules.reduce((total, [, rules]) => total + rules.length, 0)} 条自有状态规则</strong></div><div><span>输出</span><strong>{draftModule.view ? draftModule.view.title || '右侧模块卡片' : '后台状态变化'}</strong></div></div><div className="custom-module-blueprint-sections"><section><span>输入与状态</span>{session.brief.inputs.map((item) => <p key={item}>{item}</p>)}{stateEntries.length ? stateEntries.map(([key, field]) => <div key={key}><strong>{key}</strong><small>{field.type} · 默认值 {String(field.default)}</small></div>) : <p>无需额外参数</p>}</section><section><span>冲突 / 绑定</span><p>仅读写自身状态 · 当前世界：{world?.name || '未选择'}</p>{revisionSummary.map((item) => <small key={item}>{item}</small>)}</section></div><details className="custom-module-json-details"><summary>查看原始 JSON <ChevronDown size={14} /></summary><pre>{lastRaw || JSON.stringify(draftModule, null, 2)}</pre></details><div className="custom-module-action-row"><button type="button" className="custom-module-install-button custom-module-button" onClick={() => void handleInstall()} disabled={busy}><Check size={14} />保存并绑定</button><button type="button" className="custom-module-ghost-button" onClick={handleExport} disabled={busy}><Download size={14} />导出 JSON</button><button type="button" className="custom-module-ghost-button" onClick={() => void handlePublish()} disabled={busy}><Upload size={14} />发布工坊</button></div></div>}
-              {notice && <div className="custom-module-agent-message" role="status">{notice}</div>}
+          <nav className="mws-mobile-nav" aria-label="工坊区域">{([['sessions', '会话'], ['chat', '对话'], ['module', '模块']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={mobilePane === id} onClick={() => setMobilePane(id)}>{label}</button>)}</nav>
+          <div className="mws-body" data-pane={mobilePane}>
+            <aside className="mws-sessions" aria-label="创作会话">
+              <div className="mws-section-heading"><h3>创作会话</h3><button type="button" className="mws-icon" aria-label="新建会话" disabled={disabled && !workshop.busy || !world} onClick={() => { workshop.stop(); void workshop.createSession().catch((error: unknown) => setActionError(String(error))); }}><Plus size={18} /></button></div>
+              <div className="mws-session-list">{workshop.loading ? <p className="mws-muted"><Loader2 className="spin" size={15} /> 正在加载…</p> : workshop.sessions.length === 0 ? <p className="mws-muted">为这个世界新建一个创作会话。</p> : workshop.sessions.map((item) => <div className={`mws-session ${item.id === session?.id ? 'is-active' : ''}`} key={item.id}>
+                {renameId === item.id ? <form className="mws-rename" onSubmit={(event) => { event.preventDefault(); if (renameText.trim()) void runAction(async () => { await workshop.renameSession(item.id, renameText.trim()); setRenameId(undefined); }); }}><input aria-label="会话名称" autoFocus value={renameText} maxLength={80} onChange={(event) => setRenameText(event.target.value)} /><button type="submit" className="mws-icon" aria-label="保存名称" disabled={disabled || !renameText.trim()}><Check size={15} /></button><button type="button" className="mws-icon" aria-label="取消重命名" onClick={() => setRenameId(undefined)}><X size={15} /></button></form> : <><button className="mws-session-select" type="button" aria-current={item.id === session?.id ? 'true' : undefined} onClick={() => { workshop.stop(); void workshop.selectSession(item.id).catch((error: unknown) => setActionError(String(error))); setMobilePane('chat'); }}><MessageSquare size={15} /><span>{item.title}</span></button><div className="mws-session-actions"><small>{item.revisions.length ? `${item.revisions.length} 个版本` : '尚无草稿'}</small><button className="mws-icon" type="button" aria-label={`重命名会话 ${item.title}`} disabled={disabled} onClick={() => { setRenameId(item.id); setRenameText(item.title); }}><Pencil size={13} /></button><button className="mws-icon" type="button" aria-label={`删除会话 ${item.title}`} disabled={disabled || workshop.busy} onClick={() => setDeleteId(item.id)}><Trash2 size={13} /></button></div></>}
+                {deleteId === item.id && <div className="mws-confirm"><p>删除此会话及其草稿历史？已安装的模块会保留。</p><button type="button" disabled={disabled} onClick={() => void runAction(() => workshop.deleteSession(item.id))}>确认删除</button><button type="button" onClick={() => setDeleteId(undefined)}>取消</button></div>}
+              </div>)}</div>
+              <button className="mws-button" type="button" disabled={disabled || workshop.busy || !session} onClick={() => { setImportOpen(!importOpen); setMobilePane('chat'); }}><Upload size={15} /> 导入模块</button>
+              <p className="mws-footnote">聊天记录与模块版本分别保存。删除消息不会撤销草稿修改。</p>
             </aside>
-          </main>
+            <section className="mws-chat" aria-label="与 Agent 对话">
+              <div className="mws-section-heading"><h3>{session?.title || '开始创作'}</h3><span className="mws-status" role="status">{workshop.busy ? <><Loader2 size={13} className="spin" /> 正在创作</> : revision ? `草稿 v${revision.number}` : '准备就绪'}</span></div>
+              {importOpen && <section className="mws-import" aria-label="导入模块 JSON"><div className="mws-section-heading"><h4>导入模块</h4><button className="mws-icon" type="button" aria-label="关闭导入" onClick={() => setImportOpen(false)}><X size={16} /></button></div><label>选择 JSON 文件<input type="file" accept=".json,application/json" disabled={disabled} onChange={(event) => { const file = event.target.files?.[0]; if (file) { if (file.size > 1024 * 1024) { setActionError('模块文件不能超过 1 MB。'); return; } void file.text().then(setImportText).catch((error: unknown) => setActionError(String(error))); } }} /></label><textarea aria-label="模块 JSON" value={importText} onChange={(event) => setImportText(event.target.value)} rows={5} placeholder="或在这里粘贴模块 JSON" /><button type="button" className="mws-button" disabled={disabled || !importText.trim()} onClick={() => void runAction(async () => { await workshop.importModule(importText); setImportOpen(false); setImportText(''); }, '模块已导入为新草稿版本。')}>校验并导入</button></section>}
+              <div className="mws-chat-history" ref={historyRef} onScroll={() => { const element = historyRef.current; if (element) stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; }}>
+                {!session?.messages.length && <div className="mws-empty-chat"><Sparkles size={30} /><h3>把一个玩法想法变成现实</h3><p>描述玩家要做什么、需要付出什么，以及会获得什么。Agent 会逐步创建和校验模块；不支持工具调用的接口会自动尝试文本兼容模式。</p><button type="button" className="mws-suggestion" onClick={() => setInput('帮我做一个制作台：消耗金币和材料获得物品，显示资源和制作按钮。')}>制作台：消耗金币和材料，获得物品 <Send size={14} /></button></div>}
+                {session?.messages.map((message) => <article className={`mws-message ${message.role}`} key={message.id}>
+                  <header><span>{message.role === 'user' ? '你' : '共创 Agent'}</span><small>{message.status === 'stopped' ? '已停止' : message.status === 'failed' ? '未完成' : message.status === 'running' ? '进行中' : ''}</small></header>
+                  {editId === message.id ? <div className="mws-edit-message"><textarea aria-label="编辑消息" autoFocus rows={4} value={editText} onChange={(event) => setEditText(event.target.value)} /><p className="mws-footnote">从这条消息重建后续对话，现有模块版本会保留。</p><div className="mws-actions"><button className="mws-button" type="button" disabled={disabled || workshop.busy || !editText.trim() || !apiConfig} onClick={() => { if (apiConfig) { setEditId(undefined); void runAction(() => workshop.editMessage(message.id, editText.trim(), apiConfig)); } }}>编辑并重发</button><button className="mws-button" type="button" onClick={() => setEditId(undefined)}>取消</button></div></div> : message.parts.map((part, index) => part.type === 'text' ? <Markdown key={index} text={part.text} /> : <details className={`mws-tool ${part.status}`} key={part.toolCallId}><summary>{part.status === 'running' ? <Loader2 size={14} className="spin" /> : part.status === 'failed' ? <X size={14} /> : <Check size={14} />}<span>{toolLabels[part.name] ?? part.name}</span><small>{part.status === 'running' ? '执行中' : part.status === 'failed' ? '失败' : '完成'}</small></summary><h5>参数</h5><pre>{JSON.stringify(part.input, null, 2)}</pre>{part.output !== undefined && <><h5>结果</h5><pre>{JSON.stringify(part.output, null, 2)}</pre></>}</details>)}
+                  {message.status !== 'running' && editId !== message.id && <div className="mws-message-actions">{message.role === 'user' ? <button type="button" disabled={disabled || workshop.busy} onClick={() => { setEditId(message.id); setEditText(messageText(message)); }}><Pencil size={13} /> 编辑重发</button> : <button type="button" disabled={disabled || workshop.busy || !apiConfig} onClick={() => { if (apiConfig) void runAction(() => workshop.regenerate(message.id, apiConfig)); }}><RotateCcw size={13} /> 重新生成</button>}<button type="button" disabled={disabled || workshop.busy} onClick={() => void runAction(() => workshop.deleteMessage(message.id))}><Trash2 size={13} /> 删除</button></div>}
+                </article>)}
+              </div>
+              {(workshop.error || actionError) && <div className="mws-error" role="alert">{actionError || workshop.error}</div>}
+              {notice && <div className="mws-notice" role="status"><Check size={15} />{notice}</div>}
+              <form className="mws-composer" onSubmit={(event) => { event.preventDefault(); send(); }}><label className="mws-sr-only" htmlFor="workshop-message">描述你的玩法或修改要求</label><textarea id="workshop-message" value={input} onChange={(event) => setInput(event.target.value)} placeholder="描述你的玩法，或告诉 Agent 想修改哪里…" rows={3} disabled={workshop.loading || !session} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} /><div className="mws-composer-footer"><span>{!apiConfig ? '请先在设置中配置模型和 API。' : 'Enter 发送 · Shift + Enter 换行'}</span>{workshop.busy ? <button type="button" className="mws-button" onClick={workshop.stop}><Square size={14} /> 停止</button> : <button type="submit" className="mws-primary" disabled={disabled || !input.trim() || !apiConfig || !session}><Send size={15} />发送</button>}</div></form>
+            </section>
+            <section className="mws-module" aria-label="模块草稿">
+              <div className="mws-section-heading"><h3><History size={16} /> 模块草稿</h3>{revision && <span className="mws-status">v{revision.number}</span>}</div>
+              <WorkshopModulePanel key={`${session?.id}:${revision?.id}`} worldId={worldId} revision={revision} revisions={session?.revisions ?? []} disabled={disabled || workshop.busy} onRestore={(id) => void runAction(() => workshop.restoreRevision(id), '已生成回退版本。')} />
+              <footer className="mws-module-footer"><button type="button" className="mws-primary" disabled={!revision || disabled || workshop.busy} onClick={install}><Save size={15} />保存并绑定世界</button><div className="mws-actions"><button type="button" className="mws-button" disabled={!revision || disabled} onClick={exportModule}><Download size={14} />导出</button><button type="button" className="mws-button" disabled={!revision || disabled || workshop.busy} onClick={publishModule}><Upload size={14} />发布到创意工坊</button></div></footer>
+            </section>
+          </div>
         </div>
       </DawnFrameV4>
     </div>

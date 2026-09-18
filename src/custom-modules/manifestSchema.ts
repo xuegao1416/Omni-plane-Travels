@@ -6,6 +6,8 @@ StateFieldDefinition
 } from './schema';
 
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
+const moduleIdSchema = z.string().regex(ID_RE, '模块 id 必须是安全模块标识符')
+  .refine(id => !['constructor', 'prototype', '__proto__'].includes(id), '模块 id 不能使用对象保留字');
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const NAME_RE = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 
@@ -25,11 +27,12 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 
 const descriptionSchema = z.string().max(500).optional();
 const dependencySchema = z.object({
-  id: z.string().regex(ID_RE, '依赖 id 必须是安全模块标识符'),
+  id: moduleIdSchema,
   version: z.string().regex(SEMVER_RE, '依赖版本必须是 x.y.z').optional(),
   optional: z.boolean().optional(),
 }).strict();
-const stateFieldNameSchema = z.string().regex(NAME_RE, '字段名必须是安全的 ASCII 标识符');
+const stateFieldNameSchema = z.string().regex(NAME_RE, '字段名必须是安全的 ASCII 标识符')
+  .refine(name => !name.split('.').some(part => ['constructor', 'prototype', '__proto__'].includes(part)), '字段名包含保留字');
 
 const numberStateFieldSchema = z
   .object({
@@ -367,7 +370,7 @@ export const customGameplayModuleV1Schema = z
   .object({
     kind: z.literal('custom-gameplay-module'),
     schemaVersion: z.literal(1),
-    id: z.string().regex(ID_RE, 'id 必须匹配 ^[a-z0-9][a-z0-9_:-]{2,63}$'),
+    id: moduleIdSchema,
     name: z.string().min(1).max(120),
     version: z.string().regex(SEMVER_RE, 'version 必须是 x.y.z'),
     author: z.string().min(1).max(80),
@@ -442,7 +445,7 @@ const v2LogicSchema = z.object({
 export const customGameplayModuleV2Schema = z.object({
   kind: z.literal('custom-gameplay-module'),
   schemaVersion: z.literal(2),
-  id: z.string().regex(ID_RE, 'id 必须匹配 ^[a-z0-9][a-z0-9_:-]{2,63}$'),
+  id: moduleIdSchema,
   name: z.string().min(1).max(120),
   version: z.string().regex(SEMVER_RE, 'version 必须是 x.y.z'),
   author: z.string().min(1).max(80),
@@ -461,7 +464,30 @@ export const customGameplayModuleV2Schema = z.object({
   permissions: permissionsSchema,
 }).strict();
 
-export const customGameplayModuleSchema = z.union([customGameplayModuleV1Schema, customGameplayModuleV2Schema]);
+const safeHostId = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/).refine(id => !['constructor', 'prototype', '__proto__'].includes(id));
+const hostAmount = z.number().finite().positive();
+const hostActionSchema = z.union([
+  z.object({ type: z.enum(['currency.consume', 'currency.grant']), amount: hostAmount }).strict(),
+  z.object({ type: z.enum(['item.consume', 'item.grant']), itemId: safeHostId, amount: hostAmount.int() }).strict(),
+  z.object({ type: z.enum(['survival.consume', 'survival.grant']), resourceId: safeHostId, amount: hostAmount }).strict(),
+]);
+const v3RuleSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/),
+  when: v2ConditionSchema.optional(),
+  actions: z.array(z.union([v2ActionSchema, hostActionSchema])).min(1).max(32),
+}).strict();
+const v3Rules = z.array(v3RuleSchema).max(64).default([]);
+export const customGameplayModuleV3Schema = customGameplayModuleV2Schema.extend({
+  schemaVersion: z.literal(3),
+  capabilities: z.array(z.enum(['currency', 'inventory', 'survival'])).max(3),
+  items: z.record(safeHostId, z.object({
+    name: z.string().min(1).max(120).refine(name => name === name.trim() && !name.includes('.') && !['constructor', 'prototype', '__proto__'].includes(name)),
+    description: descriptionSchema, category: z.string().max(80).optional(), weight: z.number().finite().nonnegative().optional(),
+  }).strict()).refine(items => Object.keys(items).length <= 64),
+  logic: z.object({ onGameStart: v3Rules, onTurnEnd: v3Rules, onTick: v3Rules, onChoice: v3Rules, onButton: v3Rules }).strict()
+    .default({ onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [] }),
+}).strict();
+export const customGameplayModuleSchema = customGameplayModuleV3Schema;
 
 export type CustomGameplayModuleInput = z.input<typeof customGameplayModuleSchema>;
 export type CustomGameplayModuleOutput = z.output<typeof customGameplayModuleSchema>;

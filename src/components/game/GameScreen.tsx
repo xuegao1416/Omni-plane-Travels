@@ -53,6 +53,7 @@ import { normalizeAssetStatus } from './panels/businessOverlay/utils';
 import JourneyDossierContent from './shared/JourneyDossierContent';
 import { DOSSIER_META,normalizeDossierPanel } from './shared/journeyDossierMeta';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
+import { setCustomModuleActiveSave } from '../../custom-modules/saveApplication';
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 import { useMemoryStore } from '../../memory/memoryStore';
 import { usePortraitStore } from '../../stores/portraitStore';
@@ -66,6 +67,13 @@ import { CombatNarrationCoordinator,applyV3CombatCommand,buildLocalCombatContinu
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
+  const customModuleSaveId = useSaveStore(s => s.currentSaveId);
+  const customModuleScope = useRef({ mounted: true, worldId: state.selectedWorld, saveId: customModuleSaveId, manager: engine.variableManager });
+  customModuleScope.current = { mounted: true, worldId: state.selectedWorld, saveId: customModuleSaveId, manager: engine.variableManager };
+  useEffect(() => {
+    const release = customModuleSaveId ? setCustomModuleActiveSave(customModuleSaveId) : () => undefined;
+    return () => { customModuleScope.current.mounted = false; release(); };
+  }, [customModuleSaveId]);
   const { t } = useUISettings();
   // Keep tablet/near-square viewports on the compact desktop composition; reserve
   // the mobile shell for genuinely narrow portrait widths.
@@ -216,9 +224,12 @@ export default function GameScreen() {
 
   const handleCustomModuleChoice = useCallback(async (event: CustomModuleChoiceEvent) => {
     if (engine.isReadOnly) return;
+    const scope = { ...customModuleScope.current };
     const result = await runCustomModulesForWorldAndCommit(engine.variableManager.getState(), state.selectedWorld, 'onChoice', {
       event,
     }, {
+      getCurrentState: () => scope.manager.getState(),
+      isCurrent: () => customModuleScope.current.mounted && customModuleScope.current.manager === scope.manager && customModuleScope.current.worldId === scope.worldId && useSaveStore.getState().currentSaveId === scope.saveId,
       commit: (nextState) => engine.variableManager.setState(nextState),
       notify: () => { bumpVersion(); eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED); },
       autoSave: () => useSaveStore.getState().scheduleAutoSave(),
@@ -459,9 +470,12 @@ export default function GameScreen() {
 
   const handleCustomModuleButton = useCallback((moduleId: string, event: string) => {
     if (engine.isReadOnly) return;
+    const scope = { ...customModuleScope.current };
     void runCustomModulesForWorldAndCommit(engine.variableManager.getState(), state.selectedWorld, 'onButton', {
       event: { type: 'button', moduleId, event },
     }, {
+      getCurrentState: () => scope.manager.getState(),
+      isCurrent: () => customModuleScope.current.mounted && customModuleScope.current.manager === scope.manager && customModuleScope.current.worldId === scope.worldId && useSaveStore.getState().currentSaveId === scope.saveId,
       commit: (nextState) => engine.variableManager.setState(nextState),
       notify: () => { bumpVersion(); eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED); },
       autoSave: () => useSaveStore.getState().scheduleAutoSave(),

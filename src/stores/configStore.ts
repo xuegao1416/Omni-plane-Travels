@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { ApiConfig } from '@/api/types';
 import { STORAGE_KEYS } from '@/config/storageKeys';
 import { seal, unseal, isSealed } from '@/security/keyVault';
-import { TRIAL_API_CONFIG, isTrialApiConfig } from '@/api/trial';
 
 // ─── 类型 ───
 
@@ -21,6 +20,7 @@ export interface UISettings {
   lineHeight: LineHeight;
   centeredNarrative: boolean;
   autoScroll: boolean;
+  disableEffects: boolean;
 }
 
 // ─── 常量 ───
@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS: UISettings = {
   lineHeight: '舒适',
   centeredNarrative: false,
   autoScroll: true,
+  disableEffects: false,
 };
 
 const FONT_MAP: Record<FontFamily, string> = {
@@ -59,6 +60,7 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.bodyFontSize': '正文字体', 'settings.bodyFontSize.desc': '聊天消息的字体大小',
     'settings.lineHeight': '正文行距', 'settings.centeredNarrative': '居中行文',
     'settings.centeredNarrative.desc': '将对话收拢到屏幕中央，减少宽屏阅读时的视线偏移', 'settings.autoScroll': '正文自动滚动',
+    'settings.disableEffects': '关闭动态特效', 'settings.disableEffects.desc': '停用动画、模糊等 GPU 特效，显著降低手机发热与耗电',
     'theme.light': '拂晓', 'theme.dark': '玄夜', 'theme.metal': '银灰', 'theme.green': '翠林',
     'font.yahei': '雅黑', 'font.source': '思源黑体',
     'settings.provider': 'Provider', 'settings.baseUrl': 'Base URL', 'settings.baseUrl.desc': 'API 端点地址',
@@ -97,6 +99,7 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.bodyFontSize': 'Body Font Size', 'settings.bodyFontSize.desc': 'Font size for chat messages',
     'settings.lineHeight': 'Line Height', 'settings.centeredNarrative': 'Centered Reading',
     'settings.centeredNarrative.desc': 'Center the conversation in a comfortable reading column on wide screens', 'settings.autoScroll': 'Auto Scroll',
+    'settings.disableEffects': 'Disable Visual Effects', 'settings.disableEffects.desc': 'Turn off animations and blur effects to reduce heat and battery drain on mobile',
     'theme.light': 'Dawn', 'theme.dark': 'Nocturne', 'theme.metal': 'Silver', 'theme.green': 'Forest',
     'font.yahei': 'YaHei', 'font.source': 'Source Han',
     'settings.provider': 'Provider', 'settings.baseUrl': 'Base URL', 'settings.baseUrl.desc': 'API endpoint URL',
@@ -145,6 +148,10 @@ function applySettings(settings: UISettings) {
   root.style.setProperty('--body-font-size', BODY_FONT_SIZE_MAP[settings.bodyFontSize]);
   root.style.setProperty('--body-line-height', LINE_HEIGHT_MAP[settings.lineHeight]);
 
+  // 性能模式：关闭动态特效（动画/过渡/模糊），由 base.css 的 [data-effects='off'] 全局规则接管
+  if (settings.disableEffects) root.dataset.effects = 'off';
+  else delete root.dataset.effects;
+
   root.lang = settings.language;
 }
 
@@ -190,12 +197,9 @@ interface ConfigState {
   settings: UISettings;
   // API 配置
   apiConfig: ApiConfig | null;
-  trialMode: boolean;
   // Actions
   updateSettings: <K extends keyof UISettings>(key: K, value: UISettings[K]) => void;
   setApiConfig: (config: ApiConfig) => void;
-  enableTrial: () => void;
-  disableTrial: () => void;
   /** 应用启动时异步加载（解密）已持久化的 API 配置 */
   initApiConfig: () => void;
   t: (key: string) => string;
@@ -206,7 +210,6 @@ interface ConfigState {
 export const useConfigStore = create<ConfigState>((set, get) => ({
   settings: loadUISettings(),
   apiConfig: null, // 由 initApiConfig 异步加载（解密）
-  trialMode: false,
 
   updateSettings: (key, value) => {
     set(state => {
@@ -218,33 +221,16 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   setApiConfig: async (config) => {
-    if (isTrialApiConfig(config)) {
-      localStorage.setItem(STORAGE_KEYS.TRIAL_ENABLED, 'true');
-      set({ apiConfig: TRIAL_API_CONFIG, trialMode: true });
-      return;
-    }
-    localStorage.removeItem(STORAGE_KEYS.TRIAL_ENABLED);
     // 落库前加密 apiKey（明文仅保留在内存）
     const sealed: ApiConfig = { ...config, apiKey: await seal(config.apiKey) };
     localStorage.setItem(API_STORAGE_KEY, JSON.stringify(sealed));
     set({ apiConfig: config });
   },
 
-  enableTrial: () => {
-    localStorage.setItem(STORAGE_KEYS.TRIAL_ENABLED, 'true');
-    set({ apiConfig: TRIAL_API_CONFIG, trialMode: true });
-  },
-
-  disableTrial: () => {
-    localStorage.removeItem(STORAGE_KEYS.TRIAL_ENABLED);
-    set({ apiConfig: null, trialMode: false });
-  },
-
   initApiConfig: () => {
     loadApiConfig()
       .then((cfg) => {
-        if (cfg) set({ apiConfig: cfg, trialMode: false });
-        else if (localStorage.getItem(STORAGE_KEYS.TRIAL_ENABLED) === 'true') set({ apiConfig: TRIAL_API_CONFIG, trialMode: true });
+        if (cfg) set({ apiConfig: cfg });
       })
       .catch((err) => console.warn('[configStore] 初始化 API 配置失败:', err));
   },

@@ -45,7 +45,7 @@ app.use('*', async (c: Context<AppEnv>, next: Next) => {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Credentials', 'true');
     c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version, X-Trial-Client-Id, X-Trial-Purpose');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version');
     c.header('Vary', 'Origin');
   }
   if (c.req.method === 'OPTIONS') return c.body(null, 204);
@@ -285,11 +285,7 @@ app.delete('/api/workshop/:itemId', requireAuth, async (c) => {
 
 // ——— 匿名游玩统计（无需鉴权；数据完全匿名）———
 import { handlePostPlayStat } from './playStats';
-import { handleTrialCompletion, handleTrialStatus } from './trial';
 
 app.post('/api/stats/play', (c) => handlePostPlayStat(c));
 
-// —— 免费体验（上游地址和密钥只存在 Worker 环境变量）——
-app.get('/api/trial/status', (c) => handleTrialStatus(c));
-app.post('/api/trial/chat/completions', (c) => handleTrialCompletion(c));
 export default app;

@@ -82,20 +82,30 @@ export async function callAuxiliaryApi(
     }
   }, timeoutMs);
 
-  const onExternalAbort = () => controller.abort();
+  const onExternalAbort = () => controller.abort(signal?.reason);
   if (signal) {
-    if (signal.aborted) controller.abort();
+    if (signal.aborted) controller.abort(signal.reason);
     else signal.addEventListener('abort', onExternalAbort, { once: true });
   }
 
-  let resp: Response;
   try {
-    resp = await nativeFetch(fetchUrl, {
+    controller.signal.throwIfAborted();
+    const resp = await nativeFetch(fetchUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    controller.signal.throwIfAborted();
+    if (!resp.ok) throw new Error(`辅助 API 请求失败: ${resp.status}`);
+    // fetch resolves after headers; both timeout and external cancellation must
+    // remain active while the model's (possibly very slow) JSON body is read.
+    const data = await resp.json();
+    controller.signal.throwIfAborted();
+    const content = data.choices?.[0]?.message?.content || '';
+    const extracted = extractUpdateContent(content);
+    if (!extracted) console.warn('[变量提取] AI 回复中未找到有效的 UpdateVariable 内容，回复前200字:', content.slice(0, 200));
+    return extracted;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[变量提取] 请求失败（模型：${model}，端点：${fetchUrl}）：${msg}`);
@@ -105,20 +115,6 @@ export async function callAuxiliaryApi(
     if (signal) signal.removeEventListener('abort', onExternalAbort);
   }
 
-  if (!resp.ok) {
-    throw new Error(`辅助 API 请求失败: ${resp.status}`);
-  }
-
-  const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || '';
-
-  const extracted = extractUpdateContent(content);
-  if (!extracted) {
-    console.warn('[变量提取] AI 回复中未找到有效的 UpdateVariable 内容，回复前200字:', content.slice(0, 200));
-    return null;
-  }
-
-  return extracted;
 }
 
 // 从世界书提取变量更新规则

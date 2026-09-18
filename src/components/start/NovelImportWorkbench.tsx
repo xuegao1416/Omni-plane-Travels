@@ -103,7 +103,7 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
     try {
       const extension = file.name.toLowerCase().split('.').pop(); let next: NovelDataset; let world: WorldDef | undefined;
       if (extension === 'epub') next = await createNovelDatasetFromEpub(file.name, await file.arrayBuffer());
-      else if (extension === 'json') { const raw = JSON.parse(await file.text()); if (raw.kind === 'novel-world-package' && raw.dataset && raw.world) { await restoreDirectorDependencies({ customWorld: raw.world }, raw.directorDefinitions); next = importNovelDataset(raw.dataset); world = raw.world as WorldDef; } else next = importNovelDataset(raw); }
+      else if (extension === 'json') { const raw = JSON.parse(await file.text()); if (raw.kind === 'novel-world-package' && raw.dataset && raw.world) { next = importNovelDataset(raw.dataset); await restoreDirectorDependencies({ customWorld: raw.world }, raw.directorDefinitions); world = raw.world as WorldDef; } else next = importNovelDataset(raw); }
       else if (extension === 'txt') next = createNovelDatasetFromBytes(file.name.replace(/\.[^.]+$/, ''), await file.arrayBuffer(), encoding);
       else throw new Error('请选择 TXT、EPUB 或拆解资料 JSON。');
       setSourceFile(extension === 'txt' ? file : undefined);

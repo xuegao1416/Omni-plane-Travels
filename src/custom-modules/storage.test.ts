@@ -7,15 +7,12 @@ import {
   deleteCustomGameplayModule,
   disableCustomGameplayModuleForWorld,
   getCustomGameplayModulesForWorld,
-  clearCustomModuleAgentSession,
-  loadCustomModuleAgentSession,
   listCustomGameplayModules,
-  saveCustomModuleAgentSession,
   saveCustomGameplayModule,
 } from './storage';
 import { createInitialCustomModuleState, installCustomModuleState } from './stateStore';
 import type { CustomGameplayModule } from './schema';
-import { createCustomModuleAgentSession } from './agentSession';
+import { putGlobal, getGlobal } from '../storage/db';
 
 const moduleDefinition = {
   kind: 'custom-gameplay-module',
@@ -42,34 +39,19 @@ const moduleDefinition = {
 
 afterEach(async () => {
   await clearCustomGameplayModules();
-  await clearCustomModuleAgentSession();
 });
 
 describe('custom gameplay module storage', () => {
-  test('persists draft sessions separately from installed module records', async () => {
-    const session = createCustomModuleAgentSession({ id: 'world-a', name: 'World A' });
-    session.brief.goal = '记录目标';
-    await saveCustomModuleAgentSession(session);
-    expect((await loadCustomModuleAgentSession())?.brief.goal).toBe('记录目标');
-    expect(await listCustomGameplayModules()).toEqual([]);
+  test('only migrates V2 internal records; keeps earlier data for explicit import', async () => {
+    const v1 = { module: moduleDefinition, status: 'enabled' as const, worldIds: ['legacy-world'], installedAt: 1, updatedAt: 1 };
+    await putGlobal('customGameplayModules.v1', [v1]);
+    expect(await getCustomGameplayModulesForWorld('legacy-world')).toEqual([]);
+    expect(await getGlobal<unknown[]>('customGameplayModules.v1')).toEqual([v1]);
+    const imported = await saveCustomGameplayModule(moduleDefinition);
+    expect(imported.module.schemaVersion).toBe(3);
+    await bindCustomGameplayModule(moduleDefinition.id, 'legacy-world');
+    expect((await getCustomGameplayModulesForWorld('legacy-world'))[0].module.schemaVersion).toBe(3);
   });
-
-  test('persists complete agent transcripts independently for each world', async () => {
-    const first = createCustomModuleAgentSession({ id: 'world-a', name: 'World A' });
-    first.conversation = [{ role: 'assistant', content: '欢迎 A' }, { role: 'user', content: '做一个声望模块' }];
-    const second = createCustomModuleAgentSession({ id: 'world-b', name: 'World B' });
-    second.conversation = [{ role: 'assistant', content: '欢迎 B' }];
-    await saveCustomModuleAgentSession(first);
-    await saveCustomModuleAgentSession(second);
-    expect((await loadCustomModuleAgentSession('world-a'))?.conversation).toEqual(first.conversation);
-    expect((await loadCustomModuleAgentSession('world-b'))?.conversation).toEqual(second.conversation);
-  });
-
-  test('ignores a corrupted agent session snapshot', async () => {
-    await saveCustomModuleAgentSession({ sessionVersion: 99, world: null } as never);
-    expect(await loadCustomModuleAgentSession()).toBeUndefined();
-  });
-
   test('creates, updates, lists and deletes module definitions', async () => {
     const saved = await saveCustomGameplayModule(moduleDefinition);
     expect(saved.module.id).toBe('mood-system');
@@ -104,6 +86,8 @@ describe('custom gameplay module storage', () => {
     expect((await getCustomGameplayModulesForWorld('world-a')).map((item) => item.module.id)).toEqual(['core-module']);
 
     await saveCustomGameplayModule({ ...dependency, version: '1.1.0' });
+    expect((await getCustomGameplayModulesForWorld('world-a')).map((item) => item.module.id)).toEqual(['core-module']);
+    await bindCustomGameplayModule(dependency.id, 'world-a');
     expect((await getCustomGameplayModulesForWorld('world-a')).map((item) => item.module.id)).toEqual(['core-module', 'dependent-module']);
   });
 

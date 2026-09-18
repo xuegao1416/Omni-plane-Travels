@@ -4,6 +4,7 @@ import { createDefaultGameState, type NPCData } from '../schema/variables';
 import { createEmptySimState } from '../simulation/types';
 import { ensureDirectorState } from './runtime';
 import type { DirectorDecision } from './client';
+import { StructuredOutputValidationError } from '../api/structuredOutput';
 import type { ApiConfig } from '../api/types';
 import type { WorldDef } from '../data/worlds-schema';
 
@@ -67,4 +68,20 @@ test('failed review persists its committed turn for recovery and clears it only 
   expect(f.host.state.director?.pendingReview).toBeUndefined();
   await failing.run({ ...f.input, canReview: () => false });
   expect(f.host.state.director?.pendingReview?.writesCommitted).toBe(false);
+});
+
+test('a degraded planning protocol is reported while existing plans still compile', async () => {
+  const f = fixture();
+  const notices: string[] = [];
+  ensureDirectorState(f.host.state).plans.move = { id: 'move', intent: '转移到新城', participants: [], dependencies: [], status: 'ready', priority: 30, source: 'director', visibility: 'foreground', createdAt: 1, updatedAt: 1 };
+  const controller = new DirectorReviewController(async () => {
+    throw new StructuredOutputValidationError('director_decision 连续 2 次未通过结构校验', '{"plans":[]}', ['plans.0.priority: Too big: expected number to be <=70']);
+  });
+  const directive = await controller.prepareForTurn({
+    engine: f.host, world: { id: 'w', name: '世界', description: '旅行' } as WorldDef, config: {} as ApiConfig,
+    context: { saveId: 's', worldId: 'w', completedTurnId: 't', stateVersion: 'v', variableProjection: f.input.getState(), narrative: '雨下了一整天。', memories: [] },
+    turnId: 't2', isCurrent: () => true, onDegraded: message => notices.push(message),
+  });
+  expect(notices.some(message => message.includes('已沿用既有计划'))).toBe(true);
+  expect(directive?.primary?.planId).toBe('move');
 });
