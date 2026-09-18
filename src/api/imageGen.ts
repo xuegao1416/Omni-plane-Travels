@@ -20,6 +20,8 @@ validateAndRepairComfyApiPromptResources,
 formatComfyWorkflowResourceValidationError,
 } from './comfy/comfyWorkflow';
 import type { ApiPromptWorkflow } from './comfy/comfyWorkflow';
+import { waitForComfyExecution } from './comfy/comfyExecution';
+import { findComfyImageOutput } from './comfy/comfyOutput';
 import { getProxyUrl } from './client';
 import { nativeFetch } from '../utils/nativeFetch';
 
@@ -793,98 +795,93 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
     resultSamplerLabel = execution.resultSamplerLabel;
   }
 
+  const proxyUrl = getProxyUrl();
+  let comfyClientId: string | undefined;
+  let comfyWebSocketUrl: string | undefined;
+
+  // WebSocket 只作为直连 ComfyUI 时的辅助完成/错误信号。
+  // 使用 CF Worker / 其他 HTTP 代理时浏览器 WebSocket 无法附加 X-Target-URL，
+  // 因此自动跳过 WS，完整保留原 HTTP /history 兼容路径。
+  if (!proxyUrl && typeof WebSocket !== 'undefined') {
+    try {
+      comfyClientId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `omni-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const wsUrl = new URL(apiUrl);
+      wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl.pathname = `${wsUrl.pathname.replace(/\/$/, '')}/ws`;
+      wsUrl.search = '';
+      wsUrl.searchParams.set('clientId', comfyClientId);
+      comfyWebSocketUrl = wsUrl.toString();
+    } catch (error) {
+      console.debug('[ComfyUI] 无法构造 WebSocket 地址，将仅使用 HTTP history:', error);
+      comfyClientId = undefined;
+      comfyWebSocketUrl = undefined;
+    }
+  }
+
   const { url: promptUrl, headers: promptHeaders } = withProxy(`${apiUrl}/prompt`, {
     'Content-Type': 'application/json',
   });
+  const promptBody: Record<string, unknown> = { prompt: promptPayload };
+  if (comfyClientId) promptBody.client_id = comfyClientId;
+
   const res = await nativeFetch(promptUrl, {
     method: 'POST',
     headers: promptHeaders,
-    body: JSON.stringify({ prompt: promptPayload }),
+    body: JSON.stringify(promptBody),
   });
 
-  if (!res.ok) throw new Error(`ComfyUI 请求失败: ${res.statusText}`);
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const body = await res.text();
+      if (body.trim()) detail = `：${summarizeErrorBody(body, res.status, res.statusText)}`;
+    } catch {
+      // 保留原状态码错误作为兜底。
+    }
+    throw new Error(`ComfyUI 请求失败 (${res.status}) ${res.statusText}${detail}`.trim());
+  }
 
   const { prompt_id } = await res.json();
 
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    let consecutiveErrors = 0;
-    const MAX_CONSECUTIVE_ERRORS = 15; // 连续失败 15 次（15秒）判定服务端不可用
-    let settled = false; // 防止重复 resolve/reject
-    const poll = setInterval(async () => {
-      if (settled) return;
-      try {
-        attempts += 1;
-        if (attempts > 300) {
-          clearInterval(poll);
-          settled = true;
-          reject(new Error('生成超时（5分钟）'));
-          return;
-        }
-
-        const { url: historyUrl, headers: historyHeaders } = withProxy(`${apiUrl}/history/${prompt_id}`);
-        const historyRes = await nativeFetch(historyUrl, { headers: historyHeaders });
-        if (!historyRes.ok) {
-          consecutiveErrors++;
-          console.warn(`[ComfyUI] history 请求失败 (${historyRes.status}), attempt ${attempts}, 连续错误 ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}`);
-          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-            clearInterval(poll);
-            settled = true;
-            reject(new Error(`ComfyUI 连续 ${MAX_CONSECUTIVE_ERRORS} 次请求失败，服务端可能已停止`));
-          }
-          return;
-        }
-
-        consecutiveErrors = 0; // 成功则重置连续错误计数
-        const history = await historyRes.json();
-        if (!history || !history[prompt_id]) return; // 还没完成
-
-        clearInterval(poll);
-        settled = true;
-
-        const outputs = history[prompt_id].outputs;
-        if (!outputs || typeof outputs !== 'object') {
-          reject(new Error('ComfyUI 返回的 outputs 为空'));
-          return;
-        }
-
-        for (const nodeId in outputs) {
-          const nodeOutput = outputs[nodeId];
-          if (nodeOutput?.images && nodeOutput.images.length > 0) {
-            const image = nodeOutput.images[0];
-            console.log(`[ComfyUI] 找到图片: ${image.filename}`);
-            const { url: viewUrl, headers: viewHeaders } = withProxy(
-              `${apiUrl}/view?filename=${encodeURIComponent(image.filename)}&subfolder=${encodeURIComponent(image.subfolder)}&type=${encodeURIComponent(image.type)}`,
-            );
-            const imgRes = await nativeFetch(viewUrl, { headers: viewHeaders });
-            if (!imgRes.ok) {
-              reject(new Error(`图片下载失败 (${imgRes.status})`));
-              return;
-            }
-            const blob = await imgRes.blob();
-            resolve({
-              blob,
-              seed,
-              prompt: positivePrompt,
-              negativePrompt,
-              width,
-              height,
-              model: resultModelLabel,
-              sampler: resultSamplerLabel,
-              steps,
-              scale: cfgScale,
-            });
-            return;
-          }
-        }
-        reject(new Error('ComfyUI 输出中未找到图片'));
-      } catch (e) {
-        clearInterval(poll);
-        settled = true;
-        reject(e);
+  const execution = await waitForComfyExecution({
+    promptId: prompt_id,
+    websocketUrl: comfyWebSocketUrl,
+    fetchHistory: async () => {
+      const { url: historyUrl, headers: historyHeaders } = withProxy(`${apiUrl}/history/${prompt_id}`);
+      const historyRes = await nativeFetch(historyUrl, { headers: historyHeaders });
+      if (!historyRes.ok) {
+        throw new Error(`history HTTP ${historyRes.status} ${historyRes.statusText}`.trim());
       }
-    }, 1000);
+      return historyRes.json();
+    },
   });
+
+  const image = findComfyImageOutput(execution.entry.outputs);
+  if (!image) {
+    throw new Error('ComfyUI 工作流已结束，但输出中未找到可读取的图片。请确认最终连接到 SaveImage 或 PreviewImage 输出节点。');
+  }
+
+  console.log(`[ComfyUI] 找到图片: ${image.filename}`);
+  const { url: viewUrl, headers: viewHeaders } = withProxy(
+    `${apiUrl}/view?filename=${encodeURIComponent(image.filename)}&subfolder=${encodeURIComponent(image.subfolder ?? '')}&type=${encodeURIComponent(image.type ?? 'output')}`,
+  );
+  const imgRes = await nativeFetch(viewUrl, { headers: viewHeaders });
+  if (!imgRes.ok) throw new Error(`图片下载失败 (${imgRes.status})`);
+  const blob = await imgRes.blob();
+  return {
+    blob,
+    seed,
+    prompt: positivePrompt,
+    negativePrompt,
+    width,
+    height,
+    model: resultModelLabel,
+    sampler: resultSamplerLabel,
+    steps,
+    scale: cfgScale,
+  };
 }
 
 // ─── NovelAI ───

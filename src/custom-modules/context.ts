@@ -1,5 +1,5 @@
 import type { GameState } from '../schema/variables';
-import type { JsonValue } from './schema';
+import type { JsonValue, CustomModuleItemDefinition } from './schema';
 
 export interface CustomModuleChoiceEvent {
   type: 'choice';
@@ -23,6 +23,7 @@ export interface CustomModuleHostContext {
   player: {
     stats: Record<string, number>;
     currency: { primary: number };
+    inventory?: Record<string, { amount: number }>;
     survival: Record<string, { amount: number; max?: number }>;
     business?: { funds: number; assetCount: number };
   };
@@ -34,6 +35,7 @@ export interface CustomModuleContextOptions {
   time?: string;
   now?: number;
   event?: CustomModuleEvent;
+  items?: Record<string, CustomModuleItemDefinition>;
 }
 
 function clone<T>(value: T): T {
@@ -65,6 +67,7 @@ export function buildCustomModuleHostContext(
     player: {
       stats: canonicalStats,
       currency: { primary: Number(gameState.玩家?.货币资源?.主货币?.数量 ?? 0) },
+      inventory: Object.fromEntries(Object.entries(options.items ?? {}).map(([id, item]) => [id, { amount: Number(gameState.玩家?.物品栏?.[item.name]?.数量 ?? 0) }])),
       survival,
       ...(business ? { business: { funds: Number(business.资金 ?? 0), assetCount: business.资产列表?.length ?? 0 } } : {}),
     },

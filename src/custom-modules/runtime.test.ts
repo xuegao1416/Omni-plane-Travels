@@ -48,6 +48,7 @@ describe('custom gameplay module runtime', () => {
     const v2 = {
       ...moduleDefinition,
       schemaVersion: 2 as const,
+      state: { ...moduleDefinition.state, score: { type: 'number', default: 0, min: 0, max: 100 } },
       inputs: { health: 'player.stats.attrA', currency: 'player.currency.primary' },
       permissions: { read: ['player.stats.attrA', 'player.currency.primary'], write: 'own-state-only' as const },
       logic: {

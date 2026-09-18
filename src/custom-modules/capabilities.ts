@@ -4,7 +4,7 @@ import type { CustomModuleAgentWorldContext } from './agentSession';
 export const CUSTOM_MODULE_LIFECYCLES = ['onGameStart', 'onTurnEnd', 'onTick', 'onChoice', 'onButton'] as const;
 export const CUSTOM_MODULE_STATE_FIELD_TYPES = ['number', 'string', 'boolean', 'enum', 'array', 'object'] as const;
 export const CUSTOM_MODULE_CONDITION_KINDS = ['compare', 'all', 'any', 'not'] as const;
-export const CUSTOM_MODULE_ACTION_KINDS = ['set', 'add', 'subtract', 'toggle', 'append', 'remove', 'log'] as const;
+export const CUSTOM_MODULE_ACTION_KINDS = ['set', 'add', 'subtract', 'toggle', 'append', 'remove', 'log', 'currency.consume', 'currency.grant', 'item.consume', 'item.grant', 'survival.consume', 'survival.grant'] as const;
 export const CUSTOM_MODULE_VIEW_COMPONENTS = ['section', 'card', 'text', 'number', 'progress', 'badge', 'list', 'table', 'divider', 'conditional', 'button'] as const;
 
 export type CustomModuleValueType = 'number' | 'string' | 'boolean' | 'array' | 'object';
@@ -73,13 +73,14 @@ const SAFE_SEGMENT = /^[A-Za-z][A-Za-z0-9_]*$/;
 const SURVIVAL_LEAF = /^player\.survival\.([A-Za-z][A-Za-z0-9_]*)\.(amount|max)$/;
 
 export function isSafeCustomModuleResourceId(id: string): boolean {
-  return SAFE_SEGMENT.test(id);
+  return SAFE_SEGMENT.test(id) && !['constructor', 'prototype', '__proto__'].includes(id);
 }
 
 export function getCustomModuleSafeInputType(path: string): CustomModuleValueType | undefined {
   const exact = (CUSTOM_MODULE_SAFE_INPUT_PATHS as Record<string, InputCapability>)[path];
   if (exact) return exact.type;
-  return SURVIVAL_LEAF.test(path) ? 'number' : undefined;
+  return (SURVIVAL_LEAF.test(path) || /^player\.inventory\.([A-Za-z][A-Za-z0-9_]*)\.amount$/.test(path))
+    && !path.split('.').some(part => ['constructor', 'prototype', '__proto__'].includes(part)) ? 'number' : undefined;
 }
 
 export function getCustomModuleSafeEventType(path: string): CustomModuleValueType | undefined {
@@ -136,6 +137,11 @@ export interface CustomModuleCapabilityCatalog {
   actions: readonly string[];
   viewComponents: readonly string[];
   writes: 'own-state-only';
+  hostCapabilities: {
+    currency: { actions: readonly string[]; amount: string };
+    inventory: { actions: readonly string[]; itemDefinitions: string; inputTemplate: string };
+    survival: { actions: readonly string[]; resourceIds: string[] };
+  };
 }
 
 export function buildCustomModuleCapabilityCatalog(
@@ -178,5 +184,10 @@ export function buildCustomModuleCapabilityCatalog(
     actions: [...CUSTOM_MODULE_ACTION_KINDS],
     viewComponents: [...CUSTOM_MODULE_VIEW_COMPONENTS],
     writes: 'own-state-only',
+    hostCapabilities: {
+      currency: { actions: ['currency.consume', 'currency.grant'], amount: '正的有限数字；使用 amount 字段，查询 player.currency.primary' },
+      inventory: { actions: ['item.consume', 'item.grant'], itemDefinitions: 'items: Record<安全 ASCII itemId, {name, description?, category?, weight?}>；动作使用 itemId 和正整数 amount', inputTemplate: 'player.inventory.<itemId>.amount' },
+      survival: { actions: ['survival.consume', 'survival.grant'], resourceIds: survivalResourceIds },
+    },
   };
 }

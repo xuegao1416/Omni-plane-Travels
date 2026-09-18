@@ -4,7 +4,7 @@ import { afterEach,describe,expect,test } from 'bun:test';
 import { createDefaultGameState } from '../schema/variables';
 import { clearCustomGameplayModules,bindCustomGameplayModule,saveCustomGameplayModule } from './storage';
 import type { CustomGameplayModule,CustomGameplayModuleDefinition } from './schema';
-import { runCustomModulesForWorldAndCommit } from './engineBridge';
+import { runCustomModulesForWorldAndCommit, runCustomModuleTurnLifecycles } from './engineBridge';
 
 const cardOverlaySource = readFileSync(new URL('../components/event/CardOverlay.tsx', import.meta.url), 'utf8');
 const startScreenSource = readFileSync(new URL('../components/start/useStartScreen.ts', import.meta.url), 'utf8');
@@ -37,6 +37,18 @@ afterEach(async () => {
 });
 
 describe('custom module lifecycle commit bridge', () => {
+  test('dispatches the accepted world tick before turn rules and does not repeat either on retry', async () => {
+    const record = await saveCustomGameplayModule({ ...moduleDefinition, logic: { ...moduleDefinition.logic, onTurnEnd: [{ actions: [{ type: 'add', path: 'pulseCount', value: 10 }] }] } });
+    await bindCustomGameplayModule(record.module.id, 'tick-world');
+    let state = createDefaultGameState();
+    const callbacks = { getCurrentState: () => structuredClone(state), commit: (next: typeof state) => { state = next; } };
+    await runCustomModuleTurnLifecycles(state, 'tick-world', { round: 1, tick: 1, settled: true }, callbacks);
+    expect(state.customModules?.[record.module.id]?.values.pulseCount).toBe(11);
+    await runCustomModuleTurnLifecycles(state, 'tick-world', { round: 1, tick: 1, settled: true }, callbacks);
+    expect(state.customModules?.[record.module.id]?.values.pulseCount).toBe(11);
+    await runCustomModuleTurnLifecycles(state, 'tick-world', { round: 2, tick: 1, settled: false }, callbacks);
+    expect(state.customModules?.[record.module.id]?.values.pulseCount).toBe(21);
+  });
   test('keeps card closing and world creation independent from custom module failures', () => {
     expect(cardOverlaySource.indexOf('setTimeout(close, 600)')).toBeLessThan(cardOverlaySource.indexOf('onChoice?.({'));
     expect(cardOverlaySource).toContain('Promise.resolve');
@@ -134,7 +146,8 @@ describe('custom module lifecycle commit bridge', () => {
 
     expect(result.activeModuleIds).toEqual([target.id]);
     expect(gameState.customModules?.[target.id]?.values.pulseCount).toBe(1);
-    expect(gameState.customModules?.[other.id]).toBeUndefined();
+    expect(gameState.customModules?.[other.id]?.values.pulseCount).toBe(0);
+    expect(gameState.customModules?.[other.id]?.runtime.processedEvents).toBeUndefined();
   });
 
   test('commits state before notifying React and scheduling auto-save', async () => {

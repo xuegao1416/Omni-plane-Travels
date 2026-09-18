@@ -29,7 +29,8 @@ const dependencySchema = z.object({
   version: z.string().regex(SEMVER_RE, '依赖版本必须是 x.y.z').optional(),
   optional: z.boolean().optional(),
 }).strict();
-const stateFieldNameSchema = z.string().regex(NAME_RE, '字段名必须是安全的 ASCII 标识符');
+const stateFieldNameSchema = z.string().regex(NAME_RE, '字段名必须是安全的 ASCII 标识符')
+  .refine(name => !name.split('.').some(part => ['constructor', 'prototype', '__proto__'].includes(part)), '字段名包含保留字');
 
 const numberStateFieldSchema = z
   .object({
@@ -461,7 +462,30 @@ export const customGameplayModuleV2Schema = z.object({
   permissions: permissionsSchema,
 }).strict();
 
-export const customGameplayModuleSchema = z.union([customGameplayModuleV1Schema, customGameplayModuleV2Schema]);
+const safeHostId = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/).refine(id => !['constructor', 'prototype', '__proto__'].includes(id));
+const hostAmount = z.number().finite().positive();
+const hostActionSchema = z.union([
+  z.object({ type: z.enum(['currency.consume', 'currency.grant']), amount: hostAmount }).strict(),
+  z.object({ type: z.enum(['item.consume', 'item.grant']), itemId: safeHostId, amount: hostAmount.int() }).strict(),
+  z.object({ type: z.enum(['survival.consume', 'survival.grant']), resourceId: safeHostId, amount: hostAmount }).strict(),
+]);
+const v3RuleSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/),
+  when: v2ConditionSchema.optional(),
+  actions: z.array(z.union([v2ActionSchema, hostActionSchema])).min(1).max(32),
+}).strict();
+const v3Rules = z.array(v3RuleSchema).max(64).default([]);
+export const customGameplayModuleV3Schema = customGameplayModuleV2Schema.extend({
+  schemaVersion: z.literal(3),
+  capabilities: z.array(z.enum(['currency', 'inventory', 'survival'])).max(3),
+  items: z.record(safeHostId, z.object({
+    name: z.string().min(1).max(120).refine(name => name === name.trim() && !name.includes('.') && !['constructor', 'prototype', '__proto__'].includes(name)),
+    description: descriptionSchema, category: z.string().max(80).optional(), weight: z.number().finite().nonnegative().optional(),
+  }).strict()).refine(items => Object.keys(items).length <= 64),
+  logic: z.object({ onGameStart: v3Rules, onTurnEnd: v3Rules, onTick: v3Rules, onChoice: v3Rules, onButton: v3Rules }).strict()
+    .default({ onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [] }),
+}).strict();
+export const customGameplayModuleSchema = customGameplayModuleV3Schema;
 
 export type CustomGameplayModuleInput = z.input<typeof customGameplayModuleSchema>;
 export type CustomGameplayModuleOutput = z.output<typeof customGameplayModuleSchema>;

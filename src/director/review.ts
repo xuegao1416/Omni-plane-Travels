@@ -5,7 +5,8 @@ import type { SimulationState } from '../simulation/types';
 import { EvolutionTurnCoordinator, evolutionFactVersion } from '../simulation/turnCoordinator';
 import { alignDirectorPlans } from './align';
 import { reconcileDirectorActors } from './actorIdentity';
-import { applyDirectorDecision, requestDirectorDecision } from './client';
+import { applyDirectorDecision, requestDirectorDecision, type DirectorDecision } from './client';
+import { StructuredOutputValidationError } from '../api/structuredOutput';
 import type { OffscreenMemoryPort } from './memoryConsumer';
 import { retryPendingOffscreenMemories, submitOffscreenEvent } from './offscreenPipeline';
 import { evaluateDirectiveOutcome } from './outcome';
@@ -57,6 +58,8 @@ export class DirectorReviewController {
   async prepareForTurn(input: {
     engine: DirectorStateHost; context: DirectorReadContext; world: WorldDef; config: ApiConfig;
     turnId: string; isCurrent: () => boolean; signal?: AbortSignal;
+    /** 结构协议连续失败、本轮降级为沿用既有计划时调用，用于把失败暴露给用户。 */
+    onDegraded?: (message: string) => void;
   }) {
     if (this.lastInput?.canReview && !this.lastInput.canReview()) return undefined;
     const simulation = structuredClone(input.engine.state);
@@ -65,7 +68,17 @@ export class DirectorReviewController {
     alignDirectorPlans(director, input.context);
     refreshSourceExhaustion(director);
     if (simulation.config.enabled) {
-      const decision = await this.requestDecision(director, input.context, input.world.description || input.world.name, input.config, input.signal);
+      let decision: DirectorDecision;
+      try {
+        decision = await this.requestDecision(director, input.context, input.world.description || input.world.name, input.config, input.signal);
+      } catch (error) {
+        // 正文不能被结构协议失败拖住；本轮降级为沿用既有计划，但必须让调用方看到。
+        if (!(error instanceof StructuredOutputValidationError)) throw error;
+        const message = `本轮导演指导未生成，已沿用既有计划：${error.issues.join('；')}`;
+        if (input.onDegraded) input.onDegraded(message);
+        else console.warn(`[Director] ${message}`);
+        decision = { conditions: [], plans: [], offscreen: [] };
+      }
       if (input.signal?.aborted || !input.isCurrent()) return undefined;
       applyDirectorDecision(director, decision, input.context);
       alignDirectorPlans(director, input.context);

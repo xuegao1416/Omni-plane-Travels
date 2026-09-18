@@ -181,9 +181,9 @@ export interface SaveMeta {
 
 const DB_NAME = 'omni-plane-travels';
 const DB_VERSION = 10; // v10: immutable director definitions and resumable compile jobs
-// v2.8.2 shipped DB v5; v6–v9 were intermediate additions before v2.8.3.
+// DB v4 already has compatible saves/global/messages; later stores are additive.
 // Database deployment versions are independent of the save payload schema below.
-const MIN_UPGRADABLE_DB_VERSION = 5;
+const MIN_UPGRADABLE_DB_VERSION = 4;
 const SAVES_STORE = 'saves';
 const GLOBAL_STORE = 'global';
 const MESSAGES_STORE = 'messages';  // 新增：消息分片 store
@@ -756,12 +756,17 @@ export async function migrateV3ToV4(oldSave: GameSave): Promise<boolean> {
  */
 export async function loadSaveWithMigration(saveId: string): Promise<GameSave | null> {
   const db = await getDB();
-  const record = await db.get(SAVES_STORE, saveId);
+  let record = await db.get(SAVES_STORE, saveId);
 
   if (!record) return null;
 
   // 检查是否需要迁移
   const schemaVersion = (record as any).schemaVersion ?? 0;
+  if (schemaVersion === SAVE_SCHEMA_VERSION || schemaVersion === SAVE_SCHEMA_VERSION - 1) {
+    await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(saveId);
+    record = await db.get(SAVES_STORE, saveId);
+    if (!record) return null;
+  }
   if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
     // 直接上一代 v3，需要迁移
     const oldSave = record as GameSave;
@@ -863,11 +868,16 @@ export async function saveGameIncremental(
 export async function loadGame(id: string, messageLimit: number = 0): Promise<GameSave | undefined> {
   try {
     const db = await getDB();
-    const record = await db.get(SAVES_STORE, id);
+    let record = await db.get(SAVES_STORE, id);
     if (!record) return undefined;
 
     // 检查是否是新格式（有 schemaVersion，无 messages）
     const schemaVersion = (record as any).schemaVersion ?? 0;
+    if (schemaVersion === SAVE_SCHEMA_VERSION || schemaVersion === SAVE_SCHEMA_VERSION - 1) {
+      await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(id);
+      record = await db.get(SAVES_STORE, id);
+      if (!record) return undefined;
+    }
     if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
       // 新格式：从 messages store 加载消息
       const compactHead = record as CompactSaveRecord;

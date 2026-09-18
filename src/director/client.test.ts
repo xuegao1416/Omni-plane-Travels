@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { createDefaultGameState } from '../schema/variables';
 import { createEmptyDirectorState, type DirectorReadContext } from './types';
-import { applyDirectorDecision, type DirectorDecision } from './client';
+import { applyDirectorDecision, decisionSchema, type DirectorDecision } from './client';
 import { alignDirectorPlans } from './align';
 
 test('free-form conditions need real evidence and expire when authoritative facts change', () => {
@@ -33,4 +33,13 @@ test('new actor plans cannot invent canonical people, overwrite sources or reviv
   applyDirectorDecision(director, decision, context);
   expect(director.plans['actor:ghost']).toBeUndefined();
   expect(JSON.stringify(context)).toBe(before);
+});
+
+
+test('director priority remains a strict 0-70 protocol boundary', () => {
+  const base = { conditions: [], offscreen: [], plans: [{ id: 'x', intent: 'x', participants: [], constraints: [], visibility: 'foreground', evidence: [{ kind: 'narrative', quote: 'x' }] }] };
+  expect(decisionSchema.safeParse({ ...base, plans: [{ ...base.plans[0], priority: 70 }] }).success).toBe(true);
+  expect(decisionSchema.safeParse({ ...base, plans: [{ ...base.plans[0], priority: 71 }] }).success).toBe(false);
+  expect(decisionSchema.safeParse({ ...base, plans: [{ ...base.plans[0], priority: 69.5 }] }).success).toBe(false);
+  expect(decisionSchema.safeParse({ ...base, plans: [{ ...base.plans[0], priority: '70' }] }).success).toBe(false);
 });

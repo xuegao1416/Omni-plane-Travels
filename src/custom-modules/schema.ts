@@ -372,7 +372,28 @@ export interface CustomGameplayModuleV2 extends Omit<CustomGameplayModule, 'sche
   permissions: ModulePermissions;
 }
 
-export type CustomGameplayModuleDefinition = CustomGameplayModule | CustomGameplayModuleV2;
+export type CustomModuleHostCapability = 'currency' | 'inventory' | 'survival';
+export interface CustomModuleItemDefinition {
+  name: string;
+  description?: string;
+  category?: string;
+  weight?: number;
+}
+export type CustomModuleHostAction =
+  | { type: 'currency.consume' | 'currency.grant'; amount: number }
+  | { type: 'item.consume' | 'item.grant'; itemId: string; amount: number }
+  | { type: 'survival.consume' | 'survival.grant'; resourceId: string; amount: number };
+export type V3Action = V2Action | CustomModuleHostAction;
+export interface LifecycleRuleV3 { id: string; when?: V2Condition; actions: V3Action[] }
+export type ModuleLogicV3 = Record<keyof ModuleLogicV2, LifecycleRuleV3[]>;
+export interface CustomGameplayModuleV3 extends Omit<CustomGameplayModuleV2, 'schemaVersion' | 'logic'> {
+  schemaVersion: 3;
+  capabilities: CustomModuleHostCapability[];
+  items: Record<string, CustomModuleItemDefinition>;
+  logic: ModuleLogicV3;
+}
+/** Legacy definitions are accepted only at import/normalization boundaries. */
+export type CustomGameplayModuleDefinition = CustomGameplayModule | CustomGameplayModuleV2 | CustomGameplayModuleV3;
 
 export type CustomGameplayModuleInput = (Omit<CustomGameplayModule, 'logic' | 'permissions'> & {
   logic?: Partial<ModuleLogic>;

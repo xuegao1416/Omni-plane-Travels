@@ -396,6 +396,9 @@ export interface GameState {
   };
   /** 自定义玩法模块的运行时状态；与事件包/工作流完全分离。 */
   customModules?: Record<string, import('../custom-modules/stateStore').CustomModuleRuntimeState>;
+  /** Once pinned, subsequent world bindings never change this save implicitly. */
+  customModuleBindingsInitialized?: boolean;
+  customModuleBindingWarnings?: string[];
   /** 六大内置模块共用的事务、事件、日志与迁移运行态。 */
   gameplay?: import('../gameplay/types').GameplayRuntimeState;
   /** Save-scoped event decisions; pending records survive failed narrative retries. */

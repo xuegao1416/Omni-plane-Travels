@@ -30,6 +30,9 @@ export default function GeneralSettingsTab() {
             onChange={v => update('theme', v as Theme)}
           />
         </SettingRow>
+        <SettingRow label={t('settings.disableEffects')} desc={t('settings.disableEffects.desc')}>
+          <Toggle value={ui.disableEffects} onChange={v => update('disableEffects', v)} />
+        </SettingRow>
       </Section>
 
       <Section variant="paper" icon={<Type size={15} />} title="排版">

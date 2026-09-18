@@ -1,9 +1,10 @@
 import { normalizeCustomGameplayModule } from './normalize';
 import type {
   Condition,
-  CustomGameplayModule,
   CustomGameplayModuleDefinition,
   CustomGameplayModuleV2,
+  CustomGameplayModuleV3,
+  V3Action,
   CustomModuleAction,
   CustomModuleReference,
   CustomModuleValue,
@@ -22,7 +23,7 @@ import {
 
 export interface CustomModuleValidationResult {
   valid: boolean;
-  normalized?: CustomGameplayModuleDefinition;
+  normalized?: CustomGameplayModuleV3;
   errors: ModuleValidationIssue[];
   warnings: ModuleValidationIssue[];
 }
@@ -93,7 +94,7 @@ function isReference(value: unknown): value is CustomModuleReference {
   return Boolean(value && typeof value === 'object' && (value as CustomModuleReference).source && (value as CustomModuleReference).path);
 }
 
-function inputPath(module: CustomGameplayModuleV2, alias: string): string | undefined {
+function inputPath(module: CustomGameplayModuleV2 | CustomGameplayModuleV3, alias: string): string | undefined {
   const binding = module.inputs[alias];
   return typeof binding === 'string' ? binding : binding?.path;
 }
@@ -116,7 +117,7 @@ function referenceCompatibleWithField(target: StateFieldDefinition, proof: Refer
 }
 
 function validateReference(
-  module: CustomGameplayModuleV2,
+  module: CustomGameplayModuleV2 | CustomGameplayModuleV3,
   reference: CustomModuleReference,
   path: string[],
   errors: ModuleValidationIssue[],
@@ -148,7 +149,7 @@ function validateReference(
 }
 
 function validateValueReference(
-  module: CustomGameplayModuleV2,
+  module: CustomGameplayModuleV2 | CustomGameplayModuleV3,
   value: CustomModuleValue,
   path: string[],
   errors: ModuleValidationIssue[],
@@ -213,7 +214,7 @@ function validateCondition(
 
 function validateV2Condition(
   condition: V2Condition | undefined,
-  module: CustomGameplayModuleV2,
+  module: CustomGameplayModuleV2 | CustomGameplayModuleV3,
   path: string[],
   errors: ModuleValidationIssue[],
 ): void {
@@ -280,7 +281,7 @@ function validateAction(
 
 function validateV2Action(
   action: V2Action,
-  module: CustomGameplayModuleV2,
+  module: CustomGameplayModuleV2 | CustomGameplayModuleV3,
   path: string[],
   errors: ModuleValidationIssue[],
 ): void {
@@ -312,6 +313,13 @@ function validateV2Action(
       errors.push(issue([...path, action.path], 'type-mismatch', '集合元素类型与 array.items 不匹配'));
     }
   }
+}
+
+function validateV3Action(action: V3Action, module: CustomGameplayModuleV3, path: string[], errors: ModuleValidationIssue[]): void {
+  if (!('amount' in action)) { validateV2Action(action, module, path, errors); return; }
+  const capability = action.type.startsWith('currency.') ? 'currency' : action.type.startsWith('item.') ? 'inventory' : 'survival';
+  if (!module.capabilities.includes(capability)) errors.push(issue(path, 'undeclared-capability', `必须声明 capability: ${capability}`));
+  if ('itemId' in action && !Object.hasOwn(module.items, action.itemId)) errors.push(issue(path, 'undeclared-item', `物品未声明：${action.itemId}`));
 }
 
 function validateComponent(
@@ -346,8 +354,8 @@ function validateComponent(
   }
 }
 
-export function validateCustomGameplayModule(input: unknown): CustomModuleValidationResult {
-  const normalized = normalizeCustomGameplayModule(input);
+export function validateCustomGameplayModule(input: unknown, source: 'import' | 'internal' = 'import'): CustomModuleValidationResult {
+  const normalized = normalizeCustomGameplayModule(input, source);
   if (!normalized.ok) {
     return { valid: false, errors: normalized.errors, warnings: normalized.warnings };
   }
@@ -355,30 +363,25 @@ export function validateCustomGameplayModule(input: unknown): CustomModuleValida
   const errors: ModuleValidationIssue[] = [];
   const module = normalized.data;
   const state = module.state;
-  const lifecycleNames = module.schemaVersion === 2
-    ? ['onGameStart', 'onTurnEnd', 'onTick', 'onChoice', 'onButton'] as const
-    : ['onGameStart', 'onTurnEnd', 'onTick', 'onChoice'] as const;
-  for (const lifecycle of lifecycleNames) {
-    const rules = module.schemaVersion === 2
-      ? (module as CustomGameplayModuleV2).logic[lifecycle]
-      : (module as CustomGameplayModule).logic[lifecycle as 'onGameStart' | 'onTurnEnd' | 'onTick' | 'onChoice'];
-    rules.forEach((rawRule, ruleIndex) => {
-      if (module.schemaVersion === 2) {
-        const rule = rawRule as CustomGameplayModuleV2['logic']['onGameStart'][number];
-        validateV2Condition(rule.when, module as CustomGameplayModuleV2, ['logic', lifecycle, String(ruleIndex), 'when'], errors);
-        rule.actions.forEach((action, actionIndex) => validateV2Action(action, module as CustomGameplayModuleV2, ['logic', lifecycle, String(ruleIndex), 'actions', String(actionIndex)], errors));
-      } else {
-        const rule = rawRule as CustomGameplayModule['logic']['onGameStart'][number];
-        validateCondition(rule.when, state, ['logic', lifecycle, String(ruleIndex), 'when'], errors);
-        rule.actions.forEach((action, actionIndex) => validateAction(action, state, ['logic', lifecycle, String(ruleIndex), 'actions', String(actionIndex)], errors));
-      }
+  const ids = new Set<string>();
+  for (const lifecycle of ['onGameStart', 'onTurnEnd', 'onTick', 'onChoice', 'onButton'] as const) {
+    module.logic[lifecycle].forEach((rule, ruleIndex) => {
+      const path = ['logic', lifecycle, String(ruleIndex)];
+      if (ids.has(rule.id)) errors.push(issue([...path, 'id'], 'duplicate-rule-id', '规则 ID 必须在模块中唯一'));
+      ids.add(rule.id);
+      validateV2Condition(rule.when, module, [...path, 'when'], errors);
+      rule.actions.forEach((action, index) => validateV3Action(action, module, [...path, 'actions', String(index)], errors));
     });
   }
   module.view?.components.forEach((component, index) => validateComponent(component, state, ['view', 'components', String(index)], errors));
 
-  if (module.schemaVersion === 2) {
+  if (module.schemaVersion === 3) {
     for (const [alias, binding] of Object.entries(module.inputs)) {
       const hostPath = typeof binding === 'string' ? binding : binding.path;
+      const itemMatch = /^player\.inventory\.([A-Za-z][A-Za-z0-9_]*)\.amount$/.exec(hostPath);
+      if (itemMatch && (!module.capabilities.includes('inventory') || !Object.hasOwn(module.items, itemMatch[1]))) {
+        errors.push(issue(['inputs', alias], 'undeclared-item-capability', '背包查询必须声明 inventory capability 和物品定义'));
+      }
       if (!getCustomModuleSafeInputType(hostPath)) {
         errors.push(issue(['inputs', alias], 'unknown-host-input', `宿主输入路径不在安全能力目录中：${hostPath}`));
       }
@@ -401,7 +404,7 @@ export function validateCustomGameplayModule(input: unknown): CustomModuleValida
   };
 }
 
-export function assertValidCustomGameplayModule(input: unknown): CustomGameplayModuleDefinition {
+export function assertValidCustomGameplayModule(input: unknown): CustomGameplayModuleV3 {
   const result = validateCustomGameplayModule(input);
   if (!result.valid || !result.normalized) {
     throw new Error(result.errors.map((entry) => `${entry.path.join('.')}: ${entry.message}`).join('; '));

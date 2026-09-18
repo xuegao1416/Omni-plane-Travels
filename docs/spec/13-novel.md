@@ -23,7 +23,7 @@ novelConfigStore.ts 保存独立生成 API 配置并复用项目密钥库。embe
 
 ### 存储与任务
 
-src/storage/db.ts 当前数据库为 v10，支持上一正式版 2.8.2 的 DB v5 及中间 v6～v9 直接升级：在同一事务中补齐缺失表和索引、修正分段复合索引，不改写既有记录；新安装直接创建当前结构。升级失败时回滚并允许重试。novelStore.ts 是 IndexedDB 访问层，不是 Zustand store。原文、材料、章节、分段、分块、任务、档案和归并检查点分表；资料列表仅读头部与计数。迁移实现在 db.ts，没有独立 storageMigration.ts。
+src/storage/db.ts 当前数据库为 v10，支持 DB v4～v9 直接升级（包括已有消息分片的 v4 和 2.8.2 的 v5）：在同一事务中补齐缺失表和索引、修正分段复合索引，不改写既有记录；新安装直接创建当前结构。升级失败时回滚并允许重试。novelStore.ts 是 IndexedDB 访问层，不是 Zustand store。原文、材料、章节、分段、分块、任务、档案和归并检查点分表；资料列表仅读头部与计数。迁移实现在 db.ts，没有独立 storageMigration.ts。
 
 同一数据集仅一个分析写入者，支持 Web Locks。关闭工作台取消在途请求并保存检查点，恢复继续未完成单元。部分范围、失败和读取错误不标为全书完成。getNovelPlotRange(datasetId,start,end) 按分析分段索引范围返回剧情；getNovelRuntimeWindow 保留原有邻段读取。导演基于事件及全局结构编译阶段，不将分析段直接用作游戏阶段。
 
@@ -40,5 +40,3 @@ worldFactory.ts 区分不可用、仅静态、部分、完整资料。worldBookA
 bun test src/novel 覆盖导入、来源、迁移、批次恢复、取消、档案保留及原生世界兼容。scripts/novel-validate.ts 从环境变量读取真实 API；scripts/novel-retrieval-validate.ts 接收外部标注，验证基础、真实向量和降级检索。脚本不包含指定小说或密钥特判。
 
 本机 LM Studio 服务为 http://127.0.0.1:1234/v1，模型 ID novel-bge-m3，BGE-M3 Q8_0，1024 维，GPU 加载约 605 MiB。服务开启 CORS 供浏览器调用。用户可直接关闭 embedding，不要求安装 LM Studio。
-
-2026-09-12：小说拆解与剧情导演已完成本次交付。用户确认小说世界开局、剧情绑定和首轮回复正常，并确认跨设备导入续玩、新回复落盘后主线版本和阶段保持。

@@ -3,7 +3,7 @@
 
 ## 9、UI 组件系统 — `src/components/`
 
-### 9.1 游戏主界面 — `src/components/game/GameScreen.tsx` (1204行)
+### 9.1 游戏主界面 — `src/components/game/GameScreen.tsx`
 
 **布局组件实际位置**:`DesktopLayout` / `MobileLayout` / `DrawerPanel` / `navConfig.ts` / `types.ts` 均在 `src/components/game/gameScreen/`;`ChatPanel` 在 `game/chat/`;`RightPanel` / `WorldDynamicsPanel` 在 `game/panels/`;`JourneyDossierContent` 在 `game/shared/`。
 
@@ -19,8 +19,6 @@ DesktopLayout (gameScreen/DesktopLayout.tsx)
 ├── DrawerPanel (gameScreen/DrawerPanel.tsx) ← drawerContent 由 GameScreen 传入 JourneyDossierContent
 └── rightPanel (可折叠, rightCollapsed / onToggleRightPanel) → RightPanel / WorldDynamicsPanel
 ```
-
-> **注(2026-09-08)**:旧版文档写的 `LeftNavBar (52px固定)` **不存在** — 全仓库无 `LeftNavBar` 标识符,左侧导航是 DesktopLayout 内联的 `<nav className="game-journey__nav" aria-label="游戏导航">`,宽度由 CSS 类控制(源码中无 `52px` 字面量)。图标尺寸为 `<Icon size={18} strokeWidth={1.5} />`,有 `emblemSrc` 时优先渲染 `<img>`。导航项也**不含** `Settings`(仅移动端 `navConfig.ts:54-65` 的 12 项列表含 `settings`)。
 
 **移动端布局**:
 
@@ -52,13 +50,9 @@ useEffect(() => {
 }, [gameState, combatV3Enabled, readOnly, runCombatAutomationStep]);
 ```
 
-> **注(2026-09-08)**:上面这个 useEffect 的延迟实参是 **`0`**,不是 `260`;依赖数组含第 4 项 `runCombatAutomationStep`。`260` 出现在 `runCombatAutomationStep`(:855)**内部**的自链式调度(:892),用于连续敌方行动之间的节奏间隔;另有 :901 用 `setTimeout(runCombatAutomationStep, 0)` 响应策略变更。计时器声明为 `const combatAutomationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)`(:96),并在 :904 的卸载 effect 中 `clearTimeout` 清理。
-
-### 9.2 聊天面板 — `src/components/game/chat/ChatPanel.tsx` (181行)
+### 9.2 聊天面板 — `src/components/game/chat/ChatPanel.tsx`
 
 **ChatPanel 实际子组件**(ChatPanel.tsx:1-10 导入):`MessageBubble`、`ErrorBoundary`、`InputArea`、`PipelineMonitorModal`,以及 `messageWindow.ts` 的 `getInitialMessageStart` / `getPreviousMessageStart`。
-
-> **注(2026-09-08)**:旧版文档在 §9.1 写的 `NarrativeBanner` 与 `MessageList` **两个组件都不存在**。全仓库无 `NarrativeBanner` 标识符;消息列表是 ChatPanel 内联的滚动容器(`onScroll={handleMessageListScroll}`,:129)直接 map 出 `MessageBubble`,没有独立 `MessageList.tsx`。
 
 **`src/components/game/chat/` 实际文件**:`ChatPanel.tsx`、`MessageBubble.tsx`、`InputArea.tsx`、`PipelineMonitorModal.tsx`、`ContextMenu.tsx`、`InlineDiceCard.tsx`、`InlineTalentCard.tsx`、`InlineImageGenButton.tsx`、`messageWindow.ts`、`pipelineUI.ts`、`messageBubble/` 子目录(`BubbleContent.tsx` / `EditMode.tsx` / `InlinePortals.tsx` / `renderPipeline.ts` / `types.ts` / `useMenuItems.tsx`)+ 3 个测试。
 

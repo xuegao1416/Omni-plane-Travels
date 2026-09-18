@@ -13,6 +13,7 @@ import {
 } from './deepSeekResponseGuard';
 import { getMessageContent } from './contextManager';
 import { VariableManager } from './variableManager';
+import { admitAuthoredNPCs } from './playerKnowledge';
 import { eventBus, EVENTS } from './eventBus';
 import { v4 as uuid } from 'uuid';
 import type { WorldBookManager } from '../worldbook/index';
@@ -1026,6 +1027,7 @@ ${perspectiveInstruction}
                 memories: runtime ? collectMemoryEntries(runtime, 'director').map(fact => ({ id: fact.id, text: fact.summary, provenance: fact.sourceEventIds?.join(','), layer: fact.layer, confidence: fact.confidence })) : [],
               },
               isCurrent: () => varMgrRef.current === directorManager && (useSaveStore.getState().currentSaveId ?? 'unsaved') === directorSaveId && selectedWorldRef.current === directorWorld.id && evolutionFactVersion(directorManager.getState()) === directorVersion,
+              onDegraded: message => useSimulationStore.getState().setLastError(message),
             }) : undefined;
             const directiveText = formatDirectorDirective(directive);
             if (directiveText) parts.push(directiveText);
@@ -1134,7 +1136,6 @@ ${perspectiveInstruction}
           const result = await requestStreamWithRetry(narrativeApiConfig, apiMessages, {
             signal: controller.signal,
             onDelta: (_delta, acc) => { accumulated = acc; updateMessage(aiMsgId, { rawText: applyCombatBoundary(acc) }); },
-            trialPurpose: apiConfig.provider === 'custom' && apiConfig.baseUrl.replace(/\/+$/, '').endsWith('/api/trial') ? 'conversation' : undefined,
             ...presetRequestOpts,
           });
 
@@ -1637,8 +1638,10 @@ ${perspectiveInstruction}
     const statConfig = (statModule?.moduleConfig) as StatModuleSchema | undefined;
     const progressionModule = worldDef?.modules?.find(module => module.moduleId === 'progression' && module.enabled);
     const progressionConfig = (progressionModule?.moduleConfig) as Record<string, unknown> | undefined;
+    const authoredIds: string[] = [];
     for (const npc of npcs) {
       const npcId = `NPC_${npc.name}`;
+      authoredIds.push(npcId);
       const npcTierIndex = progressionModule
         ? materializeNpcTierIndex(npc.tierIndex, progressionConfig?.currentTierIndex as number | undefined)
         : undefined;
@@ -1680,6 +1683,12 @@ ${perspectiveInstruction}
         ...(npcTierIndex !== undefined ? { 成长状态: { 当前段位索引: npcTierIndex, 当前经验值: 0 } } : {}),
       };
     }
+    // 开局自建角色由玩家自己填写，直接登记为玩家已知，否则人物/任务面板看不到他们。
+    admitAuthoredNPCs(state, authoredIds, {
+      turnId: 'character-creation',
+      eventId: 'character-creation',
+      quote: '玩家在开局创建的角色',
+    });
     varMgrRef.current.setState(state);
     // 更新全局初始快照（此时包含玩家数据和NPC，NPC事迹为空）
     initialSnapshotRef.current = varMgrRef.current.createSnapshot();

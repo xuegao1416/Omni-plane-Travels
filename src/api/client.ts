@@ -2,7 +2,6 @@ import type { ApiConfig,Message,RequestOptions,StreamOptions,CompletionResult } 
 import { nativeFetch } from '../utils/nativeFetch';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { notifyRateLimited,bucketKeyForConfig,parseRetryAfter } from './rateLimiter';
-import { getTrialClientId,isTrialApiConfig } from './trial';
 
 // 获取代理 URL（校验协议安全性）
 export function getProxyUrl(): string | null {
@@ -32,9 +31,7 @@ export function getProxyUrl(): string | null {
 
 /** 统一准备请求 URL 和 Headers（处理代理逻辑） */
 export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>): { url: string; headers: Record<string, string> } {
-  // 体验路由是本项目固定的同源服务端入口，不能被用户配置的任意代理改写。
-  const isTrialEndpoint = endpoint.includes('/api/trial/');
-  const proxyUrl = isTrialEndpoint ? null : getProxyUrl();
+  const proxyUrl = getProxyUrl();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...extraHeaders,
@@ -68,7 +65,6 @@ export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHead
 // URL拼接 - 支持多种provider
 export function buildEndpoint(config: ApiConfig): string {
   const base = config.baseUrl.replace(/\/+$/, '');
-  if (isTrialApiConfig(config)) return `${base}/chat/completions`;
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
@@ -96,6 +92,16 @@ function buildRequestBody(config: ApiConfig, messages: Message[], options: Reque
   if (config.topK != null) body.top_k = config.topK;
   if (config.reasoningEffort && config.reasoningEffort !== '关闭') body.reasoning_effort = config.reasoningEffort;
   if (options.responseFormat === 'json') body.response_format = { type: 'json_object' };
+  else if (typeof options.responseFormat === 'object' && options.responseFormat.type === 'json_schema') {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: options.responseFormat.name,
+        strict: options.responseFormat.strict ?? true,
+        schema: options.responseFormat.schema,
+      },
+    };
+  }
   // Google不支持某些参数
   if (config.provider === 'google') {
     delete body.frequency_penalty;
@@ -246,11 +252,7 @@ export async function requestCompletion(
   const body = buildRequestBody(config, normalized, { ...options, stream: false });
   console.log(`🚀 [API] 发起请求 → ${endpoint} (${messages.length} 条消息)`);
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
-    endpoint,
-    isTrialApiConfig(config) ? undefined : config.apiKey,
-    isTrialApiConfig(config) ? { 'X-Trial-Client-Id': getTrialClientId(), ...(options.trialPurpose ? { 'X-Trial-Purpose': options.trialPurpose } : {}) } : undefined,
-  );
+  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
 
   const res = await nativeFetch(fetchUrl, {
     method: 'POST',
@@ -311,11 +313,7 @@ export async function requestCompletionStream(
   const normalized = normalizeMessages(config.provider, messages);
   const body = buildRequestBody(config, normalized, { ...options, stream: true });
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
-    endpoint,
-    isTrialApiConfig(config) ? undefined : config.apiKey,
-    isTrialApiConfig(config) ? { 'X-Trial-Client-Id': getTrialClientId(), ...(options.trialPurpose ? { 'X-Trial-Purpose': options.trialPurpose } : {}) } : undefined,
-  );
+  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
 
   const res = await fetch(fetchUrl, {
     method: 'POST',
@@ -377,12 +375,14 @@ async function requestWithFallback(
   }
   try {
     const result = await requestCompletionStream(config, messages, options);
-    // 内容过短（≤5字符）视为异常响应（429被包装成200、内容审核截断等），触发重试
-    if (!result.text || result.text.trim().length <= 5) {
-      console.warn(`[API] 流式响应内容过短（${result.text.length} 字符），降级到非流式重试`);
+    // 空响应可以重试；简短但有效的回答不应被当作限流或审核失败。
+    if (!result.text?.trim()) {
+      if (result.finishReason === 'content_filter' || result.finishReason === 'content-filter') throw new Error('模型服务明确拒绝了本次请求');
+      console.warn('[API] 流式响应为空，降级到非流式重试');
       const fallback = await requestCompletion(config, messages, options);
-      if (!fallback.text || fallback.text.trim().length <= 5) {
-        throw new Error(`API 429: 流式和非流式均返回过短响应，疑似限流或内容审核`);
+      if (!fallback.text?.trim()) {
+        if (fallback.finishReason === 'content_filter' || fallback.finishReason === 'content-filter') throw new Error('模型服务明确拒绝了本次请求');
+        throw new Error('模型服务返回空响应，请重试或检查模型配置');
       }
       return fallback;
     }

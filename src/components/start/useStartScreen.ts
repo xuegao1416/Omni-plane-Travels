@@ -328,9 +328,13 @@ export function useStartScreen() {
 
     // 自定义模块在初始 GameState 完整后启动；提交顺序与其它生命周期一致。
     try {
+      const customModuleOwner = engine.variableManager;
+      const customModuleSaveId = useSaveStore.getState().currentSaveId;
       await runCustomModulesForWorldAndCommit(engine.variableManager.getState(), wizard.selectedWorld, 'onGameStart', {
         round: 0,
       }, {
+        getCurrentState: () => customModuleOwner.getState(),
+        isCurrent: () => engine.variableManager === customModuleOwner && useSaveStore.getState().currentSaveId === customModuleSaveId,
         commit: (nextState) => engine.variableManager.setState(nextState),
       });
     } catch (error) {

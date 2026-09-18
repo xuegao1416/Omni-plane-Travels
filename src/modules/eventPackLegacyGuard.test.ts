@@ -47,12 +47,20 @@ function productionSources(directory: string): string[] {
   return files;
 }
 
+function containsForbiddenToken(source: string, token: string): boolean {
+  if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(token)) return source.includes(token);
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![A-Za-z0-9_$])${escaped}(?![A-Za-z0-9_$])`).test(source);
+}
+
 test('legacy card-pack identifiers stay inside the import migration boundary', () => {
+  expect(containsForbiddenToken('workshop.importModule(raw)', 'importMod')).toBe(false);
+  expect(containsForbiddenToken('await importMod(raw)', 'importMod')).toBe(true);
   const matches: string[] = [];
   for (const file of productionSources(sourceRoot)) {
     const source = readFileSync(file, 'utf8');
     for (const token of forbidden) {
-      if (source.includes(token)) matches.push(`${relative(sourceRoot, file)}: ${token}`);
+      if (containsForbiddenToken(source, token)) matches.push(`${relative(sourceRoot, file)}: ${token}`);
     }
   }
   expect(matches).toEqual([]);

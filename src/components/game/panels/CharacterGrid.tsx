@@ -50,6 +50,7 @@ export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, 
       {selected && npcs[selected] && (
         <NPCDetail
           key={selected} npc={npcs[selected]!} npcId={selected}
+          truth={gameState.人物档案?.[selected]}
           onClose={() => setSelected(null)}
           onUpdateChronicles={onUpdateChronicles}
           onMergeChronicles={onMergeChronicles}

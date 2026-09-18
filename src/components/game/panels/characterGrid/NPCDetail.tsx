@@ -1,14 +1,17 @@
 import { useCallback,useState } from 'react';
 import {
 User,BarChart3,Briefcase,MapPin,Sparkles,BookOpen,Brain,Dna,
-Zap,Star,Shield,Swords,Backpack,ScrollText
+Zap,Star,Shield,Swords,Backpack,ScrollText,Eye,EyeOff
 } from 'lucide-react';
 import { ExcelRow } from '../../../shared/ExcelRow';
 import EmptyState from '../../../shared/EmptyState';
 import type { KnownNPC } from '../../../../engine/playerKnowledge';
+import type { NPCData } from '../../../../schema/variables';
 import { DETAIL_TABS,favorClass } from './types';
 import type { DetailTab } from './types';
 import { GaugeBar } from './NPCCard';
+import { RevealRow } from './RevealRow';
+import { FogPanel, hasBlockContent } from './FogPanel';
 import { TagList,RecordGrid,Section } from './SharedUI';
 import { ListOrRecord } from './ListOrRecord';
 import { InventoryGrid } from './InventoryGrid';
@@ -101,8 +104,68 @@ function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number
   );
 }
 
-export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
+/** 技能页签内容块：可渲染玩家已知版本，也可渲染幕后真相版本（置于迷雾下）。 */
+function SkillsBlock({ data, worldId }: { data: Record<string, any>; worldId?: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {data.特殊能力 && (
+        <Section icon={Sparkles} title="特殊能力">
+          <div style={{ padding: '8px 10px', background: 'var(--accent-dim)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-base)', lineHeight: '1.5' }}>{data.特殊能力}</div>
+        </Section>
+      )}
+      {data.生存状态 && Object.keys(data.生存状态).length > 0 && (
+        <Section icon={BarChart3} title="生存状态">
+          <SurvivalStatsDisplay stats={data.生存状态} worldId={worldId} />
+        </Section>
+      )}
+      {data.成长状态 && (
+        <Section icon={Star} title="成长状态">
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {data.成长状态.当前段位索引 != null && (
+              <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+                段位: <strong>{data.成长状态.当前段位索引}</strong>
+              </span>
+            )}
+            {data.成长状态.当前经验值 != null && (
+              <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+                经验: <strong>{data.成长状态.当前经验值}</strong>
+              </span>
+            )}
+          </div>
+        </Section>
+      )}
+      {data.天赋 && data.天赋.length > 0 && (
+        <Section icon={Star} title="天赋"><TagList items={data.天赋} accent /></Section>
+      )}
+      {data.技能列表 && (
+        <Section icon={Zap} title="技能列表"><ListOrRecord data={data.技能列表} emptyText="暂无技能" /></Section>
+      )}
+    </div>
+  );
+}
+
+/** 物品页签内容块：同 SkillsBlock，可渲染已知或幕后版本。 */
+export function ItemsBlock({ data }: { data: Record<string, any> }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* 物品栏是剧情中会真正增减的那一栏（AI 通过 add/set/remove 维护），与静态的物品列表分开呈现 */}
+      {data.物品栏 && (
+        <Section icon={Backpack} title="随身物品栏"><InventoryGrid data={data.物品栏} /></Section>
+      )}
+      {data.物品列表 && (
+        <Section icon={Backpack} title="物品列表"><InventoryGrid data={data.物品列表} /></Section>
+      )}
+      {data.装备列表 && Object.keys(data.装备列表).length > 0 && (
+        <Section icon={Shield} title="装备列表"><RecordGrid data={data.装备列表} /></Section>
+      )}
+    </div>
+  );
+}
+
+export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
   npc: KnownNPC; npcId: string; onClose: () => void;
+  /** 幕后真相：只用于读者点开眼睛查看，不会同步给玩家扮演的角色。 */
+  truth?: NPCData;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
   /** 删除该 NPC；返回 false 表示删除未生效。 */
@@ -114,6 +177,8 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showDeeds, setShowDeeds] = useState(false);
+  /** 读者视角总开关：一键展开/收起本页全部幕后内容。 */
+  const [readerView, setReaderView] = useState(false);
 
   const ext = npc as any;
   const handleDelete = useCallback(async () => {
@@ -129,6 +194,14 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
   const rd = npc.关系数据 ?? {};
   const sj = npc.社会身份 ?? { 职业: '', 社会地位: '' };
   const pi = npc.个人信息 ?? { 外貌: '', 表性格: '', 里性格: '', 当前想法: '', 当前穿着: '', 当前位置: '', 当前状态: '', 备注: '' };
+  // 眼睛按钮点开的是幕后真相：只给屏幕前的读者看，不写回玩家认知、不进提示词。
+  const truthPi = truth?.个人信息;
+  const truthExt = truth as unknown as Record<string, any> | undefined;
+  // 技能/物品成块呈现：玩家已知就直出，只有幕后版本才压在迷雾下，两者皆空才显示暂无。
+  const hasKnownSkills = hasBlockContent(ext.特殊能力, ext.生存状态, ext.成长状态, ext.天赋, ext.技能列表);
+  const hasTruthSkills = hasBlockContent(truthExt?.特殊能力, truthExt?.生存状态, truthExt?.成长状态, truthExt?.天赋, truthExt?.技能列表);
+  const hasKnownItems = hasBlockContent(ext.物品栏, ext.物品列表, ext.装备列表);
+  const hasTruthItems = hasBlockContent(truthExt?.物品栏, truthExt?.物品列表, truthExt?.装备列表);
 
   return (
     <div className="game-journey__nested-overlay" style={{
@@ -168,13 +241,30 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
           </div>
 
           <div style={{ flex: 1, padding: '14px 18px', overflowY: 'auto', fontSize: 'var(--font-size-base)', lineHeight: '1.6' }}>
+            <button
+              type="button"
+              onClick={() => setReaderView(v => !v)}
+              title="查看角色尚不知情的幕后内容（仅屏幕前的你看得到）"
+              aria-pressed={readerView}
+              style={{
+                width: '100%', marginBottom: '12px', padding: '5px 10px',
+                border: `1px solid ${readerView ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)',
+                background: readerView ? 'var(--accent-dim)' : 'var(--bg-primary)',
+                color: readerView ? 'var(--accent)' : 'var(--text-muted)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                fontSize: 'var(--font-size-xs)', transition: 'all 0.15s',
+              }}
+            >
+              {readerView ? <EyeOff size={13} strokeWidth={1.5} /> : <Eye size={13} strokeWidth={1.5} />}
+              {readerView ? '收起幕后内容' : '查看幕后内容'}
+            </button>
             {tab === 'overview' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <Section icon={User} title="基本信息">
                   <ExcelRow label="姓名" value={npc.姓名 ?? '未知'} />
                   <ExcelRow label="种族" value={npc.种族 ?? '未知'} />
                   <ExcelRow label="性别" value={npc.性别 ?? '未知'} />
-                  <ExcelRow label="年龄" value={npc.年龄 === undefined ? '未知' : String(npc.年龄)} />
+                  <RevealRow label="年龄" known={npc.年龄} hidden={truth?.年龄} revealed={readerView} />
                 </Section>
                 <Section icon={BarChart3} title="关系数据">
                   <div style={{ marginBottom: '8px' }}>
@@ -184,8 +274,8 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                   <ExcelRow label="关系类型" value={rd.关系类型 ?? '未知'} />
                 </Section>
                 <Section icon={Briefcase} title="社会身份">
-                  <ExcelRow label="职业" value={sj.职业 ?? '未知'} />
-                  <ExcelRow label="地位" value={sj.社会地位 ?? '未知'} />
+                  <RevealRow label="职业" known={sj.职业} hidden={truth?.社会身份?.职业} revealed={readerView} />
+                  <RevealRow label="地位" known={sj.社会地位} hidden={truth?.社会身份?.社会地位} revealed={readerView} />
                 </Section>
                 <Section icon={MapPin} title="状态">
                   <ExcelRow label="位置" value={pi.当前位置 ?? '未知'} />
@@ -199,19 +289,17 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                 <Section icon={Sparkles} title="外貌与性格">
                   <ExcelRow label="外貌" value={pi.外貌 ?? '未知'} />
                   <ExcelRow label="表性格" value={pi.表性格 ?? '未知'} />
-                  <ExcelRow label="里性格" value={pi.里性格 ?? '未知'} />
+                  <RevealRow label="里性格" known={pi.里性格} hidden={truthPi?.里性格} revealed={readerView} />
                   <ExcelRow label="穿着" value={pi.当前穿着 ?? '未知'} />
                 </Section>
-                {(ext.背景 || npc.背景) && (
-                  <Section icon={BookOpen} title="背景">
-                    <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: '1.6', color: 'var(--text-secondary)' }}>{ext.背景 || npc.背景}</div>
-                  </Section>
-                )}
+                <Section icon={BookOpen} title="背景">
+                  <RevealRow label="背景" known={ext.背景 || npc.背景} hidden={truth?.背景} revealed={readerView} />
+                </Section>
                 <Section icon={Brain} title="内心世界">
-                  <ExcelRow label="当前想法" value={pi.当前想法 || ext.内心想法} />
+                  <RevealRow label="当前想法" known={pi.当前想法 || ext.内心想法} hidden={truthPi?.当前想法 || truth?.内心想法} revealed={readerView} />
                   <ExcelRow label="当前行动" value={ext.当前行动} />
-                  <ExcelRow label="短期目标" value={ext.短期目标} />
-                  <ExcelRow label="长期目标" value={ext.长期目标} />
+                  <RevealRow label="短期目标" known={ext.短期目标} hidden={truth?.短期目标} revealed={readerView} />
+                  <RevealRow label="长期目标" known={ext.长期目标} hidden={truth?.长期目标} revealed={readerView} />
                 </Section>
                 {(ext.种族描述 || ext.种族效果 || (ext.种族特性 && ext.种族特性.length > 0)) && (
                   <Section icon={Dna} title="种族信息">
@@ -225,11 +313,9 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
                     )}
                   </Section>
                 )}
-                {pi.备注 && (
-                  <Section icon={BookOpen} title="备注">
-                    <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: '1.5', color: 'var(--text-secondary)' }}>{pi.备注}</div>
-                  </Section>
-                )}
+                <Section icon={BookOpen} title="备注">
+                  <RevealRow label="备注" known={pi.备注} hidden={truthPi?.备注} revealed={readerView} />
+                </Section>
                 <Section icon={ScrollText} title="人物事迹">
                   <button onClick={() => setShowDeeds(true)} style={{
                     width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
@@ -247,57 +333,19 @@ export function NPCDetail({ npc, npcId, onClose, onUpdateChronicles, onMergeChro
             )}
 
             {tab === 'skills' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {ext.特殊能力 && (
-                  <Section icon={Sparkles} title="特殊能力">
-                    <div style={{ padding: '8px 10px', background: 'var(--accent-dim)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-base)', lineHeight: '1.5' }}>{ext.特殊能力}</div>
-                  </Section>
-                )}
-                {ext.生存状态 && Object.keys(ext.生存状态).length > 0 && (
-                  <Section icon={BarChart3} title="生存状态">
-                    <SurvivalStatsDisplay stats={ext.生存状态} worldId={worldId} />
-                  </Section>
-                )}
-                {ext.成长状态 && (
-                  <Section icon={Star} title="成长状态">
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {ext.成长状态.当前段位索引 != null && (
-                        <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
-                          段位: <strong>{ext.成长状态.当前段位索引}</strong>
-                        </span>
-                      )}
-                      {ext.成长状态.当前经验值 != null && (
-                        <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
-                          经验: <strong>{ext.成长状态.当前经验值}</strong>
-                        </span>
-                      )}
-                    </div>
-                  </Section>
-                )}
-                {ext.天赋 && ext.天赋.length > 0 && (
-                  <Section icon={Star} title="天赋"><TagList items={ext.天赋} accent /></Section>
-                )}
-                {ext.技能列表 && (
-                  <Section icon={Zap} title="技能列表"><ListOrRecord data={ext.技能列表} emptyText="暂无技能" /></Section>
-                )}
-                {!ext.特殊能力 && !ext.生存状态 && !ext.天赋 && !ext.技能列表 && !ext.成长状态 && (
-                  <EmptyState icon={Swords} message="暂无技能数据" />
-                )}
-              </div>
+              hasKnownSkills
+                ? <SkillsBlock data={ext} worldId={worldId} />
+                : hasTruthSkills
+                  ? <FogPanel label="技能与状态（幕后）" revealed={readerView}><SkillsBlock data={truth as unknown as Record<string, any>} worldId={worldId} /></FogPanel>
+                  : <EmptyState icon={Swords} message="暂无技能数据" />
             )}
 
             {tab === 'items' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {ext.物品列表 && (
-                  <Section icon={Backpack} title="物品列表"><InventoryGrid data={ext.物品列表} /></Section>
-                )}
-                {ext.装备列表 && Object.keys(ext.装备列表).length > 0 && (
-                  <Section icon={Shield} title="装备列表"><RecordGrid data={ext.装备列表} /></Section>
-                )}
-                {!ext.物品列表 && !ext.装备列表 && (
-                  <EmptyState icon={Backpack} message="暂无物品数据" />
-                )}
-              </div>
+              hasKnownItems
+                ? <ItemsBlock data={ext} />
+                : hasTruthItems
+                  ? <FogPanel label="随身物品（幕后）" revealed={readerView}><ItemsBlock data={truth as unknown as Record<string, any>} /></FogPanel>
+                  : <EmptyState icon={Backpack} message="暂无物品数据" />
             )}
           </div>
         </div>

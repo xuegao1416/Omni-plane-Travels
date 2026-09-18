@@ -3,7 +3,7 @@
 
 ## 10、导航与 Context — `src/context/`
 
-### 10.1 游戏导航 — `src/context/GameContext.tsx` (275行)
+### 10.1 游戏导航 — `src/context/GameContext.tsx`
 
 **文件路径**: `src/context/GameContext.tsx`
 
