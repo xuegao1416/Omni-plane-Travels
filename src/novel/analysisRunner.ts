@@ -268,6 +268,8 @@ export interface NovelAnalysisOptions {
   overviewBatchTokens?: number;
   /** Explicit user action: refresh only world materials after versioned evidence extraction. */
   forceOverview?: boolean;
+  /** Explicit user action: ignore reusable evidence and extract it again for every segment. */
+  reExtractEvidence?: boolean;
   signal?: AbortSignal;
   onProgress?: (value: NovelAnalysisProgress) => void;
   onCheckpoint?: (dataset: NovelDataset) => void;
@@ -300,6 +302,8 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   }
   const total = dataset.segments.length * 2 + 1;
   let job = await getOrCreateJob(dataset.id, startSegmentIndex, total);
+  // Channels already used on this dataset stay readable, so switching models keeps extracted evidence.
+  const usedFingerprints = (await listNovelJobs(dataset.id)).map(item => item.configFingerprint).filter((value): value is string => Boolean(value));
   job.runId = uuid(); job.model = params.config.model;
   job.configFingerprint = hashNovelText(JSON.stringify([params.config.baseUrl, params.config.model, params.config.provider]));
   job.requestCount = 0;
@@ -356,13 +360,15 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       assertNotAborted();
       let segment = dataset.segments[index];
       const sourceText = segmentSource(dataset, segment);
-      const sourceHash = hashNovelText(JSON.stringify({
-        sourceText,
-        chapterContext: chapterContext(dataset, segment),
-        analysisVersion: NOVEL_ANALYSIS_VERSION,
-        model: job.configFingerprint,
-      }));
-      if (segment.evidenceNotes && segment.analysisVersion === NOVEL_ANALYSIS_VERSION && segment.evidenceInputHash === sourceHash) {
+      const context = chapterContext(dataset, segment);
+      // Evidence extraction is grounded in the original text, not in the channel, so switching
+      // models keeps it; the former per-channel identity stays readable so stored notes are reused.
+      const evidenceInputHash = hashNovelText(JSON.stringify({ sourceText, chapterContext: context, analysisVersion: NOVEL_ANALYSIS_VERSION }));
+      const reusableHashes = new Set([evidenceInputHash]);
+      for (const fingerprint of [...usedFingerprints, job.configFingerprint]) {
+        if (fingerprint) reusableHashes.add(hashNovelText(JSON.stringify({ sourceText, chapterContext: context, analysisVersion: NOVEL_ANALYSIS_VERSION, model: fingerprint })));
+      }
+      if (!params.reExtractEvidence && segment.evidenceNotes && segment.analysisVersion === NOVEL_ANALYSIS_VERSION && segment.evidenceInputHash && reusableHashes.has(segment.evidenceInputHash)) {
         job.completed += 1;
         continue;
       }
@@ -386,13 +392,13 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           novelTitle: dataset.title,
           segment,
           sourceText,
-          chapterContext: chapterContext(dataset, segment),
+          chapterContext: context,
           sourceChapters: dataset.chapters.filter(chapter => segment.chapterIds.includes(chapter.id)),
           signal: params.signal,
           onDelta: streamText => progress({ callback: params.onProgress, job, segmentTitle: segment.title, message: '正在提取章节证据', streamText }),
         });
         assertNotAborted();
-        segment = { ...segment, evidenceNotes, evidenceStatus: 'completed', evidenceInputHash: sourceHash, analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
+        segment = { ...segment, evidenceNotes, evidenceStatus: 'completed', evidenceInputHash, analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
         dataset.segments[index] = segment;
         await saveNovelSegment(segment);
         await writeJob({ completed: job.completed + 1, currentSegmentId: segment.id });

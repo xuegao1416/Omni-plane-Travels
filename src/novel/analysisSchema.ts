@@ -57,6 +57,48 @@ const visibilitySchema = z.preprocess(
   visibilityObjectSchema.optional().default({ knownBy: [], unknownTo: [], readerOnly: false }),
 );
 
+const EVIDENCE_CHAPTER_KEYS = ['chapterId', 'chapter_id', 'chapterID', 'chapter', '章节ID', '章节Id', '章节'] as const;
+const EVIDENCE_EXCERPT_KEYS = ['excerpt', 'quote', 'text', 'snippet', 'evidence', 'content', '摘录', '原文摘录', '原文', '内容'] as const;
+const EVIDENCE_CONFIDENCE_VALUES = { explicit: 'explicit', strong_inference: 'strong_inference', weak_inference: 'weak_inference', 明确: 'explicit', 强推断: 'strong_inference', 弱推断: 'weak_inference' } as const;
+
+function firstModelString(value: unknown, depth = 0): string | undefined {
+  if (typeof value === 'string') return value.trim() ? value : undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) { const found = firstModelString(item, depth + 1); if (found) return found; }
+    return undefined;
+  }
+  if (!value || typeof value !== 'object' || depth > 3) return undefined;
+  for (const item of Object.values(value as Record<string, unknown>)) { const found = firstModelString(item, depth + 1); if (found) return found; }
+  return undefined;
+}
+
+function pickModelField(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
+  for (const key of keys) if (key in record) { const found = firstModelString(record[key]); if (found) return found; }
+  return undefined;
+}
+
+/** Citations arrive as strings, labelled strings or nested objects; all three describe the same reference. */
+function coerceEvidenceRef(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text) return undefined;
+    const labelled = /^([^:：\[\]()（）]{1,64})[:：]\s*(\S[\s\S]*)$/.exec(text) ?? /^[\[【]([^\]】]{1,64})[\]】]\s*(\S[\s\S]*)$/.exec(text);
+    return labelled ? { chapterId: labelled[1].trim(), excerpt: labelled[2].trim() } : { excerpt: text };
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const startOffset = record.startOffset ?? record.start_offset ?? record['起始位置'] ?? record['起始偏移'];
+  const endOffset = record.endOffset ?? record.end_offset ?? record['结束位置'] ?? record['结束偏移'];
+  const rawConfidence = pickModelField(record, ['confidence', 'confidenceLevel', '置信度'])?.trim().toLowerCase();
+  return {
+    chapterId: pickModelField(record, EVIDENCE_CHAPTER_KEYS),
+    startOffset: typeof startOffset === 'number' ? startOffset : undefined,
+    endOffset: typeof endOffset === 'number' ? endOffset : undefined,
+    excerpt: pickModelField(record, EVIDENCE_EXCERPT_KEYS),
+    confidence: rawConfidence ? EVIDENCE_CONFIDENCE_VALUES[rawConfidence as keyof typeof EVIDENCE_CONFIDENCE_VALUES] : undefined,
+  };
+}
+
 const evidenceRefSchema = z.object({
   chapterId: z.string().trim().min(1).optional(),
   startOffset: z.number().int().nonnegative().optional(),
@@ -64,6 +106,11 @@ const evidenceRefSchema = z.object({
   excerpt: z.string().trim().min(1).optional(),
   confidence: z.enum(['explicit', 'strong_inference', 'weak_inference']).optional().default('explicit'),
 }).catch({ confidence: 'weak_inference' });
+
+const evidenceRefListSchema = z.preprocess(
+  value => Array.isArray(value) ? value.map(coerceEvidenceRef).filter(item => item !== undefined) : value,
+  z.array(evidenceRefSchema).optional().default([]),
+);
 
 const eventSchema = z.object({
   name: modelTextSchema.optional().default(''),
@@ -78,7 +125,7 @@ const eventSchema = z.object({
   results: stringListSchema,
   nextImpact: stringListSchema,
   visibility: visibilitySchema,
-  evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
+  evidenceRefs: evidenceRefListSchema,
 });
 
 const namedArchiveSchema = z.object({
@@ -87,7 +134,7 @@ const namedArchiveSchema = z.object({
   aliases: stringListSchema,
   details: stringListSchema,
   role: modelTextSchema.optional(),
-  evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
+  evidenceRefs: evidenceRefListSchema,
 });
 
 export const novelEvidenceNoteSchema = z.object({
@@ -101,7 +148,7 @@ export const novelEvidenceNoteSchema = z.object({
   rules: stringListSchema,
   relationships: stringListSchema,
   openThreads: stringListSchema,
-  evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
+  evidenceRefs: evidenceRefListSchema,
   staticFindings: z.object({
     settings: stringListSchema, rules: stringListSchema, culture: stringListSchema,
     powerSystem: stringListSchema, economy: stringListSchema, time: stringListSchema,
@@ -141,7 +188,7 @@ const hardConstraintSchema = z.object({
   content: modelTextSchema.pipe(z.string().trim().min(1)),
   visibility: visibilitySchema,
   confidence: z.enum(['explicit', 'strong_inference', 'weak_inference']).optional().default('explicit'),
-  evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
+  evidenceRefs: evidenceRefListSchema,
 });
 
 const characterProgressSchema = z.object({
@@ -150,7 +197,7 @@ const characterProgressSchema = z.object({
   changes: stringListSchema,
   after: stringListSchema,
   nextImpact: stringListSchema,
-  evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
+  evidenceRefs: evidenceRefListSchema,
 });
 
 export const novelSegmentAnalysisSchema = z.object({
@@ -167,7 +214,7 @@ export const novelSegmentAnalysisSchema = z.object({
   relationships: stringListSchema,
   timelineStart: z.string().optional().default(''),
   timelineEnd: z.string().optional().default(''),
-  evidenceRefs: z.array(evidenceRefSchema).optional().default([]),
+  evidenceRefs: evidenceRefListSchema,
 });
 
 function unique(values: string[]): string[] {
@@ -191,36 +238,95 @@ function parseJsonObject(response: string): unknown {
   }
 }
 
-function normalizeEvidence(items: z.infer<typeof evidenceRefSchema>[], sourceChapters?: NovelChapter[]): NovelEvidenceRef[] {
+export interface NovelEvidenceWindow {
+  chapterId: string;
+  startOffset: number;
+  endOffset: number;
+}
+
+interface LocatedQuote { start: number; end: number; excerpt: string }
+
+function occurrencesOf(haystack: string, needle: string): number[] {
+  const found: number[] = [];
+  for (let at = haystack.indexOf(needle); at >= 0 && found.length < 64; at = haystack.indexOf(needle, at + 1)) found.push(at);
+  return found;
+}
+
+function compactIndex(source: string): { text: string; offsets: number[] } {
+  let text = '';
+  const offsets: number[] = [];
+  for (let index = 0; index < source.length; index += 1) {
+    if (/\s/.test(source[index])) continue;
+    text += source[index]; offsets.push(index);
+  }
+  return { text, offsets };
+}
+
+/** Pick the occurrence the segment itself quoted, falling back to the first one. */
+function preferredStart(starts: number[], length: number, windows: NovelEvidenceWindow[]): number {
+  return starts.find(start => windows.some(window => start >= window.startOffset && start + length <= window.endOffset)) ?? starts[0];
+}
+
+/** Locate a quote inside a chapter, tolerating whitespace drift and repeated wording. */
+function locateQuote(
+  content: string,
+  excerpt: string,
+  windows: NovelEvidenceWindow[],
+  compacted: Map<string, { text: string; offsets: number[] }>,
+): LocatedQuote | null {
+  const exact = occurrencesOf(content, excerpt);
+  if (exact.length) {
+    const start = preferredStart(exact, excerpt.length, windows);
+    return { start, end: start + excerpt.length, excerpt };
+  }
+  // A quote that only differs by paragraph joins or indentation still marks the same source location.
+  let compact = compacted.get(content);
+  if (!compact) { compact = compactIndex(content); compacted.set(content, compact); }
+  const target = compactIndex(excerpt);
+  if (!target.text) return null;
+  const loose = occurrencesOf(compact.text, target.text);
+  if (!loose.length) return null;
+  const mapped = loose.map(position => ({ start: compact!.offsets[position], end: compact!.offsets[position + target.text.length - 1] + 1 }));
+  const chosen = mapped.find(candidate => windows.some(window => candidate.start >= window.startOffset && candidate.end <= window.endOffset)) ?? mapped[0];
+  return { start: chosen.start, end: chosen.end, excerpt: content.slice(chosen.start, chosen.end) };
+}
+
+function normalizeEvidence(items: z.infer<typeof evidenceRefSchema>[], sourceChapters?: NovelChapter[], windows?: NovelEvidenceWindow[]): NovelEvidenceRef[] {
   const normalized: NovelEvidenceRef[] = [];
+  const compacted = new Map<string, { text: string; offsets: number[] }>();
   for (const item of items) {
-    if (!item.chapterId || !item.excerpt?.trim()) continue;
-    const excerpt = item.excerpt.trim();
-    let { startOffset, endOffset } = item;
-    if (sourceChapters) {
-      const chapter = sourceChapters.find(source => source.id === item.chapterId);
-      if (!chapter) continue;
-      const position = chapter.content.indexOf(excerpt);
-      // A unique literal quote provides an auditable location without model arithmetic.
-      if (position < 0 || chapter.content.indexOf(excerpt, position + 1) >= 0) continue;
-      startOffset = (chapter.startOffset ?? 0) + position;
-      endOffset = startOffset + excerpt.length;
+    const excerpt = item.excerpt?.trim();
+    if (!excerpt) continue;
+    if (!sourceChapters) {
+      const { startOffset, endOffset } = item;
+      if (!item.chapterId || startOffset === undefined || endOffset === undefined || endOffset <= startOffset) continue;
+      normalized.push({ chapterId: item.chapterId, startOffset, endOffset, excerpt, confidence: item.confidence });
+      continue;
     }
-    if (startOffset === undefined || endOffset === undefined || endOffset <= startOffset) continue;
-    const sourceChapter = sourceChapters?.find(source => source.id === item.chapterId);
+    // A declared chapter is authoritative; a missing or unknown one is resolved from the quoted text.
+    const declared = item.chapterId ? sourceChapters.find(source => source.id === item.chapterId) : undefined;
+    let located: { chapter: NovelChapter; quote: LocatedQuote } | undefined;
+    for (const chapter of declared ? [declared] : sourceChapters) {
+      const quote = locateQuote(chapter.content, excerpt, (windows ?? []).filter(window => window.chapterId === chapter.id), compacted);
+      if (quote) { located = { chapter, quote }; break; }
+    }
+    if (!located) continue;
+    const base = located.chapter.startOffset ?? 0;
     normalized.push({
-      chapterId: item.chapterId,
-      startOffset,
-      endOffset,
-      excerpt,
+      chapterId: located.chapter.id,
+      startOffset: base + located.quote.start,
+      endOffset: base + located.quote.end,
+      excerpt: located.quote.excerpt,
       confidence: item.confidence,
-      ...(sourceChapter ? { chapterStartOffset: startOffset - (sourceChapter.startOffset ?? 0), chapterEndOffset: endOffset - (sourceChapter.startOffset ?? 0), sourceVersion: sourceChapter.sourceVersion } : {}),
+      chapterStartOffset: located.quote.start,
+      chapterEndOffset: located.quote.end,
+      sourceVersion: located.chapter.sourceVersion,
     });
   }
   return normalized;
 }
 
-function normalizeEvent(item: z.infer<typeof eventSchema>, sourceChapters?: NovelChapter[]): NovelEvent | null {
+function normalizeEvent(item: z.infer<typeof eventSchema>, sourceChapters?: NovelChapter[], windows?: NovelEvidenceWindow[]): NovelEvent | null {
   const name = item.name.trim();
   const description = item.description.trim();
   if (!name || !description) return null;
@@ -241,7 +347,7 @@ function normalizeEvent(item: z.infer<typeof eventSchema>, sourceChapters?: Nove
       unknownTo: unique(item.visibility.unknownTo),
       readerOnly: item.visibility.readerOnly,
     },
-    evidenceRefs: normalizeEvidence(item.evidenceRefs, sourceChapters),
+    evidenceRefs: normalizeEvidence(item.evidenceRefs, sourceChapters, windows),
   };
 }
 
@@ -254,7 +360,7 @@ function parsed<T>(schema: z.ZodType<T>, response: string): T {
   return result.data;
 }
 
-export function parseNovelEvidenceNoteResponse(response: string, sourceChapters?: NovelChapter[]): NovelEvidenceNote {
+export function parseNovelEvidenceNoteResponse(response: string, sourceChapters?: NovelChapter[], windows?: NovelEvidenceWindow[]): NovelEvidenceNote {
   const data = parsed(novelEvidenceNoteSchema, response);
   return {
     summary: data.summary.trim(),
@@ -263,13 +369,13 @@ export function parseNovelEvidenceNoteResponse(response: string, sourceChapters?
     factions: unique(data.factions),
     locations: unique(data.locations),
     items: unique(data.items),
-    events: data.events.map(item => normalizeEvent(item, sourceChapters)).filter(Boolean) as NovelEvent[],
+    events: data.events.map(item => normalizeEvent(item, sourceChapters, windows)).filter(Boolean) as NovelEvent[],
     rules: unique(data.rules),
     relationships: unique(data.relationships),
     openThreads: unique(data.openThreads),
-    evidenceRefs: normalizeEvidence(data.evidenceRefs, sourceChapters),
+    evidenceRefs: normalizeEvidence(data.evidenceRefs, sourceChapters, windows),
     ...(data.staticFindings ? { staticFindings: data.staticFindings } : {}),
-    ...(data.archives ? { archives: Object.fromEntries(Object.entries(data.archives).map(([category, entries]) => [category, entries.map(entry => ({ ...entry, evidenceRefs: normalizeEvidence(entry.evidenceRefs, sourceChapters) }))])) } : {}),
+    ...(data.archives ? { archives: Object.fromEntries(Object.entries(data.archives).map(([category, entries]) => [category, entries.map(entry => ({ ...entry, evidenceRefs: normalizeEvidence(entry.evidenceRefs, sourceChapters, windows) }))])) } : {}),
   };
 }
 
@@ -317,11 +423,11 @@ export interface ParsedNovelSegmentAnalysis {
   evidenceRefs: NovelEvidenceRef[];
 }
 
-export function parseNovelSegmentAnalysisResponse(response: string, sourceChapters?: NovelChapter[]): ParsedNovelSegmentAnalysis {
+export function parseNovelSegmentAnalysisResponse(response: string, sourceChapters?: NovelChapter[], windows?: NovelEvidenceWindow[]): ParsedNovelSegmentAnalysis {
   const data = parsed(novelSegmentAnalysisSchema, response);
   const constraints: NovelHardConstraint[] = data.hardConstraints
     .filter(item => item.confidence !== 'weak_inference'
-      && normalizeEvidence(item.evidenceRefs, sourceChapters).some(ref => ref.confidence !== 'weak_inference'))
+      && normalizeEvidence(item.evidenceRefs, sourceChapters, windows).some(ref => ref.confidence !== 'weak_inference'))
     .map(item => ({
       content: item.content.trim(),
       visibility: {
@@ -330,7 +436,7 @@ export function parseNovelSegmentAnalysisResponse(response: string, sourceChapte
         readerOnly: item.visibility.readerOnly,
       },
       confidence: item.confidence,
-      evidenceRefs: normalizeEvidence(item.evidenceRefs, sourceChapters),
+      evidenceRefs: normalizeEvidence(item.evidenceRefs, sourceChapters, windows),
     }));
   return {
     summary: data.summary.trim(),
@@ -341,19 +447,19 @@ export function parseNovelSegmentAnalysisResponse(response: string, sourceChapte
     hardConstraints: constraints.map(item => item.content),
     constraintDetails: constraints,
     foreshadowing: unique(data.foreshadowing),
-    events: data.events.map(item => normalizeEvent(item, sourceChapters)).filter(Boolean) as NovelEvent[],
+    events: data.events.map(item => normalizeEvent(item, sourceChapters, windows)).filter(Boolean) as NovelEvent[],
     characterProgress: data.characterProgress.map(item => ({
       characterName: item.characterName,
       before: unique(item.before),
       changes: unique(item.changes),
       after: unique(item.after),
       nextImpact: unique(item.nextImpact),
-      evidenceRefs: normalizeEvidence(item.evidenceRefs, sourceChapters),
+      evidenceRefs: normalizeEvidence(item.evidenceRefs, sourceChapters, windows),
     })),
     worldRules: unique(data.worldRules),
     relationships: unique(data.relationships),
     timelineStart: data.timelineStart.trim(),
     timelineEnd: data.timelineEnd.trim(),
-    evidenceRefs: normalizeEvidence(data.evidenceRefs, sourceChapters),
+    evidenceRefs: normalizeEvidence(data.evidenceRefs, sourceChapters, windows),
   };
 }

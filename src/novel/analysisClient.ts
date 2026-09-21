@@ -4,6 +4,7 @@ import {
   parseNovelEvidenceNoteResponse,
   parseNovelOverviewResponse,
   parseNovelSegmentAnalysisResponse,
+  type NovelEvidenceWindow,
   type ParsedNovelSegmentAnalysis,
 } from './analysisSchema';
 import { buildNovelEvidencePrompt, buildNovelOverviewPrompt, buildNovelSegmentPrompt } from './analysisPrompts';
@@ -15,6 +16,11 @@ export type NovelAnalysisRequest = (
   messages: Message[],
   options: StreamOptions,
 ) => Promise<CompletionResult>;
+
+/** The segment's own chapter ranges, so a repeated quote resolves to the passage this segment quoted. */
+function evidenceWindows(segment: NovelSegment): NovelEvidenceWindow[] | undefined {
+  return segment.sourceRanges?.map(range => ({ chapterId: range.chapterId, startOffset: range.startOffset, endOffset: range.endOffset }));
+}
 
 async function requestJson(
   config: ApiConfig,
@@ -69,7 +75,7 @@ export async function generateNovelEvidenceNote(params: {
   request?: NovelAnalysisRequest;
 }): Promise<NovelEvidenceNote> {
   try {
-    return await validated(params.config, buildNovelEvidencePrompt(params), response => parseNovelEvidenceNoteResponse(response, params.sourceChapters), params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
+    return await validated(params.config, buildNovelEvidencePrompt(params), response => parseNovelEvidenceNoteResponse(response, params.sourceChapters, evidenceWindows(params.segment)), params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes('token 上限') || params.sourceText.length < 1200) throw error;
     const mid = Math.floor(params.sourceText.length / 2);
@@ -113,9 +119,9 @@ export async function generateNovelSegmentAnalysis(params: {
 }): Promise<ParsedNovelSegmentAnalysis> {
   try {
     return await validated(params.config, buildNovelSegmentPrompt(params), response => {
-      const result = parseNovelSegmentAnalysisResponse(response, params.sourceChapters);
+      const result = parseNovelSegmentAnalysisResponse(response, params.sourceChapters, evidenceWindows(params.segment));
       const missing = result.events.filter(event => !event.evidenceRefs?.length);
-      if (missing.length) throw new Error(`剧情事件「${missing.map(event => event.name).join('、')}」缺少可核对的事件来源证据；请在各事件的 evidenceRefs 中提供支持该事件的原文摘录及 chapterId`);
+      if (missing.length) throw new Error(`剧情事件「${missing.map(event => event.name).join('、')}」缺少可核对的事件来源证据；请在本事件的 evidenceRefs 中附上原文摘录及章节ID，或重新提取本段证据后重试`);
       return result;
     }, params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
   } catch (error) {

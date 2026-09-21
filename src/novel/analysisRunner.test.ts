@@ -1,8 +1,9 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, test } from 'bun:test';
 import type { ApiConfig } from '../api/types';
-import { getNovelDataset, listNovelJobs, saveNovelDataset } from './novelStore';
+import { getNovelDataset, listNovelJobs, saveNovelDataset, saveNovelJob } from './novelStore';
 import { NOVEL_ANALYSIS_VERSION, runNovelAnalysis, type NovelAnalysisGenerators } from './analysisRunner';
+import { hashNovelText } from './segmentation';
 import type { NovelDataset, NovelEvidenceNote, NovelStaticMaterial } from './types';
 
 const config: ApiConfig = { apiKey: 'test', baseUrl: 'https://example.invalid/v1', model: 'test', provider: 'custom', stream: false };
@@ -204,4 +205,50 @@ test('full archives survive a summary that omits entities and scope stays partia
   expect(result.dataset.staticMaterial.items?.[0].name).toBe('旧铜符');
   expect(result.dataset.staticMaterial.items?.[0].id).toBeTruthy();
   expect(result.dataset.analysisStatus).toBe('partial');
+});
+
+function compileGenerators(onEvidence: () => void): NovelAnalysisGenerators {
+  return {
+    evidence: async ({ segment }) => { onEvidence(); return note(segment.title); },
+    overview: async () => overview,
+    segment: async ({ segment }) => ({ summary: `${segment.title}完成`, openingFacts: [], carryFacts: [], endingFacts: [], nextReference: [], hardConstraints: [], constraintDetails: [], foreshadowing: [], events: [], characterProgress: [], worldRules: [], relationships: [], timelineStart: '', timelineEnd: '', evidenceRefs: [] }),
+  };
+}
+
+test('keeps extracted evidence when only the analysis channel changes', async () => {
+  const source = dataset(`novel-runner-${Date.now()}-channel`);
+  await saveNovelDataset(source);
+  let evidenceCalls = 0;
+  const generators = compileGenerators(() => { evidenceCalls += 1; });
+
+  await runNovelAnalysis({ datasetId: source.id, config, startSegmentIndex: 0, generators });
+  expect(evidenceCalls).toBe(2);
+
+  await runNovelAnalysis({ datasetId: source.id, config: { ...config, model: 'other-channel' }, startSegmentIndex: 0, generators });
+  expect(evidenceCalls).toBe(2);
+
+  await runNovelAnalysis({ datasetId: source.id, config: { ...config, model: 'other-channel' }, startSegmentIndex: 0, generators, reExtractEvidence: true });
+  expect(evidenceCalls).toBe(4);
+});
+
+test('recognizes evidence extracted by the superseded per-channel identity', async () => {
+  const source = dataset(`novel-runner-${Date.now()}-legacy`);
+  const fingerprint = hashNovelText(JSON.stringify([config.baseUrl, 'earlier-channel', config.provider]));
+  source.segments = source.segments.map(segment => {
+    const chapter = source.chapters.find(item => item.id === segment.chapterIds[0])!;
+    // Identity written before evidence became channel-independent.
+    const legacy = hashNovelText(JSON.stringify({
+      sourceText: segment.sourceText,
+      chapterContext: `${chapter.id} | ${chapter.title} | ${chapter.startOffset}-${chapter.endOffset}`,
+      analysisVersion: NOVEL_ANALYSIS_VERSION,
+      model: fingerprint,
+    }));
+    return { ...segment, evidenceNotes: note(segment.title), evidenceStatus: 'completed' as const, evidenceInputHash: legacy, analysisVersion: NOVEL_ANALYSIS_VERSION };
+  });
+  await saveNovelDataset(source);
+  await saveNovelJob({ id: 'legacy-job', datasetId: source.id, status: 'failed', phase: 'evidence', startSegmentIndex: 0, total: 1, completed: 0, failed: 0, retryCount: 0, configFingerprint: fingerprint, createdAt: 1, updatedAt: 1 });
+
+  let evidenceCalls = 0;
+  await runNovelAnalysis({ datasetId: source.id, config, startSegmentIndex: 0, generators: compileGenerators(() => { evidenceCalls += 1; }) });
+  expect(evidenceCalls).toBe(0);
 });

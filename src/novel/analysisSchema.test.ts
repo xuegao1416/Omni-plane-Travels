@@ -96,4 +96,51 @@ describe('novel analysis response contracts', () => {
     expect(segment.hardConstraints).toEqual(['城门关闭']);
     expect(segment.constraintDetails[0].evidenceRefs[0].startOffset).toBe(104);
   });
+
+  test('keeps repeated wording by resolving it to the passage the segment quoted', () => {
+    const content = '城门已经关闭。守卫离开。城门已经关闭。守卫返回。';
+    const sourceChapters = [{ id: 'c1', index: 0, title: '第一章', content }];
+    const note = parseNovelEvidenceNoteResponse(
+      JSON.stringify({ summary: '二次封锁', evidenceRefs: [{ chapterId: 'c1', excerpt: '城门已经关闭。', confidence: 'explicit' }] }),
+      sourceChapters,
+      [{ chapterId: 'c1', startOffset: 12, endOffset: 19 }],
+    );
+    expect(note.evidenceRefs[0]).toMatchObject({ chapterStartOffset: 12, chapterEndOffset: 19 });
+    const withoutWindow = parseNovelEvidenceNoteResponse(
+      JSON.stringify({ summary: '二次封锁', evidenceRefs: [{ chapterId: 'c1', excerpt: '城门已经关闭。', confidence: 'explicit' }] }),
+      sourceChapters,
+    );
+    expect(withoutWindow.evidenceRefs[0]).toMatchObject({ chapterStartOffset: 0, chapterEndOffset: 7 });
+  });
+
+  test('locates a quote that only differs by paragraph joins, and stores the exact source text', () => {
+    const sourceChapters = [{ id: 'c1', index: 0, title: '第一章', content: '雨停了。\n\n城门已经关闭。' }];
+    const note = parseNovelEvidenceNoteResponse(
+      JSON.stringify({ summary: '夜雨', evidenceRefs: [{ chapterId: 'c1', excerpt: '雨停了。城门已经关闭。', confidence: 'explicit' }] }),
+      sourceChapters,
+    );
+    expect(note.evidenceRefs[0]).toMatchObject({ startOffset: 0, endOffset: 13, excerpt: '雨停了。\n\n城门已经关闭。' });
+  });
+
+  test('accepts citations written as labelled strings or nested objects', () => {
+    const sourceChapters = [{ id: 'c1', index: 0, title: '第一章', content: '城门已经关闭。守卫离开。' }];
+    const note = parseNovelEvidenceNoteResponse(JSON.stringify({
+      summary: '关门',
+      events: [{ name: '封锁', description: '城门关闭', evidenceRefs: ['c1：城门已经关闭。', { chapterId: { text: 'c1' }, excerpt: { text: '守卫离开。' }, confidence: '明确' }] }],
+    }), sourceChapters);
+    expect(note.events?.[0]?.evidenceRefs?.map(ref => ref.excerpt)).toEqual(['城门已经关闭。', '守卫离开。']);
+    expect(note.events?.[0]?.evidenceRefs?.every(ref => ref.confidence === 'explicit')).toBe(true);
+  });
+
+  test('resolves a citation without a chapter id from the quoted text', () => {
+    const sourceChapters = [
+      { id: 'c1', index: 0, title: '第一章', content: '雨停了。' },
+      { id: 'c2', index: 1, title: '第二章', content: '城门已经关闭。' },
+    ];
+    const note = parseNovelEvidenceNoteResponse(
+      JSON.stringify({ summary: '关门', evidenceRefs: [{ excerpt: '城门已经关闭。', confidence: 'explicit' }] }),
+      sourceChapters,
+    );
+    expect(note.evidenceRefs[0]).toMatchObject({ chapterId: 'c2', chapterStartOffset: 0 });
+  });
 });
