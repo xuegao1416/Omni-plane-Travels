@@ -1684,12 +1684,13 @@ ${perspectiveInstruction}
       };
     }
     // 开局自建角色由玩家自己填写，直接登记为玩家已知，否则人物/任务面板看不到他们。
-    admitAuthoredNPCs(state, authoredIds, {
+    // admitAuthoredNPCs 返回新的 state（playerKnowledge 是新建对象），必须用返回值回写。
+    const admittedState = admitAuthoredNPCs(state, authoredIds, {
       turnId: 'character-creation',
       eventId: 'character-creation',
       quote: '玩家在开局创建的角色',
     });
-    varMgrRef.current.setState(state);
+    varMgrRef.current.setState(admittedState);
     // 更新全局初始快照（此时包含玩家数据和NPC，NPC事迹为空）
     initialSnapshotRef.current = varMgrRef.current.createSnapshot();
   }, []);

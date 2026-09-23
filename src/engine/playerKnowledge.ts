@@ -134,7 +134,13 @@ export function applyPlayerObservations(state: GameState, receipt: PlayerObserva
   receipt.observations.forEach((observation, index) => {
     const reject = (reason: string) => rejected.push({ index, reason });
     if (!safeKey(observation.npcId) || !Object.hasOwn(state.人物档案, observation.npcId)) return reject('Unknown canonical character');
-    if (typeof observation.quote !== 'string' || !observation.quote.trim() || !receipt.text.includes(observation.quote)) return reject('Missing source quotation');
+    // 人物分类只描述"是否在玩家眼前的场景里"，属于玩家自身视角而非幕后秘密，
+    // 允许在没有引文的情况下同步；其余字段仍然必须有本轮正文引文。
+    const presenceOnly = observation.path === '人物分类';
+    if (!presenceOnly
+      && (typeof observation.quote !== 'string' || !observation.quote.trim() || !receipt.text.includes(observation.quote))) {
+      return reject('Missing source quotation');
+    }
     if (!validField(observation)) return reject('Field or disclosure mode not allowed');
     let character = knowledge.characters[observation.npcId];
     if (!character) {
@@ -180,6 +186,7 @@ export function admitAuthoredNPCs(state: GameState, npcIds: readonly string[], s
  * 本轮正文里出现的在场角色，其"看得见"的字段直接投影给玩家。
  * 只覆盖 observable / observableNumbers 里的公开字段；当前想法、里性格、目标、背景等
  * 秘密字段一律不投影，仍需正式披露证据。用于兜底：观测字段缺失时人物面板不会永久停在旧值。
+ * 已认识的角色离场时只同步"人物分类"，其余字段留在幕后，避免把离场者的隐藏状态暴露给玩家。
  */
 const sceneFields = [
   '姓名', '种族', '性别', '人物分类', '个人信息.外貌', '个人信息.表性格',
@@ -191,12 +198,23 @@ export function collectSceneObservations(state: GameState, text: string): Player
   const observations: PlayerObservation[] = [];
   for (const [id, npc] of Object.entries(state.人物档案 ?? {})) {
     if (!safeKey(id) || !npc || typeof npc !== 'object') continue;
-    // Mentioning an absent character does not reveal their current hidden state.
-    // Offscreen facts require explicit, field-level disclosure evidence.
-    if (npc.人物分类 !== '在场') continue;
     const flat = flatten(npc as unknown as Record<string, unknown>);
     const name = typeof flat['姓名'] === 'string' ? flat['姓名'].trim() : '';
     const quote = text.includes(id) ? id : (name && text.includes(name) ? name : '');
+    const category = typeof flat['人物分类'] === 'string' ? flat['人物分类'].trim() : '';
+    // 已认识的角色是否"在眼前"是玩家自身视角，不是幕后秘密。只同步这一项，
+    // 避免面板永久停在旧的"在场"，让玩家以为已经离开的人还待在身边。
+    if (category && category !== '在场') {
+      const known = !!state.playerKnowledge?.characters[id];
+      if (known && category.includes('离场')) {
+        observations.push({ npcId: id, path: '人物分类', value: '离场', quote, mode: 'observed' });
+      }
+      continue;
+    }
+    // 人物分类缺失或异常时不投影，保持保守行为。
+    if (category !== '在场') continue;
+    // Mentioning an absent character does not reveal their current hidden state.
+    // Offscreen facts require explicit, field-level disclosure evidence.
     if (!quote) continue;
     const introduction = !state.playerKnowledge?.characters[id];
     if (introduction && !name) continue;

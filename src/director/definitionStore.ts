@@ -56,3 +56,13 @@ export async function listDirectorCompileJobs(definitionId?: string): Promise<Di
   const jobs: DirectorCompileJob[] = await (await getDB()).getAll(DIRECTOR_JOBS_STORE);
   return jobs.filter(job => !definitionId || job.definitionId === definitionId).sort((a, b) => b.updatedAt - a.updatedAt);
 }
+
+/** 回收某个工作区（definitionId）下的全部编译任务与剧情版本，用于资料被删除时清理孤儿数据。 */
+export async function deleteDirectorWorkspace(definitionId: string): Promise<void> {
+  if (!definitionId) return;
+  const db = await getDB();
+  const jobs: DirectorCompileJob[] = await db.getAll(DIRECTOR_JOBS_STORE);
+  for (const job of jobs) if (job.definitionId === definitionId) await db.delete(DIRECTOR_JOBS_STORE, job.id);
+  const records = await db.getAll(DIRECTOR_DEFINITIONS_STORE) as DirectorDefinitionRecord[];
+  for (const record of records) if (record.definition.id === definitionId) await db.delete(DIRECTOR_DEFINITIONS_STORE, record.id);
+}

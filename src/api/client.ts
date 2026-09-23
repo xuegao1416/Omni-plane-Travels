@@ -75,6 +75,8 @@ export function buildEndpoint(config: ApiConfig): string {
 
 /** DeepSeek 推理模型首 token 和完整生成通常更慢，避免 2 分钟硬中止截断正文。 */
 export function getRequestTimeoutMs(config: ApiConfig): number {
+  const custom = config.requestTimeoutMs;
+  if (typeof custom === 'number' && Number.isFinite(custom) && custom > 0) return custom;
   return config.provider === 'deepseek' ? 300_000 : 120_000;
 }
 

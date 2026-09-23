@@ -6,7 +6,7 @@ import { useMemoryStore } from '../../memory/memoryStore';
 import { NOVEL_ANALYSIS_VERSION,runNovelAnalysis,type NovelAnalysisProgress } from '../../novel/analysisRunner';
 import { copyNovelDataset,importNovelDataset } from '../../novel/datasetImport';
 import { createNovelDatasetFromEpub } from '../../novel/epubImport';
-import { getNovelDataset,listNovelDatasets,listNovelJobs,saveNovelDataset,saveNovelDatasetHeader } from '../../novel/novelStore';
+import { deleteNovelDataset,getNovelDataset,listNovelDatasets,listNovelJobs,saveNovelDataset,saveNovelDatasetHeader } from '../../novel/novelStore';
 import { createNovelDatasetFromBytes,type NovelTextEncoding } from '../../novel/plainText';
 import { probeNovelEmbedding } from '../../novel/semanticIndex';
 import type { NovelDataset,NovelEvidenceRef,NovelStaticMaterial } from '../../novel/types';
@@ -20,6 +20,7 @@ import { NovelConnectionSettings } from './novelWorkbench/NovelConnectionSetting
 import './novelWorkbench/workbench.css';
 import DirectorAuthorEditor from './worldEditorForm/DirectorAuthorEditor';
 import { collectDirectorDependencies, restoreDirectorDependencies } from '../../director/dependencies';
+import { deleteDirectorWorkspace } from '../../director/definitionStore';
 
 interface NovelImportWorkbenchProps { onClose: () => void; onCreateWorld: (world: WorldDef) => void; worlds?: WorldDef[]; onUpdateWorld?: (world: WorldDef) => void }
 const TABS = ['来源与章节', '分析任务', '世界资料', '剧情资料', '创建世界'];
@@ -52,6 +53,7 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
   const [mode, setMode] = useState<'auto' | 'single_chapter' | 'custom'>('auto'), [maxTokens, setMaxTokens] = useState(6000);
   const [rangeStart, setRangeStart] = useState(0), [rangeEnd, setRangeEnd] = useState(0), [sourceFile, setSourceFile] = useState<File>();
   const [pendingImport, setPendingImport] = useState<{ dataset: NovelDataset; world?: WorldDef }>();
+  const [pendingDelete, setPendingDelete] = useState(false);
   const [search, setSearch] = useState(''), [category, setCategory] = useState('all'), [archivePage, setArchivePage] = useState(0), [conflictsOnly, setConflictsOnly] = useState(false);
   const [materialDraft, setMaterialDraft] = useState<string>();
   const [embeddingState, setEmbeddingState] = useState('off'), [probing, setProbing] = useState(false);
@@ -96,6 +98,20 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
         });
       }
     } catch (error) { setMessage(`导入保存失败：${String(error)}`); }
+  };
+  const removeDataset = async () => {
+    if (!dataset || busy) return;
+    const target = dataset;
+    setPendingDelete(false); setMessage(`正在移除《${target.title}》…`);
+    try {
+      await deleteNovelDataset(target.id);
+      await deleteDirectorWorkspace(`novel-director:${target.id}`);
+      setDataset(undefined); setTitle(''); setEvidence(undefined); setMaterialDraft(undefined); setProgress(undefined);
+      setChapterIndex(0); setChapterPage(0); setSegmentPage(0); setPlotIndex(0); setArchivePage(0); setSourceFile(undefined);
+      setDirectorBinding(undefined); setWorldUpdate(undefined); setWorldDiff([]);
+      setRecent(await listNovelDatasets());
+      setMessage(`《${target.title}》已从本地移除。`);
+    } catch (error) { setMessage(`删除失败：${String(error)}`); }
   };
   const loadFile = async (file?: File, encoding?: NovelTextEncoding) => {
     if (!file || busy) return;
@@ -179,6 +195,7 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
   };
   const evidenceButton = (ref: NovelEvidenceRef, index: number) => <button key={`${ref.chapterId}-${ref.startOffset}-${index}`} type="button" className="novel-workbench-source-link" onClick={() => setEvidence(ref)}>{dataset?.chapters.find(chapter => chapter.id === ref.chapterId)?.title ?? '原文来源'}：{ref.excerpt.slice(0, 70)}</button>;
   const chapter = dataset?.chapters[chapterIndex], plot = dataset?.segments[plotIndex];
+  const linkedWorlds = dataset ? worlds.filter(world => world.novelSource?.datasetId === dataset.id) : [];
   const chapters = useMemo(() => (dataset?.chapters ?? []).map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => !chapterSearch || `${chapter.title} ${chapter.volumeTitle ?? ''}`.includes(chapterSearch)), [dataset?.chapters, chapterSearch]);
   const generated = useMemo(() => dataset ? buildNovelWorldBookEntries(dataset.staticMaterial, 1) : [], [dataset?.staticMaterial]);
   const archives = dataset ? [...(dataset.staticMaterial.characters ?? []), ...(dataset.staticMaterial.factions ?? []), ...(dataset.staticMaterial.locations ?? []), ...(dataset.staticMaterial.items ?? [])] : [];
@@ -195,8 +212,9 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
       <nav className="novel-workbench-tabs" aria-label="拆解工作区">{TABS.map((name, index) => <button key={name} type="button" aria-current={tab === index ? 'page' : undefined} className={tab === index ? 'is-active' : ''} onClick={() => setTab(index)}>{String(index + 1).padStart(2, '0')} · {name}</button>)}</nav>
       <main className="novel-import-workbench__body"><p className={`novel-import-workbench__status${/失败|未完成|不可用/.test(message) ? ' is-error' : ''}`} role="status">{message}</p>
         {pendingImport && <section className="novel-import-workbench__panel"><h3>检测到相同资料 ID</h3><p>默认导入为副本保留现有资料。更新会使用导入文件替换原资料。</p><div className="novel-import-workbench__structure-actions"><button autoFocus onClick={() => void acceptImport(copyNovelDataset(pendingImport.dataset), pendingImport.world, pendingImport.dataset)}>作为副本（默认）</button><button onClick={() => void acceptImport(pendingImport.dataset, pendingImport.world)}>恢复／更新现有资料</button><button onClick={() => setPendingImport(undefined)}>取消导入</button></div></section>}
+        {pendingDelete && dataset && <section className="novel-import-workbench__panel"><h3>移除《{dataset.title}》</h3><p>会从本地删除这份资料的章节、分段、分析结果与剧情整理草稿，无法撤销。已导出的 JSON 档案不受影响。</p>{linkedWorlds.length > 0 && <p role="alert">以下世界正在使用这份资料：{linkedWorlds.map(world => world.name).join('、')}。移除后这些世界会失去小说来源与对应的主线剧情。</p>}<div className="novel-import-workbench__structure-actions"><button autoFocus disabled={busy} onClick={() => void removeDataset()}>确认移除</button><button onClick={() => setPendingDelete(false)}>取消</button></div></section>}
         {tab === 0 && <><section className="novel-import-workbench__step"><button type="button" className="novel-import-workbench__dropzone" disabled={busy} onClick={() => inputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); void loadFile(e.dataTransfer.files[0]); }}><Upload size={24} /><strong>{isReading ? '正在识别文件…' : '选择或拖入小说文件'}</strong><small>TXT 文本 · EPUB 电子书 · JSON 拆解档案／世界资料包</small></button><input ref={inputRef} type="file" accept=".txt,.epub,.json" hidden onChange={e => { void loadFile(e.target.files?.[0]); e.target.value = ''; }} />
-          {!!recent.length && <label className="novel-import-workbench__field">继续已有资料<select disabled={busy} value={dataset?.id ?? ''} onChange={e => { const found = recent.find(item => item.id === e.target.value); if (found) { setSourceFile(undefined); void openDataset(found); } }}><option value="" disabled>选择本地资料</option>{recent.map(item => <option key={item.id} value={item.id}>{item.title} · {label(item.analysisStatus)} · {item.completedSegmentCount ?? 0}/{item.segmentCount ?? item.segments.length} 段</option>)}</select></label>}</section>
+          {!!recent.length && <label className="novel-import-workbench__field">继续已有资料<select disabled={busy} value={dataset?.id ?? ''} onChange={e => { const found = recent.find(item => item.id === e.target.value); if (found) { setSourceFile(undefined); void openDataset(found); } }}><option value="" disabled>选择本地资料</option>{recent.map(item => <option key={item.id} value={item.id}>{item.title} · {label(item.analysisStatus)} · {item.completedSegmentCount ?? 0}/{item.segmentCount ?? item.segments.length} 段</option>)}</select></label>}{dataset && <div className="novel-import-workbench__structure-actions"><button type="button" disabled={busy} onClick={() => setPendingDelete(true)}>移除当前资料</button></div>}</section>
           {dataset && <><div className="novel-workbench-metrics"><span><b>{dataset.chapters.length}</b>章</span><span><b>{dataset.rawTextLength.toLocaleString()}</b>原文字符</span><span><b>{dataset.segments.length}</b>分析段</span><span><b>{dataset.importIssues?.length ?? 0}</b>导入提示</span></div>
             {sourceFile && <label className="novel-import-workbench__field">TXT 编码 · 当前 {dataset.encoding ?? '未知'}<select disabled={busy} value={dataset.encoding ?? ''} onChange={e => void loadFile(sourceFile, e.target.value as NovelTextEncoding || undefined)}><option value="">自动识别</option><option value="utf-8">UTF-8</option><option value="utf-16le">UTF-16 LE</option><option value="utf-16be">UTF-16 BE</option><option value="gb18030">GB18030 / GBK</option></select><small>切换编码重新导入新的来源，请先检查正文预览。</small></label>}
             {!!dataset.importIssues?.length && <details className="novel-import-workbench__segments" open><summary>导入报告 · {dataset.importIssues.length} 项</summary><ul>{dataset.importIssues.slice(0, 100).map((issue, index) => <li key={index}>{issue.severity === 'error' ? '无法读取：' : '请核对：'}{issue.message}{issue.chapterId && <button onClick={() => { const index = dataset.chapters.findIndex(chapter => chapter.id === issue.chapterId); if (index >= 0) setChapterIndex(index); }}>查看章节</button>}</li>)}</ul>{dataset.importIssues.length > 100 && <p>显示前 100 项，完整报告包含在资料导出中。</p>}</details>}
