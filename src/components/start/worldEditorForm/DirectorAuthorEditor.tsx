@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { WorldDef } from '../../../data/worlds-schema';
 import type { ApiConfig } from '../../../api/types';
 import { requestCompletion } from '../../../api/client';
@@ -108,6 +108,13 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
   const patchNode = (index: number, patch: Partial<DirectorDraft['nodes'][number]>) => setDraft(d => d && ({ ...d, nodes: d.nodes.map((n, i) => i === index ? { ...n, ...patch } : n) }));
   const toggle = (ids: string[], id: string, checked: boolean) => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id);
   const patchStage = (index: number, patch: Partial<DirectorDraft['stages'][number]>) => setDraft(d => d && ({ ...d, stages: d.stages.map((s, i) => i === index ? { ...s, ...patch } : s) }));
+  // 来源回显用索引：面板里每个事件都要回显来源，逐条 find 整份证据数组在小说来源下是平方级开销。
+  const evidenceExcerpts = useMemo(() => {
+    const index = new Map<string, string>();
+    for (const ref of base?.source.evidenceRefs ?? []) index.set(`novel:${ref.chapterId}:${ref.startOffset}:${ref.endOffset}`, ref.excerpt);
+    return index;
+  }, [base]);
+
   const field = 'world-weave-field world-weave-field--wide';
   return <details className="world-weave-accordion">
     <summary><span>主线剧情</span><em>{binding ? '已选择版本' : required ? '创建世界前必需' : '可选'}</em></summary>
@@ -157,7 +164,7 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
               <button type="button" className="btn-ghost" onClick={() => patchNode(i, { conditions: [...node.conditions, { id: `condition-${crypto.randomUUID()}`, description: '' }] })}>添加成立条件</button>
               <fieldset><legend>参与人物</legend>{draft.characters.map(actor => <label key={actor.id} style={{ display: 'block' }}><input type="checkbox" checked={node.actorIds.includes(actor.id)} onChange={e => patchNode(i, { actorIds: toggle(node.actorIds, actor.id, e.target.checked) })} />{actor.name || '未命名人物'}</label>)}</fieldset>
               <fieldset><legend>依赖已落实事件（全部满足才成立）</legend>{draft.nodes.filter(n => n.id !== node.id).map(dependency => <label key={dependency.id} style={{ display: 'block' }}><input type="checkbox" checked={node.dependsOn.includes(dependency.id)} onChange={e => patchNode(i, { dependsOn: toggle(node.dependsOn, dependency.id, e.target.checked) })} />{draft.stages.find(s => s.id === dependency.stageId)?.title} · {dependency.title}</label>)}</fieldset>
-              <details><summary>查看来源</summary>{node.sourceRefs.map(ref => { const match = /^author:(\d+):(\d+)$/.exec(ref); const evidence = base?.source.evidenceRefs?.find(r => `novel:${r.chapterId}:${r.startOffset}:${r.endOffset}` === ref); return <blockquote key={ref}>{match ? base?.source.text.slice(Number(match[1]), Number(match[2])) : evidence?.excerpt ?? ref}</blockquote>; })}</details>
+              <details><summary>查看来源</summary>{node.sourceRefs.map(ref => { const match = /^author:(\d+):(\d+)$/.exec(ref); const excerpt = evidenceExcerpts.get(ref); return <blockquote key={ref}>{match ? base?.source.text.slice(Number(match[1]), Number(match[2])) : excerpt ?? ref}</blockquote>; })}</details>
             </div></details>)}
           </div>
         </details>)}

@@ -66,4 +66,45 @@ describe('director definition compilation', () => {
     expect(result.status).toBe('failed');
     expect(Object.keys(result.checkpoints)).toHaveLength(0);
   });
+  test('同一人物拿到重复 id 时按姓名归一合并，而不是整批判失败', async () => {
+    const job = createDirectorCompileJob({ kind: 'author', text: '证人前来求助' });
+    const request = async () => {
+      const draft = sampleDraft() as DirectorDraft;
+      draft.characters = [
+        { id: 'a', name: '证人', aliases: [] },
+        { id: 'b', name: '证人', aliases: ['报案人'] },
+      ];
+      draft.nodes[0]!.actorIds = ['a', 'b'];
+      return JSON.stringify(draft);
+    };
+    const result = await compileDirectorDefinition(job, { request });
+    expect(result.status).toBe('completed');
+    expect(result.definition?.characters).toHaveLength(1);
+    expect(result.definition?.characters[0]?.aliases).toEqual(['报案人']);
+    expect(result.definition?.nodes[0]?.actorIds).toHaveLength(1);
+  });
+  test('同一 id 指向两个不同姓名属于真矛盾，仍按原样校验报错', async () => {
+    const job = createDirectorCompileJob({ kind: 'author', text: '证人前来求助' });
+    const request = async () => {
+      const draft = sampleDraft() as DirectorDraft;
+      draft.characters = [
+        { id: 'a', name: '证人', aliases: [] },
+        { id: 'a', name: '守卫', aliases: [] },
+      ];
+      draft.nodes[0]!.actorIds = ['a'];
+      return JSON.stringify(draft);
+    };
+    const result = await compileDirectorDefinition(job, { request });
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('重复人物');
+  });
+  test('证据摘录必须完整落在记录的窗口内', () => {
+    const chapters = [{ id: 'c1', index: 0, title: '章一', content: '城门关闭，守卫换班。' }];
+    const datasetWith = (excerpt: string) => ({
+      id: 'novel-source', title: '来源测试', chapters, staticMaterial: {}, analysisStatus: 'ready',
+      segments: [{ id: 's1', status: 'completed', evidenceRefs: [], events: [{ name: '关门', description: '城门关闭', evidenceRefs: [{ chapterId: 'c1', startOffset: 0, endOffset: 4, excerpt, confidence: 'explicit' as const }] }] }],
+    }) as unknown as NovelDataset;
+    expect(createDirectorCompileJob({ kind: 'novel', dataset: datasetWith('城门关闭') }).units).toHaveLength(1);
+    expect(() => createDirectorCompileJob({ kind: 'novel', dataset: datasetWith('关闭，') })).toThrow('小说证据与原文不匹配');
+  });
 });

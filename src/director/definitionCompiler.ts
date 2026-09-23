@@ -40,12 +40,17 @@ export function createDirectorCompileJob(input: DirectorCompileInput, options: {
     title = d.title;
     const refs = d.segments.flatMap(s => [...(s.evidenceRefs ?? []), ...s.events.flatMap(e => e.evidenceRefs ?? [])]);
     const evidence = [...new Map(refs.map(r => [`novel:${r.chapterId}:${r.startOffset}:${r.endOffset}`, r])).values()];
+    // 逐条校验证据与原文的对应关系。章节先建索引、匹配用 indexOf 定位：
+    // 不再对每条证据 slice 一整个区间再 includes —— 证据多、章节长时那会把主线程和内存拖死。
+    const chapterById = new Map(d.chapters.map(chapter => [chapter.id, chapter]));
     for (const r of evidence) {
-      const chapter = d.chapters.find(c => c.id === r.chapterId);
+      const chapter = chapterById.get(r.chapterId);
       if (!chapter || r.startOffset < 0 || r.endOffset <= r.startOffset || !r.excerpt.trim()) throw new Error('小说剧情来源不完整，请先恢复原文与证据');
       const start = r.chapterStartOffset ?? r.startOffset - (chapter.startOffset ?? 0);
       const end = r.chapterEndOffset ?? r.endOffset - (chapter.startOffset ?? 0);
-      if (start < 0 || end > chapter.content.length || !chapter.content.slice(start, end).includes(r.excerpt)) throw new Error('小说证据与原文不匹配');
+      if (start < 0 || end > chapter.content.length) throw new Error('小说证据与原文不匹配');
+      const found = chapter.content.indexOf(r.excerpt, start);
+      if (found < 0 || found + r.excerpt.length > end) throw new Error('小说证据与原文不匹配');
     }
     source = { kind: 'novel', text: d.rawText ?? d.chapters.map(c => c.content).join('\n'), datasetId: d.id, sourceVersion: d.sourceVersion, chapterIds: d.chapters.map(c => c.id), evidenceRefs: evidence };
     for (const s of d.segments) {
@@ -71,6 +76,49 @@ function stableDraft(draft: DirectorDraft): DirectorDraft {
   return { ...draft, characters: draft.characters.map(c => ({ ...c, id: chars.get(c.id)! })), stages: draft.stages.map(s => ({ ...s, id: stages.get(s.id)!, nodeIds: s.nodeIds.map(id => nodes.get(id)!), ...(s.completion ? { completion: { mode: s.completion.mode, nodeIds: s.completion.nodeIds.map(id => nodes.get(id)!) } } : {}) })), nodes: draft.nodes.map(n => ({ ...n, id: nodes.get(n.id)!, stageId: stages.get(n.stageId)!, actorIds: n.actorIds.map(id => chars.get(id)!), dependsOn: n.dependsOn.map(id => nodes.get(id)!), conditions: n.conditions.map(c => ({ ...c, id: `condition-${contentHash([nodes.get(n.id), c.description])}` })) })) };
 }
 
+/**
+ * 分批编译时同一个人物可能在两批里拿到不同的 id —— 最终身份本来就由规范名决定（见 stableDraft），
+ * 这里在校验前把同一个人的多个 id 并成一个，避免因这种噪音让整批判失败。
+ * 只处理「同一个人的身份噪音」：同一个 id 指向两个不同姓名属于真矛盾，原样退回校验报错。
+ */
+function normalizeCharacterIdentity(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const record = input as Record<string, unknown>;
+  const characters = record.characters;
+  const nodes = record.nodes;
+  if (!Array.isArray(characters) || !Array.isArray(nodes)) return input;
+  const readable = characters.filter((item): item is { id: string; name: string; aliases?: unknown } => (
+    !!item && typeof item === 'object'
+    && typeof (item as Record<string, unknown>).id === 'string'
+    && typeof (item as Record<string, unknown>).name === 'string'
+  ));
+  if (readable.length !== characters.length) return input;
+  const idMap = new Map<string, string>();
+  const merged = new Map<string, { id: string; name: string; aliases: string[] }>();
+  for (const character of readable) {
+    const id = `actor-${contentHash(character.name.normalize('NFKC').trim())}`;
+    const recorded = idMap.get(character.id);
+    if (recorded !== undefined && recorded !== id) return input;
+    idMap.set(character.id, id);
+    // 别名只补「整个字段缺失」这种格式瑕疵；字段存在但类型不对仍旧交回校验。
+    if (character.aliases !== undefined && (!Array.isArray(character.aliases) || character.aliases.some(alias => typeof alias !== 'string'))) return input;
+    const aliases = Array.isArray(character.aliases) ? character.aliases : [];
+    const existing = merged.get(id);
+    if (existing) existing.aliases = [...new Set([...existing.aliases, ...aliases])];
+    else merged.set(id, { id, name: character.name, aliases: [...new Set(aliases)] });
+  }
+  return {
+    ...record,
+    characters: [...merged.values()],
+    nodes: nodes.map(node => {
+      if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
+      const item = node as Record<string, unknown>;
+      if (!Array.isArray(item.actorIds)) return node;
+      return { ...item, actorIds: [...new Set(item.actorIds.map(actorId => (typeof actorId === 'string' ? idMap.get(actorId) ?? actorId : actorId)))] };
+    }),
+  };
+}
+
 export async function compileDirectorDefinition(initial: DirectorCompileJob, options: { request: (input: DirectorCompileRequest) => Promise<string>; signal?: AbortSignal; onCheckpoint?: (job: DirectorCompileJob) => Promise<void>; mergeBatchSize?: number }): Promise<DirectorCompileJob> {
   const job = structuredClone(initial);
   if (job.sourceFingerprint !== contentHash({ source: job.source, units: job.units })) throw new Error('原始资料已改变，请创建新的编译任务');
@@ -87,7 +135,8 @@ export async function compileDirectorDefinition(initial: DirectorCompileJob, opt
       const raw = await options.request({ phase, system: DEFINITION_COMPILER_SYSTEM, prompt: JSON.stringify({ phase, sourceRefs: refs, data, ...repair }), stream: false, signal: options.signal });
       checkAbort();
       try {
-        const checked = validateDirectorDraft(JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')), refs);
+        const parsed = JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));
+        const checked = validateDirectorDraft(normalizeCharacterIdentity(parsed), refs);
         if (phase === 'merge') {
           const required = (data as DirectorDraft[]).flatMap(d => d.nodes.flatMap(n => n.sourceRefs));
           const retained = new Set(checked.nodes.flatMap(n => n.sourceRefs));
