@@ -30,7 +30,7 @@ export default function ProviderForm({
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>API 端点</div>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>留空则使用官方默认地址</div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>留空用官方默认地址；填到 /chat/completions 结尾则原样使用，不再自动补全</div>
         </div>
         <input
           className="input-field"

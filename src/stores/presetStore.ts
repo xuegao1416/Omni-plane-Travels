@@ -1,6 +1,7 @@
 // 预设管理 Store — 用户预设持久化 + 激活状态
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { safeSetItem } from '@/storage/safeStorage';
 import type { PresetPack } from '@/data/builtinPresets';
 import { getBuiltinPreset } from '@/data/builtinPresets';
 
@@ -123,7 +124,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
       } else {
         updated = [...state.userPresets, pack];
       }
-      localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+      safeSetItem(PRESETS_KEY, JSON.stringify(updated));
       return { userPresets: updated };
     });
   },
@@ -131,7 +132,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
   deletePreset: (id) => {
     set((state) => {
       const updated = state.userPresets.filter(p => p.id !== id);
-      localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+      safeSetItem(PRESETS_KEY, JSON.stringify(updated));
       const newActive = state.activePresetId === id ? null : state.activePresetId;
       if (newActive === null) localStorage.removeItem(ACTIVE_KEY);
       return { userPresets: updated, activePresetId: newActive };
@@ -141,7 +142,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
   setActivePreset: (id) => {
     const normalized = sanitizeActiveId(id);
     if (normalized) {
-      localStorage.setItem(ACTIVE_KEY, normalized);
+      safeSetItem(ACTIVE_KEY, normalized);
     } else {
       localStorage.removeItem(ACTIVE_KEY);
     }
@@ -160,7 +161,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
         ...state.builtinOverrides,
         [presetId]: { ...current, [identifier]: enabled },
       };
-      localStorage.setItem(OVERRIDES_KEY, JSON.stringify(updated));
+      safeSetItem(OVERRIDES_KEY, JSON.stringify(updated));
       return { builtinOverrides: updated };
     });
   },
@@ -172,7 +173,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
         ...state.builtinContentOverrides,
         [presetId]: { ...current, [identifier]: content },
       };
-      localStorage.setItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updated));
+      safeSetItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updated));
       return { builtinContentOverrides: updated };
     });
   },
@@ -181,10 +182,10 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
     set((state) => {
       const updated = { ...state.builtinOverrides };
       delete updated[presetId];
-      localStorage.setItem(OVERRIDES_KEY, JSON.stringify(updated));
+      safeSetItem(OVERRIDES_KEY, JSON.stringify(updated));
       const updatedContent = { ...state.builtinContentOverrides };
       delete updatedContent[presetId];
-      localStorage.setItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updatedContent));
+      safeSetItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updatedContent));
       return { builtinOverrides: updated, builtinContentOverrides: updatedContent };
     });
   },

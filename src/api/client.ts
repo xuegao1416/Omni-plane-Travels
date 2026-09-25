@@ -62,14 +62,27 @@ export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHead
   return { url: endpoint, headers };
 }
 
+/**
+ * 基址是否已经带版本段（/v1、/v4、/v1beta，允许结尾不带斜杠）。
+ *
+ * 判断"要不要再补 /v1"必须用这个：只看 `/v1` 结尾会漏掉别的版本号，
+ * 例如智谱 GLM 的端点是 https://open.bigmodel.cn/api/paas/v4 —— 误补一个
+ * /v1 会直接打到 https://open.bigmodel.cn/api/paas/v4/v1/chat/completions。
+ */
+function hasVersionSegment(base: string): boolean {
+  return /\/v\d+(\/|$)/i.test(base);
+}
+
 // URL拼接 - 支持多种provider
 export function buildEndpoint(config: ApiConfig): string {
   const base = config.baseUrl.replace(/\/+$/, '');
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
-  // URL 已含版本路径（如 /v2/xxx）时直接追加 /chat/completions，不插入多余的 /v1
-  if (/\/v\d+\//.test(base)) return `${base}/chat/completions`;
+  // Gemini 的 OpenAI 兼容层挂在 /v1beta/openai 下；裸域名直接拼 /v1/chat/completions 会打到不存在的路径。
+  if (config.provider === 'google' && !hasVersionSegment(base)) return `${base}/v1beta/openai/chat/completions`;
+  // URL 已含版本路径（/v1、/v4、/v2/xxx 等）时只追加路径，不插多余的 /v1
+  if (hasVersionSegment(base)) return `${base}/chat/completions`;
   return `${base}/v1/chat/completions`;
 }
 
@@ -436,14 +449,16 @@ export async function requestStreamWithRetry(
 function getModelListUrls(config: ApiConfig): string[] {
   const base = config.baseUrl.replace(/\/+$/, '');
   if (config.provider === 'google') {
-    return [`${base}/v1beta/models?key=${config.apiKey}`];
+    // 基址已带版本段时沿用，避免拼出 /v1beta/v1beta/models。
+    const root = /\/v\d/i.test(base) ? base : `${base}/v1beta`;
+    return [`${root}/models?key=${config.apiKey}`];
   }
 
   const standardUrl = base.endsWith('/v1') || base.endsWith('/openai')
     ? `${base}/models`
     : base.endsWith('/v1/chat/completions')
       ? base.replace(/\/chat\/completions$/, '/models')
-      : /\/v\d+\//.test(base)
+      : hasVersionSegment(base)
         ? `${base}/models`
         : `${base}/v1/models`;
 
@@ -580,7 +595,7 @@ export async function fetchEmbedding(
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/embeddings')) {
-    url = base.endsWith('/v1') ? `${base}/embeddings` : `${base}/v1/embeddings`;
+    url = hasVersionSegment(base) ? `${base}/embeddings` : `${base}/v1/embeddings`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
@@ -614,7 +629,7 @@ export async function fetchEmbeddingBatch(
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/embeddings')) {
-    url = base.endsWith('/v1') ? `${base}/embeddings` : `${base}/v1/embeddings`;
+    url = hasVersionSegment(base) ? `${base}/embeddings` : `${base}/v1/embeddings`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
@@ -692,7 +707,7 @@ export async function fetchRerank(
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/rerank') && !base.endsWith('/rerank/')) {
-    url = base.endsWith('/v1') ? `${base}/rerank` : `${base}/v1/rerank`;
+    url = hasVersionSegment(base) ? `${base}/rerank` : `${base}/v1/rerank`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);

@@ -58,7 +58,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   const [generatingModule, setGeneratingModule] = useState<string | null>(null);
   const [pipelineStage] = useState('');
   const [refinedEntries, setRefinedEntries] = useState<WorldBookEntryDef[]>([]);
-  const [, setGenError] = useState('');
+  const [genError, setGenError] = useState('');
   const [artworkError, setArtworkError] = useState('');
   const [isProcessingArtwork, setIsProcessingArtwork] = useState(false);
   const [selectedModules, setSelectedModules] = useState<Set<string>>(() => {
@@ -105,7 +105,9 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
         worldBookEntries: refinedEntries.length > 0 ? refinedEntries : base.worldBookEntries,
         draftUpdatedAt: Date.now(),
       };
-      saveWorldDraft(draft);
+      // 草稿自动保存不应打断编辑：存储配额耗尽时只跳过本次落盘。
+      try { saveWorldDraft(draft); }
+      catch (err) { console.warn('[世界草稿] 自动保存失败:', err instanceof Error ? err.message : String(err)); }
     }, 30_000);
     return () => clearInterval(interval);
   }, [isDraft, form, refinedEntries, initialWorld]);
@@ -128,7 +130,8 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
         worldBookEntries: refinedEntries.length > 0 ? refinedEntries : base.worldBookEntries,
         draftUpdatedAt: Date.now(),
       };
-      saveWorldDraft(draft);
+      try { saveWorldDraft(draft); }
+      catch (err) { console.warn('[世界草稿] 离开时保存失败:', err instanceof Error ? err.message : String(err)); }
     };
   }, [isDraft, form, refinedEntries, initialWorld]);
 
@@ -230,9 +233,9 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   const handleAIGenerate = async () => {
     const promptText = worldIntentPrompt;
-    if (!promptText.trim()) { setGenError('请输入世界描述'); return; }
-    if (!apiConfig) { setGenError('请先在设置中配置API'); return; }
-    setGenError(''); setIsGeneratingWorld(true);
+    if (!promptText.trim()) { setGenError('请先写下世界意图，再开始编织。'); return; }
+    if (!apiConfig) { setGenError('请先在设置中配置API：填写接口后回到这里，再点「开始编织世界」。'); return; }
+    setGenError(''); setWeaveValidation(''); setIsGeneratingWorld(true);
     const ctrl = new AbortController(); aiAbortRef.current = ctrl;
     try { setShowGuidedChoice(true); } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
@@ -264,28 +267,35 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   const handleGuidedComplete = (worldDef: WorldDef) => applyGeneratedWorld(worldDef);
 
   const handleTalentAiGenerate = async (categoryIndex: number, count: number) => {
-    if (!apiConfig) return;
+    if (!apiConfig) { await dialog.alert('尚未配置可用的 API：请先到「设置」中填写接口后再试。'); return; }
     const cat = talentData?.categories?.[categoryIndex]; if (!cat) return;
     setIsGeneratingTalent(true);
+    let failure = '';
     try {
       const prompt = `为以下世界的"${cat.name}"天赋大类生成${count}个天赋：\n世界描述：${form.overview || aiGenName || '通用世界'}\n大类：${cat.name}（${cat.description || '无描述'}）\n品质分5档：普通(40%)、精良(25%)、稀有(20%)、史诗(10%)、传说(5%)。\n只输出JSON数组：[{"id":"英文","name":"天赋名","description":"描述","rarity":"品质","effects":["效果"]}]`;
       const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompt }], { signal: new AbortController().signal, onDelta: () => {} });
       const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\[[\s\S]*\])/);
-      if (jsonMatch) {
+      if (!jsonMatch) failure = '模型没有返回可解析的天赋列表，请重试或换一个模型。';
+      else {
         const fixed = jsonMatch[1].trim().replace(/[""]/g, '"').replace(/['']/g, "'");
         const talents = JSON.parse(fixed);
         if (Array.isArray(talents)) {
           const next = JSON.parse(JSON.stringify(talentData));
           for (const t of talents) { if (!next.categories[categoryIndex].talents.find((et: any) => et.id === t.id)) next.categories[categoryIndex].talents.push(t); }
           updateModuleDataByModuleId('talent', next);
-        }
+        } else failure = '模型返回的天赋格式不正确，请重试。';
       }
-    } catch (err: unknown) { console.warn('[天赋AI生成] 失败:', err instanceof Error ? err.message : String(err)); }
-    finally { setIsGeneratingTalent(false); }
+    } catch (err: unknown) {
+      failure = err instanceof Error ? err.message : String(err);
+      console.warn('[天赋AI生成] 失败:', failure);
+    } finally { setIsGeneratingTalent(false); }
+    if (failure) await dialog.alert(`天赋生成失败：${failure}`);
   };
 
   const handleModuleAiFill = async (moduleId: string) => {
-    if (!apiConfig) return; setGeneratingModule(moduleId);
+    if (!apiConfig) { await dialog.alert('尚未配置可用的 API：请先到「设置」中填写接口后再试。'); return; }
+    setGeneratingModule(moduleId);
+    let failure = '';
     try {
       const desc = form.overview || aiGenName || '通用世界';
       const prompts: Record<string, string> = {
@@ -294,25 +304,31 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
         survival: buildSurvivalGenPrompt({ theme: desc, tone: '中等' }),
         business: buildBusinessGenPrompt({ theme: desc, tone: '中等' }),
       };
-      if (!prompts[moduleId]) return;
-      const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompts[moduleId] }], { signal: new AbortController().signal, onDelta: () => {} });
-      const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);
-      if (jsonMatch) {
-        const fixed = jsonMatch[1].trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
-        const parsed = JSON.parse(fixed);
-        const normalized = moduleId === 'progression'
-          ? normalizeProgressionConfig(parsed as import('../../modules/schema').ProgressionModuleSchema)
-          : moduleId === 'stat'
-            ? {
-                ...parsed,
-                special: Array.isArray(parsed.special) ? parsed.special : [],
-                pointScale: clampPointScale(parsed.pointScale),
-              }
-            : parsed;
-        updateModuleDataByModuleId(moduleId, normalized as any);
+      if (!prompts[moduleId]) failure = '该模块暂不支持 AI 补全。';
+      else {
+        const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompts[moduleId] }], { signal: new AbortController().signal, onDelta: () => {} });
+        const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);
+        if (!jsonMatch) failure = '模型没有返回可解析的模块数据，请重试或换一个模型。';
+        else {
+          const fixed = jsonMatch[1].trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+          const parsed = JSON.parse(fixed);
+          const normalized = moduleId === 'progression'
+            ? normalizeProgressionConfig(parsed as import('../../modules/schema').ProgressionModuleSchema)
+            : moduleId === 'stat'
+              ? {
+                  ...parsed,
+                  special: Array.isArray(parsed.special) ? parsed.special : [],
+                  pointScale: clampPointScale(parsed.pointScale),
+                }
+              : parsed;
+          updateModuleDataByModuleId(moduleId, normalized as any);
+        }
       }
-    } catch (err: unknown) { console.warn(`[模块AI补全] ${moduleId} 失败:`, err instanceof Error ? err.message : String(err)); }
-    finally { setGeneratingModule(null); }
+    } catch (err: unknown) {
+      failure = err instanceof Error ? err.message : String(err);
+      console.warn(`[模块AI补全] ${moduleId} 失败:`, failure);
+    } finally { setGeneratingModule(null); }
+    if (failure) await dialog.alert(`模块补全失败：${failure}`);
   };
 
   const professionModuleConfig = form.modules?.find(module => module.moduleId === 'profession')?.moduleConfig;
@@ -331,16 +347,27 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   };
 
   const handleSave = () => {
-    if (!form.name.trim()) return;
-    let world = formToWorldDef(form, initialWorld, refinedEntries);
-    if (!initialWorld) world.id = directorWorkspaceId;
-    world.modules = normalizeSelectedWorldModules(world.modules);
-    injectModuleRuleEntries(world, form, refinedEntries);
-    if (isDraft) {
-      savedRef.current = true;
-      world = promoteDraftToCustomWorld({ ...initialWorld as WorldDraft, ...world } as WorldDraft);
+    if (!form.name.trim()) {
+      setWeaveValidation('请先填写世界名称，再创建世界。');
+      setWeaveStep(1);
+      return;
     }
-    onSave(world);
+    try {
+      let world = formToWorldDef(form, initialWorld, refinedEntries);
+      if (!initialWorld) world.id = directorWorkspaceId;
+      world.modules = normalizeSelectedWorldModules(world.modules);
+      injectModuleRuleEntries(world, form, refinedEntries);
+      if (isDraft) {
+        savedRef.current = true;
+        world = promoteDraftToCustomWorld({ ...initialWorld as WorldDraft, ...world } as WorldDraft);
+      }
+      onSave(world);
+    } catch (err: unknown) {
+      // 落盘失败（含存储配额耗尽）必须让玩家看到，否则只是"点了没反应"。
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[世界编织] 保存失败:', message);
+      void dialog.alert(`世界保存失败：${message}`);
+    }
   };
 
   const handleExport = async () => {
@@ -452,6 +479,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
           <section aria-labelledby="world-weave-rules-title">
             {isGeneratingWorld && <div className="world-weave-progress" role="status" aria-live="polite"><strong>正在编织世界</strong><span>{pipelineStage || '解析种子'}</span><div className="world-weave-progress__steps"><span className={pipelineStage === '解析种子' ? 'is-active' : ''}>解析种子</span><span className={pipelineStage === '编织法则' ? 'is-active' : ''}>编织法则</span><span className={pipelineStage === '生成编年' ? 'is-active' : ''}>生成编年</span><span className={pipelineStage === '校验' ? 'is-active' : ''}>校验</span></div></div>}
             {weaveValidation && !isGeneratingWorld && <p className="world-weave-validation world-weave-validation--error" role="alert">{weaveValidation}</p>}
+            {genError && <p className="world-weave-validation world-weave-validation--error" role="alert">{genError}</p>}
           <div className="world-weave-section-heading"><div><span className="world-weave-kicker">STEP 02 · RULES</span><h4 id="world-weave-rules-title">选择这座世界遵循的法则</h4></div><span className="world-weave-section-hint">未选择的模块不会凭空生成数据</span></div>
           <div className="world-weave-module-surface"><ModuleSelector selected={selectedModules} onToggle={toggleModule} disabledByConflict={disabledByConflict} /><div className="world-weave-module-summary" aria-live="polite"><strong>当前启用</strong>{enabledModules.length ? enabledModules.map(module => <span key={module.id}>{module.name}</span>) : <span className="is-muted">暂无额外模块，仍可继续编年</span>}</div></div>
           {disabledByConflict.size > 0 && <p className="world-weave-validation world-weave-validation--warning"><AlertTriangle size={14} /> 已按互斥关系标记不可同时启用的模块，请选择适合本世界的一组法则。</p>}

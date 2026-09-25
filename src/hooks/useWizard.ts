@@ -4,6 +4,7 @@ import type { PlayerProfile } from '../storage/db';
 import type { WorldBookEntry } from '../worldbook/index';
 import { loadWorldBook } from '../engine/worldPersonality';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { trySetItem } from '@/storage/safeStorage';
 import { normalizeModules } from '../modules/normalizeModule';
 import { deleteCustomWorldFromList, type CustomWorldDeleteResult } from '../data/customWorldLifecycle';
 
@@ -117,8 +118,10 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
   }, [view, selectedWorld, worldBookLoaded]);
 
   // 持久化用户创建的世界
+  // 自建世界带有完整世界书，体积可观：配额耗尽时只跳过本次落盘，
+  // 不能让同步异常冒泡掀翻整个界面（内存态仍然有效）。
   useEffect(() => {
-    localStorage.setItem(CREATED_WORLDS_KEY, JSON.stringify(createdWorlds));
+    trySetItem(CREATED_WORLDS_KEY, JSON.stringify(createdWorlds));
   }, [createdWorlds]);
 
   // ─── 世界编辑器操作 ───

@@ -313,15 +313,23 @@ export function createWorldBookManager(initialEntries: WorldBookEntry[]): WorldB
     },
 
     addEntries(newEntries: WorldBookEntry[]) {
-      const minId = entries.length > 0 ? Math.min(...entries.map(e => e.id)) : 0;
-      let nextId = Math.min(minId, 0) - 1;
-      const existingIds = new Set(entries.map(e => e.id));
-      const toAdd = newEntries
-        .map(e => ({
-          ...e,
-          id: e.id < 0 ? e.id : nextId--,
-        }))
-        .filter(e => !existingIds.has(e.id)); // 去重：相同 ID 不重复添加
+      // 负 ID 代表"运行时注入的世界专属条目"，按数组下标生成，批次之间会撞号。
+      // 原实现只对已知 ID 去重，撞号的一整批新条目会被静默丢弃（加了没反应）；
+      // 改为撞号时重新分配一个未占用的负 ID。
+      const usedIds = new Set(entries.map(e => e.id));
+      let nextId = Math.min(entries.length > 0 ? Math.min(...entries.map(e => e.id)) : 0, 0) - 1;
+      const allocate = (): number => {
+        while (usedIds.has(nextId)) nextId -= 1;
+        usedIds.add(nextId);
+        return nextId;
+      };
+      const toAdd = newEntries.map(e => {
+        if (e.id < 0 && !usedIds.has(e.id)) {
+          usedIds.add(e.id);
+          return e;
+        }
+        return { ...e, id: allocate() };
+      });
       entries = [...entries, ...toAdd];
     },
 

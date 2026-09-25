@@ -94,7 +94,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     problem: '部分 DeepSeek 公益站为了防滥用，不开放 GET /models 或 GET /v1/models。此时点击「获取模型」失败，不代表代理或聊天接口坏了。',
     solution: '代理只负责解决跨域并转发请求，不会替公益站开放模型目录。模型列表拉取失败时，直接手动填写公益站公布的模型 ID 即可。',
     steps: [
-      { text: 'API 端点填写公益站提供的根地址或 /v1 地址', tip: '不要把 /chat/completions 直接填进 API 端点，应用会自动拼接。' },
+      { text: 'API 端点填公益站提供的根地址、/v1 地址，或它文档里写明的版本地址（例如智谱 GLM 是 /api/paas/v4）', tip: '应用会自动补上后面的 /chat/completions；若某个站的路径比较特殊，也可以把完整的对话地址（以 /chat/completions 结尾）整个填进去，此时应用原样使用、不再拼接。' },
       { text: 'API 密钥填写公益站发放的 Key' },
       { text: '模型名称直接手动填写', tip: '以公益站公布的模型 ID 为准，不要根据模型显示名称自行猜测。' },
       { text: '「获取」失败但「测试连接」成功时，可以忽略模型列表失败，直接保存使用' },
