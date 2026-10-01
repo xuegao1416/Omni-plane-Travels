@@ -82,7 +82,7 @@ requestStreamWithRetry(config, messages, options)      // :400
 
 **文件路径**: `src/storage/db.ts`
 
-**当前 DB 版本**: `DB_VERSION = 10`。支持 DB v4～v9 直接升级，包括已有消息分片的 v4 和 2.8.2 的 v5；在原子事务中补齐当前表和索引，保留全部既有记录，修正旧小说分段索引，失败则回滚并允许重试。存档 payload 的 v3→v4 迁移窗口独立于 DB 部署版本。下列仅为历史结构记录，不逐级重放：
+**当前 DB 版本**: `DB_VERSION = 10`。支持 DB v4～v9 直接升级，包括已有消息分片的 v4 和 2.8.2 的 v5；在原子事务中补齐当前表和索引，保留全部既有记录，修正旧小说分段索引，失败则回滚并允许重试。存档 payload 的 v4→v5 迁移窗口独立于 DB 部署版本。下列仅为历史结构记录，不逐级重放：
 
 - v1-v3:`saves` + `global` 两个 store；`saves` 含 `timestamp` 索引。
 - v4:`messages` 分片 store + `saveId`、`saveId_seq` 索引。
@@ -144,7 +144,7 @@ interface GameSave {
 > **注**:`interface GameSave`(db.ts:120)**未加 export**;`SaveLifecycle`(db.ts:117)、`SaveMeta`(db.ts:164)、`CompactSaveRecord`(db.ts:740)均为 `export`。`enabledMods` 带 TODO 注释,计划下次格式升级改名为 `enabledEventPacks`。
 
 ```typescript
-// CompactSaveRecord — v4+存档存储格式(不含 messages),db.ts:740
+// CompactSaveRecord — v5 存档头部格式（不含 messages）
 export interface CompactSaveRecord {
   id: string; name: string; timestamp: number;
   schemaVersion: number; round: number;
@@ -157,6 +157,7 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
+  encodedHistory?: StorageEncoding; // 大 memoryRuntime/simulationState 的存储编码，读取后恢复明文字段
   enabledMods?: string[];
   messageCount: number;
   lastMessageSeq: number;
@@ -298,10 +299,12 @@ let _autoSaveBuilder: (() => GameSave | null) | null = null;
 
 
 
-## 8.9 当前存档 schema 与兼容窗口（v2.8.4）
+## 8.9 当前存档 schema 与文件格式
 
-- 内部 `SAVE_SCHEMA_VERSION = 4`。v4 将存档头和消息分离，消息按 `${saveId}#${seq}` 存在 messages store。
-- 自动迁移只保留直接上一代：**v3 内联 messages → v4 分片**，入口为 `planV3ToV4Migration` / `migrateV3ToV4`。
-- v0/v1/v2 内部 IndexedDB 结构已退出当前兼容窗口，不再通过多代链式迁移加载。
-- 外部存档 JSON 导入由 `importSaveFromData` 规范化后直接写成当前 v4；这是文件导入协议，不属于内部 schema 历史链。
-- 当前 v4 运行时不再回退读取老的内联 messages 记录。
+- 内部 `SAVE_SCHEMA_VERSION = 5`，继续使用存档头和 `${saveId}#${seq}` 消息分片。自动迁移仅保留 **v4 分片 → v5**，入口为 `planV4ToV5Migration` / `loadSaveWithMigration`；事务内读取当前头后升级版本标记，不批量改写历史。
+- 大消息 `snapshot` 存为 `MessageRecord.encodedSnapshot`；头部的大 `memoryRuntime/simulationState` 存为 `encodedHistory`。`storageCodec.ts` 使用带 version/type 的 ZIP JSON 编码，只在压缩确实缩小时使用；小记录和旧 v4 分片可保持明文。
+- 编码在写事务前完成；三种消息读取函数在 cursor 事务结束后解码，`loadGame` / `loadSaveWithMigration` / `exportSave` 恢复正常对象。`gameState` 保持明文，模块应用/恢复可继续透传其余存档头字段。
+- v0～v3 内部格式已退出兼容窗口，原始数据库记录不删除。需要先用相应旧 App 导出 JSON，再以外部协议导入。
+- `exportSave` 仍返回外部协议 **2.0 JSON Blob**，供云端等消费者使用；外部 JSON v1/v2 导入由 `importSaveFromData` 规范化后直接写成 v5，不属于内部迁移链。
+- 本地文件导出由 `saveFileCodec.ts` 打包为标准 DEFLATE ZIP，扩展名 `.save.zip`，仅包含完整 `save.json`。本地 UI 与 `importSaveFromFile` 共用内容识别解码器，支持旧 JSON 和 ZIP；ZIP 校验 CRC，损坏或缺少 `save.json` 明确报错。
+- 无损压缩不增加快照裁剪，也不改变现有回滚引用、模块 checkpoint 修订及云端裁剪策略。

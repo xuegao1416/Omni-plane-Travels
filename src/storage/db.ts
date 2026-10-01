@@ -1,5 +1,7 @@
 // IndexedDB 存储层
 import { openDB, type IDBPDatabase } from 'idb';
+import { encodeStorageValue, decodeStorageValue, type StorageEncoding } from './storageCodec';
+import { decodeSaveFile } from './saveFileCodec';
 import type { ChatMessage } from '../engine/types';
 import type { GameState } from '../schema/variables';
 import { STORAGE_KEYS } from '@/config/storageKeys';
@@ -120,7 +122,7 @@ export type SaveLifecycle = 'active' | 'ended';
 
 /** 完整存档记录（写入 IndexedDB saves store） */
 export interface GameSave {
-  /** v3/v4 internal save schema marker; imports are normalized before persistence. */
+  /** v4/v5 internal save schema marker; imports are normalized before persistence. */
   schemaVersion?: number;
   id: string;
   name: string;
@@ -275,6 +277,42 @@ export interface MessageRecord {
   seq: number;
   /** 完整消息 */
   message: ChatMessage;
+  encodedSnapshot?: StorageEncoding;
+}
+
+
+async function encodeMessageRecord(saveId: string, message: ChatMessage, seq: number): Promise<MessageRecord> {
+  const encodedSnapshot = await encodeStorageValue(message.snapshot);
+  if (!encodedSnapshot) return { key: `${saveId}#${seq}`, saveId, seq, message };
+  const { snapshot, ...plainMessage } = message;
+  return { key: `${saveId}#${seq}`, saveId, seq, message: plainMessage as ChatMessage, encodedSnapshot };
+}
+
+async function decodeMessageRecord(record: MessageRecord): Promise<ChatMessage> {
+  if (record.encodedSnapshot === undefined) return record.message;
+  return { ...record.message, snapshot: await decodeStorageValue(record.encodedSnapshot) } as ChatMessage;
+}
+
+async function encodeSaveHead<T extends { memoryRuntime?: unknown; simulationState?: SimulationState; encodedHistory?: StorageEncoding }>(head: T): Promise<T> {
+  // Opaque compact heads may be passed through metadata/module paths.
+  if (head.encodedHistory !== undefined && !('memoryRuntime' in head) && !('simulationState' in head)) return head;
+  const { encodedHistory: previousEncoding, ...plainHead } = head;
+  const encodedHistory = await encodeStorageValue({ memoryRuntime: head.memoryRuntime, simulationState: head.simulationState });
+  if (!encodedHistory) return plainHead as T;
+  const { memoryRuntime, simulationState, ...rest } = plainHead;
+  return { ...rest, encodedHistory } as T;
+}
+
+async function decodeSaveHead(head: CompactSaveRecord): Promise<CompactSaveRecord> {
+  if (head.encodedHistory === undefined) return head;
+  const { encodedHistory, ...plainHead } = head;
+  const history = await decodeStorageValue(encodedHistory);
+  if (!history || typeof history !== 'object' || Array.isArray(history)
+    || Object.keys(history).some(key => key !== 'memoryRuntime' && key !== 'simulationState')) {
+    throw new Error('存档历史压缩数据损坏');
+  }
+  const payload = history as { memoryRuntime?: unknown; simulationState?: SimulationState };
+  return { ...plainHead, memoryRuntime: payload.memoryRuntime, simulationState: payload.simulationState };
 }
 
 // ─── 消息分片操作 ─────────────────────────────────────
@@ -303,12 +341,13 @@ export async function getLastMessageSeq(saveId: string): Promise<number> {
 /** 获取指定存档的最近 N 条消息 */
 export async function getRecentMessages(saveId: string, count: number): Promise<ChatMessage[]> {
   const db = await getDB();
-  const tx = db.transaction(MESSAGES_STORE, 'readonly');
-  const index = tx.store.index('saveId_seq');
 
   // 先获取最后一条的 seq
   const lastSeq = await getLastMessageSeq(saveId);
   if (lastSeq < 0) return [];
+
+  const tx = db.transaction(MESSAGES_STORE, 'readonly');
+  const index = tx.store.index('saveId_seq');
 
   // 计算起始 seq
   const startSeq = Math.max(0, lastSeq - count + 1);
@@ -317,14 +356,15 @@ export async function getRecentMessages(saveId: string, count: number): Promise<
     [saveId, lastSeq],
   );
 
-  const messages: ChatMessage[] = [];
+  const records: MessageRecord[] = [];
   let cursor = await index.openCursor(range, 'prev');
   while (cursor) {
-    messages.unshift(cursor.value.message);
+    records.unshift(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages;
+  await tx.done;
+  return Promise.all(records.map(decodeMessageRecord));
 }
 
 /** 获取指定存档的指定 seq 范围的消息 */
@@ -338,32 +378,23 @@ export async function getMessageRange(saveId: string, startSeq: number, endSeq: 
     [saveId, endSeq],
   );
 
-  const messages: ChatMessage[] = [];
+  const records: MessageRecord[] = [];
   let cursor = await index.openCursor(range, 'next');
   while (cursor) {
-    messages.push(cursor.value.message);
+    records.push(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages;
+  await tx.done;
+  return Promise.all(records.map(decodeMessageRecord));
 }
 
 /** 增量写入消息（批量 put，幂等：key 含 seq） */
 export async function putMessages(saveId: string, messages: ChatMessage[], startSeq: number): Promise<void> {
+  const records = await Promise.all(messages.map((message, i) => encodeMessageRecord(saveId, message, startSeq + i)));
   const db = await getDB();
   const tx = db.transaction(MESSAGES_STORE, 'readwrite');
-
-  for (let i = 0; i < messages.length; i++) {
-    const seq = startSeq + i;
-    const record: MessageRecord = {
-      key: `${saveId}#${seq}`,
-      saveId,
-      seq,
-      message: messages[i],
-    };
-    await tx.store.put(record);
-  }
-
+  for (const record of records) await tx.store.put(record);
   await tx.done;
 }
 
@@ -532,14 +563,15 @@ export async function getAllMessages(saveId: string): Promise<ChatMessage[]> {
     [saveId, Number.MAX_SAFE_INTEGER],
   );
 
-  const messages: ChatMessage[] = [];
+  const records: MessageRecord[] = [];
   let cursor = await index.openCursor(range, 'next');
   while (cursor) {
-    messages.push(cursor.value.message);
+    records.push(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages;
+  await tx.done;
+  return Promise.all(records.map(decodeMessageRecord));
 }
 
 // ─── Global store（键值对，存元数据列表等） ─────────────
@@ -634,7 +666,7 @@ export function invalidateSaveMetaCache(): void {
 // ─── 老存档迁移 ────────────────────────────────────────
 
 /** 存档 schema 版本 */
-export const SAVE_SCHEMA_VERSION = 4;
+export const SAVE_SCHEMA_VERSION = 5;
 
 /** 紧凑头部（不含 messages） */
 export interface CompactSaveRecord {
@@ -653,6 +685,7 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
+  encodedHistory?: StorageEncoding;
   messageCount: number;
   lastMessageSeq: number;
   estBytes?: number;
@@ -661,131 +694,39 @@ export interface CompactSaveRecord {
   endReason?: string;
 }
 
-/**
- * 纯函数：规划直接上一代 v3（内联 messages）→ 当前 v4（分片）迁移。
- * 不接触 IndexedDB，便于单测（L-16）。
- * - 仅接受 schemaVersion === 3；当前 v4 返回 null，更早版本不再进入自动迁移链
- * - 否则返回紧凑头部 compactHead + 消息分片记录 messageRecords
- *   - 无消息 → messageRecords 为空，compactHead.messageCount=0 / lastMessageSeq=-1
- *   - 有消息 → 每条消息生成一条分片，seq 从 0 递增
- */
-export function planV3ToV4Migration(oldSave: GameSave): {
-  head: CompactSaveRecord;
-  messageRecords: MessageRecord[];
-} | null {
-  const schemaVersion = Number((oldSave as any).schemaVersion ?? 0);
-  if (schemaVersion >= SAVE_SCHEMA_VERSION) return null;
-  if (schemaVersion !== SAVE_SCHEMA_VERSION - 1) {
-    throw new Error(`不支持从存档 schema v${schemaVersion} 直接迁移到 v${SAVE_SCHEMA_VERSION}；仅保留 v${SAVE_SCHEMA_VERSION - 1} → v${SAVE_SCHEMA_VERSION}`);
+/** Only the direct previous compact schema is migrated; existing shards stay lossless. */
+export function planV4ToV5Migration(oldHead: CompactSaveRecord): CompactSaveRecord | null {
+  if (oldHead.schemaVersion === SAVE_SCHEMA_VERSION) return null;
+  if (oldHead.schemaVersion !== SAVE_SCHEMA_VERSION - 1 || 'messages' in oldHead) {
+    throw new Error('不支持的内部存档格式；仅保留 v4 → v5');
   }
-
-  const messages = oldSave.messages || [];
-
-  const compactHead: CompactSaveRecord = {
-    id: oldSave.id,
-    name: oldSave.name,
-    timestamp: oldSave.timestamp,
-    schemaVersion: SAVE_SCHEMA_VERSION,
-    round: messages.reduce((max, m) => Math.max(max, m.round), 0),
-    gameState: oldSave.gameState,
-    worldId: oldSave.worldId,
-    personalInfo: oldSave.personalInfo,
-    characterHistory: oldSave.characterHistory,
-    memoryRuntime: oldSave.memoryRuntime,
-    memoryConfig: oldSave.memoryConfig,
-    vectorMemory: oldSave.vectorMemory,
-    variableConfig: oldSave.variableConfig,
-    customWorld: oldSave.customWorld,
-    simulationState: oldSave.simulationState,
-    lifecycle: oldSave.lifecycle === 'ended' ? 'ended' : 'active',
-    endedAt: oldSave.endedAt,
-    endReason: oldSave.endReason,
-    messageCount: messages.length,
-    lastMessageSeq: messages.length > 0 ? messages.length - 1 : -1,
-  };
-
-  const messageRecords: MessageRecord[] = messages.map((m, i) => ({
-    key: `${oldSave.id}#${i}`,
-    saveId: oldSave.id,
-    seq: i,
-    message: { ...m, seq: i },
-  }));
-
-  return { head: compactHead, messageRecords };
+  return { ...oldHead, schemaVersion: SAVE_SCHEMA_VERSION };
 }
 
-/**
- * 迁移直接上一代存档（v3 内联 messages）到当前格式（v4 分片存储）
- * - 将内联的 messages 拆到 messages store
- * - 生成紧凑头部（不含 messages）
- * - 一次性事务完成，失败不动老记录
- * 实现基于纯函数 planV3ToV4Migration，保证迁移逻辑可单测。
- */
-export async function migrateV3ToV4(oldSave: GameSave): Promise<boolean> {
-  try {
-    const plan = planV3ToV4Migration(oldSave);
-    if (!plan) return true; // 已迁移，跳过
-
-    const db = await getDB();
-    const { head: compactHead, messageRecords } = plan;
-
-    if (messageRecords.length > 0) {
-      // 一次性事务：写消息分片 + 更新头部
-      const tx = db.transaction([MESSAGES_STORE, SAVES_STORE], 'readwrite');
-      const msgStore = tx.objectStore(MESSAGES_STORE);
-      for (const rec of messageRecords) {
-        await msgStore.put(rec);
-      }
-      await tx.objectStore(SAVES_STORE).put(compactHead as any);
-      await tx.done;
-    } else {
-      await db.put(SAVES_STORE, compactHead as any);
-    }
-
-    console.log(`[存档迁移] 成功迁移存档 ${oldSave.id}，共 ${messageRecords.length} 条消息`);
-    return true;
-  } catch (err) {
-    console.warn(`[存档迁移] 迁移存档 ${oldSave.id} 失败（不影响原存档）:`, err);
-    return false;
-  }
-}
-
-/**
- * 加载存档时自动迁移（按需）
- * 如果检测到老格式存档，自动迁移到新格式
- */
 export async function loadSaveWithMigration(saveId: string): Promise<GameSave | null> {
   const db = await getDB();
   let record = await db.get(SAVES_STORE, saveId);
-
   if (!record) return null;
-
-  // 检查是否需要迁移
-  const schemaVersion = (record as any).schemaVersion ?? 0;
-  if (schemaVersion === SAVE_SCHEMA_VERSION || schemaVersion === SAVE_SCHEMA_VERSION - 1) {
-    await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(saveId);
-    record = await db.get(SAVES_STORE, saveId);
-    if (!record) return null;
-  }
-  if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
-    // 直接上一代 v3，需要迁移
-    const oldSave = record as GameSave;
-    const migrated = await migrateV3ToV4(oldSave);
-    if (migrated) {
-      // 迁移成功，重新读取（现在是紧凑头部）
-      const migratedRecord = await db.get(SAVES_STORE, saveId) as GameSave | undefined;
-      return migratedRecord ? normalizeSaveLifecycle(migratedRecord) : null;
+  const schemaVersion = record.schemaVersion ?? 0;
+  if (schemaVersion !== SAVE_SCHEMA_VERSION && schemaVersion !== SAVE_SCHEMA_VERSION - 1) return null;
+  if ('messages' in record) return null;
+  await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(saveId);
+  record = await db.get(SAVES_STORE, saveId);
+  if (!record) return null;
+  if (record.schemaVersion === SAVE_SCHEMA_VERSION - 1) {
+    // Reread under the write lock: a concurrent save may have replaced the head.
+    const tx = db.transaction(SAVES_STORE, 'readwrite');
+    const current = await tx.store.get(saveId);
+    if (!current) {
+      await tx.done;
+      return null;
     }
-    // 迁移失败时不把旧结构继续送入当前运行时。
-    return null;
+    const migrated = planV4ToV5Migration(current);
+    if (migrated) await tx.store.put(migrated);
+    await tx.done;
+    record = migrated ?? current;
   }
-
-  if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
-    return normalizeSaveLifecycle(record as GameSave);
-  }
-
-  console.warn(`[存档迁移] 存档 ${saveId} 使用不受支持的 schema v${schemaVersion}`);
-  return null;
+  return normalizeSaveLifecycle(await decodeSaveHead(record) as unknown as GameSave);
 }
 
 // ─── 存档 CRUD ────────────────────────────────────────
@@ -806,20 +747,15 @@ export async function saveGameIncremental(
 ): Promise<void> {
   const db = await getDB();
 
-  // 1) 增量写消息（单事务批量 put，幂等：key 含 seq）
+  // Compression finishes before opening any write transaction.
+  const messageRecords = await Promise.all(newMessages.map(msg => encodeMessageRecord(saveId, msg, msg.seq ?? 0)));
+  const encodedHead = await encodeSaveHead(compactHead);
   let maxSeq = -1;
-  if (newMessages.length > 0) {
+  if (messageRecords.length > 0) {
     const tx = db.transaction(MESSAGES_STORE, 'readwrite');
-    for (const msg of newMessages) {
-      const seq = msg.seq ?? 0;
-      const record: MessageRecord = {
-        key: `${saveId}#${seq}`,
-        saveId,
-        seq,
-        message: msg,
-      };
+    for (const record of messageRecords) {
       await tx.store.put(record);
-      maxSeq = Math.max(maxSeq, seq);
+      maxSeq = Math.max(maxSeq, record.seq);
     }
     await tx.done;
   }
@@ -830,7 +766,7 @@ export async function saveGameIncremental(
   const currentLastSeq = (compactHead as any).lastMessageSeq ?? existingHead?.lastMessageSeq ?? -1;
   const newLastSeq = Math.max(currentLastSeq, maxSeq);
   const fullHead: CompactSaveRecord = {
-    ...compactHead,
+    ...encodedHead,
     schemaVersion: SAVE_SCHEMA_VERSION,
     messageCount: newLastSeq + 1,
     lastMessageSeq: newLastSeq,
@@ -861,104 +797,24 @@ export async function saveGameIncremental(
 }
 
 /**
- * 加载完整存档（当前 v4；仅自动迁移直接上一代 v3）
+ * 加载完整存档（当前 v5；仅自动迁移直接上一代 v4）
  * @param id 存档 ID
  * @param messageLimit 消息加载限制（0 = 全量，> 0 = 只加载最近 N 条）
  */
 export async function loadGame(id: string, messageLimit: number = 0): Promise<GameSave | undefined> {
-  try {
-    const db = await getDB();
-    let record = await db.get(SAVES_STORE, id);
-    if (!record) return undefined;
-
-    // 检查是否是新格式（有 schemaVersion，无 messages）
-    const schemaVersion = (record as any).schemaVersion ?? 0;
-    if (schemaVersion === SAVE_SCHEMA_VERSION || schemaVersion === SAVE_SCHEMA_VERSION - 1) {
-      await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(id);
-      record = await db.get(SAVES_STORE, id);
-      if (!record) return undefined;
-    }
-    if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
-      // 新格式：从 messages store 加载消息
-      const compactHead = record as CompactSaveRecord;
-      let messages = messageLimit > 0
-        ? await getRecentMessages(id, messageLimit)  // lazy 加载：只加载最近 N 条
-        : await getAllMessages(id);                    // 全量加载
-
-      // 检查消息是否有 seq 字段，如果没有则补充
-      const hasSeq = messages.some(m => m.seq !== undefined);
-      if (!hasSeq && messages.length > 0) {
-        console.log(`[DB] 新格式存档 ${id} 的消息缺少 seq 字段，补充 seq...`);
-        messages = messages.map((m, i) => ({ ...m, seq: i }));
-      }
-
-      return {
-        id: compactHead.id,
-        name: compactHead.name,
-        timestamp: compactHead.timestamp,
-        messages,
-        gameState: compactHead.gameState,
-        worldId: compactHead.worldId,
-        personalInfo: compactHead.personalInfo,
-        characterHistory: compactHead.characterHistory,
-        memoryRuntime: compactHead.memoryRuntime,
-        memoryConfig: compactHead.memoryConfig,
-        vectorMemory: compactHead.vectorMemory,
-        variableConfig: compactHead.variableConfig,
-        customWorld: compactHead.customWorld,
-        simulationState: compactHead.simulationState,
-        lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
-        endedAt: compactHead.endedAt,
-        endReason: compactHead.endReason,
-        moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
-        moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
-      };
-    }
-
-    // 直接上一代 v3（内联 messages）：自动迁移到 v4。更早版本不再串联迁移。
-    if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
-      console.log(`[DB] 检测到 v3 存档 ${id}，开始迁移到 v4...`);
-      const oldSave = record as GameSave;
-      const migrated = await migrateV3ToV4(oldSave);
-      if (migrated) {
-        // 迁移成功，重新读取（现在是新格式）
-        const newRecord = await db.get(SAVES_STORE, id);
-        if (newRecord) {
-          const compactHead = newRecord as CompactSaveRecord;
-          const messages = messageLimit > 0
-            ? await getRecentMessages(id, messageLimit)
-            : await getAllMessages(id);
-          return {
-            id: compactHead.id,
-            name: compactHead.name,
-            timestamp: compactHead.timestamp,
-            messages,
-            gameState: compactHead.gameState,
-            worldId: compactHead.worldId,
-            personalInfo: compactHead.personalInfo,
-            characterHistory: compactHead.characterHistory,
-            memoryRuntime: compactHead.memoryRuntime,
-            memoryConfig: compactHead.memoryConfig,
-            vectorMemory: compactHead.vectorMemory,
-            variableConfig: compactHead.variableConfig,
-            customWorld: compactHead.customWorld,
-            simulationState: compactHead.simulationState,
-                lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
-            endedAt: compactHead.endedAt,
-            endReason: compactHead.endReason,
-            moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
-            moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
-          };
-        }
-      }
-      throw new Error(`存档 ${id} 从 v3 迁移到 v4 失败`);
-    }
-
-    throw new Error(`存档 ${id} 使用不受支持的 schema v${schemaVersion}；当前仅支持 v4 与直接上一代 v3`);
-  } catch (err) {
-    console.error('[DB] 加载失败:', err);
-    throw new Error('存档加载失败');
+  const head = await loadSaveWithMigration(id);
+  if (!head) {
+    if (await (await getDB()).get(SAVES_STORE, id)) throw new Error('存档使用不受支持的内部格式；当前仅支持 v5 与直接上一代 v4');
+    return undefined;
   }
+  let messages = messageLimit > 0 ? await getRecentMessages(id, messageLimit) : await getAllMessages(id);
+  if (messages.length > 0 && !messages.some(m => m.seq !== undefined)) messages = messages.map((m, i) => ({ ...m, seq: i }));
+  return {
+    ...head,
+    messages,
+    moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
+    moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
+  };
 }
 
 /** 删除存档（同时清理 messages 分片） */
@@ -1074,8 +930,8 @@ const PREVIOUS_SAVE_EXPORT_VERSION = '1.0';
  */
 export async function exportSave(saveId: string): Promise<Blob> {
   const db = await getDB();
-  const record = await db.get(SAVES_STORE, saveId);
-  if (!record) throw new Error('存档不存在');
+  const record = await loadSaveWithMigration(saveId);
+  if (!record) throw new Error('存档不存在或格式不受支持');
 
   let messages: ChatMessage[];
   const schemaVersion = (record as any).schemaVersion ?? 0;
@@ -1131,15 +987,7 @@ export async function exportSave(saveId: string): Promise<Blob> {
 
 /** 从文件导入存档，返回新 SaveMeta */
 export async function importSaveFromFile(file: File): Promise<SaveMeta> {
-  const text = await file.text();
-  let rawData: any;
-  try {
-    rawData = JSON.parse(text);
-  } catch {
-    throw new Error('文件格式无效，无法解析 JSON');
-  }
-
-  return importSaveFromData(rawData);
+  return importSaveFromData(await decodeSaveFile(file));
 }
 
 /** 从原始数据导入存档（normalize + 新 ID + 唯一名称） */

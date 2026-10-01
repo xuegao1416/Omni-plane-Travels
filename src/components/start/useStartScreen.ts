@@ -8,6 +8,7 @@ import { useWizard } from '../../hooks/useWizard';
 import { useAiFill } from '../../hooks/useAiFill';
 import { useCharacterHistory,clearSegmentsCache } from '../../hooks/useCharacterHistory';
 import { loadSaveWithMigration,type GameSave } from '../../storage/db';
+import { decodeSaveFile, encodeSaveFile, SAVE_FILE_EXTENSION } from '../../storage/saveFileCodec';
 import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
@@ -443,8 +444,7 @@ export function useStartScreen() {
 
   const handleImportSave = async (file: File) => {
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
+      const data = await decodeSaveFile(file);
       await importSaveToStore(data);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -455,11 +455,11 @@ export function useStartScreen() {
 
   const handleExportSave = async (saveId: string) => {
     try {
-      const blob = await exportSaveFromStore(saveId);
+      const blob = await encodeSaveFile(await exportSaveFromStore(saveId));
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `world-wanderer-save-${Date.now()}.json`;
+      a.download = `world-wanderer-save-${Date.now()}${SAVE_FILE_EXTENSION}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: unknown) {
