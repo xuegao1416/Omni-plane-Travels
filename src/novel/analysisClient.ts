@@ -1,6 +1,7 @@
 import { requestStreamWithRetry } from '../api/client';
 import type { ApiConfig, CompletionResult, Message, StreamOptions } from '../api/types';
 import {
+  NovelAnalysisJsonError,
   parseNovelEvidenceNoteResponse,
   parseNovelOverviewResponse,
   parseNovelSegmentAnalysisResponse,
@@ -20,6 +21,11 @@ export type NovelAnalysisRequest = (
 /** The segment's own chapter ranges, so a repeated quote resolves to the passage this segment quoted. */
 function evidenceWindows(segment: NovelSegment): NovelEvidenceWindow[] | undefined {
   return segment.sourceRanges?.map(range => ({ chapterId: range.chapterId, startOffset: range.startOffset, endOffset: range.endOffset }));
+}
+
+function shouldSplitFailedInput(error: unknown, sourceText: string): boolean {
+  return sourceText.length >= 1200 && (error instanceof NovelAnalysisJsonError
+    || (error instanceof Error && error.message.includes('token 上限')));
 }
 
 async function requestJson(
@@ -77,7 +83,8 @@ export async function generateNovelEvidenceNote(params: {
   try {
     return await validated(params.config, buildNovelEvidencePrompt(params), response => parseNovelEvidenceNoteResponse(response, params.sourceChapters, evidenceWindows(params.segment)), params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes('token 上限') || params.sourceText.length < 1200) throw error;
+    params.signal?.throwIfAborted();
+    if (!shouldSplitFailedInput(error, params.sourceText)) throw error;
     const mid = Math.floor(params.sourceText.length / 2);
     const pieces = [params.sourceText.slice(0, mid), params.sourceText.slice(mid)];
     const notes: NovelEvidenceNote[] = [];
@@ -125,7 +132,8 @@ export async function generateNovelSegmentAnalysis(params: {
       return result;
     }, params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes('token 上限') || params.sourceText.length < 1200) throw error;
+    params.signal?.throwIfAborted();
+    if (!shouldSplitFailedInput(error, params.sourceText)) throw error;
     const mid = Math.floor(params.sourceText.length / 2);
     const first = await generateNovelSegmentAnalysis({ ...params, sourceText: params.sourceText.slice(0, mid) });
     const last = await generateNovelSegmentAnalysis({ ...params, sourceText: params.sourceText.slice(mid), previousEndingFacts: first.endingFacts });

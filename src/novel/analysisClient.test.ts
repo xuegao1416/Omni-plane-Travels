@@ -56,3 +56,33 @@ test('truncated plot output is recompiled in ordered halves, retaining both resu
   expect(output.foreshadowing).toEqual(['伏笔2', '伏笔3']);
   expect(prompts[2]).toContain('结束2');
 });
+
+test('invalid JSON after one repair retries smaller plot inputs in order', async () => {
+  const prompts: string[] = [];
+  const output = await generateNovelSegmentAnalysis({
+    config: { baseUrl: 'https://example.invalid', model: 'test', apiKey: '', provider: 'custom' } as ApiConfig,
+    novelTitle: '测试', sourceText: '甲'.repeat(650) + '乙'.repeat(650),
+    segment: { id: 's1', index: 0, title: '第一段', chapterIds: [], summary: '', hardConstraints: [], events: [] },
+    evidenceNote: {} as NovelEvidenceNote, previousEndingFacts: [], retrievedEvidence: '',
+    request: async (_config, messages) => {
+      prompts.push(messages.map(message => message.content).join('\n'));
+      return { text: prompts.length <= 2 ? '{"summary":"他说"走吧""}' : JSON.stringify({ summary: `结果${prompts.length}`, endingFacts: [`结束${prompts.length}`] }), elapsed: 1 };
+    },
+  });
+  expect(prompts).toHaveLength(4);
+  expect(output.summary).toBe('结果3\n结果4');
+  expect(output.endingFacts).toEqual(['结束4']);
+  expect(prompts[3]).toContain('结束3');
+});
+
+test('invalid JSON on a small segment stops after one repair', async () => {
+  let calls = 0;
+  await expect(generateNovelSegmentAnalysis({
+    config: { baseUrl: 'https://example.invalid', model: 'test', apiKey: '', provider: 'custom' } as ApiConfig,
+    novelTitle: '测试', sourceText: '短段落',
+    segment: { id: 's1', index: 0, title: '第一段', chapterIds: [], summary: '', hardConstraints: [], events: [] },
+    evidenceNote: {} as NovelEvidenceNote, previousEndingFacts: [], retrievedEvidence: '',
+    request: async () => { calls++; return { text: '{"summary":"他说"走吧""}', elapsed: 1 }; },
+  })).rejects.toThrow('AI 返回的 JSON 无法解析');
+  expect(calls).toBe(2);
+});

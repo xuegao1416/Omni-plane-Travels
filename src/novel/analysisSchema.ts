@@ -221,6 +221,13 @@ function unique(values: string[]): string[] {
   return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
 }
 
+export class NovelAnalysisJsonError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NovelAnalysisJsonError';
+  }
+}
+
 function parseJsonObject(response: string): unknown {
   const withoutThinking = String(response ?? '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
@@ -230,11 +237,11 @@ function parseJsonObject(response: string): unknown {
   const candidate = (fenced ?? withoutThinking).trim();
   const start = candidate.indexOf('{');
   const end = candidate.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('AI 没有返回 JSON 对象');
+  if (start < 0 || end <= start) throw new NovelAnalysisJsonError('AI 没有返回 JSON 对象');
   try {
     return JSON.parse(candidate.slice(start, end + 1));
   } catch (error) {
-    throw new Error(`AI 返回的 JSON 无法解析：${error instanceof Error ? error.message : '格式错误'}`);
+    throw new NovelAnalysisJsonError(`AI 返回的 JSON 无法解析：${error instanceof Error ? error.message : '格式错误'}`);
   }
 }
 

@@ -11,7 +11,7 @@ import { createNovelDatasetFromBytes,type NovelTextEncoding } from '../../novel/
 import { probeNovelEmbedding } from '../../novel/semanticIndex';
 import type { NovelDataset,NovelEvidenceRef,NovelStaticMaterial } from '../../novel/types';
 import { canCreateNovelWorld,mergeNovelChapterWithPrevious,rebuildNovelDatasetSegments,renameNovelChapter,splitNovelChapter } from '../../novel/workbenchState';
-import { createWorldFromNovel,regenerateNovelWorldMaterial } from '../../novel/worldFactory';
+import { createNovelBackgroundWorld,createWorldFromNovel,regenerateNovelWorldMaterial } from '../../novel/worldFactory';
 import { buildNovelWorldBookEntries } from '../../novel/worldBookAdapter';
 import { useNovelConfigStore } from '../../stores/novelConfigStore';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
@@ -166,10 +166,16 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
     } catch (error) { const latest = await getNovelDataset(dataset.id).catch(() => undefined); if (latest) setDataset(latest); setMessage(`拆解未完成：${error instanceof Error ? error.message : String(error)}`); }
     finally { abortRef.current = null; runRef.current = null; setIsAnalyzing(false); }
   };
-  const createWorld = async () => {
+  const createWorld = async (backgroundOnly = false) => {
     if (!dataset) return;
     try {
       const latest = await getNovelDataset(dataset.id) ?? dataset, next = { ...latest, title: title.trim() || latest.title, updatedAt: Date.now() };
+      if (backgroundOnly) {
+        const background = createNovelBackgroundWorld(next);
+        await saveNovelDatasetHeader(next);
+        onCreateWorld(worlds.find(world => world.id === background.id) ?? background);
+        return;
+      }
       const base = worlds.find(world => world.novelSource?.datasetId === next.id) ?? createWorldFromNovel(next, startSegmentIndex);
       const binding = directorBinding ?? base.directorSource;
       if (next.segments.length && !binding) throw new Error('请先在下方整理并保存主线版本，再创建小说世界');
@@ -233,6 +239,7 @@ export function NovelImportWorkbench({ onClose, onCreateWorld, worlds = [], onUp
           {!!plot.characterProgress?.length && <section className="novel-import-workbench__panel"><h3>人物变化</h3>{plot.characterProgress.map((character, index) => <article key={index}><h4>{character.characterName}</h4><p>之前：{character.before.join('；')}</p><p>变化：{character.changes.join('；')}</p><p>之后：{character.after.join('；')}</p>{character.evidenceRefs.map(evidenceButton)}</article>)}</section>}
           {[['开场事实', plot.openingFacts], ['结尾事实', plot.endingFacts], ['伏笔', plot.foreshadowing], ['未解决线索', plot.evidenceNotes?.openThreads], ['硬约束', plot.hardConstraints], ['后续参考', plot.nextReference]].map(([name, values]) => Array.isArray(values) && values.length ? <section className="novel-import-workbench__panel" key={String(name)}><h3>{String(name)}</h3><ul>{values.map((value, index) => <li key={index}>{value}</li>)}</ul></section> : null)}{!!plot.evidenceRefs?.length && <details className="novel-import-workbench__segments"><summary>分段证据 · {plot.evidenceRefs.length} 条</summary>{plot.evidenceRefs.map(evidenceButton)}</details>}</> : <p>暂无剧情分段，只有静态资料的档案也可直接创建世界。</p>)}
         {tab === 4 && (dataset ? <section className="novel-import-workbench__panel"><h3>将资料接入项目世界</h3><label className="novel-import-workbench__field">世界名称<input value={title} disabled={busy} onChange={e => setTitle(e.target.value)} /></label><p>世界书：{generated.length} 条 · 剧情：{completed}/{dataset.segments.length} 段 · {staticOnly ? '仅静态资料' : fullReady ? '全书完成' : '部分资料'}</p>{!!dataset.segments.length && <label className="novel-import-workbench__field">世界起始剧情段<input type="number" min={1} max={dataset.segments.length} value={startSegmentIndex + 1} disabled={busy} onChange={e => setStartSegmentIndex(Math.max(0, Math.min(dataset.segments.length - 1, Number(e.target.value) - 1)))} /><small>{dataset.segments[startSegmentIndex]?.title} · {label(dataset.segments[startSegmentIndex]?.status)}</small></label>}<p className="novel-import-workbench__hint">创建后可在世界列表继续编辑和开始游戏。完整档案按关键词调用；剧情资料保留来源，不直接创建数值规则。</p><div className="novel-import-workbench__structure-actions"><button disabled={!worldReady || busy || (!!dataset.segments.length && !directorBinding)} onClick={() => void createWorld()}>{worlds.some(world => world.novelSource?.datasetId === dataset.id) ? '打开已创建世界' : staticOnly ? '创建静态资料世界' : fullReady ? '创建完整小说世界' : '创建部分资料世界'}</button><button onClick={() => exportData(false)} disabled={busy}><Download size={15} />导出拆解资料</button><button onClick={() => exportData(true)} disabled={busy || !worldReady}><Download size={15} />导出世界资料包</button></div>{!worldReady && <p>需要可用的世界资料，以及所选起始分段的分析结果。</p>}{worldReady && !!dataset.segments.length && !directorBinding && <p className="novel-import-workbench__hint">小说世界需要先在下方整理并保存一个主线版本；保存后即可创建世界。</p>}
+          {!!dataset.segments.length && <div className="novel-import-workbench__structure-actions"><button disabled={busy || !generated.length} onClick={() => void createWorld(true)}>{worlds.some(world => world.id === `novel_${dataset.id}_background`) ? '打开背景世界' : '跳过剧情，仅用背景创建世界'}</button><p className="novel-import-workbench__hint">使用已提取的世界资料自由开玩，无需等待剧情拆解或保存主线。已有拆解进度保留，可之后继续。</p></div>}
           {!!dataset.segments.length && <DirectorAuthorEditor key={dataset.id} workspaceId={`novel-director:${dataset.id}`} title={title || dataset.title} binding={directorBinding} novelDatasetId={dataset.id} apiConfig={config.api} onBind={setDirectorBinding} required />}
           {worldUpdate && <div><h3>世界更新预览</h3><p>保留手工修改；不会直接删除本次未出现的旧条目。</p><ul>{worldDiff.slice(0, 100).map((line, index) => <li key={index}>{line}</li>)}</ul>{!worldDiff.length && <p>没有需要替换的生成内容。</p>}<button onClick={() => { onUpdateWorld?.(worldUpdate); setWorldUpdate(undefined); setMessage('世界资料更新已应用。'); }}>应用到已有世界</button><button onClick={() => setWorldUpdate(undefined)}>保留当前世界</button></div>}</section> : <p>导入小说并准备世界资料后，在这里创建世界。</p>)}
         {evidence && <aside className="novel-workbench-evidence" aria-label="原文依据"><div className="novel-workbench-section-header"><h3>{evidenceChapter?.title ?? '来源章节不存在'}</h3><button onClick={() => setEvidence(undefined)} aria-label="关闭原文依据"><X size={16} /></button></div><blockquote>{evidence.excerpt}</blockquote><small>来源区间：{evidence.chapterStartOffset ?? evidence.startOffset}—{evidence.chapterEndOffset ?? evidence.endOffset} · {evidence.confidence === 'explicit' ? '明确事实' : '推断'}</small>{evidenceChapter && <><p className="novel-workbench-prose">{(() => { const at = evidenceChapter.content.indexOf(evidence.excerpt); return at < 0 ? '摘录与当前原文不匹配，请核对来源版本。' : evidenceChapter.content.slice(Math.max(0, at - 250), at + evidence.excerpt.length + 250); })()}</p><button onClick={() => { setChapterIndex(dataset!.chapters.indexOf(evidenceChapter)); setTab(0); setEvidence(undefined); }}>打开完整章节</button></>}</aside>}
