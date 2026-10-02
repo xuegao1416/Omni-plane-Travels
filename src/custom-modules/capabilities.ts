@@ -14,6 +14,8 @@ type InputCapability = { type: CustomModuleValueType; description: string };
 const BASE_INPUT_PATHS = {
   'game.round': { type: 'number', description: '当前玩家回合序号' },
   'game.time': { type: 'string', description: '当前世界时间' },
+  'game.elapsedMinutes': { type: 'number', description: '规范世界时钟经过分钟；无时钟时未知' },
+  'game.location': { type: 'string', description: '当前规范玩家场景位置' },
   'player.stats.attrA': { type: 'number', description: '玩家规范属性 attrA' },
   'player.stats.attrB': { type: 'number', description: '玩家规范属性 attrB' },
 } as const satisfies Record<string, InputCapability>;

@@ -377,6 +377,8 @@ export interface NPCData {
 }
 
 export interface GameState {
+  /** Authored consequence deduplication lives in rollbackable save state. */
+  authoredEffectReceipts?: Record<string, { planId: string; effectSignature: string }>;
   playerIdentity?: { actorId: string; name: string; aliases: string[] };
   playerKnowledge?: import('../engine/playerKnowledge').PlayerKnowledgeState;
   世界: WorldState;

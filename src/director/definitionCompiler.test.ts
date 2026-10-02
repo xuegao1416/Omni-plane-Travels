@@ -108,3 +108,8 @@ describe('director definition compilation', () => {
     expect(() => createDirectorCompileJob({ kind: 'novel', dataset: datasetWith('关闭，') })).toThrow('小说证据与原文不匹配');
   });
 });
+
+test('compiler preserves authored effect actor references through canonical identity normalization', async () => {
+ const result=await compileDirectorDefinition(createDirectorCompileJob({kind:'author',text:'证人前来求助'}),{request:async()=>JSON.stringify({...sampleDraft(),nodes:[{...sampleDraft().nodes[0],effects:[{type:'npc.move',actorId:'a',location:'城门'}]}]})});
+ expect(result.status).toBe('completed'); expect(result.definition!.nodes[0]!.effects).toEqual([{type:'npc.move',actorId:result.definition!.characters[0]!.id,location:'城门'}]);
+});

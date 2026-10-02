@@ -9,7 +9,8 @@ import { applyDirectorDecision, requestDirectorDecision, type DirectorDecision }
 import { StructuredOutputValidationError } from '../api/structuredOutput';
 import type { OffscreenMemoryPort } from './memoryConsumer';
 import { retryPendingOffscreenMemories, submitOffscreenEvent } from './offscreenPipeline';
-import { evaluateDirectiveOutcome } from './outcome';
+import { commitDirectiveOutcome, evaluateDirectiveOutcome } from './outcome';
+import { executeAuthoredEffects } from './authoredEffects';
 import { compileDirectorDirective, ensureDirectorState, getLatestDirectorDirective, migrateLegacySimulationToDirector } from './runtime';
 import { refreshSourceExhaustion } from './sourceAdapter';
 import type { DirectorReadContext, OffscreenEventProposal } from './types';
@@ -40,7 +41,8 @@ export interface DirectorReviewInput {
 }
 
 export class DirectorReviewController {
-  constructor(private readonly requestDecision: typeof requestDirectorDecision = requestDirectorDecision) {}
+  constructor(private readonly requestDecision: typeof requestDirectorDecision = requestDirectorDecision,
+    private readonly evaluateOutcome: typeof evaluateDirectiveOutcome = evaluateDirectiveOutcome) {}
   private gate = new EvolutionTurnCoordinator();
   private foregroundBusy = true;
   private lastInput: DirectorReviewInput | undefined;
@@ -111,13 +113,30 @@ export class DirectorReviewController {
     const director = migrateLegacySimulationToDirector(simulation);
     const context: DirectorReadContext = { saveId: input.saveId, worldId: input.world.id, completedTurnId: input.turnId, stateVersion: expectedVersion, variableProjection: structuredClone(input.getState()), narrative: input.narrative, playerInput: input.playerInput, memories: input.getDirectorMemories?.() ?? [] };
     reconcileDirectorActors(director, context.variableProjection.人物档案);
-    const persist = () => { input.engine.state.director = director; input.engine.saveState(); };
+    let hasPersisted = false;
+    const persist = () => { input.engine.state.director = director; input.engine.saveState(); hasPersisted = true; };
     try {
       input.onMainlineBusy(true);
       const directive = getLatestDirectorDirective(simulation);
       if (!options.backgroundOnly && directive && (directive.issuedForTurnId ? directive.issuedForTurnId === input.turnId : directive.basedOnTurnId !== input.turnId)) {
-        await evaluateDirectiveOutcome({ director, directive, narrative: input.narrative, turnId: input.turnId, stateVersion: expectedVersion, config: input.config, signal });
+        const receipt = await this.evaluateOutcome({ director, directive, narrative: input.narrative, turnId: input.turnId, stateVersion: expectedVersion, config: input.config, signal, commit: false });
         if (!isCurrent()) return;
+        let draft = input.getState();
+        let effectsApplied = false;
+        const committed = commitDirectiveOutcome(director, directive, receipt, input.narrative, { turnId: input.turnId, stateVersion: expectedVersion }, plan => {
+          const result = executeAuthoredEffects(draft, plan, director, { eventId: `foreground:${input.saveId}:${plan.id}` });
+          if (!result.success) throw new Error(`作者效果未结算：${result.reason ?? plan.id}`);
+          draft = result.state;
+          effectsApplied = true;
+          return true;
+        });
+        if (!isCurrent()) return;
+        if (committed && effectsApplied) {
+          input.commitState(draft);
+          expectedVersion = evolutionFactVersion(input.getState());
+          context.stateVersion = expectedVersion;
+          context.variableProjection = structuredClone(input.getState());
+        }
       }
       alignDirectorPlans(director, context);
       refreshSourceExhaustion(director);
@@ -177,12 +196,14 @@ export class DirectorReviewController {
       if (!incompleteMemory) delete director.pendingReview;
       persist();
       input.onBackgroundError?.(incompleteMemory ? '部分幕后记忆尚未写入，重试只补交未完成的消费者。' : null);
-      input.onCommitted('mainline');
     } catch (error) {
       if (!signal.aborted && isCurrent()) input.onBackgroundError?.(`剧情导演未完成：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       input.onMainlineBusy(false);
       input.onBackgroundBusy(false);
+      // The owner already committed earlier progress even if a later API or
+      // memory operation failed. Notify save/sync once for that committed scope.
+      if (hasPersisted && isCurrent()) input.onCommitted('mainline');
     }
   }
 }

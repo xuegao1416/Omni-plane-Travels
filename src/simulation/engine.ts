@@ -264,6 +264,7 @@ export class DirectorRuntime extends MechanicalRuntime {
     gameTime: string,
     isInitial: boolean = false,
     note?: string,
+    retainedIds: readonly string[] = [],
   ): SimulationSnapshot {
     // 瘦身快照数据，防止序列化过大
     const slimState = this._slimForSnapshot(this.state);
@@ -288,10 +289,12 @@ export class DirectorRuntime extends MechanicalRuntime {
     }
     this.state.snapshots.push(snapshot);
 
-    // 最多保留 20 个快照
+    // 保留消息引用的快照；无引用的冗余快照最多保留最近20个。
     const MAX_SNAPSHOTS = 20;
     if (this.state.snapshots.length > MAX_SNAPSHOTS) {
-      this.state.snapshots = this.state.snapshots.slice(-MAX_SNAPSHOTS);
+      const retained = new Set(retainedIds);
+      const recent = new Set(this.state.snapshots.slice(-MAX_SNAPSHOTS).map(s => s.id));
+      this.state.snapshots = this.state.snapshots.filter(s => retained.has(s.id) || recent.has(s.id));
     }
 
     this.saveState();

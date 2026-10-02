@@ -2,6 +2,7 @@ import type { NovelDataset } from '../novel/types';
 import type { DirectorDefinition, DirectorSource } from './definitionTypes';
 import { validateDirectorDraft, type DirectorDraft } from './definitionSchema';
 import { DEFINITION_COMPILER_SYSTEM } from './definitionPrompts';
+import { remapAuthoredEffect } from './sourceAdapter';
 
 export interface DirectorCompileUnit { id: string; text: string; sourceRefs: string[] }
 export interface DirectorCompileJob {
@@ -73,7 +74,7 @@ function stableDraft(draft: DirectorDraft): DirectorDraft {
   const chars = new Map(draft.characters.map(c => [c.id, `actor-${contentHash(c.name.normalize('NFKC').trim())}`]));
   const nodes = new Map(draft.nodes.map(n => [n.id, `event-${contentHash({ refs: [...n.sourceRefs].sort(), title: n.title })}`]));
   const stages = new Map(draft.stages.map(s => [s.id, `stage-${contentHash(s.nodeIds.map(id => nodes.get(id)).sort())}`]));
-  return { ...draft, characters: draft.characters.map(c => ({ ...c, id: chars.get(c.id)! })), stages: draft.stages.map(s => ({ ...s, id: stages.get(s.id)!, nodeIds: s.nodeIds.map(id => nodes.get(id)!), ...(s.completion ? { completion: { mode: s.completion.mode, nodeIds: s.completion.nodeIds.map(id => nodes.get(id)!) } } : {}) })), nodes: draft.nodes.map(n => ({ ...n, id: nodes.get(n.id)!, stageId: stages.get(n.stageId)!, actorIds: n.actorIds.map(id => chars.get(id)!), dependsOn: n.dependsOn.map(id => nodes.get(id)!), conditions: n.conditions.map(c => ({ ...c, id: `condition-${contentHash([nodes.get(n.id), c.description])}` })) })) };
+  return { ...draft, characters: draft.characters.map(c => ({ ...c, id: chars.get(c.id)! })), stages: draft.stages.map(s => ({ ...s, id: stages.get(s.id)!, nodeIds: s.nodeIds.map(id => nodes.get(id)!), ...(s.completion ? { completion: { mode: s.completion.mode, nodeIds: s.completion.nodeIds.map(id => nodes.get(id)!) } } : {}) })), nodes: draft.nodes.map(n => ({ ...n, id: nodes.get(n.id)!, stageId: stages.get(n.stageId)!, actorIds: n.actorIds.map(id => chars.get(id)!), effects: n.effects?.map(effect => remapAuthoredEffect(effect, Object.fromEntries(chars))), dependsOn: n.dependsOn.map(id => nodes.get(id)!), conditions: n.conditions.map(c => ({ ...c, id: `condition-${contentHash([nodes.get(n.id), c.description])}` })) })) };
 }
 
 /**
@@ -114,7 +115,12 @@ function normalizeCharacterIdentity(input: unknown): unknown {
       if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
       const item = node as Record<string, unknown>;
       if (!Array.isArray(item.actorIds)) return node;
-      return { ...item, actorIds: [...new Set(item.actorIds.map(actorId => (typeof actorId === 'string' ? idMap.get(actorId) ?? actorId : actorId)))] };
+      const effects = Array.isArray(item.effects) ? item.effects.map(effect => {
+        if (!effect || typeof effect !== 'object' || Array.isArray(effect)) return effect;
+        const fields = effect as Record<string, unknown>;
+        return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, key === 'actorId' && typeof value === 'string' ? idMap.get(value) ?? value : value]));
+      }) : item.effects;
+      return { ...item, ...(Object.hasOwn(item, 'effects') ? { effects } : {}), actorIds: [...new Set(item.actorIds.map(actorId => (typeof actorId === 'string' ? idMap.get(actorId) ?? actorId : actorId)))] };
     }),
   };
 }

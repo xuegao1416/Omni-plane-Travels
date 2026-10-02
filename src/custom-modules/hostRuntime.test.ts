@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { createDefaultGameState } from '../schema/variables';
-import { executeCustomModuleInGame } from './hostRuntime';
+import { executeCustomModuleInGame, executeCustomModuleRuleInGame } from './hostRuntime';
 import { simulateCustomModule } from './preview';
 import { normalizeCustomGameplayModule } from './normalize';
 import { createInitialCustomModuleState, migrateCustomModuleState } from './stateStore';
 import type { CustomGameplayModuleV3 } from './schema';
+import { revertGameplayTransaction } from '../gameplay/kernel';
 
 export const craftingModule: CustomGameplayModuleV3 = {
   kind: 'custom-gameplay-module', schemaVersion: 3, id: 'crafting-demo', name: '工坊', version: '1.0.0', author: 'test', scope: 'world',
@@ -28,6 +29,39 @@ function state() {
 }
 
 describe('V3 atomic host runtime', () => {
+  test('rule logs omit immutable definitions and still restore state, costs and dedup on undo', () => {
+    const original = state();
+    original.玩家.物品栏.铁剑 = { 数量: 0, 类型: '武器', 品质: '普通', 备注: '' };
+    original.customModules = { [craftingModule.id]: createInitialCustomModuleState(craftingModule) };
+    const result = executeCustomModuleInGame(original, craftingModule, 'onButton', { eventId: 'compact' });
+    const log = result.gameState.gameplay!.logs.at(-1)!;
+    expect(JSON.stringify(log)).not.toContain('own-state-only');
+    const undo = revertGameplayTransaction(result.gameState, log.transactionId, { tick: 0 });
+    expect(undo.status).toBe('applied');
+    expect(undo.state.customModules).toEqual(original.customModules);
+    expect(undo.state.玩家).toEqual(original.玩家);
+    const replay = executeCustomModuleInGame(undo.state, craftingModule, 'onButton', { eventId: 'compact' });
+    expect(replay.gameState.customModules![craftingModule.id].values.crafted).toBe(1);
+    expect(replay.gameState.玩家.货币资源.主货币.数量).toBe(5);
+  });
+  test('fixed rule requires installed version and executes only target with trusted rule event', () => {
+    const module: CustomGameplayModuleV3 = { ...craftingModule,
+      inputs: { directorRule: 'event.button.event' }, permissions: { ...craftingModule.permissions, read: ['event.button.event'] },
+      logic: { ...craftingModule.logic, onChoice: [
+        { id: 'target', when: { type: 'compare', source: 'input', path: 'directorRule', operator: 'eq', value: 'target' }, actions: [{ type: 'add', path: 'crafted', value: 1 }] },
+        { id: 'other', actions: [{ type: 'add', path: 'crafted', value: 20 }] },
+      ] },
+    };
+    const original = state();
+    expect(executeCustomModuleRuleInGame(original, module.id, module.version, 'onChoice', 'target', { eventId: 'fixed' }).warnings.length).toBeGreaterThan(0);
+    expect(original.customModules).toBeUndefined();
+    original.customModules = { [module.id]: createInitialCustomModuleState(module) };
+    expect(executeCustomModuleRuleInGame(original, module.id, '2', 'onChoice', 'target', { eventId: 'fixed' }).warnings.length).toBeGreaterThan(0);
+    const result = executeCustomModuleRuleInGame(original, module.id, module.version, 'onChoice', 'target', { eventId: 'fixed' });
+    expect(result.warnings).toEqual([]);
+    expect(result.gameState.customModules![module.id].values.crafted).toBe(1);
+    expect(executeCustomModuleRuleInGame(result.gameState, module.id, module.version, 'onChoice', 'target', { eventId: 'fixed' }).gameState).toEqual(result.gameState);
+  });
   test('reserved module identity fails visibly before host execution', () => {
     const result = executeCustomModuleInGame(state(), { ...craftingModule, id: 'constructor' }, 'onButton', { eventId: 'reserved' });
     expect(result.warnings.length).toBeGreaterThan(0);

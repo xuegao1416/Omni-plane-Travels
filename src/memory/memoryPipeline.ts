@@ -880,14 +880,15 @@ function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, _playerName:
     const sa = runtime.sceneAnchor;
     parts.push(`场景：${sa.locationLabel || '未知'} | ${sa.timeLabel || '未知'} | 目标：${sa.immediateGoal || '无'} | 风险：${sa.immediateRisk || '无'}`);
   }
-  const threads = runtime.activeThreads.filter(t => t.status === 'open' || t.status === 'blocked');
+  const current = (value: { conflictStatus?: string; validUntilRound?: number | null }) => value.conflictStatus !== 'superseded' && value.conflictStatus !== 'rejected' && value.validUntilRound == null;
+  const threads = runtime.activeThreads.filter(t => current(t) && (t.status === 'open' || t.status === 'blocked'));
   if (threads.length > 0) parts.push(`活跃线程：${threads.map(t => `${t.title}(${t.status})`).join('、')}`);
-  const slots = runtime.stateSlots.filter(s => s.status === 'active');
+  const slots = runtime.stateSlots.filter(s => current(s) && s.status === 'active');
   if (slots.length > 0) parts.push(`状态槽：${slots.map(s => `${s.slotType}(${s.scopeId})`).join('、')}`);
   // 关系网带地点标注，帮助 AI 理解空间上下文
   if (runtime.relationNetwork.length > 0) {
     const rels = runtime.relationNetwork
-      .filter(r => r.status === 'active' || r.status === 'changed')
+      .filter(r => current(r) && (r.status === 'active' || r.status === 'changed'))
       .slice(0, 8)
       .map(r => {
         const loc = r.locationScope ? `[${r.locationScope}]` : '';
@@ -980,9 +981,10 @@ function versionedUpsert<T extends { id: string }>(
     return;
   }
   const oldId = existing.id;
+  const archivedId = uniqueVersionId(list, oldId, currentRound);
   list[idx] = {
     ...existing,
-    id: uniqueVersionId(list, oldId, currentRound),
+    id: archivedId,
     conflictStatus: 'superseded',
     validUntilRound: currentRound,
     updatedAt: Date.now(),
@@ -990,7 +992,7 @@ function versionedUpsert<T extends { id: string }>(
   list.push({
     ...incoming,
     id: incoming.id || oldId,
-    previousVersionId: oldId,
+    previousVersionId: archivedId,
     ...(incomingRecord.createdAt == null ? { createdAt: Date.now() } : {}),
     updatedAt: Date.now(),
   } as T);
@@ -1134,8 +1136,9 @@ export function applyIngestToRuntime(
           while (runtime.entityCards.some(item => item.id === branchId)) branchId = `${baseId}@branch${branchIndex++}`;
           runtime.entityCards.push({ ...candidate, id: branchId, previousVersionId: candidate.previousVersionId ?? oldId, createdAt: Date.now(), updatedAt: Date.now() });
         } else {
-          runtime.entityCards[idx] = { ...runtime.entityCards[idx], id: uniqueVersionId(runtime.entityCards, oldId, currentRound), conflictStatus: 'superseded', validUntilRound: currentRound, updatedAt: Date.now() };
-          runtime.entityCards.push({ ...candidate, id: String(patch.id || oldId), previousVersionId: oldId, createdAt: Date.now(), updatedAt: Date.now() });
+          const archivedId = uniqueVersionId(runtime.entityCards, oldId, currentRound);
+          runtime.entityCards[idx] = { ...runtime.entityCards[idx], id: archivedId, conflictStatus: 'superseded', validUntilRound: currentRound, updatedAt: Date.now() };
+          runtime.entityCards.push({ ...candidate, id: String(patch.id || oldId), previousVersionId: archivedId, createdAt: Date.now(), updatedAt: Date.now() });
         }
       } else runtime.entityCards.push({ ...candidate, id: runtime.entityCards.some(item => item.id === candidate.id) ? uniqueVersionId(runtime.entityCards, candidate.id, currentRound) : candidate.id, createdAt: Date.now(), updatedAt: Date.now() });
     }

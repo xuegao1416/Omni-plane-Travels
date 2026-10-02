@@ -5,6 +5,7 @@
 
 import { useCallback } from 'react';
 import { useMemoryStore } from './memoryStore';
+import { projectMemoryRuntime } from './memoryVisibility';
 import type {
   MemorySystemConfig,
   NarrativeMemoryRuntime,
@@ -773,22 +774,24 @@ export function useMemorySystem(): MemorySystemHook {
 // ─── 内部辅助 ───
 
 function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, _playerName: string): string {
+  runtime = projectMemoryRuntime(runtime);
+  const current = (value: { conflictStatus?: string; validUntilRound?: number | null }) => value.conflictStatus !== 'superseded' && value.conflictStatus !== 'rejected' && value.validUntilRound == null;
   const parts: string[] = [];
   if (runtime.sceneAnchor) {
     const sa = runtime.sceneAnchor;
     parts.push(`场景：${sa.locationLabel || '未知'} | ${sa.timeLabel || '未知'} | 目标：${sa.immediateGoal || '无'} | 风险：${sa.immediateRisk || '无'}`);
   }
-  const activeThreads = runtime.activeThreads.filter(t => t.status === 'open' || t.status === 'blocked');
+  const activeThreads = runtime.activeThreads.filter(t => current(t) && (t.status === 'open' || t.status === 'blocked'));
   if (activeThreads.length > 0) {
     parts.push(`活跃线程：${activeThreads.map(t => `${t.title}(${t.status})`).join('、')}`);
   }
-  const activeSlots = runtime.stateSlots.filter(s => s.status === 'active');
+  const activeSlots = runtime.stateSlots.filter(s => current(s) && s.status === 'active');
   if (activeSlots.length > 0) {
     parts.push(`状态槽：${activeSlots.map(s => `${s.slotType}(${s.scopeId})`).join('、')}`);
   }
   if (runtime.relationNetwork.length > 0) {
     const topRels = runtime.relationNetwork
-      .filter(r => r.status === 'active' || r.status === 'changed')
+      .filter(r => current(r) && (r.status === 'active' || r.status === 'changed'))
       .slice(0, 8)
       .map(r => {
         const loc = r.locationScope ? `[${r.locationScope}]` : '';

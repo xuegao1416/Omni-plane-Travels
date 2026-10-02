@@ -1,6 +1,13 @@
 import type { DirectorState, PlotPlan } from './types';
 import type { DirectorDefinition } from './definitionTypes';
 import { validateDirectorDefinition } from './definitionSchema';
+import type { DirectorAuthoredEffect } from './authoredEffectsTypes';
+
+export function remapAuthoredEffect(effect: DirectorAuthoredEffect, binding: Record<string, string>): DirectorAuthoredEffect {
+  const copy = structuredClone(effect);
+  if ('actorId' in copy) copy.actorId = binding[copy.actorId] ?? copy.actorId;
+  return copy;
+}
 
 /** Called only by new-game initialization with a resolved immutable version. */
 export function bindDirectorDefinition(director: DirectorState, definition: DirectorDefinition, options: { startStageId?: string; roleBinding?: Record<string, string> } = {}): DirectorState {
@@ -28,10 +35,11 @@ export function bindDirectorDefinition(director: DirectorState, definition: Dire
       visibility: node.execution === 'offscreen' ? 'reader_only' : 'foreground',
       source: definition.source.kind === 'novel' ? 'novel' : 'authored', sourceRef: node.id,
       basis: [...node.sourceRefs], createdAt: now, updatedAt: now,
+      authorEffects: node.effects?.map(effect => remapAuthoredEffect(effect, options.roleBinding ?? {})),
     };
   }
   director.sourceBinding = { type: definition.source.kind === 'novel' ? 'novel' : 'authored', sourceId: definition.source.datasetId ?? definition.id, definitionId: definition.id, version: definition.version, startStageId: definition.stages[start].id, roleBinding: options.roleBinding, exhausted: nodes.length === 0, boundAt: now };
-  director.sourceBinding.stages = definition.stages.slice(start).map(stage => ({ id: stage.id, title: stage.title, mode: stage.completion?.mode ?? 'all', planIds: stage.nodeIds.map(planId), completionPlanIds: (stage.completion?.nodeIds ?? stage.nodeIds).map(planId), status: 'pending' }));
+  director.sourceBinding.stages = definition.stages.slice(start).map(stage => ({ id: stage.id, title: stage.title, mode: stage.completion?.mode ?? 'all', failurePolicy: stage.failurePolicy ?? 'continue', planIds: stage.nodeIds.map(planId), completionPlanIds: (stage.completion?.nodeIds ?? stage.nodeIds).map(planId), status: 'pending' }));
   director.sourceBinding.actorNames = Object.fromEntries(definition.characters.map(actor => [options.roleBinding?.[actor.id] ?? actor.id, actor.name]));
   director.sourceBinding.actorAliases = Object.fromEntries(definition.characters.map(actor => [options.roleBinding?.[actor.id] ?? actor.id, [...actor.aliases]]));
   refreshSourceExhaustion(director);
@@ -43,19 +51,22 @@ export function refreshSourceExhaustion(director: DirectorState): boolean {
   const stages = director.sourceBinding.stages;
   if (stages?.length) {
     let active: string | undefined;
+    let stopped = false;
     for (const stage of stages) {
+      if (stopped) { stage.status = 'pending'; continue; }
       const statuses = stage.completionPlanIds.map(id => director.plans[id]?.status);
       const complete = stage.mode === 'any' ? statuses.includes('occurred') : statuses.length > 0 && statuses.every(status => status === 'occurred');
       const failed = stage.mode === 'any' ? statuses.every(status => status === 'invalid' || status === 'superseded') : statuses.some(status => status === 'invalid' || status === 'superseded');
       stage.status = complete ? 'completed' : failed ? 'failed' : active ? 'pending' : 'active';
       if (stage.status === 'active') active = stage.id;
+      if (failed && stage.failurePolicy === 'stop') stopped = true;
       if (complete || failed) for (const id of stage.planIds) {
         const plan = director.plans[id];
         if (plan && !['occurred', 'invalid', 'superseded'].includes(plan.status)) plan.status = 'superseded';
       }
     }
     director.sourceBinding.currentStageId = active;
-    director.sourceBinding.exhausted = stages.every(stage => stage.status === 'completed' || stage.status === 'failed');
+    director.sourceBinding.exhausted = !stopped && stages.every(stage => stage.status === 'completed' || stage.status === 'failed');
     return director.sourceBinding.exhausted;
   }
   const source = director.sourceBinding.type === 'novel' ? 'novel' : 'authored';

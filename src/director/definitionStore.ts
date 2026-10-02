@@ -18,7 +18,7 @@ export async function saveDirectorDefinition(definition: DirectorDefinition): Pr
     const { createdAt: newTime, ...newContent } = definition;
     if (contentHash(oldContent) !== contentHash(newContent)) {
       await tx.done;
-      throw new Error('该剧情版本已存在，禁止覆盖；请另存新版本');
+      throw new Error(`该剧情版本已存在，禁止覆盖：${definition.title}（${definition.id} / ${definition.version}）。导入文件与本地版本内容不同；请使用更新版本号的存档或世界文件，已有存档无需删除。`);
     }
   } else await tx.store.add({ id: key, definition: structuredClone(definition) } satisfies DirectorDefinitionRecord);
   await tx.done;

@@ -47,7 +47,7 @@ interface SaveState {
   deleteSave: (saveId: string) => Promise<void>;
   forceDeleteSave: (saveId: string) => Promise<void>;
   renameSave: (saveId: string, newName: string) => Promise<void>;
-  importSave: (data: any) => Promise<SaveMeta | null>;
+  importSave: (data: any) => Promise<SaveMeta>;
   exportSave: (saveId: string) => Promise<Blob>;
 
   // 保存（写入 DB + 更新元数据）
@@ -193,7 +193,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       return meta;
     } catch (err) {
       console.error('[存档] 导入失败:', err);
-      return null;
+      throw err;
     }
   },
 

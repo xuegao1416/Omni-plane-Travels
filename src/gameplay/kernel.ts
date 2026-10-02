@@ -105,6 +105,9 @@ export function createGameplayStateDiff(
   const effects: GameplayEffect[] = [];
   const visit = (left: unknown, right: unknown, path: string): void => {
     if (Object.is(left, right)) return;
+    // Isolated transaction drafts clone unchanged arrays too. Replacing those
+    // arrays logs immutable definitions and even prior logs again at each turn.
+    if (Array.isArray(left) && Array.isArray(right) && JSON.stringify(left) === JSON.stringify(right)) return;
     if (isPlainGameplayRecord(left) && isPlainGameplayRecord(right)) {
       const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
       for (const key of keys) visit(left[key], right[key], path ? `${path}.${key}` : key);

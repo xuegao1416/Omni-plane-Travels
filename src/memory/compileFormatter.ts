@@ -99,7 +99,7 @@ const THREAD_STATUS_BOOST: Record<string, number> = { open: 3, blocked: 2, suspe
 const EVENT_STATUS_BOOST: Record<string, number> = { hot: 3, warm: 1, cold: 0 };
 
 function selectHotThreads(threads: NarrativeThread[], limit: number): NarrativeThread[] {
-  return [...threads].sort((a, b) => {
+  return [...threads].filter(t => t.conflictStatus !== 'superseded' && t.conflictStatus !== 'rejected' && t.validUntilRound == null).sort((a, b) => {
     const d = (THREAD_STATUS_BOOST[b.status] ?? 0) - (THREAD_STATUS_BOOST[a.status] ?? 0);
     return d !== 0 ? d : (b.priority ?? 0) - (a.priority ?? 0) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
   }).slice(0, limit);

@@ -64,8 +64,8 @@ export function RuntimeGraphPanel({
         <StatPill label="模式" value={config.enabled ? '已启用' : '已关闭'} />
         <StatPill label="对象总量" value={stats.totalObjects} />
         <StatPill label="写入游标" value={stats.lastIngestCursor} />
-        <StatPill label="Mutation" value={stats.mutationCount} />
-        <StatPill label="Checkpoint" value={stats.checkpointCount} />
+        <StatPill label="变更" value={stats.mutationCount} />
+        <StatPill label="检查点" value={stats.checkpointCount} />
         {!isSimple && <StatPill label="向量事实" value={vectorMemory.length} />}
       </div>
       {/* 预览卡片网格 */}

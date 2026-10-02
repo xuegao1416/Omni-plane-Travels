@@ -60,6 +60,11 @@ export function alignDirectorPlans(state: DirectorState, ctx: DirectorReadContex
   const align = (id: string) => {
     const plan = state.plans[id];
     if (!plan || visited.has(id) || visiting.has(id) || ['occurred', 'invalid', 'superseded'].includes(plan.status)) return;
+    // The accepted proposal already owns its variable consequences. Only its
+    // original memory consumer may finish it; do not re-evaluate a killed actor.
+    const accepted = Object.entries(state.offscreenReceipts).some(([key, receipt]) =>
+      state.offscreenProposals[key]?.planId === id && receipt.status === 'accepted' && receipt.consumers.variables === 'done');
+    if (accepted) { plan.status = 'directed'; visited.add(id); return; }
     visiting.add(id);
     for (const dependency of plan.dependencies) if (dependency.kind === 'plan') align(dependency.ref);
     const truths = plan.dependencies.map(dep => {

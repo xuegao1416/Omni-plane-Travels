@@ -7,6 +7,18 @@ beforeEach(() => {
 });
 
 describe('memory checkpoint vector snapshot', () => {
+  test('loading keeps historical checkpoint bindings and new checkpoints retain those referenced by messages', () => {
+    const snapshot = structuredClone(useMemoryStore.getState().getMemoryRuntime());
+    const checkpoints = Array.from({ length: 20 }, (_, i) => ({
+      id: `history-${i}`, createdAt: i, lastIngestCursor: i,
+      activeThreadCount: 0, eventCount: 0, entityCount: 0, snapshot,
+    }));
+    useMemoryStore.getState().fromJSON({ memoryRuntime: { ...snapshot, checkpoints } });
+    expect(useMemoryStore.getState().getMemoryRuntime().checkpoints).toHaveLength(20);
+    useMemoryStore.getState().createCheckpoint(checkpoints.map(cp => cp.id));
+    expect(useMemoryStore.getState().restoreCheckpoint('history-0')).toBe(true);
+    expect(useMemoryStore.getState().getMemoryRuntime().lastIngestCursor).toBe(0);
+  });
   test('restores vector memory saved with the checkpoint', () => {
     const vector = {
       id: 'vector-1',

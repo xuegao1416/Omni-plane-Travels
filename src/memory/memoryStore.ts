@@ -151,7 +151,7 @@ interface MemoryStoreActions {
   clearVectorMemory: () => void;
 
   // Checkpoint
-  createCheckpoint: () => NarrativeCheckpoint | null;
+  createCheckpoint: (retainedIds?: readonly string[]) => NarrativeCheckpoint | null;
   restoreCheckpoint: (checkpointId: string) => boolean;
 
   // Mutation 日志
@@ -241,29 +241,25 @@ function normalizeMemoryRuntime(raw: unknown): NarrativeMemoryRuntime {
       ? safe.sceneAnchor as SceneAnchor
       : null,
     activeThreads: normalizeArray(safe.activeThreads)
-      .map((t: unknown) => t && typeof t === 'object' ? normalizeThread(t as Record<string, unknown>) : t)
-      .slice(-30) as NarrativeThread[],
+      .map((t: unknown) => t && typeof t === 'object' ? normalizeThread(t as Record<string, unknown>) : t) as NarrativeThread[],
     stateSlots: normalizeArray(safe.stateSlots)
-      .map((s: unknown) => s && typeof s === 'object' ? normalizeStateSlot(s as Record<string, unknown>) : s)
-      .slice(-30) as NarrativeStateSlot[],
+      .map((s: unknown) => s && typeof s === 'object' ? normalizeStateSlot(s as Record<string, unknown>) : s) as NarrativeStateSlot[],
     relationEdges: normalizeArray(safe.relationEdges)
-      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationEdge(r as Record<string, unknown>) : r)
-      .slice(-50) as NarrativeRelationEdge[],
+      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationEdge(r as Record<string, unknown>) : r) as NarrativeRelationEdge[],
     relationNetwork: normalizeArray(safe.relationNetwork)
-      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationNetworkItem(r as Record<string, unknown>) : r)
-      .slice(-50) as NarrativeRelationNetworkItem[],
+      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationNetworkItem(r as Record<string, unknown>) : r) as NarrativeRelationNetworkItem[],
     eventCards: (normalizeArray(safe.eventCards) as unknown[])
       .map((c: unknown) => c && typeof c === 'object' ? normalizeEventCard(c as Record<string, unknown>) : c)
       .sort((a: any, b: any) => (Number(b.importance || 0) - Number(a.importance || 0)) || (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)))
       .slice(0, 50) as NarrativeEventCard[],
     entityCards: normalizeArray(safe.entityCards)
-      .map((c: unknown) => c && typeof c === 'object' ? normalizeEntityCard(c as Record<string, unknown>) : c)
-      .slice(-30) as NarrativeEntityCard[],
+      .map((c: unknown) => c && typeof c === 'object' ? normalizeEntityCard(c as Record<string, unknown>) : c) as NarrativeEntityCard[],
     archiveCards: normalizeArray(safe.archiveCards)
       .map((a: unknown) => a && typeof a === 'object' ? normalizeProvenance(a as Record<string, unknown>) : a)
       .slice(-30) as NarrativeArchiveCard[],
     mutationLog: normalizeArray(safe.mutationLog).slice(-50) as NarrativeMutation[],
-    checkpoints: normalizeArray(safe.checkpoints).slice(-5) as NarrativeCheckpoint[],
+    // Message references own checkpoint retention; loading must not invalidate them.
+    checkpoints: normalizeArray(safe.checkpoints) as NarrativeCheckpoint[],
     summarySaveHistory: normalizeArray(safe.summarySaveHistory).slice(-MAX_SUMMARY_HISTORY) as SummarySaveRecord[],
     lastSummarySave: safe.lastSummarySave && typeof safe.lastSummarySave === 'object'
       ? safe.lastSummarySave as SummarySaveRecord
@@ -698,7 +694,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
 
   // ─── Checkpoint ───
 
-  createCheckpoint: () => {
+  createCheckpoint: (retainedIds = []) => {
     const state = get();
     if (!state.memoryRuntime) return null;
 
@@ -762,7 +758,10 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     set((s) => {
       if (!s.memoryRuntime) return s;
       const MAX_CHECKPOINTS = 10;
-      const checkpoints = [...s.memoryRuntime.checkpoints, checkpoint].slice(-MAX_CHECKPOINTS);
+      const all = [...s.memoryRuntime.checkpoints, checkpoint];
+      const retained = new Set(retainedIds);
+      const recent = new Set(all.slice(-MAX_CHECKPOINTS).map(cp => cp.id));
+      const checkpoints = all.filter(cp => retained.has(cp.id) || recent.has(cp.id));
       return { memoryRuntime: { ...prunedRuntime, checkpoints } };
     });
 

@@ -215,11 +215,12 @@ function saveSnapshot(
   aiMsgId: string,
   msgIndex: number,
   gameTime?: string,
+  retainedMessages: readonly ChatMessage[] = [],
 ) {
   try {
     const snapshot = varMgrRef.current.createSnapshot();
     const memStoreForCheckpoint = useMemoryStore.getState();
-    const memCheckpoint = memStoreForCheckpoint.createCheckpoint();
+    const memCheckpoint = memStoreForCheckpoint.createCheckpoint(retainedMessages.flatMap(m => m.memoryCheckpointId ? [m.memoryCheckpointId] : []));
 
     // 创建世界演化引擎快照
     let simulationSnapshotId: string | undefined;
@@ -229,6 +230,8 @@ function saveSnapshot(
         msgIndex,
         gameTime || '',
         false,
+        undefined,
+        retainedMessages.flatMap(m => m.simulationSnapshotId ? [m.simulationSnapshotId] : []),
       );
       simulationSnapshotId = simSnapshot.id;
     } catch (simErr) {
@@ -367,7 +370,7 @@ export function useGameEngine(
     if (latest && !generatingRef.current && !isSaveReadOnly() && varMgrRef.current === manager
       && useSaveStore.getState().currentSaveId === saveId && selectedWorldRef.current === worldId
       && messagesRef.current.filter(message => message.role === 'assistant').at(-1)?.id === latest.id) {
-      saveSnapshot(varMgrRef, updateMessage, latest.id, latest.round, manager.getState().世界.时间系统.当前时间);
+      saveSnapshot(varMgrRef, updateMessage, latest.id, latest.round, manager.getState().世界.时间系统.当前时间, messagesRef.current);
       onAutoSaveRef.current?.();
     }
   }, [reviewCommittedTurn, updateMessage]);
@@ -1344,7 +1347,7 @@ ${perspectiveInstruction}
 
       // 管线完成 — 保存当前变量快照到 AI 消息（用于回滚）
       const gameTimeStr = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
-      saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTimeStr);
+      saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTimeStr, messagesRef.current);
 
       // 清理内存中的冗余快照，防止内存无限增长
       setMessages(prev => optimizeSnapshots(prev));
@@ -1443,7 +1446,7 @@ ${perspectiveInstruction}
       await directorReviews.retryMainline();
       // 重试成功后重新保存快照
       const gameTimeStr2 = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
-      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId, ctx.round, gameTimeStr2);
+      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId, ctx.round, gameTimeStr2, messagesRef.current);
 
       setMessages(prev => optimizeSnapshots(prev));
       setPipelineStatus(pipelineResult.status);
@@ -1527,7 +1530,7 @@ ${perspectiveInstruction}
 
       // 重试成功后更新快照
       const gameTimeStr3 = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
-      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId, ctx.round, gameTimeStr3);
+      saveSnapshot(varMgrRef, updateMessage, ctx.aiMsgId, ctx.round, gameTimeStr3, messagesRef.current);
 
       setPipelineStatus({ ...executor.getStatus(), stages: { ...executor.getStatus().stages } });
     } catch (err: unknown) {

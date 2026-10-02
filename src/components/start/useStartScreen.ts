@@ -9,6 +9,7 @@ import { useAiFill } from '../../hooks/useAiFill';
 import { useCharacterHistory,clearSegmentsCache } from '../../hooks/useCharacterHistory';
 import { loadSaveWithMigration,type GameSave } from '../../storage/db';
 import { decodeSaveFile, encodeSaveFile, SAVE_FILE_EXTENSION } from '../../storage/saveFileCodec';
+import { isQuotaExceededError } from '../../storage/safeStorage';
 import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
@@ -445,9 +446,12 @@ export function useStartScreen() {
   const handleImportSave = async (file: File) => {
     try {
       const data = await decodeSaveFile(file);
-      await importSaveToStore(data);
+      const meta = await importSaveToStore(data);
+      await showAlert(`已导入「${meta.name}」，共 ${meta.messageCount ?? 0} 条消息。请在存档列表中选择它并继续旅程。`, { title: '导入成功' });
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = isQuotaExceededError(err)
+        ? '浏览器存储空间不足，存档未能导入。请释放设备空间或导出并清理不需要的旧存档，再重试。'
+        : err instanceof Error ? err.message : String(err);
       console.error('[导入] 失败:', err);
       await showAlert(`导入失败: ${errMsg}`, { title: '导入失败', danger: true });
     }
