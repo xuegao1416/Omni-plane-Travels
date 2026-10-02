@@ -18,7 +18,8 @@ import { isCombatAllyNpc } from '../gameplay/combatV2';
 import type { StatModuleSchema } from '../modules/schema';
 import { ensureNpcModuleDefaults } from '../utils/npcStats';
 import { getNpcCategoryValue } from '../utils/npcHelpers';
-import { applyPlayerObservations, collectSceneObservations, type PlayerObservation } from './playerKnowledge';
+import { type PlayerObservation } from './playerKnowledge';
+import { applyNarrativeKnowledge } from './narrativeKnowledge';
 
 export function extractPlayerObservations(input: unknown): PlayerObservation[] {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return [];
@@ -233,6 +234,7 @@ async function callAuxiliaryApiForEngine(
 【玩家观察记录】
 在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"disclosed",introduces:false}]。
 公开字段（姓名、种族、性别、人物分类、外貌、表性格、当前穿着、当前位置、当前状态、当前行动、关系数据）由系统按本轮正文自动同步，不必输出。
+自动同步的前提是人物档案已正确更新：亲自与玩家互动的角色必须在 effects 中设为“在场”，并按本轮实际行动更新位置和关系数据。人物档案中已有规范ID不等于玩家已经认识；首次见面时先输出 path:"姓名"、introduces:true 的有效观察，再输出其他字段。不要只输出关系观察却遗漏首次姓名登记，也不要把“无更新”作为已发生互动的替代。
 例外（重要）：若你在正文里只用代称描写某个角色（"老头""老板娘""那位客人"等），而人物档案里用的是正式姓名，系统按姓名匹配不到，这个角色就不会进入角色关系面板。此时必须补一条出场声明，把正文代称和正式姓名连起来：
 playerObservations:[{"npcId":"人物档案中的规范ID","path":"姓名","value":"你在人物档案里写的正式姓名","quote":"本轮正文里该角色的代称原文（逐字）","mode":"observed","introduces":true}]
 首次登记该角色用 introduces:true；若该角色已经认识，则用 introduces:false，并在同一轮用同一段代称原文补上你更新过的公开字段（外貌、当前穿着、当前位置、当前状态、当前行动、关系数据.关系类型、关系数据.好感度）。
@@ -367,20 +369,12 @@ export async function runVariableExtraction(params: {
         let hash = 2166136261;
         for (let i = 0; i < parsed.content.length; i++) hash = Math.imul(hash ^ parsed.content.charCodeAt(i), 16777619);
         const eventId = `narrative:${worldId}:${round}:${(hash >>> 0).toString(36)}`;
-        if (observations.length) {
-          const result = applyPlayerObservations(varMgr.getState(), { id: `observation:${eventId}`, turnId: eventId, eventId, turnNumber: round, committed: true, text: parsed.content, observations });
-          assertCurrent();
-          varMgr.setState(result.state);
-        }
-        // 兜底投影：本轮已提交正文中的在场角色，其公开字段直接同步给玩家，
-        // 避免 AI 漏输出 playerObservations 时人物/任务面板永久停在旧值。
-        const committedText = parsed.content;
-        const sceneObservations = collectSceneObservations(varMgr.getState(), committedText);
-        if (sceneObservations.length) {
-          const sceneResult = applyPlayerObservations(varMgr.getState(), { id: `scene:${eventId}`, turnId: eventId, eventId, turnNumber: round, committed: true, text: committedText, observations: sceneObservations });
-          assertCurrent();
-          varMgr.setState(sceneResult.state);
-        }
+        const observedState = applyNarrativeKnowledge(varMgr.getState(), {
+          id: `observation:${eventId}`, turnId: eventId, eventId, turnNumber: round,
+          committed: true, text: parsed.content, observations,
+        });
+        assertCurrent();
+        varMgr.setState(observedState);
       }
 
       eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);

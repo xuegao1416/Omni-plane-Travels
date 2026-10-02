@@ -884,37 +884,11 @@ export function generateSaveId(): string {
 // ─── 快照优化 ─────────────────────────────────────
 
 /**
- * 保存前瘦身消息快照：
- * 1. 始终保留第一条消息的快照（兜底）
- * 2. 始终保留最后 10 条消息的快照（高频悔棋/重发）
- * 3. 更早的消息每隔 10 条保留一个关键帧快照
+ * 保留逐轮状态。持久层已压缩快照，不能通过丢弃历史状态来节省空间：
+ * 重发依赖前一轮的精确变量，旧关键帧会让变量与记忆/导演回到不同轮。
  */
 export function optimizeSnapshots(messages: ChatMessage[]): ChatMessage[] {
-  if (!messages || messages.length === 0) return messages;
-
-  const total = messages.length;
-  let firstSnapshotFound = false;
-
-  return messages.map((msg, i) => {
-    if (!msg.snapshot) return msg;
-
-    // 始终保留第一条有 snapshot 的消息
-    if (!firstSnapshotFound) {
-      firstSnapshotFound = true;
-      return msg;
-    }
-
-    const isRecent = i >= total - 10;
-    const isKeyframe = i % 10 === 0;
-
-    if (!isRecent && !isKeyframe) {
-      // 清除冗余快照，释放内存
-      const { snapshot, snapshotTime, ...rest } = msg;
-      return rest as ChatMessage;
-    }
-
-    return msg;
-  });
+  return messages;
 }
 
 // ─── 导出/导入 ────────────────────────────────────────

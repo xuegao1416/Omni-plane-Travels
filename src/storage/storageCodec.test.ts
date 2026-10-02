@@ -62,7 +62,7 @@ test('direct previous compact v4 loads plain shards without rewriting history', 
   expect((await db.get('messages', `${id}#0`)).message).toEqual(message);
 });
 
-test('putMessages compresses snapshots and optimized rewrites remove stale encoded snapshots', async () => {
+test('snapshot optimization preserves exact historical relationship state through storage', async () => {
   const { optimizeSnapshots } = await import('./db');
   const id = `trim-${Date.now()}`;
   const messages = Array.from({ length: 25 }, (_, seq) => ({ id: `m${seq}`, seq, role: 'assistant', round: seq, timestamp: seq, snapshotTime: seq, snapshot: { text: 'rollback'.repeat(2000) } })) as any;
@@ -71,8 +71,9 @@ test('putMessages compresses snapshots and optimized rewrites remove stale encod
   expect((await db.get('messages', `${id}#1`)).encodedSnapshot).toBeDefined();
   const trimmed = optimizeSnapshots(await getAllMessages(id));
   await putMessages(id, trimmed, 0);
-  expect((await db.get('messages', `${id}#1`)).encodedSnapshot).toBeUndefined();
-  expect((await getMessageRange(id, 1, 1))[0].snapshot).toBeUndefined();
+  expect(trimmed).toEqual(messages);
+  expect((await db.get('messages', `${id}#1`)).encodedSnapshot).toBeDefined();
+  expect((await getMessageRange(id, 1, 1))[0].snapshot).toEqual(messages[1].snapshot);
   expect((await getMessageRange(id, 10, 10))[0].snapshot).toEqual(messages[10].snapshot);
 });
 

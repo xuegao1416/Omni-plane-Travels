@@ -13,6 +13,7 @@ import {
 } from './deepSeekResponseGuard';
 import { getMessageContent } from './contextManager';
 import { VariableManager } from './variableManager';
+import { resolveRollbackTarget } from './rollbackTarget';
 import { admitAuthoredNPCs } from './playerKnowledge';
 import { eventBus, EVENTS } from './eventBus';
 import { v4 as uuid } from 'uuid';
@@ -428,21 +429,20 @@ export function useGameEngine(
   }, []);
   // 辅助：回滚变量快照 + 记忆检查点 + 世界演化快照，并截断消息列表到指定索引
   const rollbackAndTruncate = useCallback((truncateAt: number) => {
-    if (isSaveReadOnly()) return;
+    if (generatingRef.current || isSaveReadOnly()) return false;
     const combatSession = varMgrRef.current.getState().v3?.combatSession;
-    if (!canRollbackCombat(combatSession?.riskMode ?? 'normal', combatSession?.lifecycle ?? 'active')) return;
+    if (!canRollbackCombat(combatSession?.riskMode ?? 'normal', combatSession?.lifecycle ?? 'active')) return false;
     const currentMessages = messagesRef.current;
+    const rollback = resolveRollbackTarget(currentMessages, truncateAt);
+    if (!rollback.ok) {
+      void dlgAlert(`第 ${rollback.target.round} 轮的变量快照已被旧版清理，无法精确恢复。请选择仍有完整快照的回退层，或导入补全快照后的存档。`, { title: '无法精确回退' });
+      return false;
+    }
 
     // 1. 回滚变量快照
-    let restored = false;
-    for (let i = truncateAt - 1; i >= 0; i--) {
-      if (currentMessages[i].snapshot) {
-        varMgrRef.current.restoreSnapshot(currentMessages[i].snapshot as any);
-        restored = true;
-        break;
-      }
-    }
-    if (!restored && initialSnapshotRef.current) {
+    if (rollback.target?.snapshot) {
+      varMgrRef.current.restoreSnapshot(rollback.target.snapshot as GameState);
+    } else if (initialSnapshotRef.current) {
       varMgrRef.current.restoreSnapshot(initialSnapshotRef.current as any);
     }
     // Historical message snapshots may predate the structured clock. Rebuild it
@@ -482,12 +482,15 @@ export function useGameEngine(
     }
 
     // 4. 截断消息
-    setMessages(prev => {
-      const truncated = prev.slice(0, truncateAt);
-      messagesRef.current = truncated;
-      return truncated;
-    });
-  }, []);
+    roundRef.current = rollback.round;
+    seqRef.current = rollback.seq;
+    lastExecutorRef.current = null;
+    lastPipelineCtxRef.current = null;
+    setPipelineStatus(null);
+    messagesRef.current = rollback.retainedMessages;
+    setMessages(rollback.retainedMessages);
+    return true;
+  }, [dlgAlert]);
 
   // 从快照面板执行完整回滚：状态、记忆、世界演化和后续消息一起回到该 AI 层。
   const rollbackToSnapshot = useCallback((msgIndex: number) => {
@@ -611,7 +614,7 @@ export function useGameEngine(
     const msg = currentMessages[idx];
     if (!msg || msg.role !== 'user') return;
 
-    rollbackAndTruncate(idx);
+    if (!rollbackAndTruncate(idx)) return;
 
     setTimeout(() => {
       sendMessageRef.current?.(getMessageContent(msg));
@@ -635,7 +638,7 @@ export function useGameEngine(
     if (userIdx === -1) return;
     const userMsg = currentMessages[userIdx];
 
-    rollbackAndTruncate(userIdx);
+    if (!rollbackAndTruncate(userIdx)) return;
 
     setTimeout(() => {
       sendMessageRef.current?.(getMessageContent(userMsg));
