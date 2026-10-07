@@ -44,6 +44,16 @@ test('accepted memory records stored by a writer do not retain an expired proxy'
   expect(stored?.event.text).toBe('existing');
 });
 
+test('memory task reads detach live facts without cloning the rollback checkpoint archive', () => {
+  const runtime = { events: [{ text: 'current fact' }], checkpoints: [{ id: 'old', snapshot: { events: [{ text: 'historical fact' }] } }] };
+  const guarded = guardTurnMemory({ getMemoryRuntime: () => runtime }, () => true);
+  const draft = guarded.getMemoryRuntime();
+  expect(draft.checkpoints).toEqual([]);
+  draft.events[0]!.text = 'task edit';
+  expect(runtime.events[0]!.text).toBe('current fact');
+  expect(runtime.checkpoints[0]!.snapshot.events[0]!.text).toBe('historical fact');
+});
+
 test('recovery caches retain usable derived data after their original turn expires', () => {
   let current = true;
   const guarded = guardTurnMemory({ getRecords: () => [{ keywords: ['key'] }] }, () => current);

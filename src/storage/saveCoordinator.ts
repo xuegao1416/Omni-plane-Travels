@@ -5,7 +5,7 @@ interface PendingSave { capture: GameSave; revision: number; create?: boolean; w
 interface ScheduledSave extends PendingSave { timer: ReturnType<typeof setTimeout> }
 export class SaveScheduleCancelledError extends Error { constructor() { super('Scheduled save cancelled'); } }
 interface SaveQueue { running: boolean; pending?: PendingSave; failed?: { capture: GameSave; revision: number; create?: boolean } }
-export interface SaveOutcome { status: 'saved' | 'failed'; capture: GameSave; revision: number; error?: unknown }
+export interface SaveOutcome { status: 'saved' | 'failed'; saveId: string; revision: number; error?: unknown }
 
 /** Captures immediately; each save has independent serialization and latest-request coalescing. */
 export class SaveCoordinator {
@@ -20,7 +20,7 @@ export class SaveCoordinator {
   private nextRevision(id: string): number { const revision = (this.revisions.get(id) ?? 0) + 1; this.revisions.set(id, revision); return revision; }
   private notify(outcome: SaveOutcome): void {
     for (const listener of this.listeners) {
-      try { listener({ ...outcome, capture: structuredClone(outcome.capture) }); }
+      try { listener({ ...outcome }); }
       catch (error) { console.error('[save] 保存反馈失败:', error); }
     }
   }
@@ -129,11 +129,11 @@ export class SaveCoordinator {
           if (pending.create) await this.persistence.create!(pending.capture);
           else await this.persistence.save(pending.capture);
           queue.failed = undefined;
-          this.notify({ status: 'saved', capture: pending.capture, revision: pending.revision });
+          this.notify({ status: 'saved', saveId: pending.capture.id, revision: pending.revision });
           for (const waiter of pending.waiters) waiter.resolve();
         } catch (error) {
           queue.failed = { capture: pending.capture, revision: pending.revision, create: pending.create };
-          this.notify({ status: 'failed', capture: pending.capture, revision: pending.revision, error });
+          this.notify({ status: 'failed', saveId: pending.capture.id, revision: pending.revision, error });
           for (const waiter of pending.waiters) waiter.reject(error);
         }
       }

@@ -113,8 +113,9 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
   });
 
   const vectors = memStore.vectorMemory;
+  const runtime = memStore.getMemoryRuntime();
   const eligible = vectors.filter(item =>
-    isMemoryVisibleInRuntime(item, memStore.getMemoryRuntime()) && item.state !== 'expired'
+    isMemoryVisibleInRuntime(item, runtime) && item.state !== 'expired'
       && item.conflictStatus !== 'superseded'
       && item.conflictStatus !== 'rejected'
       && item.importance >= config.vectorRetrieveMinImportance

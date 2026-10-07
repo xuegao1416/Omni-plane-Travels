@@ -40,3 +40,11 @@ test('failed progress can be recovered without allowing an old retry to replace 
   expect(written.map(value => value.name)).toEqual(['newer']);
   expect(saves.getFailedCapture('one')).toBeUndefined();
 });
+
+test('save notifications contain only status metadata rather than another full history capture', async () => {
+  const saves = new SaveCoordinator({ save: async () => {} });
+  let notification: unknown;
+  saves.subscribe(outcome => { notification = outcome; });
+  await saves.request(capture('one'));
+  expect(notification).toEqual({ status: 'saved', saveId: 'one', revision: 1 });
+});

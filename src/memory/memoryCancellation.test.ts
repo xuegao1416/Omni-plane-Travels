@@ -81,6 +81,8 @@ test('write uses a private draft and aborts before retrying or committing a repl
 test('accepted write commits its cloneable runtime draft and rejects a stale same-save draft', async () => {
   useMemoryStore.setState({ config: createDefaultMemorySystemConfig() });
   useMemoryStore.getState().initMemoryRuntime('current');
+  useMemoryStore.getState().updateSceneAnchor({ locationLabel: '旅店' });
+  const checkpoint = useMemoryStore.getState().createCheckpoint()!;
   globalThis.fetch = (async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ scenePatch: { locationLabel: '城门' } }) } }] }))) as unknown as typeof fetch;
   const guarded = guardTurnMemory(useMemoryStore.getState(), () => true, useMemoryStore.getState);
   await executeMemoryWrite(guarded, { ...context(), apiConfig: { ...api, baseUrl: 'https://memory-accepted.test' } });
@@ -94,6 +96,8 @@ test('accepted write commits its cloneable runtime draft and rejects a stale sam
   useMemoryStore.getState().updateSceneAnchor({ locationLabel: '玩家的新修改' });
   expect(() => guarded.commitMemoryRuntime(stale, version, baseline)).toThrow();
   expect(useMemoryStore.getState().memoryRuntime?.sceneAnchor?.locationLabel).toBe('玩家的新修改');
+  expect(useMemoryStore.getState().restoreCheckpoint(checkpoint.id)).toBe(true);
+  expect(useMemoryStore.getState().memoryRuntime?.sceneAnchor?.locationLabel).toBe('旅店');
 });
 
 test('parallel summary completion survives the later structured memory draft commit', async () => {

@@ -326,9 +326,9 @@ export const useSaveStore = create<SaveState>((set, get) => ({
 
 saveCoordinator.subscribe(outcome => {
   if (outcome.status === 'failed') useSaveStore.setState({ saveFailure: {
-    saveId: outcome.capture.id, message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+    saveId: outcome.saveId, message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
   } });
-  else if (useSaveStore.getState().saveFailure?.saveId === outcome.capture.id) useSaveStore.setState({ saveFailure: null });
+  else if (useSaveStore.getState().saveFailure?.saveId === outcome.saveId) useSaveStore.setState({ saveFailure: null });
 });
 
 // ─── 自动存档 builder（由 GameContext 注入） ───

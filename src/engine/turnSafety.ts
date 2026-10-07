@@ -28,7 +28,13 @@ export function guardTurnMemory<T extends object>(store: T, isCurrent: () => boo
         assert();
         const owner = getCurrent();
         const action = Reflect.get(owner, key) as (...args: unknown[]) => unknown;
-        return snapshot(Reflect.apply(action, owner, args.map(snapshot)));
+        const result = Reflect.apply(action, owner, args.map(snapshot));
+        // Pipeline drafts need current facts, not the archive of rollback
+        // snapshots. Commits merge the owner's checkpoint ledger separately.
+        if (key === 'getMemoryRuntime' && result && typeof result === 'object' && 'checkpoints' in result && Array.isArray(result.checkpoints)) {
+          return snapshot({ ...result, checkpoints: [] });
+        }
+        return snapshot(result);
       };
     },
     set() { assert(); throw new Error('记忆任务必须通过 store 操作提交状态'); },
