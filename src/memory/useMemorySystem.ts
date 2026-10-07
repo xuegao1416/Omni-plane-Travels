@@ -1,5 +1,6 @@
 // Shared pipeline contracts. The former duplicate React hook had no runtime callers.
 import type { MemoryEntry, VectorMemoryItem } from './types';
+import type { MemoryApiPort } from '../api/presets';
 import type { parseVectorQueryRewriteResult, parseNarrativeRetrievePlannerResult, parseRerankResult } from './narrativeParsers';
 
 export type { MemoryEntry } from './types';
@@ -28,13 +29,13 @@ export interface MemoryPipelineContext {
   /** 玩家名字 */
   playerName: string;
   /** API 配置（记忆系统默认） */
-  apiConfig: { baseUrl: string; apiKey: string; model: string };
+  apiConfig: MemoryApiPort;
   /** 各阶段独立 API 配置（可选，未设置则回退到 apiConfig） */
-  writeApiConfig?: { baseUrl: string; apiKey: string; model: string };
-  summaryApiConfig?: { baseUrl: string; apiKey: string; model: string };
-  conflictJudgeApiConfig?: { baseUrl: string; apiKey: string; model: string };
-  retrievalApiConfig?: { baseUrl: string; apiKey: string; model: string };
-  vectorApiConfig?: { baseUrl: string; apiKey: string; model: string };
+  writeApiConfig?: MemoryApiPort;
+  summaryApiConfig?: MemoryApiPort;
+  conflictJudgeApiConfig?: MemoryApiPort;
+  retrievalApiConfig?: MemoryApiPort;
+  vectorApiConfig?: MemoryApiPort;
   /** 管线间共享数据 */
   _queryRewriteResult?: ReturnType<typeof parseVectorQueryRewriteResult>;
   _plannerResult?: ReturnType<typeof parseNarrativeRetrievePlannerResult>;

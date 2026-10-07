@@ -53,7 +53,7 @@ import { useSaveStore } from '../stores/saveStore';
 import { formatSnapshotForMainAI } from '../utils/npcHelpers';
 import type { MemoryPipelineContext } from '../memory/useMemorySystem';
 import { buildModuleContextProjection } from '../gameplay/moduleRuntime/contextRouter';
-import { resolvePreset } from '../api/presets';
+import { memoryApiPort, resolvePreset } from '../api/presets';
 import { apiPresetStore } from '../stores/apiPresetStore';
 import { runCustomModuleTurnLifecycles } from '../custom-modules/engineBridge';
 import { pinCustomModuleDefinitions } from '../custom-modules/saveDefinitions';
@@ -569,7 +569,7 @@ export function useGameEngine(
       memConfig.writePipeline.summaryApiPresetId, memConfig.writePipeline.conflictJudgeApiPresetId,
       memConfig.retrieval.plannerApiPresetId, memConfig.vectorExtractApiPresetId].some(Boolean);
     const presets = usesPreset ? await apiPresetStore.getPresets() : [];
-    const defaultMemApi = { baseUrl: mainApiConfig.baseUrl, apiKey: mainApiConfig.apiKey, model: mainApiConfig.model };
+    const defaultMemApi = memoryApiPort(mainApiConfig);
     const memApiConfig = resolvePreset(presets, memConfig.apiPresetId) ?? defaultMemApi;
 
     // 提取资源状态快照（供记忆编译阶段注入 AI 上下文）

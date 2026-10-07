@@ -1,6 +1,8 @@
 import { isMemoryVisibleInRuntime, projectMemoryRuntime, sameMemoryVisibility, memoryVisibilityMetadata, annotateNarrativeDiscoveries } from './memoryVisibility';
 // 记忆系统管线执行器 - 从 useGameEngine.ts 提取
-import { fetchRerank, requestCompletion } from '../api/client';
+import { fetchRerank, getRequestTimeoutMs, requestCompletion } from '../api/client';
+import type { ApiConfig } from '../api/types';
+import type { MemoryApiPort } from '../api/presets';
 import { waitForRateLimit } from '../api/rateLimiter';
 import { abortableDelay } from '../utils/abortableDelay';
 import type { MemoryPipelineContext } from './useMemorySystem';
@@ -15,6 +17,7 @@ import { normalizeProvenance } from './normalize';
 import { collectMemoryEntries } from './memoryCandidates';
 import {
   parseNarrativePayload,
+  parseNarrativeArrayPayload,
   parseNarrativeIngestResult,
   parseNarrativeSummaryResult,
   parseNarrativeRetrievePlannerResult,
@@ -186,22 +189,27 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
 
 /** 调用记忆系统 AI */
 export async function callMemoryAI(
-  apiConfig: { baseUrl: string; apiKey: string; model: string },
+  apiConfig: MemoryApiPort,
   systemPrompt: string,
   userContent: string,
   temperature = 0.3,
-  timeoutMs = 120000,
   signal?: AbortSignal,
+  timeoutMs?: number,
 ): Promise<string> {
   signal?.throwIfAborted();
+  // 记忆固定走 OpenAI 兼容线路，但超时档位仍按该阶段预设的真实 provider 取。
+  const budgetMs = timeoutMs ?? getRequestTimeoutMs({ ...apiConfig, provider: apiConfig.provider ?? 'openai' });
+  const requestConfig: ApiConfig = { ...apiConfig, provider: 'openai', requestTimeoutMs: budgetMs };
   const controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
   signal?.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(() => controller.abort(new DOMException(`记忆AI调用超时(${timeoutMs / 1000}s)`, 'TimeoutError')), timeoutMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await waitForRateLimit({ ...apiConfig, provider: 'openai' }, controller.signal);
+    await waitForRateLimit(requestConfig, controller.signal);
+    // Rate-limit cooldown is cancellable, but does not consume response time.
+    timer = setTimeout(() => controller.abort(new DOMException(`记忆AI调用超时(${Math.round(budgetMs / 1000)}s)`, 'TimeoutError')), budgetMs);
     const result = await requestCompletion(
-      { ...apiConfig, provider: 'openai' },
+      requestConfig,
       [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
       { temperature, signal: controller.signal },
     );
@@ -319,7 +327,7 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
           .replace(/\{\{叙事写入参考\}\}/g, referenceBlock)
           .replace(/\{\{剧情原文\}\}/g, ctx.batchText);
 
-        const rawResult = await callMemoryAI(ctx.writeApiConfig ?? ctx.apiConfig, prompt, '请分析上述剧情并输出结构化叙事记忆 JSON。', 0.3, 120000, ctx.signal);
+        const rawResult = await callMemoryAI(ctx.writeApiConfig ?? ctx.apiConfig, prompt, '请分析上述剧情并输出结构化叙事记忆 JSON。', 0.3, ctx.signal);
         const parsed = annotateNarrativeDiscoveries(runtime, parseNarrativeIngestResult(rawResult) as unknown as Record<string, unknown>, sourceEventId, ctx.floor);
         const conflictDecisions: ConflictDecisionMap = new WeakMap();
 
@@ -366,7 +374,7 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
                       .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
                       .replace(/\{\{currentObject\}\}/g, JSON.stringify(existing))
                       .replace(/\{\{incomingObject\}\}/g, JSON.stringify(incoming));
-                    const judgeRaw = await callMemoryAI(ctx.conflictJudgeApiConfig ?? ctx.apiConfig, judgePrompt, '请裁决冲突，输出 JSON。', 0.3, 120000, ctx.signal);
+                    const judgeRaw = await callMemoryAI(ctx.conflictJudgeApiConfig ?? ctx.apiConfig, judgePrompt, '请裁决冲突，输出 JSON。', 0.3, ctx.signal);
                     const judgeResult = parseNarrativeConflictJudgeResult(judgeRaw);
                     if (judgeResult.action === 'reject_incoming') {
                       incomingList[i] = null;
@@ -470,7 +478,7 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
           .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
           .replace(/\{\{batchText\}\}/g, ctx.batchText);
 
-        const rawResult = await callMemoryAI(ctx.summaryApiConfig ?? ctx.apiConfig, prompt, '请为当前剧情批次产出结构化摘要 JSON。', 0.3, 120000, ctx.signal);
+        const rawResult = await callMemoryAI(ctx.summaryApiConfig ?? ctx.apiConfig, prompt, '请为当前剧情批次产出结构化摘要 JSON。', 0.3, ctx.signal);
         const parsed = parseNarrativeSummaryResult(rawResult);
         const savedAt = Date.now();
         const sourceEventId = appendSourceEvent(memStore, ctx);
@@ -528,9 +536,8 @@ export async function executeMemoryVector(memStore: MemoryStore, ctx: MemoryPipe
       .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
       .replace(/\{\{剧情原文\}\}/g, ctx.batchText);
 
-    const rawResult = await callMemoryAI(ctx.vectorApiConfig ?? ctx.apiConfig, prompt, '请提取长期事实，输出 JSON 数组。', 0.3, 120000, ctx.signal);
-    const parsed = parseNarrativePayload(rawResult);
-    const factsArray = Array.isArray(parsed) ? parsed : Array.isArray(parsed.facts) ? parsed.facts : Array.isArray(parsed.data) ? parsed.data : [];
+    const rawResult = await callMemoryAI(ctx.vectorApiConfig ?? ctx.apiConfig, prompt, '请提取长期事实，输出 JSON 数组。', 0.3, ctx.signal);
+    const factsArray = parseNarrativeArrayPayload(rawResult);
     const sourceEventId = appendSourceEvent(memStore, ctx);
 
     let vectorItems: VectorMemoryItem[] = factsArray
@@ -597,7 +604,7 @@ export async function executeMemoryQueryRewrite(memStore: MemoryStore, ctx: Memo
       .replace(/\{\{inputText\}\}/g, ctx.inputText)
       .replace(/\{\{recentContext\}\}/g, ctx.recentContext.slice(-800))
       .replace(/\{\{entityTerms\}\}/g, '').replace(/\{\{timeTerms\}\}/g, '');
-    const qrRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, qrPrompt, '请分析当前输入并输出查询改写 JSON。', 0.3, 120000, ctx.signal);
+    const qrRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, qrPrompt, '请分析当前输入并输出查询改写 JSON。', 0.3, ctx.signal);
     const qrResult = parseVectorQueryRewriteResult(qrRaw);
     ctx._retrievalKeywords = qrResult.retrievalKeywords;
     ctx._semanticQuery = qrResult.semanticQuery || ctx.inputText;
@@ -643,7 +650,7 @@ export async function executeMemoryRetrievePlan(memStore: MemoryStore, ctx: Memo
       .replace(/\{\{summaryHistory\}\}/g, `共 ${runtime.summarySaveHistory.length} 条摘要`)
       .replace(/\{\{memoryCandidates\}\}/g, candidateList || '无候选');
 
-    const plannerRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, plannerPrompt, '请规划需要注入的记忆，输出 JSON。', 0.3, 120000, ctx.signal);
+    const plannerRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, plannerPrompt, '请规划需要注入的记忆，输出 JSON。', 0.3, ctx.signal);
     const plannerResult = parseNarrativeRetrievePlannerResult(plannerRaw);
     ctx._plannerResult = plannerResult;
     ctx._finalSelectedTitles = [...plannerResult.items.map(i => i.title)];
@@ -697,7 +704,7 @@ export async function executeMemoryMultiRound(memStore: MemoryStore, ctx: Memory
           .replace(/\{\{memoryCandidates\}\}/g, candidateList || '无候选')
           .replace(/\{\{previousResults\}\}/g, previousResults);
 
-        const multiRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, multiFilled, '请补充遗漏的记忆，输出 JSON。', 0.3, 120000, ctx.signal);
+        const multiRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, multiFilled, '请补充遗漏的记忆，输出 JSON。', 0.3, ctx.signal);
         const multiResult = parseNarrativeRetrievePlannerResult(multiRaw);
 
         const multiTitles = multiResult.items.map(i => i.title);
@@ -751,7 +758,7 @@ export async function executeMemoryRerank(memStore: MemoryStore, ctx: MemoryPipe
       .replace(/\{\{query\}\}/g, ctx.inputText)
       .replace(/\{\{candidates\}\}/g, titleSelected.map((m, i) => `[${i}] ${m.title}: ${m.summary}`).join('\n'));
 
-    const rerankRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, rerankPrompt, '请对候选记忆精排打分，输出 JSON。', 0.3, 120000, ctx.signal);
+    const rerankRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, rerankPrompt, '请对候选记忆精排打分，输出 JSON。', 0.3, ctx.signal);
     const rerankResult = parseRerankResult(rerankRaw);
     ctx._rerankResult = rerankResult;
 
