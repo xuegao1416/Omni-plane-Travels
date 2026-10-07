@@ -19,7 +19,7 @@ export interface CustomModuleButtonEvent {
 export type CustomModuleEvent = CustomModuleChoiceEvent | CustomModuleButtonEvent;
 
 export interface CustomModuleHostContext {
-  game: { round: number; time: string };
+  game: { round: number; time: string; elapsedMinutes?: number; location?: string };
   player: {
     stats: Record<string, number>;
     currency: { primary: number };
@@ -63,6 +63,9 @@ export function buildCustomModuleHostContext(
     game: {
       round: Number.isFinite(options.round) ? Number(options.round) : 0,
       time: options.time ?? gameState.世界?.时间系统?.当前时间 ?? '',
+      location: gameState.世界?.空间定位?.当前位置 ?? '',
+      ...(Number.isFinite(gameState.世界?.时间系统?.时钟?.elapsedMinutes)
+        ? { elapsedMinutes: gameState.世界.时间系统.时钟!.elapsedMinutes } : {}),
     },
     player: {
       stats: canonicalStats,

@@ -3,7 +3,6 @@ import { useMediaQuery } from '../../../hooks/useIsMobile';
 import ContextMenu from './ContextMenu';
 import type { Props } from './messageBubble/types';
 import { useRenderedContent,useDisplayScripts } from './messageBubble/renderPipeline';
-import { useInlinePortals } from './messageBubble/InlinePortals';
 import EditMode from './messageBubble/EditMode';
 import { useMenuItems } from './messageBubble/useMenuItems';
 import BubbleContent from './messageBubble/BubbleContent';
@@ -22,10 +21,6 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
   // 渲染管线
   const { renderedContent, iframeRef } = useRenderedContent(message, isUser);
   const displayScripts = useDisplayScripts();
-
-  // 内联 Portal 挂载
-  const messageHtmlRef = useRef<HTMLDivElement>(null);
-  useInlinePortals(messageHtmlRef, renderedContent, worldSystem, onDiceRoll, isUser, message);
 
   // 右键菜单（原生事件）
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -115,7 +110,8 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
             isUser={isUser}
             renderedContent={renderedContent}
             iframeRef={iframeRef}
-            messageHtmlRef={messageHtmlRef}
+            worldSystem={worldSystem}
+            onDiceRoll={onDiceRoll}
             onOptionClick={readOnly ? undefined : onOptionClick}
           />
         )}

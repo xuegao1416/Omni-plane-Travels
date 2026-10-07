@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import type { CreationDraftOwner, CreationDraftOperation } from './creationDraftOwner';
 import type { PlayerProfile } from '../storage/db';
 import type { WorldBookEntry } from '../worldbook/index';
 import type { WorldDef } from '../data/worldLoader';
@@ -7,64 +8,61 @@ import type { HistoryPreset } from '../storage/templateStore';
 import { requestStreamWithRetry } from '../api/client';
 import { getAgeStages, getAllSegmentIds } from '../utils/ageStages';
 
-// ─── 模块级缓存：跨导航保留已生成的 segments ───
-let _segmentsCache: Record<string, string> | null = null;
-export function clearSegmentsCache() { _segmentsCache = null; }
-
 interface UseCharacterHistoryOptions {
+  draftOwner: CreationDraftOwner;
   apiConfig: ApiConfig | null;
-  personalInfo: PlayerProfile;
   selectedWorld: string;
   allWorlds: WorldDef[];
   worldEntry: WorldBookEntry | null;
-  initialCharacterHistory?: string;
-  /** 玩家选择的叙事视角 */
-  perspective?: string;
   navigate: (screen: any) => void;
   showAlert: (msg: string, opts?: any) => Promise<void>;
 }
 
 export function useCharacterHistory({
-  apiConfig, personalInfo, selectedWorld, allWorlds, worldEntry,
-  initialCharacterHistory, perspective, navigate, showAlert,
+  apiConfig, allWorlds, worldEntry, selectedWorld: viewWorld, draftOwner, navigate, showAlert,
 }: UseCharacterHistoryOptions) {
-  const [segments, setSegments] = useState<Record<string, string>>(() => {
-    // 优先从缓存恢复（解决返回再前进丢失经历的 Bug）
-    if (_segmentsCache) return { ..._segmentsCache };
-    const ids = getAllSegmentIds(personalInfo.age || '');
-    const initial: Record<string, string> = {};
-    for (const id of ids) initial[id] = '';
-    if (initialCharacterHistory) initial.prologue = initialCharacterHistory;
-    return initial;
-  });
+  const document = useSyncExternalStore(draftOwner.subscribe, draftOwner.getSnapshot, draftOwner.getSnapshot);
+  const segments = document.segments, includeAgeStages = document.includeAgeStages;
+  const setSegments: Dispatch<SetStateAction<Record<string, string>>> = useCallback(value => {
+    const current = draftOwner.getSnapshot().segments;
+    draftOwner.edit({ segments: typeof value === 'function' ? value(current) : value });
+  }, [draftOwner]);
+  const setIncludeAgeStages: Dispatch<SetStateAction<boolean>> = useCallback(value => {
+    const current = draftOwner.getSnapshot().includeAgeStages;
+    draftOwner.edit({ includeAgeStages: typeof value === 'function' ? value(current) : value });
+  }, [draftOwner]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
-  const [includeAgeStages, setIncludeAgeStages] = useState(true);
-  const abortRef = useRef<AbortController | null>(null);
-
-  // segments 变化时同步到缓存
-  const segmentsRef = useRef(segments);
-  segmentsRef.current = segments;
-
-  // ─── 辅助函数 ───
-  const getWorldSetting = useCallback(() => {
-    const worldData = allWorlds.find(w => w.id === selectedWorld);
-    return worldEntry?.content || worldData?.description || '自由穿越模式';
-  }, [allWorlds, selectedWorld, worldEntry]);
-
-  const getPlayerInfoBlock = useCallback(() => {
+  const operationRef = useRef<CreationDraftOperation | null>(null);
+  const beginGeneration = (segmentId: string | null) => {
+    const operation = draftOwner.beginOperation('history');
+    operationRef.current = operation;
+    setIsGenerating(true); setRegeneratingId(segmentId);
+    operation.signal.addEventListener('abort', () => {
+      if (operationRef.current === operation) { setIsGenerating(false); setRegeneratingId(null); }
+    }, { once: true });
+    return operation;
+  };
+  const finishGeneration = (operation: CreationDraftOperation) => {
+    if (operationRef.current !== operation) return;
+    operation.finish(); operationRef.current = null;
+    setIsGenerating(false); setRegeneratingId(null);
+  };
+  const getWorldSetting = (worldId: string) => {
+    const worldData = allWorlds.find(w => w.id === worldId);
+    return (worldId === viewWorld ? worldEntry?.content : undefined) || worldData?.description || '自由穿越模式';
+  };
+  const getPlayerInfoBlock = (profile: PlayerProfile) => {
     const parts = [
-      `- 姓名：${personalInfo.name || '未设定'}`,
-      `- 性别：${personalInfo.gender || '未设定'}`,
-      `- 年龄：${personalInfo.age || '未设定'}`,
-      `- 背景描述：${personalInfo.background || '无'}`,
+      `- 姓名：${profile.name || '未设定'}`,
+      `- 性别：${profile.gender || '未设定'}`,
+      `- 年龄：${profile.age || '未设定'}`,
+      `- 背景描述：${profile.background || '无'}`,
     ];
-    if (personalInfo.career) parts.push(`- 职业：${personalInfo.career}`);
-    if (personalInfo.customNpcs.length > 0) {
-      parts.push(`- 关联NPC：${personalInfo.customNpcs.map(n => `${n.name}(${n.relationshipType || '同伴'})`).join('、')}`);
-    }
+    if (profile.career) parts.push(`- 职业：${profile.career}`);
+    if (profile.customNpcs.length > 0) parts.push(`- 关联NPC：${profile.customNpcs.map(n => `${n.name}(${n.relationshipType || '同伴'})`).join('、')}`);
     return parts.join('\n');
-  }, [personalInfo]);
+  };
 
   // ─── 解析 AI 输出为分段 ───
   const parseSegmentsFromText = (text: string, ageStr: string): Record<string, string> => {
@@ -98,12 +96,11 @@ export function useCharacterHistory({
   const handleGenerateAll = async (drafts?: Record<string, string>) => {
     if (!apiConfig) { await showAlert('请先配置API'); navigate('settings'); return; }
 
-    const draftsMap = drafts || {};
-
-    setIsGenerating(true);
-    setRegeneratingId(null);
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const operation = beginGeneration(null);
+    const { profile: personalInfo, selectedWorld, includeAgeStages } = operation.inputs;
+    const perspective = personalInfo.perspective;
+    const config = structuredClone(apiConfig);
+    const draftsMap = structuredClone(drafts || operation.inputs.segments);
 
     const ageStages = getAgeStages(personalInfo.age);
     const stagePrompts = includeAgeStages
@@ -133,10 +130,10 @@ export function useCharacterHistory({
     const systemPrompt = `你是一位专业的角色背景故事撰写者，擅长为互动小说生成沉浸式的人生经历。请根据以下信息，为玩家生成完整的人生经历。
 
 【世界设定】
-${getWorldSetting()}
+${getWorldSetting(selectedWorld)}
 
 【玩家信息】
-${getPlayerInfoBlock()}
+${getPlayerInfoBlock(personalInfo)}
 ${npcBlock}${draftBlock}
 ═══════════════════════════════════════
 【写作要求】
@@ -181,22 +178,23 @@ ${stagePrompts}`;
 
     let rawText = '';
     try {
-      const result = await requestStreamWithRetry(apiConfig, messages, {
-        signal: controller.signal,
+      const result = await requestStreamWithRetry(config, messages, {
+        signal: operation.signal,
         onDelta: (_delta, acc) => {
+          if (!operation.isCurrent()) return;
           rawText = acc;
           const parsed = parseSegmentsFromText(acc, personalInfo.age);
-          setSegments(parsed);
+          operation.commit({ segments: parsed });
         },
       });
+      if (!operation.isCurrent()) return;
       const finalSegments = parseSegmentsFromText(result.text || rawText, personalInfo.age);
-      setSegments(finalSegments);
+      operation.commit({ segments: finalSegments });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      console.error('[AI生成全部] 失败:', err);
+      if (operation.isCurrent()) await showAlert(`经历生成失败：${err instanceof Error ? err.message : String(err)}。已收到的片段仍保留，可手写或重试。`, { title: '生成失败' });
     } finally {
-      setIsGenerating(false);
-      abortRef.current = null;
+      finishGeneration(operation);
     }
   };
 
@@ -204,10 +202,10 @@ ${stagePrompts}`;
   const handleRegenerateSegment = async (segmentId: string, draft?: string) => {
     if (!apiConfig) { await showAlert('请先配置API'); navigate('settings'); return; }
 
-    setIsGenerating(true);
-    setRegeneratingId(segmentId);
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const operation = beginGeneration(segmentId);
+    const { profile: personalInfo, selectedWorld, segments } = operation.inputs;
+    const perspective = personalInfo.perspective;
+    const config = structuredClone(apiConfig);
 
     const ageStages = getAgeStages(personalInfo.age);
     const allIds = getAllSegmentIds(personalInfo.age);
@@ -224,8 +222,9 @@ ${stagePrompts}`;
     if (prevSegment) contextBlock += `【前一阶段内容】\n${prevSegment}\n\n`;
     if (nextSegment) contextBlock += `【后一阶段内容】\n${nextSegment}\n\n`;
 
-    const draftBlock = draft?.trim()
-      ? `\n【玩家草稿】\n${draft.trim()}\n\n请参考以上草稿内容，在其基础上扩展、润色、补充细节。保留草稿中的核心设定和关键事件，但用更好的叙事手法呈现。\n`
+    const segmentDraft = draft ?? segments[segmentId];
+    const draftBlock = segmentDraft?.trim()
+      ? `\n【玩家草稿】\n${segmentDraft.trim()}\n\n请参考以上草稿内容，在其基础上扩展、润色、补充细节。保留草稿中的核心设定和关键事件，但用更好的叙事手法呈现。\n`
       : '';
 
     const stageName = segmentNames[segmentId] || segmentId;
@@ -238,10 +237,10 @@ ${stagePrompts}`;
     const systemPrompt = `你是一位专业的角色背景故事撰写者。请只为以下阶段生成内容。
 
 【世界设定】
-${getWorldSetting()}
+${getWorldSetting(selectedWorld)}
 
 【玩家信息】
-${getPlayerInfoBlock()}
+${getPlayerInfoBlock(personalInfo)}
 
 ${contextBlock}${draftBlock}
 【写作要求】
@@ -260,50 +259,43 @@ ${contextBlock}${draftBlock}
 
     try {
       let accumulated = '';
-      const result = await requestStreamWithRetry(apiConfig, messages, {
-        signal: controller.signal,
+      const result = await requestStreamWithRetry(config, messages, {
+        signal: operation.signal,
         onDelta: (_delta, acc) => {
+          if (!operation.isCurrent()) return;
           accumulated = acc;
-          setSegments(prev => ({ ...prev, [segmentId]: acc }));
+          operation.commit({ segments: { ...draftOwner.getSnapshot().segments, [segmentId]: acc } });
         },
       });
-      setSegments(prev => ({ ...prev, [segmentId]: result.text || accumulated }));
+      operation.commit({ segments: { ...draftOwner.getSnapshot().segments, [segmentId]: result.text || accumulated } });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      console.error(`[AI生成 ${segmentId}] 失败:`, err);
+      if (operation.isCurrent()) await showAlert(`经历生成失败：${err instanceof Error ? err.message : String(err)}。已收到的片段仍保留，可手写或重试。`, { title: '生成失败' });
     } finally {
-      setIsGenerating(false);
-      setRegeneratingId(null);
-      abortRef.current = null;
+      finishGeneration(operation);
     }
   };
 
   // ─── 加载预设 ───
   const loadPreset = useCallback((preset: HistoryPreset) => {
-    setSegments({ ...preset.segments });
-    setIncludeAgeStages(preset.includeAgeStages);
-  }, []);
+    draftOwner.edit({ segments: { ...preset.segments }, includeAgeStages: preset.includeAgeStages });
+  }, [draftOwner]);
 
   // ─── 拼接完整文本 ───
   const buildFullCharacterHistory = useCallback(() => {
-    const ids = includeAgeStages
-      ? getAllSegmentIds(personalInfo.age)
-      : ['prologue'];
-    return ids.map(id => (segments[id] || '').trim()).filter(Boolean).join('\n\n');
-  }, [segments, personalInfo.age, includeAgeStages]);
+    const current = draftOwner.getSnapshot();
+    const ids = current.includeAgeStages ? getAllSegmentIds(current.profile.age) : ['prologue'];
+    return ids.map(id => (current.segments[id] || '').trim()).filter(Boolean).join('\n\n');
+  }, [draftOwner]);
 
-  // 清理（开始游戏或离开向导时调用）
-  const cleanup = () => {
-    abortRef.current?.abort();
-    // 将当前 segments 保存到缓存，以便重新进入步骤3时恢复
-    _segmentsCache = { ...segmentsRef.current };
-  };
-
-  // 开始游戏时清理缓存
-  const clearCacheAndCleanup = () => {
-    abortRef.current?.abort();
-    _segmentsCache = null;
-  };
+  const cancelGeneration = useCallback(() => {
+    draftOwner.cancelOperation('history');
+    operationRef.current = null;
+    setIsGenerating(false); setRegeneratingId(null);
+  }, [draftOwner]);
+  // Leaving a screen only cancels work; draft persistence belongs to the owner.
+  useEffect(() => cancelGeneration, [cancelGeneration]);
+  const clearCompletedDraft = () => { cancelGeneration(); draftOwner.complete(); };
 
   return {
     segments, setSegments,
@@ -313,7 +305,7 @@ ${contextBlock}${draftBlock}
     handleRegenerateSegment,
     loadPreset,
     buildFullCharacterHistory,
-    cleanup,
-    clearCacheAndCleanup,
+    cleanup: cancelGeneration, cancelGeneration,
+    clearCompletedDraft,
   };
 }

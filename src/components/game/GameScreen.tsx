@@ -6,6 +6,8 @@ import { useMediaQuery } from '../../hooks/useIsMobile';
 import ChatPanel from './chat/ChatPanel';
 import ProfilePanel from './panels/ProfilePanel';
 import CharacterGrid from './panels/CharacterGrid';
+import { mergeCurrentNpcChronicles, updateCurrentNpcChronicles, type ChronicleMergeOptions } from './panels/characterGrid/chronicleActions';
+import { requestCompletion } from '../../api/client';
 import NotebookPanel from './panels/NotebookPanel';
 import TaskPanel from './panels/TaskPanel';
 import ProfessionTreePanel from './panels/ProfessionTreePanel';
@@ -32,7 +34,11 @@ import { resolveProfessionBinding } from '../../data/professions';
 import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
 import { resolveCombatRuleset } from '../../gameplay/combatRulesets';
 import { createDefaultDiceModule } from '../../modules/defaults';
-import { useSaveStore } from '../../stores/saveStore';
+import { useSaveStore, captureCurrentSave } from '../../stores/saveStore';
+import { LeaveJourney, type JourneyDestination } from '../../context/journeyNavigation';
+import { useDialog } from '../shared/Dialog';
+import { encodeSaveFile } from '../../storage/saveFileCodec';
+import { exportSaveCapture } from '../../storage/db';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
 import { installWorldEventPacks } from '../../modules/webEventStore';
 import { getRuntimePack,listPacks,type EventRuntimePack } from '../../modules/eventApi';
@@ -47,7 +53,6 @@ import MobileLayout from './gameScreen/MobileLayout';
 import { useSimulation } from './gameScreen/hooks/useSimulation';
 import { useSurvivalCraft } from './gameScreen/hooks/useSurvivalCraft';
 import { useSurvivalSettlement } from './gameScreen/hooks/useSurvivalSettlement';
-import { useBusinessSettlement } from './gameScreen/hooks/useBusinessSettlement';
 import { assignBusinessStaff,purchaseBusinessAsset,upgradeBusinessAsset } from '../../gameplay/modules/business';
 import { normalizeAssetStatus } from './panels/businessOverlay/utils';
 import JourneyDossierContent from './shared/JourneyDossierContent';
@@ -56,7 +61,7 @@ import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBr
 import { setCustomModuleActiveSave } from '../../custom-modules/saveApplication';
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 import { useMemoryStore } from '../../memory/memoryStore';
-import { usePortraitStore } from '../../stores/portraitStore';
+import { useStoredImageUrls } from '../../hooks/useStoredImageUrl';
 import { imageDb } from '../../storage/imageDb';
 import { getEngineState } from '../../simulation/SimulationApi';
 import { normalizeCombatEncounterRequest,type CombatCommandInputV2,type CombatEncounterRequest } from '../../gameplay/protocols';
@@ -67,6 +72,44 @@ import { CombatNarrationCoordinator,applyV3CombatCommand,buildLocalCombatContinu
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
+  const { DialogUI: navigationDialog, confirm: confirmNavigation } = useDialog();
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const leaveDestination = useRef<JourneyDestination | null>(null);
+  const leaveRequested = useRef(false);
+  const leaveOwnerAlive = useRef(true);
+  const navigationPorts = useRef({ engine, navigate, confirmNavigation, blocked: false });
+  navigationPorts.current = { engine, navigate, confirmNavigation, blocked: false };
+  const leaveTask = useRef<LeaveJourney | null>(null);
+  if (!leaveTask.current) leaveTask.current = new LeaveJourney({
+    busy: () => navigationPorts.current.engine.isGenerating,
+    blocked: () => navigationPorts.current.blocked,
+    identity: () => useSaveStore.getState().currentSaveId ?? '',
+    version: () => { const { timestamp: _, ...capture } = captureCurrentSave(); return JSON.stringify(capture); },
+    confirmStop: () => navigationPorts.current.confirmNavigation('停止生成后，已生成的正文会保留。保存成功后再离开。', { title: '停止并保存离开？', confirmText: '停止并保存', cancelText: '继续等待' }),
+    stop: () => navigationPorts.current.engine.cancelAndWait(),
+    flush: () => useSaveStore.getState().flushAutoSave(),
+    navigate: target => navigationPorts.current.navigate(target),
+  });
+  useEffect(() => { leaveOwnerAlive.current = true; return () => { leaveOwnerAlive.current = false; leaveTask.current?.cancel(); }; }, []);
+  const handleNavigate = useCallback((target: JourneyDestination) => {
+    if (leaveRequested.current) return;
+    if (target === 'settings') { navigationPorts.current.navigate(target); return; }
+    leaveRequested.current = true; leaveDestination.current = target;
+    setIsLeaving(true); setLeaveError(null);
+    void leaveTask.current!.run(target).catch(error => {
+      if (leaveOwnerAlive.current) setLeaveError(`未能保存离开：${error instanceof Error ? error.message : String(error)}`);
+    }).finally(() => { leaveRequested.current = false; if (leaveOwnerAlive.current) setIsLeaving(false); });
+  }, []);
+  const handleNavigationBackup = async () => {
+    try {
+      const save = captureCurrentSave();
+      const blob = await encodeSaveFile(await exportSaveCapture(save));
+      const url = URL.createObjectURL(blob), anchor = document.createElement('a');
+      anchor.href = url; anchor.download = `journey-backup-${Date.now()}.zip`; anchor.click(); URL.revokeObjectURL(url);
+    } catch (error) { setLeaveError(`备份导出未完成：${error instanceof Error ? error.message : String(error)}`); }
+  };
+  const saveFailure = useSaveStore(s => s.saveFailure?.saveId === s.currentSaveId ? s.saveFailure : null);
   const customModuleSaveId = useSaveStore(s => s.currentSaveId);
   const customModuleScope = useRef({ mounted: true, worldId: state.selectedWorld, saveId: customModuleSaveId, manager: engine.variableManager });
   customModuleScope.current = { mounted: true, worldId: state.selectedWorld, saveId: customModuleSaveId, manager: engine.variableManager };
@@ -130,7 +173,8 @@ export default function GameScreen() {
 
   // ── Derived data ──
   const gameState = engine.variableManager.getState();
-  const savedPortraits = usePortraitStore(s => s.portraits);
+  const savedPortraits = useStoredImageUrls(Object.fromEntries(Object.entries(gameState.人物档案 ?? {})
+    .map(([id, npc]) => [id, (npc as any).portraitBlobKey || `portrait-${id}`])));
   const apiConfig = useConfigStore(s => s.apiConfig);
   const worldDef = useMemo(() => {
     try { return findWorldDef(state.selectedWorld); } catch { return undefined; }
@@ -574,8 +618,8 @@ export default function GameScreen() {
   const {
     runtimeRecipes, isGeneratingRecipe,
     handleSurvivalCraft, handleSurvivalUnlockRecipe, handleSurvivalGather, handleSurvivalGenerateRecipe, handleSurvivalDeleteRecipe,
+    cancelSurvivalRecipeGeneration,
   } = useSurvivalCraft(engine, apiConfig, worldDef, setNotification, bumpVersion);
-  useBusinessSettlement(engine, worldDef, bumpVersion);
   const { getChangeLog: getSurvivalChangeLog } = useSurvivalSettlement(engine, worldDef, bumpVersion);
   // ── Event effects ──
   useEffect(() => {
@@ -595,7 +639,7 @@ export default function GameScreen() {
       enabledModules: ['dice'],
     });
     if (result.status !== 'applied') return;
-    engine.variableManager.setState(result.state);
+    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldDef, bumpVersion]);
@@ -612,7 +656,7 @@ export default function GameScreen() {
       setNotification(result.reason ?? '属性点不足');
       return;
     }
-    engine.variableManager.setState(result.state);
+    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldDef, bumpVersion]);
@@ -630,7 +674,7 @@ export default function GameScreen() {
       setNotification(result.reason ?? '突破条件未满足');
       return;
     }
-    engine.variableManager.setState(result.state);
+    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldDef, worldSystem.职业体系, bumpVersion]);
@@ -657,7 +701,7 @@ export default function GameScreen() {
       setNotification(result.reason ?? '当前条件不满足');
       return;
     }
-    engine.variableManager.setState(result.state);
+    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldDef, bumpVersion]);
@@ -674,7 +718,7 @@ export default function GameScreen() {
       setNotification(result.reason ?? '当前条件不满足');
       return;
     }
-    engine.variableManager.setState(result.state);
+    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldSystem, bumpVersion]);
@@ -685,7 +729,7 @@ export default function GameScreen() {
       setNotification(result.reason ?? '经营操作未执行');
       return;
     }
-    engine.variableManager.setState(result.state);
+    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
   }, [engine, bumpVersion]);
@@ -765,12 +809,8 @@ export default function GameScreen() {
   const handleLeaveV3Combat = useCallback(async () => {
     if (combatAutomationTimerRef.current) clearTimeout(combatAutomationTimerRef.current);
     combatAutomationTimerRef.current = null;
-    try {
-      await useSaveStore.getState().flushAutoSave();
-    } finally {
-      navigate('start');
-    }
-  }, [navigate]);
+    handleNavigate('start');
+  }, [handleNavigate]);
 
   const runCombatAutomationStep = useCallback(() => {
     combatAutomationTimerRef.current = null;
@@ -854,22 +894,36 @@ export default function GameScreen() {
     useSaveStore.getState().scheduleAutoSave();
     setNotification('已恢复战前完整检查点，请重新编队');
   }, [engine, bumpVersion]);
-  const handleUpdateChronicles = useCallback((npcId: string, chronicles: string[]) => {
-    if (engine.isReadOnly) return;
-    const s = engine.variableManager.getState();
-    const npc = s.人物档案?.[npcId];
-    if (!npc) return;
-    (npc as any).人物事迹 = chronicles;
-    engine.variableManager.setState(s);
-    bumpVersion();
-  }, [engine, bumpVersion]);
-  const handleMergeChronicles = useCallback(async (npcId: string, startIndex: number, endIndex: number) => {
-    if (engine.isReadOnly) return false;
-    if (!apiConfig) return false;
-    const ok = await engine.variableManager.mergeNpcChronicles(npcId, startIndex, endIndex, apiConfig);
-    if (ok) bumpVersion();
-    return ok;
-  }, [engine, apiConfig, bumpVersion]);
+  const currentPlayerActionHost = () => {
+    const scope = { ...customModuleScope.current };
+    return {
+      readState: () => scope.manager.getState(),
+      isCurrent: () => customModuleScope.current.mounted && customModuleScope.current.manager === scope.manager
+        && customModuleScope.current.worldId === scope.worldId && useSaveStore.getState().currentSaveId === scope.saveId
+        && !engine.isReadOnly && !engine.isGenerating,
+      commit: (next: ReturnType<typeof engine.variableManager.getState>) => {
+        const accepted = engine.commitPlayerState(next);
+        if (accepted) bumpVersion();
+        return accepted;
+      },
+    };
+  };
+  const handleUpdateChronicles = (npcId: string, chronicles: string[], expectedChronicles?: string[]) => {
+    const result = updateCurrentNpcChronicles(currentPlayerActionHost(), npcId, chronicles, expectedChronicles);
+    if (!result.applied && result.reason) setNotification(result.reason);
+    return result.applied;
+  };
+  const handleMergeChronicles = async (npcId: string, startIndex: number, endIndex: number, options?: ChronicleMergeOptions) => {
+    if (!apiConfig) { setNotification('请先配置可用模型。'); return false; }
+    const result = await mergeCurrentNpcChronicles({
+      ...options, host: currentPlayerActionHost(), npcId, startIndex, endIndex,
+      generate: async ({ npcName, deeds, signal }) => (await requestCompletion(apiConfig, [{ role: 'user', content:
+        `你是叙事记录员。以下是NPC「${npcName}」的${deeds.length}条事迹记录，请将它们合并总结为1条简洁的事迹摘要（30-60字），保留关键事件，去除冗余。只输出合并后的1条文本，不要编号或其他前缀。\n\n原始事迹：\n${deeds.map((c, i) => `${i + 1}. ${c}`).join('\n')}`,
+      }], { temperature: 0.3, signal })).text,
+    });
+    if (!result.applied && result.reason) setNotification(result.reason);
+    return result.applied;
+  };
   const handleDeleteNpc = useCallback((npcId: string) => {
     if (engine.isReadOnly) return false;
     if (!npcId) return false;
@@ -893,7 +947,6 @@ export default function GameScreen() {
     if (ext.portraitBlobKey && ext.portraitBlobKey !== portraitKey) {
       imageDb.deleteBlob(ext.portraitBlobKey).catch(() => { /* 同上 */ });
     }
-    usePortraitStore.getState().clearPortrait(npcId);
     bumpVersion();
     useSaveStore.getState().scheduleAutoSave();
     setNotification(t('npc.delete.success').replace('{name}', npcName));
@@ -927,6 +980,7 @@ export default function GameScreen() {
   }, [engine.isReadOnly]);
   // ── Panel rendering (shared between desktop and mobile) ──
   const renderPanelContent = (panel: OverlayPanel, onClose: () => void) => {
+    const host = currentPlayerActionHost();
     const content = (() => {
       switch (panel) {
         case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} variableManager={engine.variableManager} />;
@@ -934,7 +988,11 @@ export default function GameScreen() {
         case 'tasks': return <TaskPanel gameState={gameState} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} />;
         case 'profession': return <ProfessionTreePanel config={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} gameState={gameState} currentTick={gameState.simulationRuntime?.tick ?? 0} onUnlock={id => applyProfessionAction('unlock', id)} onUse={id => applyProfessionAction('use', id)} />;
         case 'notebook': return <NotebookPanel gameState={gameState} />;
-        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager} onRestoreSnapshot={(snap) => { if (readOnly) return; engine.variableManager.restoreSnapshot(snap); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onRollbackToSnapshot={(msgIndex) => { if (readOnly) return; engine.rollbackToSnapshot(msgIndex); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onSave={() => { if (readOnly) return; bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }} onCommitState={async () => { if (readOnly) return; bumpVersion(); await useSaveStore.getState().flushAutoSave(); setNotification('状态已应用并保存'); }} />;
+        case 'variables': return <VariableSnapshotPanel messages={engine.messages} varMgr={engine.variableManager}
+          onIsCurrent={host.isCurrent} onPrepareStateJSON={engine.preparePlayerStateJSON}
+          onRollbackToSnapshot={(msgIndex) => { if (!host.isCurrent()) return; engine.rollbackToSnapshot(msgIndex); bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }}
+          onSave={() => { if (!host.isCurrent()) return; bumpVersion(); useSaveStore.getState().scheduleAutoSave(); }}
+          onCommitState={async next => { if (!host.isCurrent() || !host.commit(next)) return false; await useSaveStore.getState().flushAutoSave(); setNotification('状态已应用并保存'); return true; }} />;
         case 'worldbook': return <WorldBookPanel worldId={state.selectedWorld} engine={engine} />;
         case 'memory': return <MemorySettingsOverlay visible={true} onClose={onClose} onSave={() => useSaveStore.getState().scheduleAutoSave()} messages={engine.messages} mode="inline" />;
         case 'dynamics': return <WorldDynamicsPanel gameState={gameState} onManualTick={readOnly ? async () => undefined : handleManualTick} isSimulating={isSimulating} worldDef={worldDef} onRulesChange={handleSimulationRulesChange} onUseAction={readOnly ? undefined : text => { handleUseWorldDynamicsAction(text); onClose(); }} />;
@@ -951,8 +1009,8 @@ export default function GameScreen() {
   const getPanelEmblem = (panel: OverlayPanel): string | undefined => panel ? DOSSIER_META[normalizeDossierPanel(panel)].emblemSrc : undefined;
   const activeNavButtons = useMemo(() => navButtons.filter(button => button.id !== 'profession' || hasProfessionModule), [hasProfessionModule]);
   const mobileNavItems = useMemo(() => buildMobileNavItems({
-    navigate, setShowLeftOverlay, setMobileActivePanel,
-  }).filter(item => item.id !== 'profession' || hasProfessionModule), [navigate, hasProfessionModule]);
+    navigate: handleNavigate, setShowLeftOverlay, setMobileActivePanel,
+  }).filter(item => item.id !== 'profession' || hasProfessionModule), [handleNavigate, hasProfessionModule]);
   // ── Shared elements ──
   const bizData = (() => {
     const bizConfig = businessConfig;
@@ -997,6 +1055,7 @@ export default function GameScreen() {
     <RightPanel
       gameState={gameState} worldId={state.selectedWorld}
       onSurvivalGenerateRecipe={readOnly ? undefined : handleSurvivalGenerateRecipe}
+      onSurvivalCancelRecipeGeneration={readOnly ? undefined : cancelSurvivalRecipeGeneration}
       onSurvivalCraft={readOnly ? undefined : handleSurvivalCraft}
       onSurvivalUnlock={readOnly ? undefined : handleSurvivalUnlockRecipe}
       unlockedRecipeIds={gameState.gameplay?.survival?.unlockedRecipes ?? []}
@@ -1031,8 +1090,10 @@ export default function GameScreen() {
       onResend={engine.resendFromMessage} onResendFromHere={engine.resendFromAssistantMessage}
       pipelineStatus={engine.pipelineStatus} worldSystem={worldSystem}
       onDiceRoll={handleDiceRoll} onRetrySingleStage={engine.retrySingleStage}
+      onRetryPipeline={engine.retryPipeline}
       readOnly={readOnly}
       externalDraft={chatDraft}
+      externalBlockedReason={isLeaving ? '正在保存旅程，请稍候。' : undefined}
     />
   );
   // 生存资源数据（供 SurvivalOverlay 使用）
@@ -1040,8 +1101,10 @@ export default function GameScreen() {
     return worldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled)?.moduleConfig as import('../../modules/schema').SurvivalModuleSchema | undefined;
   })();
   // ── Render ──
+  navigationPorts.current.blocked = combatSaving || abilitySaving || isSimulating || isGeneratingRecipe || combatNarrationInFlightRef.current;
   return (
     <>
+      <div inert={isLeaving} style={{ display: 'contents' }}>
       {isMobile ? (
         <MobileLayout
           worldName={worldDef?.name || '世界漫游指南'}
@@ -1058,7 +1121,7 @@ export default function GameScreen() {
       ) : (
         <DesktopLayout
           navButtons={activeNavButtons} overlay={overlay} onOverlayChange={setOverlay}
-          onNavigate={navigate}
+          onNavigate={handleNavigate}
           isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen}
           drawerTitle={getPanelTitle(overlay)}
           drawerEmblemSrc={getPanelEmblem(overlay)}
@@ -1118,6 +1181,15 @@ export default function GameScreen() {
           {notification}
         </button>
       )}
+      </div>
+      {isLeaving && <div role="status" style={{ position: 'fixed', inset: 0, zIndex: 290, display: 'grid', placeItems: 'center', background: 'var(--overlay-backdrop)' }}>正在保存旅程…</div>}
+      {!isLeaving && (leaveError || saveFailure) && <section role="alert" style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 280, maxWidth: 'calc(100vw - 32px)', padding: 14, background: 'var(--bg-secondary)', border: '1px solid var(--danger)', borderRadius: 8 }}>
+        <p>{leaveError || `进度尚未保存：${saveFailure?.message}`}。当前旅程仍保留，可重试或导出完整备份。</p>
+        <button type="button" onClick={() => { if (leaveDestination.current) handleNavigate(leaveDestination.current); else void useSaveStore.getState().flushAutoSave().then(() => setLeaveError(null)).catch(error => setLeaveError(String(error))); }}>重试保存</button>
+        <button type="button" onClick={() => { void handleNavigationBackup(); }}>导出备份</button>
+        {leaveError && <button type="button" onClick={() => { leaveDestination.current = null; setLeaveError(null); }}>留在旅程</button>}
+      </section>}
+      {navigationDialog}
     </>
   );
 }

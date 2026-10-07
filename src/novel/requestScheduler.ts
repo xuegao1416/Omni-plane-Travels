@@ -6,16 +6,6 @@ import type { NovelAnalysisRequest } from './analysisClient';
 interface Pool { active: number; limit: number; blockedUntil: number; }
 const pools = new Map<string, Pool>();
 
-/** 可中断的等待竞态：取消任务时不必等完当前的限流间隔。 */
-function abortWhen(signal?: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    if (!signal) return;
-    const reason = () => signal.reason ?? new DOMException('Aborted', 'AbortError');
-    if (signal.aborted) { reject(reason()); return; }
-    signal.addEventListener('abort', () => reject(reason()), { once: true });
-  });
-}
-
 /**
  * 小说分析专用限流桶（`novel:analysis:` 前缀），独立于游戏内请求：
  * - 避免拆解批量请求拖慢游戏对话/记忆/模块构建
@@ -31,7 +21,7 @@ export async function applyNovelRateLimit(config: ApiConfig, signal?: AbortSigna
   if (typeof config.rateLimitMs === 'number' && config.rateLimitMs > 0) {
     setRateLimitInterval(config.rateLimitMs, bucket);
   }
-  await Promise.race([waitForRateLimit(bucket), abortWhen(signal)]);
+  await waitForRateLimit(bucket, signal);
 }
 
 export function waitNovelRequest(ms: number, signal?: AbortSignal): Promise<void> {

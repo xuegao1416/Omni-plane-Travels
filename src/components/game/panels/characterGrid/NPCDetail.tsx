@@ -1,3 +1,4 @@
+import type { ChronicleMergeOptions } from './chronicleActions';
 import { useCallback,useState } from 'react';
 import {
 User,BarChart3,Briefcase,MapPin,Sparkles,BookOpen,Brain,Dna,
@@ -162,16 +163,15 @@ export function ItemsBlock({ data }: { data: Record<string, any> }) {
   );
 }
 
-export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onPortraitChange, onDeleted }: {
+export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onDeleted }: {
   npc: KnownNPC; npcId: string; onClose: () => void;
   /** 幕后真相：只用于读者点开眼睛查看，不会同步给玩家扮演的角色。 */
   truth?: NPCData;
-  onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
-  onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  onUpdateChronicles?: (npcId: string, chronicles: string[], expectedChronicles?: string[]) => boolean | void;
+  onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number, options?: ChronicleMergeOptions) => Promise<boolean>;
   /** 删除该 NPC；返回 false 表示删除未生效。 */
   onDeleteNpc?: (npcId: string) => boolean | Promise<boolean>;
   worldId?: string;
-  onPortraitChange?: (npcId: string, url: string) => void;
   /** 删除成功后的回调（用于关闭外层卡片选择状态）。 */
   onDeleted?: () => void;
 }) {
@@ -214,7 +214,7 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
         width: '92%', maxWidth: '640px', height: '82vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onPortraitChange={onPortraitChange} onDelete={onDeleteNpc ? () => handleDelete() : undefined} />
+        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onDelete={onDeleteNpc ? () => handleDelete() : undefined} />
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <div style={{

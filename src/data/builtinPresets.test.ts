@@ -5,6 +5,7 @@ import {
 } from './builtinPresets';
 import { DRC_FORMAT_REPAIR_PROMPT_ID } from './presetDrcV12';
 import { MacroEngine } from '../engine/macroEngine';
+import { assembleSystemPrompt, injectAtDepthEntries } from '../engine/promptAssembler';
 
 describe('DeepSeek built-in preset', () => {
   const preset = getBuiltinPreset('deepseek');
@@ -164,5 +165,91 @@ describe('文风切换（setvar 单选机制）', () => {
     const resolved = resolveEnabled('deepseek', ['style_wuxia']);
     expect(resolved).toContain('文风：古风武侠');
     expect(resolved).not.toContain('语言自然、直接、连贯'); // DeepSeek 默认文风被覆盖
+  });
+});
+
+describe('实验性破甲·尾部深度注入（默认预设）', () => {
+  const preset = getBuiltinPreset('default');
+  const byId = (identifier: string) => preset.prompts.find(p => p.identifier === identifier);
+
+  const assemble = (enableIds: string[], userText: string) => {
+    const prompts = preset.prompts.map(p =>
+      p.identifier === 'exp_tail_reinforce' || p.identifier === 'exp_tail_sensitive'
+        ? { ...p, enabled: enableIds.includes(p.identifier) }
+        : p,
+    );
+    return assembleSystemPrompt({ ...preset, prompts }, {
+      varSnapshot: '',
+      wbInjection: '',
+      playerProfileBlock: '',
+      firewallTitle: '',
+      firewallContent: '',
+      userText,
+      round: 1,
+      macroEngine: new MacroEngine(),
+    });
+  };
+
+  test('两个 Gemini 尾部兼容开关都默认开启', () => {
+    expect(byId('exp_tail_reinforce')?.enabled).toBe(true);
+    expect(byId('exp_tail_sensitive')?.enabled).toBe(true);
+  });
+
+  test('Gemini 3.8 默认不要求输出思维链或创作流程', () => {
+    expect(byId('thinking')?.enabled).toBe(false);
+    expect(byId('writing_process')?.enabled).toBe(false);
+  });
+
+  test('不启用时不产生任何深度注入，系统提示保持原样', () => {
+    expect(assemble([], '我走进酒馆').depthEntries).toHaveLength(0);
+    expect(assemble([], '我走进酒馆').systemPrompt).not.toContain('TailReinforce');
+  });
+
+  test('启用后条目离开系统提示头部，改挂到聊天历史末尾（紧邻生成点）', () => {
+    const result = assemble(['exp_tail_reinforce'], '我走近她');
+
+    expect(result.systemPrompt).not.toContain('TailReinforce');
+    expect(result.depthEntries).toHaveLength(1);
+    expect(result.depthEntries[0].depth).toBe(0);
+    expect(result.depthEntries[0].label).toBe('创作重申');
+
+    const history = injectAtDepthEntries(
+      [
+        { role: 'assistant' as const, content: '旧回复' },
+        { role: 'user' as const, content: '当前玩家输入' },
+      ],
+      result.depthEntries,
+    );
+    expect(history).toHaveLength(3);
+    expect(history[history.length - 2].content).toBe('当前玩家输入');
+    expect(history[history.length - 1].content).toMatch(/^\[创作重申 - depth:0\]/);
+    expect(history[history.length - 1].content).toContain('<TailReinforce>');
+  });
+
+  test('敏感触发档只在玩家输入命中关键词时注入', () => {
+    expect(assemble(['exp_tail_sensitive'], '我们聊了聊天气').depthEntries).toHaveLength(0);
+    expect(assemble(['exp_tail_sensitive'], '她吻了我').depthEntries).toHaveLength(1);
+  });
+});
+
+describe('双人成行（适配版）Gemini 尾部兼容', () => {
+  const preset = getBuiltinPreset('drc_v12');
+
+  test('默认把创作重申放在历史尾部而不是系统提示头部', () => {
+    const tail = preset.prompts.find(p => p.identifier === 'drc_gemini_tail_reinforce');
+    expect(tail).toMatchObject({ enabled: true, injectionPosition: 1, injectionDepth: 0 });
+
+    const result = assembleSystemPrompt(preset, {
+      varSnapshot: '',
+      wbInjection: '',
+      playerProfileBlock: '',
+      firewallTitle: '',
+      firewallContent: '',
+      userText: '两位成年角色继续亲密互动',
+      round: 1,
+      macroEngine: new MacroEngine(),
+    });
+    expect(result.systemPrompt).not.toContain('<TailReinforce>');
+    expect(result.depthEntries.some(entry => entry.depth === 0 && entry.content.includes('<TailReinforce>'))).toBe(true);
   });
 });

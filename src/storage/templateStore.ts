@@ -8,6 +8,7 @@ import { v4 as uuid } from 'uuid';
 import type { PlayerProfile, CustomNpc } from './db';
 import type { SkillData, InventoryItem } from '../schema/variables';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { safeSetItem } from '@/storage/safeStorage';
 export { downloadJSON } from '../utils/download';
 
 // ─── 类型定义 ─────────────────────────────────────────
@@ -61,7 +62,7 @@ function readJSON<T>(key: string): T[] {
 }
 
 function writeJSON<T>(key: string, data: T[]) {
-  localStorage.setItem(key, JSON.stringify(data));
+  safeSetItem(key, JSON.stringify(data));
 }
 
 // ─── 主角预设 CRUD ───────────────────────────────────

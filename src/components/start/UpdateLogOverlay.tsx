@@ -3,6 +3,7 @@ import { Megaphone,X } from 'lucide-react';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { EntrySlicedButton } from './EntrySurface';
 import { APP_VERSION } from '../../config/version';
+import { trySetItem } from '../../storage/safeStorage';
 
 const UPDATE_LOG_STORAGE_KEY = `omni.update-notice.${APP_VERSION}.seen`;
 
@@ -16,7 +17,8 @@ export default function UpdateLogOverlay() {
   }, []);
 
   const dismiss = () => {
-    window.localStorage.setItem(UPDATE_LOG_STORAGE_KEY, 'true');
+    // 已读标记属于尽力而为：存储写不进去也不该让这个动作直接失败。
+    trySetItem(UPDATE_LOG_STORAGE_KEY, 'true');
     setOpen(false);
   };
 

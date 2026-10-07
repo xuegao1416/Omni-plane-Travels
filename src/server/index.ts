@@ -45,7 +45,7 @@ app.use('*', async (c: Context<AppEnv>, next: Next) => {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Credentials', 'true');
     c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version, x-content-encoding');
     c.header('Vary', 'Origin');
   }
   if (c.req.method === 'OPTIONS') return c.body(null, 204);
@@ -126,7 +126,7 @@ app.put('/api/saves/:slotId', async (c) => {
   const s = c.get('session');
   const contentLength = Number(c.req.header('Content-Length') || 0);
   if (contentLength > MAX_SLOT_BYTES) {
-    return c.json({ error: 'PAYLOAD_TOO_LARGE', message: '单槽存档上限 1MB' }, 413);
+    return c.json({ error: 'PAYLOAD_TOO_LARGE', message: '单槽存档上限 10MB' }, 413);
   }
   const body = await c.req.json();
   const payloadJson = JSON.stringify(body);

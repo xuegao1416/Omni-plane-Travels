@@ -3,7 +3,7 @@
 import { useState,useEffect,useCallback } from 'react';
 import { Brain } from 'lucide-react';
 import { useMemoryStore } from '../../../memory/memoryStore';
-import { loadPresets } from '../apiPresetUtils';
+import { useApiPresets } from '../../../stores/apiPresetStore';
 import { Section,SettingRow,Select } from '../SettingsUIComponents';
 import { WriteConfigPanel } from './WriteConfigPanel';
 import { VectorConfigPanel } from './VectorConfigPanel';
@@ -25,7 +25,7 @@ export function MemorySettingsOverlay({ visible, onClose, onSave, messages = [],
 }) {
   const store = useMemoryStore();
   const { config, memoryRuntime, vectorMemory } = store;
-  const apiPresets = loadPresets();
+  const { presets: apiPresets } = useApiPresets();
   const [localConfig, setLocalConfig] = useState(() => ({ ...config }));
   const [localPromptTemplates, setLocalPromptTemplates] = useState(() => ({ ...config.narrativePromptTemplates }));
   const [expandedPrompts, setExpandedPrompts] = useState<Record<string, boolean>>({});

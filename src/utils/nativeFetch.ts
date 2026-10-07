@@ -1,70 +1,139 @@
-/**
- * Tauri 原生 HTTP Helper
- *
- * 用途：在 Tauri 桌面端绕过 WebView 的 CORS 限制，使用原生 HTTP 客户端发起请求。
- *
- * 背景：
- *   - Tauri WebView 中直接 fetch 外部 API 会因 CORS 失败
- *   - tauri-plugin-http 提供原生 HTTP 能力，绕过浏览器限制
- *
- * 设计：
- *   - 仅用于「无需流式」的请求（模型列表、测试连接、embedding、非流式聊天等）
- *   - 自动检测平台，非 Tauri 时退回普通 fetch（保持浏览器端一致行为）
- *   - 返回标准 Response 对象，调用侧无感知
- *
- * 安全：
- *   - 绝不使用第三方 CORS 代理，避免泄露玩家 API Key
- */
-
-let isTauriEnv: boolean | null = null;
-
-/** 是否运行在 Tauri 环境 */
+/** Runtime capability detection also works when modules were loaded before the WebView. */
 export function isTauri(): boolean {
-  if (isTauriEnv !== null) return isTauriEnv;
-  try {
-    isTauriEnv = Boolean(
-      typeof window !== 'undefined' &&
-      (window as any).__TAURI_INTERNALS__
-    );
-  } catch {
-    isTauriEnv = false;
-  }
-  return isTauriEnv;
+  return typeof window !== 'undefined' && Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 }
 
-/**
- * 原生 fetch：在 Tauri 环境下使用 tauri-plugin-http 绕过 CORS；
- * 其他环境退回标准 fetch。
- */
-export async function nativeFetch(url: string, init?: RequestInit): Promise<Response> {
-  if (!isTauri()) {
-    return fetch(url, init);
-  }
 
-  let tauriFetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-  try {
-    ({ fetch: tauriFetch } = await import('@tauri-apps/plugin-http'));
-  } catch (err) {
-    // 只有模块本身取不到才算插件不可用；此时降级后的请求仍受 WebView CORS 限制。
-    console.warn('[nativeFetch] Tauri HTTP 插件不可用，降级为普通 fetch:', err);
-    return fetch(url, init);
-  }
-
-  try {
-    return await tauriFetch(url, init);
-  } catch (err) {
-    // 请求被拒与网络故障要分开报：scope 未放行时提示去查 capabilities，
-    // 否则容易被误读成插件没装而掩盖真实原因。
-    const text = err instanceof Error ? err.message : String(err);
-    const denied = /url not allowed|not allowed on the configured scope|scope|permission/i.test(text);
-    console.warn(
-      denied
-        ? '[nativeFetch] 请求被 http 插件的 scope 拒绝，降级为普通 fetch：请检查 capabilities 中 http:default 的 allow 列表'
-        : '[nativeFetch] 原生请求失败，降级为普通 fetch',
-      err,
-    );
-    return fetch(url, init);
-  }
+export interface NativeRequestInit extends RequestInit {
+  /** Total request deadline, including response body consumption. */
+  timeoutMs?: number;
 }
+type FetchImplementation = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+export interface NativeFetchDependencies {
+  isTauri: () => boolean;
+  browserFetch: FetchImplementation;
+  loadNativeFetch: () => Promise<FetchImplementation>;
+}
+
+/** Native and browser requests share the same cancellation and body lifetime. */
+export function createNativeFetch(dependencies: NativeFetchDependencies) {
+  return async (input: string | URL | Request, init: NativeRequestInit = {}): Promise<Response> => {
+    const { timeoutMs, ...requestInit } = init;
+    const externalSignal = init.signal ?? (input instanceof Request ? input.signal : undefined);
+    externalSignal?.throwIfAborted();
+    const controller = timeoutMs != null && timeoutMs > 0 ? new AbortController() : undefined;
+    const signal = controller?.signal ?? externalSignal;
+    const onExternalAbort = () => controller?.abort(externalSignal?.reason);
+    if (controller) externalSignal?.addEventListener('abort', onExternalAbort, { once: true });
+    const timer = controller ? setTimeout(() => controller.abort(new DOMException('Request timeout exceeded', 'TimeoutError')), timeoutMs) : undefined;
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      externalSignal?.removeEventListener('abort', onExternalAbort);
+    };
+    if (signal) requestInit.signal = signal;
+
+    try {
+      let fetchImpl = dependencies.browserFetch;
+      if (dependencies.isTauri()) {
+        try {
+          const loading = dependencies.loadNativeFetch();
+          fetchImpl = signal ? await awaitAbortable(loading, signal) : await loading;
+        } catch (error) {
+          signal?.throwIfAborted();
+          // Only plugin loading is safe to fall back from: no request has been sent.
+          console.warn('[transport] Tauri HTTP 插件不可用，使用浏览器 HTTP:', error);
+        }
+      }
+      signal?.throwIfAborted();
+      const pending = fetchImpl(input, requestInit);
+      const response = signal ? await awaitAbortable(pending, signal, response => {
+        void response.body?.cancel(signal.reason).catch(() => {});
+      }) : await pending;
+      if (!response.body || !signal) { cleanup(); return response; }
+      return bindBodyLifetime(response, signal, cleanup);
+    } catch (error) {
+      cleanup();
+      if (signal?.aborted) throw signal.reason;
+      throw error;
+    }
+  };
+}
+
+function awaitAbortable<T>(pending: Promise<T>, signal: AbortSignal, discard?: (value: T) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => { signal.removeEventListener('abort', onAbort); reject(signal.reason); };
+    signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    pending.then(value => {
+      signal.removeEventListener('abort', onAbort);
+      if (signal.aborted) {
+        discard?.(value);
+        reject(signal.reason);
+      } else resolve(value);
+    }, error => {
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.aborted ? signal.reason : error);
+    });
+  });
+}
+
+function bindBodyLifetime(response: Response, signal: AbortSignal, cleanup: () => void): Response {
+  const reader = response.body!.getReader();
+  let settled = false;
+  let onAbort: () => void;
+  const finish = () => {
+    settled = true;
+    signal.removeEventListener('abort', onAbort);
+    cleanup();
+  };
+  const body = new ReadableStream<Uint8Array>({
+    start(stream) {
+      onAbort = () => {
+        if (settled) return;
+        finish();
+        stream.error(signal.reason);
+        // Native fetch's body cancel releases the Rust response resource.
+        void reader.cancel(signal.reason).catch(() => {}).finally(() => reader.releaseLock());
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      if (signal.aborted) onAbort();
+    },
+    async pull(stream) {
+      try {
+        const chunk = await reader.read();
+        if (settled) return;
+        if (chunk.done) { finish(); reader.releaseLock(); stream.close(); }
+        else stream.enqueue(chunk.value);
+      } catch (error) {
+        if (settled) return;
+        finish(); reader.releaseLock(); stream.error(signal.aborted ? signal.reason : error);
+      }
+    },
+    async cancel(reason) {
+      if (settled) return;
+      finish();
+      try { await reader.cancel(reason); } finally { reader.releaseLock(); }
+    },
+  });
+  const result = new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  preserveResponseMetadata(result, response);
+  return result;
+}
+
+function preserveResponseMetadata(result: Response, source: Response): void {
+  for (const field of ['url', 'redirected', 'type'] as const) {
+    Object.defineProperty(result, field, { value: source[field] });
+  }
+  const clone = result.clone.bind(result);
+  Object.defineProperty(result, 'clone', { value: () => {
+    const copy = clone(); preserveResponseMetadata(copy, source); return copy;
+  } });
+}
+
+export const nativeFetch = createNativeFetch({
+  isTauri,
+  browserFetch: (input, init) => globalThis.fetch(input, init),
+  loadNativeFetch: async () => (await import('@tauri-apps/plugin-http')).fetch,
+});
 
 export default nativeFetch;

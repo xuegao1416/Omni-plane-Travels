@@ -77,7 +77,7 @@ export interface AssembleResult {
   assistantPrefill?: string;
   /** 预设自带的深度注入条目（injection_position=1，如双人成行的 🔒丨文风 depth=2）。
    *  供调用方合并进 atDepthEntries，注入到聊天历史指定深度。现有 4 预设无此类条目。 */
-  depthEntries: Array<{ depth: number; content: string }>;
+  depthEntries: Array<{ depth: number; content: string; label?: string }>;
 }
 
 /**
@@ -122,7 +122,7 @@ export function assembleSystemPrompt(
   const trimmedVarSnapshot = trimToTokenBudget(ctx.varSnapshot, VAR_SNAPSHOT_TOKEN_BUDGET);
 
   const bodyParts: string[] = [];
-  const depthEntries: Array<{ depth: number; content: string }> = [];
+  const depthEntries: Array<{ depth: number; content: string; label?: string }> = [];
   let assistantPrefill: string | undefined;
 
   triggered.forEach((entry, i) => {
@@ -137,7 +137,7 @@ export function assembleSystemPrompt(
     // 深度注入条目：剥离正文，转为 depthEntries
     if (entry.injectionPosition === 1) {
       if (content.trim()) {
-        depthEntries.push({ depth: entry.injectionDepth ?? 4, content });
+        depthEntries.push({ depth: entry.injectionDepth ?? 4, content, ...(entry.injectionLabel ? { label: entry.injectionLabel } : {}) });
       }
       return;
     }
@@ -203,7 +203,7 @@ export function assembleSystemPrompt(
  */
 export function injectAtDepthEntries<T extends { role: string; content: string }>(
   chatHistory: T[],
-  atDepthEntries: Array<{ depth: number; content: string }>,
+  atDepthEntries: Array<{ depth: number; content: string; label?: string }>,
 ): T[] {
   if (!atDepthEntries || atDepthEntries.length === 0) return chatHistory;
 
@@ -216,7 +216,7 @@ export function injectAtDepthEntries<T extends { role: string; content: string }
     const insertPos = Math.max(0, result.length - entry.depth);
     const depthMsg = {
       role: 'user' as const,
-      content: `[世界书补充 - depth:${entry.depth}]\n${entry.content}`,
+      content: `[${entry.label ?? '世界书补充'} - depth:${entry.depth}]\n${entry.content}`,
     } as T;
     result.splice(insertPos, 0, depthMsg);
   }

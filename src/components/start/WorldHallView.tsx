@@ -20,7 +20,7 @@ import type { WorldDef } from '../../data/worldLoader';
 import { saveWorldDraft,deleteWorldDraft,type WorldDraft } from '../../data/worldLoader';
 import { resolveWorldArtwork } from '../../data/worldArtwork';
 import WorldForkSelectModal from './WorldForkSelectModal';
-import type { GameSave,SaveMeta } from '../../storage/db';
+import type { SaveMeta } from '../../storage/db';
 import { TABS,type TabKey } from './stepWorldBrowser/constants';
 import { normalizeExternal } from './stepWorldBrowser/constants';
 import { restoreDirectorDependencies } from '../../director/dependencies';
@@ -339,6 +339,8 @@ interface WorldHallViewProps {
   setSelectedWorld: (id: string) => void;
   onBackToHome: () => void;
   onStartWizard: () => void;
+  creationDraftName?: string;
+  onResumeCreation?: () => void;
   onOpenEvents: () => void;
   onOpenCustomModules: () => void;
   onOpenSettings: () => void;
@@ -346,7 +348,7 @@ interface WorldHallViewProps {
   onOpenEditor: (world: WorldDef | null, step?: number) => void;
   onDeleteWorld: (worldId: string) => void | Promise<{ ok: boolean }>;
   onImportWorld: (world: WorldDef) => void;
-  onLoadSave: (save: GameSave) => void;
+  onLoadSave: (saveId: string) => Promise<void>;
   onDeleteSave: (id: string) => void | Promise<void>;
   onImportSave: (file: File) => void | Promise<void>;
   onExportSave: (id: string) => void | Promise<void>;
@@ -360,6 +362,7 @@ export default function WorldHallView({
   setSelectedWorld,
   onBackToHome,
   onStartWizard,
+  creationDraftName, onResumeCreation,
   onOpenEvents,
   onOpenCustomModules,
   onOpenSettings,
@@ -563,6 +566,7 @@ export default function WorldHallView({
           <span><b>世界漫游指南</b><small>OMNI PLANE TRAVELS</small></span>
         </div>
         <div ref={navActionsRef} className="entry-hall-header__actions" data-layout-id="hall.nav" data-layout-label="顶部导航整体" data-layout-editable="true" data-layout-container="hall.screen">
+          {onResumeCreation && <EntrySlicedButton frame="dawn-v4-compact" onClick={onResumeCreation} title={creationDraftName}>继续创建</EntrySlicedButton>}
           <EntrySlicedButton frame="dawn-v4-compact" icon={Sparkles} onClick={() => setNovelOpen(true)}>小说拆解台</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-26-v2.png" icon={Settings} onClick={onOpenSettings} data-layout-id="hall.nav.save" data-layout-label="导航 · 设置" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">设置</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-07-v2.png" icon={Boxes} onClick={() => { playHallSound('confirm'); onOpenEvents(); }} data-layout-id="hall.nav.events" data-layout-label="导航 · 事件中心" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">事件中心</EntrySlicedButton>

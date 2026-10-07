@@ -1,4 +1,4 @@
-import { useState,useMemo,useCallback } from 'react';
+import { useState,useMemo,useCallback,useEffect,useRef } from 'react';
 import { ChevronDown,ChevronRight,History,RotateCcw } from 'lucide-react';
 import { useDialog } from '../../shared/Dialog';
 import type { GameState } from '../../../schema/variables';
@@ -7,6 +7,7 @@ import { SnapshotToolbar } from './variableSnapshot/SnapshotToolbar';
 import { ApiSettingsSection } from './variableSnapshot/ApiSettingsSection';
 import { SnapshotList } from './variableSnapshot/SnapshotList';
 import { RollbackConfirm } from './variableSnapshot/RollbackConfirm';
+import { importCurrentVariableJSON, prepareCurrentVariableJSON, resolveCurrentRollbackIndex } from './variableSnapshot/currentVariableActions';
 import { STORAGE_KEYS } from '../../../config/storageKeys';
 import type { GameplayLogEntry } from '../../../gameplay/types';
 import { revertGameplayTransaction } from '../../../gameplay/kernel';
@@ -72,11 +73,14 @@ function gameplayStatusColor(status: GameplayLogEntry['status']): string {
 
 function GameplayLogSection({
   varMgr,
-  onSave,
+  onCommitState,
+  onIsCurrent,
   onChanged,
   revision,
-}: Pick<VariableSnapshotPanelProps, 'varMgr' | 'onSave'> & { onChanged: () => void; revision: number }) {
+}: Pick<VariableSnapshotPanelProps, 'varMgr' | 'onCommitState' | 'onIsCurrent'> & { onChanged: () => void; revision: number }) {
   const { DialogUI, confirm, alert } = useDialog();
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const [expanded, setExpanded] = useState(false);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
 
@@ -92,20 +96,25 @@ function GameplayLogSection({
       `撤销“${log.label || log.transactionId}”？只有在该事务写入的变量尚未被后续变化覆盖时才能安全撤销。`,
       { title: '确认撤销玩法变化', confirmText: '撤销', danger: true },
     );
-    if (!accepted) return;
+    if (!accepted || !alive.current || onIsCurrent && !onIsCurrent()) return;
 
     const state = varMgr.getState();
     const result = revertGameplayTransaction(state, log.transactionId, {
       tick: state.simulationRuntime?.tick ?? 0,
     });
     // 即使撤销被阻止，也保留内核产生的审计日志，让玩家能看到原因。
-    varMgr.setState(result.state as GameState);
+    try {
+      if (!await onCommitState(result.state as GameState)) { await alert('当前行动仍在处理或旅程已变化，撤销未应用。', { title: '撤销未完成' }); return; }
+    } catch {
+      if (alive.current && (!onIsCurrent || onIsCurrent())) { onChanged(); await alert('撤销结果已应用，但立即存档失败。请保留页面并继续保存。', { title: '保存失败' }); }
+      return;
+    }
+    if (!alive.current || onIsCurrent && !onIsCurrent()) return;
     onChanged();
-    onSave?.();
     if (result.status !== 'applied') {
       await alert(result.reason || '该事务当前无法撤销。', { title: '撤销未完成' });
     }
-  }, [alert, confirm, onChanged, onSave, varMgr]);
+  }, [alert, confirm, onChanged, onCommitState, onIsCurrent, varMgr]);
 
   return (
     <>
@@ -197,9 +206,18 @@ function GameplayLogSection({
 }
 
 export default function VariableSnapshotPanel({
-  messages, varMgr, onRestoreSnapshot, onRollbackToSnapshot, onSave, onCommitState,
+  messages, varMgr, onRollbackToSnapshot, onSave, onCommitState, onPrepareStateJSON, onIsCurrent,
 }: VariableSnapshotPanelProps) {
-  const { DialogUI, alert: dlgAlert } = useDialog();
+  const { DialogUI, alert: dlgAlert, confirm: dlgConfirm } = useDialog();
+  const activeManager = useRef(varMgr); activeManager.current = varMgr;
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const pendingApply = useRef<AbortController | null>(null);
+  const editSources = useRef<Record<string, string>>({});
+  const rollbackSource = useRef<{ manager: typeof varMgr; messageId: string; isCurrent: () => boolean } | null>(null);
+  useEffect(() => () => { pendingApply.current?.abort(); pendingApply.current = null; }, [varMgr]);
+  const currentHost = () => ({ readState: () => varMgr.getState(), prepare: onPrepareStateJSON,
+    isCurrent: () => alive.current && activeManager.current === varMgr && (onIsCurrent?.() ?? true) });
   const [layerEditTexts, setLayerEditTexts] = useState<Record<string, string>>({});
   const [layerModified, setLayerModified] = useState<Set<string>>(new Set());
   const [confirmRollback, setConfirmRollback] = useState<SnapshotLayer | null>(null);
@@ -237,6 +255,17 @@ export default function VariableSnapshotPanel({
     return layers;
   }, [messages, varMgr, gameplayRevision]);
 
+  const refreshCurrentDraft = useCallback(async () => {
+    const host = currentHost();
+    if (layerModified.has('current') && !await dlgConfirm('刷新会用最新变量替换当前 JSON 草稿。保留草稿可先复制文本再刷新。', { title: '载入最新变量', confirmText: '替换草稿' })) return;
+    if (!host.isCurrent()) return;
+    const latest = varMgr.getState();
+    editSources.current.current = JSON.stringify(latest);
+    setLayerEditTexts(prev => ({ ...prev, current: JSON.stringify(latest, null, 2) }));
+    setLayerModified(prev => { const next = new Set(prev); next.delete('current'); return next; });
+    setGameplayRevision(prev => prev + 1);
+  }, [varMgr, onIsCurrent, layerModified, dlgConfirm]);
+
   // ─── 层编辑 ───
   const getLayerEditText = useCallback((layer: SnapshotLayer) => {
     if (layerEditTexts[layer.id] !== undefined) return layerEditTexts[layer.id];
@@ -244,50 +273,56 @@ export default function VariableSnapshotPanel({
   }, [layerEditTexts]);
 
   const handleLayerEdit = useCallback((layerId: string, text: string) => {
+    editSources.current[layerId] ??= JSON.stringify(snapshotLayers.find(layer => layer.id === layerId)?.snapshot ?? varMgr.getState());
     setLayerEditTexts(prev => ({ ...prev, [layerId]: text }));
     setLayerModified(prev => new Set(prev).add(layerId));
-  }, []);
+  }, [snapshotLayers, varMgr]);
 
   const handleLoadLatest = useCallback(async (layer: SnapshotLayer) => {
-    const text = getLayerEditText(layer);
-    try {
-      JSON.parse(text);
-    } catch {
-      dlgAlert('JSON 格式错误，请检查后重试', { title: '格式错误' });
-      return;
-    }
-    if (!varMgr.setStateFromJSON(text)) {
-      dlgAlert('状态内容无法应用，请检查数据后重试', { title: '应用失败' });
-      return;
+    if (pendingApply.current) return;
+    const controller = new AbortController(); pendingApply.current = controller;
+    const host = currentHost();
+    const proposal = prepareCurrentVariableJSON({ host, json: getLayerEditText(layer),
+      expectedState: editSources.current[layer.id] ?? JSON.stringify(layer.snapshot), signal: controller.signal });
+    if (!proposal.state) {
+      pendingApply.current = null;
+      void dlgAlert(proposal.reason || '当前状态无法应用', { title: '应用未完成' }); return;
     }
     try {
-      if (onCommitState) await onCommitState();
-      else onSave?.();
-      const canonicalText = JSON.stringify(varMgr.getState(), null, 2);
-      setLayerEditTexts(prev => ({ ...prev, [layer.id]: canonicalText }));
+      const accepted = await onCommitState(proposal.state);
+      if (controller.signal.aborted || !host.isCurrent()) return;
+      if (!accepted) { void dlgAlert('当前旅程正在处理行动或已变化，编辑草稿保留。', { title: '应用未完成' }); return; }
+      const canonical = varMgr.getState();
+      editSources.current[layer.id] = JSON.stringify(canonical);
+      setLayerEditTexts(prev => ({ ...prev, [layer.id]: JSON.stringify(canonical, null, 2) }));
       setLayerModified(prev => { const next = new Set(prev); next.delete(layer.id); return next; });
       setGameplayRevision(prev => prev + 1);
     } catch {
-      dlgAlert('编辑已经应用到当前游戏，但立即存档失败。请保留页面并重试。', { title: '保存失败' });
-    }
-  }, [varMgr, getLayerEditText, onSave, onCommitState, dlgAlert]);
+      if (!controller.signal.aborted && host.isCurrent()) void dlgAlert('编辑已经应用到当前游戏，但立即存档失败。草稿保留，可继续保存。', { title: '保存失败' });
+    } finally { if (pendingApply.current === controller) pendingApply.current = null; }
+  }, [varMgr, getLayerEditText, onCommitState, onPrepareStateJSON, onIsCurrent, dlgAlert]);
+
+  const requestRollback = useCallback((layer: SnapshotLayer) => {
+    rollbackSource.current = { manager: varMgr, messageId: messages[layer.msgIndex]?.id ?? '', isCurrent: currentHost().isCurrent };
+    setConfirmRollback(layer);
+  }, [varMgr, messages, onIsCurrent]);
 
   const handleRollback = useCallback(() => {
     if (!confirmRollback) return;
-    if (onRollbackToSnapshot && confirmRollback.msgIndex >= 0) {
-      onRollbackToSnapshot(confirmRollback.msgIndex);
-    } else {
-      varMgr.restoreSnapshot(confirmRollback.snapshot);
-      onRestoreSnapshot?.(confirmRollback.snapshot);
-      onSave?.();
-    }
-    setConfirmRollback(null);
-  }, [varMgr, onRestoreSnapshot, onRollbackToSnapshot, onSave, confirmRollback]);
+    const source = rollbackSource.current;
+    const index = source && source.manager === varMgr ? resolveCurrentRollbackIndex({ messages,
+      messageId: source.messageId, snapshot: confirmRollback.snapshot, isCurrent: source.isCurrent }) : -1;
+    if (index < 0 || !onRollbackToSnapshot) {
+      void dlgAlert('所选历史记录或旅程已经变化，请重新选择快照。', { title: '恢复未执行' });
+    } else onRollbackToSnapshot(index);
+    rollbackSource.current = null; setConfirmRollback(null);
+  }, [varMgr, messages, onRollbackToSnapshot, confirmRollback, dlgAlert]);
 
   // ─── 导出 / 导入 ───
   const handleExport = useCallback(() => {
     const data = {
       exportedAt: new Date().toISOString(),
+      snapshot: varMgr.getState(),
       layers: snapshotLayers.map(l => ({
         msgIndex: l.msgIndex, snapshotTime: l.snapshotTime,
         isInitial: l.isInitial, snapshot: l.snapshot,
@@ -300,21 +335,24 @@ export default function VariableSnapshotPanel({
     a.download = `variable-snapshots-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [snapshotLayers]);
+  }, [snapshotLayers, varMgr]);
 
   const handleImport = useCallback(async (file: File) => {
+    pendingApply.current?.abort();
+    const controller = new AbortController(); pendingApply.current = controller;
+    const host = currentHost();
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const snapshot = data.snapshot || data;
-      if (typeof snapshot === 'object' && snapshot !== null) {
-        varMgr.restoreSnapshot(snapshot);
-        onSave?.();
-      }
+      const proposal = await importCurrentVariableJSON({ host, readText: () => file.text(), signal: controller.signal });
+      if (controller.signal.aborted || !host.isCurrent()) return;
+      if (!proposal.state) { void dlgAlert(proposal.reason || '文件格式不正确', { title: '导入未完成' }); return; }
+      const accepted = await onCommitState(proposal.state);
+      if (controller.signal.aborted || !host.isCurrent()) return;
+      if (!accepted) { void dlgAlert('当前旅程正在处理行动或已变化，导入未应用。', { title: '导入未完成' }); return; }
+      setGameplayRevision(prev => prev + 1);
     } catch {
-      dlgAlert('导入失败：文件格式不正确', { title: '导入失败' });
-    }
-  }, [varMgr, onSave, dlgAlert]);
+      if (!controller.signal.aborted && host.isCurrent()) void dlgAlert('变量已经应用，但立即存档失败。请保留页面并继续保存。', { title: '保存失败' });
+    } finally { if (pendingApply.current === controller) pendingApply.current = null; }
+  }, [varMgr, onCommitState, onPrepareStateJSON, onIsCurrent, dlgAlert]);
 
   return (
     <div className="game-variable-panel">
@@ -323,7 +361,7 @@ export default function VariableSnapshotPanel({
         snapshotLayers={snapshotLayers}
         onExport={handleExport}
         onImport={handleImport}
-        onRefresh={() => {}}
+        onRefresh={() => void refreshCurrentDraft()}
       />
       <ApiSettingsSection
         varApiPresetId={varApiPresetId}
@@ -332,7 +370,8 @@ export default function VariableSnapshotPanel({
       />
       <GameplayLogSection
         varMgr={varMgr}
-        onSave={onSave}
+        onCommitState={onCommitState}
+        onIsCurrent={onIsCurrent}
         onChanged={() => setGameplayRevision(prev => prev + 1)}
         revision={gameplayRevision}
       />
@@ -341,7 +380,7 @@ export default function VariableSnapshotPanel({
         getLayerEditText={getLayerEditText}
         layerModified={layerModified}
         onLoadLatest={handleLoadLatest}
-        onRollbackRequest={setConfirmRollback}
+        onRollbackRequest={requestRollback}
         onLayerEdit={handleLayerEdit}
       />
       {confirmRollback && (

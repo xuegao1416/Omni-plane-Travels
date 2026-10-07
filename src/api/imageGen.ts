@@ -381,10 +381,10 @@ export function getGenerationConfigError(cfg: Partial<ImageGenConfig>): string {
 
 // ─── ComfyUI ───
 
-export async function fetchComfyUIData(apiUrl: string): Promise<ComfyUIData> {
+export async function fetchComfyUIData(apiUrl: string, signal?: AbortSignal): Promise<ComfyUIData> {
   const baseUrl = apiUrl.replace(/\/$/, '');
   const { url, headers } = withProxy(`${baseUrl}/object_info`);
-  const res = await nativeFetch(url, { headers });
+  const res = await nativeFetch(url, { headers, signal });
   if (!res.ok) throw new Error('无法连接到 ComfyUI');
   const data = await res.json();
 
@@ -700,7 +700,8 @@ export function resolveComfyWorkflow(
   return config.comfyWorkflowPresets?.find((p) => p.id === config.comfyActiveWorkflowId) || null;
 }
 
-export async function generateComfyUIImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
+export async function generateComfyUIImage(prompt: string, config: Partial<ImageGenConfig>, signal?: AbortSignal): Promise<ImageGenResult> {
+  signal?.throwIfAborted();
   const apiUrl = (config.comfyUrl || 'http://localhost:8188').replace(/\/$/, '');
 
   // 优先使用自定义工作流
@@ -733,7 +734,7 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
     resultSamplerLabel = config.comfySampler || 'euler';
 
     // 获取 object_info 用于资源校验
-    const comfyData = await fetchComfyUIData(apiUrl);
+    const comfyData = await fetchComfyUIData(apiUrl, signal);
 
     // 拓扑感知运行时注入（从 KSampler 正/负向输入反向回溯到真正的 CLIPTextEncode 节点）
     const injectedPrompt = applyRuntimeValuesToApiPrompt(
@@ -827,6 +828,7 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
   if (comfyClientId) promptBody.client_id = comfyClientId;
 
   const res = await nativeFetch(promptUrl, {
+    signal,
     method: 'POST',
     headers: promptHeaders,
     body: JSON.stringify(promptBody),
@@ -846,11 +848,12 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
   const { prompt_id } = await res.json();
 
   const execution = await waitForComfyExecution({
+    signal,
     promptId: prompt_id,
     websocketUrl: comfyWebSocketUrl,
     fetchHistory: async () => {
       const { url: historyUrl, headers: historyHeaders } = withProxy(`${apiUrl}/history/${prompt_id}`);
-      const historyRes = await nativeFetch(historyUrl, { headers: historyHeaders });
+      const historyRes = await nativeFetch(historyUrl, { headers: historyHeaders, signal });
       if (!historyRes.ok) {
         throw new Error(`history HTTP ${historyRes.status} ${historyRes.statusText}`.trim());
       }
@@ -867,7 +870,7 @@ export async function generateComfyUIImage(prompt: string, config: Partial<Image
   const { url: viewUrl, headers: viewHeaders } = withProxy(
     `${apiUrl}/view?filename=${encodeURIComponent(image.filename)}&subfolder=${encodeURIComponent(image.subfolder ?? '')}&type=${encodeURIComponent(image.type ?? 'output')}`,
   );
-  const imgRes = await nativeFetch(viewUrl, { headers: viewHeaders });
+  const imgRes = await nativeFetch(viewUrl, { headers: viewHeaders, signal });
   if (!imgRes.ok) throw new Error(`图片下载失败 (${imgRes.status})`);
   const blob = await imgRes.blob();
   return {
@@ -986,7 +989,8 @@ function parseStructuredPrompt(text: string) {
   return result.sceneComposition || result.characters.length || result.globalUC ? result : null;
 }
 
-export async function generateNovelAIImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
+export async function generateNovelAIImage(prompt: string, config: Partial<ImageGenConfig>, signal?: AbortSignal): Promise<ImageGenResult> {
+  signal?.throwIfAborted();
   const apiKey = config.apiKey;
   if (!apiKey) throw new Error('未配置 NovelAI API Key');
 
@@ -1116,6 +1120,7 @@ export async function generateNovelAIImage(prompt: string, config: Partial<Image
     Authorization: `Bearer ${apiKey}`,
   });
   const resp = await nativeFetch(naiUrl, {
+    signal,
     method: 'POST',
     headers: naiHeaders,
     body: JSON.stringify(requestBody),
@@ -1161,7 +1166,8 @@ export async function generateNovelAIImage(prompt: string, config: Partial<Image
 
 // ─── OpenAI Compatible ───
 
-export async function generateOpenAICompatibleImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
+export async function generateOpenAICompatibleImage(prompt: string, config: Partial<ImageGenConfig>, signal?: AbortSignal): Promise<ImageGenResult> {
+  signal?.throwIfAborted();
   const provider = config.openaiCompatibleProvider || 'openai';
   const endpoint = normalizeOpenAICompatibleApiUrl(config.openaiCompatibleApiUrl || '', provider);
   const apiKey = String(config.openaiCompatibleApiKey || '').trim();
@@ -1192,6 +1198,7 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
     Authorization: `Bearer ${apiKey}`,
   });
   const resp = await nativeFetch(oaiUrl, {
+    signal,
     method: 'POST',
     headers: oaiHeaders,
     body: JSON.stringify(requestBody),
@@ -1238,7 +1245,7 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
 
     if (imageUrl) {
       const { url: dlUrl, headers: dlHeaders } = withProxy(imageUrl);
-      const imageResp = await nativeFetch(dlUrl, { headers: dlHeaders });
+      const imageResp = await nativeFetch(dlUrl, { headers: dlHeaders, signal });
       if (!imageResp.ok) throw new Error('其他生图返回的图片地址无法下载');
       imageBlob = await imageResp.blob();
     }
@@ -1317,7 +1324,8 @@ export async function fetchKreaModels(apiKey: string): Promise<string[]> {
   }
 }
 
-export async function generateKreaImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
+export async function generateKreaImage(prompt: string, config: Partial<ImageGenConfig>, signal?: AbortSignal): Promise<ImageGenResult> {
+  signal?.throwIfAborted();
   const apiKey = config.kreaApiKey;
   if (!apiKey) throw new Error('未配置 Krea API Key');
 
@@ -1347,6 +1355,7 @@ export async function generateKreaImage(prompt: string, config: Partial<ImageGen
   );
 
   const createRes = await nativeFetch(createUrl, {
+    signal,
     method: 'POST',
     headers: createHeaders,
     body: JSON.stringify(requestBody),
@@ -1368,19 +1377,9 @@ export async function generateKreaImage(prompt: string, config: Partial<ImageGen
   const jobId = createData.job_id;
   if (!jobId) throw new Error('Krea API 未返回 job_id');
 
-  // 轮询等待任务完成
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    const MAX_ATTEMPTS = 150; // 最多等待5分钟（每2秒轮询一次）
-    const poll = setInterval(async () => {
-      attempts += 1;
-      if (attempts > MAX_ATTEMPTS) {
-        clearInterval(poll);
-        reject(new Error('生成超时（5分钟）'));
-        return;
-      }
-
-      try {
+  // Sequential polling avoids overlapping requests and wakes immediately on cancellation.
+  for (let attempts = 0; attempts < 150; attempts++) {
+    await waitForImagePoll(2000, signal);
         const { url: statusUrl, headers: statusHeaders } = withProxy(
           `https://api.krea.ai/jobs/${jobId}`,
           {
@@ -1388,33 +1387,30 @@ export async function generateKreaImage(prompt: string, config: Partial<ImageGen
           },
         );
 
-        const statusRes = await nativeFetch(statusUrl, { headers: statusHeaders });
+        const statusRes = await nativeFetch(statusUrl, { headers: statusHeaders, signal });
         if (!statusRes.ok) {
           console.warn(`[Krea] 状态查询失败 (${statusRes.status}), attempt ${attempts}`);
-          return;
+          continue;
         }
 
         const statusData = await statusRes.json();
         const status = statusData.status;
 
         if (status === 'completed') {
-          clearInterval(poll);
           const imageUrl = statusData.result?.urls?.[0] || statusData.result?.url;
           if (!imageUrl) {
-            reject(new Error('Krea 返回结果中未找到图片 URL'));
-            return;
+            throw new Error('Krea 返回结果中未找到图片 URL');
           }
 
           // 下载图片
           const { url: dlUrl, headers: dlHeaders } = withProxy(imageUrl);
-          const imgRes = await nativeFetch(dlUrl, { headers: dlHeaders });
+          const imgRes = await nativeFetch(dlUrl, { headers: dlHeaders, signal });
           if (!imgRes.ok) {
-            reject(new Error(`图片下载失败 (${imgRes.status})`));
-            return;
+            throw new Error(`图片下载失败 (${imgRes.status})`);
           }
           const blob = await imgRes.blob();
 
-          resolve({
+          return {
             blob,
             seed: null,
             prompt: positivePrompt,
@@ -1425,25 +1421,30 @@ export async function generateKreaImage(prompt: string, config: Partial<ImageGen
             sampler: 'Krea',
             steps: null,
             scale: null,
-          });
+          };
         } else if (status === 'failed' || status === 'cancelled') {
-          clearInterval(poll);
-          reject(new Error(`Krea 生成失败: ${status}`));
+          throw new Error(`Krea 生成失败: ${status}`);
         }
         // 其他状态（queued, processing）继续等待
-      } catch (e) {
-        clearInterval(poll);
-        reject(e);
-      }
-    }, 2000);
+  }
+  throw new Error('生成超时（5分钟）');
+}
+
+function waitForImagePoll(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(signal?.reason); };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve(); }, ms);
+    signal?.addEventListener('abort', abort, { once: true });
   });
 }
 
 // ─── 路由函数 ───
 
-export async function generateConfiguredImage(prompt: string, config: Partial<ImageGenConfig>): Promise<ImageGenResult> {
-  if (config.engine === 'comfyui') return generateComfyUIImage(prompt, config);
-  if (config.engine === 'openai_compatible') return generateOpenAICompatibleImage(prompt, config);
-  if (config.engine === 'krea') return generateKreaImage(prompt, config);
-  return generateNovelAIImage(prompt, config);
+export async function generateConfiguredImage(prompt: string, config: Partial<ImageGenConfig>, signal?: AbortSignal): Promise<ImageGenResult> {
+  signal?.throwIfAborted();
+  if (config.engine === 'comfyui') return generateComfyUIImage(prompt, config, signal);
+  if (config.engine === 'openai_compatible') return generateOpenAICompatibleImage(prompt, config, signal);
+  if (config.engine === 'krea') return generateKreaImage(prompt, config, signal);
+  return generateNovelAIImage(prompt, config, signal);
 }

@@ -6,6 +6,7 @@ import { useWorkshopStore,type WorkshopItem,type WorkshopItemDetail,type Worksho
 import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
 import { STORAGE_KEYS } from '../../config/storageKeys';
+import { fitsInLocalStorage,formatStorageSize,safeSetItem } from '../../storage/safeStorage';
 import type { WorldDef } from '../../data/worlds-schema';
 import { installWorkshopItem,type WorkshopInstallOperation,restoreCustomWorldStorage } from '../../workshopRuntime';
 import { PUBLIC_WORKSHOP_TYPES,isPublicWorkshopType,type PublicWorkshopType } from '../../workshopCatalog';
@@ -62,7 +63,16 @@ export default function WorkshopSettingsTab() {
       const existing: WorldDef[] = JSON.parse(previous || '[]');
       const idx = existing.findIndex(w => w.id === world.id);
       if (idx >= 0) existing[idx] = world; else existing.push(world);
-      localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(existing));
+      // 提前检查项目容量预算；浏览器的实际配额仍由 safeSetItem 处理。
+      const payload = JSON.stringify(existing);
+      const fit = fitsInLocalStorage(STORAGE_KEYS.CUSTOM_WORLDS, payload);
+      if (!fit.ok) {
+        throw new Error(
+          `本地存储超过容量预警线：安装后约需 ${formatStorageSize(fit.projectedChars)}，预警上限为 ${formatStorageSize(fit.budgetChars)}。`
+          + '请先到「用户中心 · 本地资产」把不再需要的世界导出后清理，再重新安装。',
+        );
+      }
+      safeSetItem(STORAGE_KEYS.CUSTOM_WORLDS, payload);
       return {
         label: `世界「${world.name}」`,
         rollback: () => restoreCustomWorldStorage(STORAGE_KEYS.CUSTOM_WORLDS, previous),

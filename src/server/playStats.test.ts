@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parsePlayPingBody } from './playStats';
+import { parsePlayPingBody, type PlayPing } from './playStats';
 
 const now = 1_800_000_000_000;
 const validPing = {
@@ -12,7 +12,7 @@ const validPing = {
   browserFamily: 'Chrome',
   screenSize: '1920x1080',
   timezone: 'Asia/Shanghai',
-};
+} satisfies PlayPing;
 
 describe('parsePlayPingBody', () => {
   test('accepts a valid anonymous session', () => {

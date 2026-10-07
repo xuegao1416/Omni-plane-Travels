@@ -1,3 +1,4 @@
+import type { DirectorAuthoredEffect } from './authoredEffectsTypes';
 /** Immutable authored content; kept separate from save-scoped director plans. */
 export interface DirectorSource {
   kind: 'author' | 'novel';
@@ -22,6 +23,7 @@ export interface DirectorDefinition {
     description: string;
     nodeIds: string[];
     completion?: { mode: 'all' | 'any'; nodeIds: string[] };
+    failurePolicy?: 'stop' | 'continue';
   }>;
   nodes: Array<{
     id: string;
@@ -43,6 +45,7 @@ export interface DirectorDefinition {
     constraints: string[];
     sourceRefs: string[];
     referenceOutcome?: string;
+    effects?: DirectorAuthoredEffect[];
   }>;
   characters: Array<{ id: string; name: string; aliases: string[] }>;
   coverage: { complete: boolean; gaps: string[]; boundary: string };

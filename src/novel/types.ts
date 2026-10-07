@@ -92,6 +92,25 @@ export interface NovelStaticMaterial {
   };
 }
 
+export type NovelMaterialField = keyof NovelStaticMaterial;
+
+/** One authored override. `baseline` is the model output the override was made against. */
+export interface NovelMaterialEdit {
+  field: NovelMaterialField;
+  baseline?: NovelStaticMaterial[NovelMaterialField];
+  value?: NovelStaticMaterial[NovelMaterialField];
+  remove: boolean;
+}
+
+/** Generated material and authored overrides stay separate so regeneration cannot silently drop player edits. */
+export interface NovelMaterialDocument {
+  version: 1;
+  generated: NovelStaticMaterial;
+  edits: NovelMaterialEdit[];
+}
+
+export type NovelAnalysisGoal = 'full' | 'background';
+
 export interface NovelChapter {
   sourceVersion?: string;
   included?: boolean;
@@ -197,6 +216,8 @@ export type NovelJobStatus = 'idle' | 'queued' | 'running' | 'paused' | 'complet
 export type NovelJobPhase = 'index' | 'evidence' | 'overview' | 'segments' | 'completed';
 
 export interface NovelAnalysisJob {
+  overviewRefreshPending?: boolean;
+  refreshOperationId?: string;
   runId?: string;
   model?: string;
   configFingerprint?: string;
@@ -210,6 +231,7 @@ export interface NovelAnalysisJob {
   datasetId: string;
   status: NovelJobStatus;
   phase: NovelJobPhase;
+  goal?: NovelAnalysisGoal;
   startSegmentIndex: number;
   total: number;
   completed: number;
@@ -223,6 +245,8 @@ export interface NovelAnalysisJob {
 }
 
 export interface NovelDataset {
+  taskPreparation?: { mode: 'auto' | 'single_chapter' | 'custom'; maxTokens: number; startChapterIndex: number; endChapterIndex: number };
+  preparation?: import('./preparationModel').NovelPreparationCheckpoint;
   sourceVersion?: string;
   encoding?: string;
   importIssues?: Array<{code: string; message: string; chapterId?: string; resource?: string; severity: 'warning' | 'error'}>;
@@ -240,6 +264,7 @@ export interface NovelDataset {
   rawText?: string;
   chapters: NovelChapter[];
   staticMaterial: NovelStaticMaterial;
+  materialDocument?: NovelMaterialDocument;
   /** v1 upgrade baseline for exact-match regeneration of worlds created before provenance. */
   legacyStaticMaterial?: NovelStaticMaterial;
   segments: NovelSegment[];

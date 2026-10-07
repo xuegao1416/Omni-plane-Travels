@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { createDefaultGameState } from '../schema/variables';
-import { applyStatModuleInitData } from './useGameEngine';
+import { applyStatModuleInitData } from '../gameplay/characterInitialization';
 
 describe('applyStatModuleInitData', () => {
   test('consumes materialized special-object values', () => {

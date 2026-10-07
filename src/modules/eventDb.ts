@@ -28,6 +28,8 @@ function normalizeWebEventRecord(raw: WebEventRecord & { worldId?: string }): We
   const legacyWorldId = raw.worldId;
   const record = { ...raw } as WebEventRecord & { worldId?: string };
   delete record.worldId;
+  delete (record as WebEventRecord & { _saveImportOwner?: string })._saveImportOwner;
+  delete (record as WebEventRecord & { _writeRevision?: string })._writeRevision;
   return legacyWorldId && !record.manifest.worldId
     ? { ...record, manifest: { ...record.manifest, worldId: legacyWorldId } }
     : record;
@@ -35,7 +37,7 @@ function normalizeWebEventRecord(raw: WebEventRecord & { worldId?: string }): We
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
-function getDb(): Promise<IDBPDatabase> {
+export function getEventDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
@@ -56,23 +58,26 @@ function getDb(): Promise<IDBPDatabase> {
 }
 
 export async function putWebEvent(rec: WebEventRecord): Promise<void> {
-  const db = await getDb();
-  await db.put(STORE, rec);
+  const db = await getEventDB();
+  // Every normal edit supersedes import ownership, including a spread of a read record.
+  const value = { ...rec, _writeRevision: crypto.randomUUID() } as WebEventRecord & { _saveImportOwner?: string; _writeRevision: string };
+  delete value._saveImportOwner;
+  await db.put(STORE, value);
 }
 
 export async function getWebEvent(id: string): Promise<WebEventRecord | undefined> {
-  const db = await getDb();
+  const db = await getEventDB();
   const raw = await db.get(STORE, id) as (WebEventRecord & { worldId?: string }) | undefined;
   return raw ? normalizeWebEventRecord(raw) : undefined;
 }
 
 export async function deleteWebEvent(id: string): Promise<void> {
-  const db = await getDb();
+  const db = await getEventDB();
   await db.delete(STORE, id);
 }
 
 export async function allWebEvents(): Promise<WebEventRecord[]> {
-  const db = await getDb();
+  const db = await getEventDB();
   const records = await db.getAll(STORE) as Array<WebEventRecord & { worldId?: string }>;
   return records.map(normalizeWebEventRecord);
 }
@@ -119,22 +124,22 @@ export function recordToEntry(rec: WebEventRecord): EventRegistryEntry {
 // ─────────────────────────────────────────────────────────────
 
 export async function putCollection(col: Collection): Promise<void> {
-  const db = await getDb();
+  const db = await getEventDB();
   await db.put(COLLECTION_STORE, col);
 }
 
 export async function getCollection(id: string): Promise<Collection | undefined> {
-  const db = await getDb();
+  const db = await getEventDB();
   return db.get(COLLECTION_STORE, id);
 }
 
 export async function deleteCollection(id: string): Promise<void> {
-  const db = await getDb();
+  const db = await getEventDB();
   await db.delete(COLLECTION_STORE, id);
 }
 
 export async function allCollections(): Promise<Collection[]> {
-  const db = await getDb();
+  const db = await getEventDB();
   return db.getAll(COLLECTION_STORE);
 }
 

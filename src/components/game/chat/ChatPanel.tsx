@@ -12,7 +12,8 @@ import { getInitialMessageStart,getPreviousMessageStart } from './messageWindow'
 interface Props {
   messages: ChatMessage[];
   isGenerating: boolean;
-  onSend: (text: string) => void;
+  onSend: import('./draftSubmission').ActionSender;
+  externalBlockedReason?: string;
   onCancel: () => void;
   onDelete: (id: string) => void;
   onEdit: (id: string, content: string) => void;
@@ -25,6 +26,7 @@ interface Props {
   onDiceRoll?: (roll: DiceRoll) => void;
   /** 单步重试回调 */
   onRetrySingleStage?: (taskId: PipelineTaskId) => void;
+  onRetryPipeline?: () => void;
   worldName?: string;
   worldSceneUrl?: string;
   mobileSummary?: React.ReactNode;
@@ -32,8 +34,10 @@ interface Props {
   externalDraft?: { id: string; text: string } | null;
 }
 
-export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, worldName, worldSceneUrl, mobileSummary, readOnly = false, externalDraft = null }: Props) {
+export default function ChatPanel({ messages, isGenerating, onSend, onCancel, onDelete, onEdit, onResend, onResendFromHere, pipelineStatus, worldSystem, onDiceRoll, onRetrySingleStage, onRetryPipeline, worldName, worldSceneUrl, mobileSummary, readOnly = false, externalDraft = null, externalBlockedReason }: Props) {
   const [showMonitor, setShowMonitor] = useState(false);
+  const monitorOpenRef = useRef(showMonitor);
+  monitorOpenRef.current = showMonitor;
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const [visibleStart, setVisibleStart] = useState(() => getInitialMessageStart(messages.length));
@@ -89,14 +93,15 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
     })
   }, []);
 
-  // 自动滚动到底部（受设置控制）
+  const lastMessage = messages.at(-1);
+  // Only visible narrative changes scroll. Checkpoints and pipeline metadata do not.
   useEffect(() => {
-    if (!settings.autoScroll) return;
+    if (!settings.autoScroll || monitorOpenRef.current) return;
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, settings.autoScroll]);
+  }, [messages.length, lastMessage?.id, lastMessage?.rawText, lastMessage?.streaming, settings.autoScroll]);
 
   // 复制到剪贴板
   const handleCopy = useCallback((text: string) => {
@@ -158,6 +163,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
       {/* 输入区 */}
       <InputArea
         onSend={onSend}
+        externalBlockedReason={externalBlockedReason}
         onCancel={onCancel}
         isGenerating={isGenerating}
         pipelineStatus={pipelineStatus ?? null}
@@ -173,6 +179,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
           status={pipelineStatus ?? null}
           onClose={() => setShowMonitor(false)}
           onRetrySingleStage={onRetrySingleStage}
+          onRetryPipeline={!readOnly && messages.filter(message => message.role === 'assistant').at(-1)?.turnRecovery ? onRetryPipeline : undefined}
           isGenerating={isGenerating}
         />
       )}

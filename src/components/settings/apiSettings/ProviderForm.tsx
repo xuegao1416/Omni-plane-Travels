@@ -1,5 +1,4 @@
 import type { ApiConfig } from '../../../api/types';
-import type { ApiPreset } from '../apiPresetUtils';
 import PresetManager from './PresetManager';
 import ProxySettings from './ProxySettings';
 import AdvancedSettings from './AdvancedSettings';
@@ -12,25 +11,25 @@ interface Props {
   setModels: (models: string[]) => void;
   loadingModels: boolean;
   onFetchModels: () => void;
-  presets: ApiPreset[];
-  setPresets: (presets: ApiPreset[]) => void;
   onLoadPreset: (config: ApiConfig) => void;
+  proxyUrl: string;
+  onProxyChange: (value: string) => void;
 }
 
 export default function ProviderForm({
   config, set, models, setModels, loadingModels, onFetchModels,
-  presets, setPresets, onLoadPreset,
+  onLoadPreset, proxyUrl, onProxyChange,
 }: Props) {
   return (
     <div className="settings-api-form">
 
-      <PresetManager config={config} presets={presets} setPresets={setPresets} onLoadPreset={onLoadPreset} />
+      <PresetManager config={config} onLoadPreset={onLoadPreset} />
 
       {/* API 端点 */}
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>API 端点</div>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>留空则使用官方默认地址</div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>留空用官方默认地址；填到 /chat/completions 结尾则原样使用，不再自动补全</div>
         </div>
         <input
           className="input-field"
@@ -56,7 +55,7 @@ export default function ProviderForm({
         />
       </div>
 
-      <ProxySettings />
+      <ProxySettings proxyUrl={proxyUrl} onChange={onProxyChange} />
 
       {/* 模型设置 */}
       <div className="settings-api-section-title">

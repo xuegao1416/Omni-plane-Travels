@@ -2,7 +2,7 @@ import { requestCompletion } from '../api/client';
 import { requestStructuredCompletion } from '../api/structuredOutput';
 import { z } from 'zod';
 import type { ApiConfig } from '../api/types';
-import type { DirectorDirective, DirectorOutcomeItem, DirectorOutcomeReceipt, DirectorState, DirectiveOutcome } from './types';
+import type { DirectorDirective, DirectorOutcomeItem, DirectorOutcomeReceipt, DirectorState, DirectiveOutcome, PlotPlan } from './types';
 
 const allowed = new Set<DirectiveOutcome>(['realized','partially_realized','not_realized','player_rejected','invalidated','deferred']);
 const outcomeSchema = z.array(z.object({
@@ -12,7 +12,7 @@ const outcomeSchema = z.array(z.object({
 }).strict());
 
 /** Only grounded receipts for this issued directive may advance its plans. */
-export function commitDirectiveOutcome(director: DirectorState, directive: DirectorDirective, receipt: DirectorOutcomeReceipt, narrative: string, committed: { turnId: string; stateVersion?: string }): boolean {
+export function commitDirectiveOutcome(director: DirectorState, directive: DirectorDirective, receipt: DirectorOutcomeReceipt, narrative: string, committed: { turnId: string; stateVersion?: string }, settleEffects?: (plan: PlotPlan) => boolean): boolean {
   if (receipt.directiveId !== directive.id || receipt.turnId !== committed.turnId
     || receipt.stateVersion !== committed.stateVersion
     || director.receipts.some(previous => previous.id === receipt.id)) return false;
@@ -29,6 +29,10 @@ export function commitDirectiveOutcome(director: DirectorState, directive: Direc
       ? { planId: item.planId, outcome: 'not_realized' as const }
       : item;
   });
+  for (const item of outcomes) {
+    const plan = director.plans[item.planId]!;
+    if (item.outcome === 'realized' && plan.authorEffects?.length && !settleEffects?.(plan)) return false;
+  }
   director.receipts.push({ ...receipt, outcomes });
   outcomes.forEach(item => applyOutcome(director, item, receipt.id));
   return true;
@@ -55,6 +59,7 @@ export async function evaluateDirectiveOutcome(input: {
   stateVersion?: string;
   config: ApiConfig;
   signal?: AbortSignal;
+  commit?: boolean;
 }, request: typeof requestCompletion = requestCompletion): Promise<DirectorOutcomeReceipt> {
   const receiptId = `outcome:${input.turnId}:${input.directive.id}`;
   const committed = input.director.receipts.find(receipt => receipt.id === receiptId);
@@ -80,6 +85,6 @@ export async function evaluateDirectiveOutcome(input: {
     outcomes,
     createdAt: Date.now(),
   };
-  commitDirectiveOutcome(input.director, input.directive, receipt, input.narrative, input);
+  if (input.commit !== false) commitDirectiveOutcome(input.director, input.directive, receipt, input.narrative, input);
   return receipt;
 }

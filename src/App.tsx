@@ -27,12 +27,23 @@ function AppContent() {
     else reportDepth('home');
   }, [state.currentScreen]);
 
-  if (state.currentScreen === 'settings') {
-    const previousScreen = state.screenHistory[state.screenHistory.length - 1];
+  const previousScreen = state.screenHistory[state.screenHistory.length - 1];
+  const settingsOpen = state.currentScreen === 'settings';
+  if (state.currentScreen === 'game' || (settingsOpen && previousScreen === 'game')) {
+    return (
+      <div className={settingsOpen ? 'settings-route' : undefined}>
+        <div className={settingsOpen ? 'settings-route__background' : undefined} aria-hidden={settingsOpen || undefined} inert={settingsOpen}>
+          <GameScreen />
+        </div>
+        {settingsOpen && <SettingsScreen />}
+      </div>
+    );
+  }
+  if (settingsOpen) {
     return (
       <div className="settings-route">
         <div className="settings-route__background" aria-hidden="true" inert>
-          {previousScreen === 'game' ? <GameScreen /> : <StartScreen />}
+          <StartScreen />
         </div>
         <SettingsScreen />
       </div>
@@ -41,7 +52,6 @@ function AppContent() {
 
   switch (state.currentScreen) {
     case 'events': return <EventsScreen />;
-    case 'game': return <GameScreen />;
     case 'user-center': return <UserCenterPage />;
     default: return <StartScreen />;
   }

@@ -1,22 +1,27 @@
-import { useState,useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { ApiConfig } from '../../../api/types';
-import type { ApiPreset } from '../apiPresetUtils';
-import { savePresets } from '../apiPresetUtils';
+import type { ApiPreset } from '../../../api/presets';
+import { apiPresetStore, useApiPresets } from '../../../stores/apiPresetStore';
 import { rowStyle } from './types';
 
 interface Props {
   config: ApiConfig;
-  presets: ApiPreset[];
-  setPresets: (presets: ApiPreset[]) => void;
   onLoadPreset: (config: ApiConfig) => void;
 }
 
-export default function PresetManager({ config, presets, setPresets, onLoadPreset }: Props) {
+export default function PresetManager({ config, onLoadPreset }: Props) {
   const [presetName, setPresetName] = useState('');
+  const { presets, initialized, error: recoveryError, warning } = useApiPresets();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const pendingRef = useRef(false);
+  const nameRef = useRef(presetName); nameRef.current = presetName;
 
-  const handleSave = useCallback(() => {
-    if (!presetName.trim()) return;
+  const handleSave = async () => {
+    if (!presetName.trim() || pendingRef.current) return;
+    pendingRef.current = true; setPending(true); setError('');
+    const capturedName = presetName;
     const preset: ApiPreset = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: presetName.trim(),
@@ -24,23 +29,30 @@ export default function PresetManager({ config, presets, setPresets, onLoadPrese
       createdAt: Date.now(),
       rateLimitMs: config.rateLimitMs,
     };
-    const next = [...presets, preset];
-    setPresets(next);
-    savePresets(next);
-    setPresetName('');
-  }, [presetName, config, presets, setPresets]);
+    try {
+      await apiPresetStore.change(null, preset);
+      if (nameRef.current === capturedName) setPresetName('');
+    } catch (error) { setError(error instanceof Error ? error.message : String(error)); }
+    finally { pendingRef.current = false; setPending(false); }
+  };
 
-  const handleDelete = useCallback((id: string) => {
-    const next = presets.filter(p => p.id !== id);
-    setPresets(next);
-    savePresets(next);
-  }, [presets, setPresets]);
+  const handleDelete = async (preset: ApiPreset) => {
+    if (pendingRef.current) return;
+    pendingRef.current = true; setPending(true); setError('');
+    try { await apiPresetStore.change(preset, null); }
+    catch (error) { setError(error instanceof Error ? error.message : String(error)); }
+    finally { pendingRef.current = false; setPending(false); }
+  };
 
   return (
     <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
       <div style={{ fontSize: 'var(--font-size-base)', fontWeight: '500', color: 'var(--text-secondary)' }}>
         预设配置
       </div>
+      {(recoveryError || error || warning) && <div role="alert" style={{ fontSize: 'var(--font-size-sm)' }}>
+        {recoveryError || error || warning}
+        <button type="button" disabled={pending} onClick={() => { setError(''); void apiPresetStore.reload(); }}>重新读取</button>
+      </div>}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         <input
           className="input-field"
@@ -51,7 +63,7 @@ export default function PresetManager({ config, presets, setPresets, onLoadPrese
         />
         <button
           onClick={handleSave}
-          disabled={!presetName.trim()}
+          disabled={!presetName.trim() || pending || !initialized || !!recoveryError}
           style={{
             padding: '5px 14px', fontSize: 'var(--font-size-base)', whiteSpace: 'nowrap',
             border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer',
@@ -59,11 +71,11 @@ export default function PresetManager({ config, presets, setPresets, onLoadPrese
             color: presetName.trim() ? 'var(--text-primary)' : 'var(--text-muted)',
           }}
         >
-          保存当前配置
+          {pending ? '保存中…' : '保存当前配置'}
         </button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {presets.length === 0 ? (
+        {!initialized ? <div>正在读取预设…</div> : presets.length === 0 ? (
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', padding: '4px 0' }}>暂无预设</div>
         ) : (
           presets.map((p, i) => (
@@ -71,7 +83,8 @@ export default function PresetManager({ config, presets, setPresets, onLoadPrese
               <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', width: '18px', textAlign: 'right' }}>{i + 1}</span>
               <span style={{ flex: 1, fontSize: 'var(--font-size-base)', fontWeight: '500' }}>{p.name}</span>
               <button
-                onClick={() => onLoadPreset(p.config)}
+                disabled={pending || !!recoveryError}
+                onClick={() => onLoadPreset(structuredClone(p.config))}
                 style={{
                   border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 10px',
                   fontSize: 'var(--font-size-sm)', cursor: 'pointer', background: 'var(--bg-primary)', color: 'var(--text-primary)',
@@ -80,7 +93,9 @@ export default function PresetManager({ config, presets, setPresets, onLoadPrese
                 加载
               </button>
               <button
-                onClick={() => handleDelete(p.id)}
+                disabled={pending || !!recoveryError}
+                aria-label={`删除预设 ${p.name}`}
+                onClick={() => handleDelete(p)}
                 style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 <Trash2 size={14} />

@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, test } from 'bun:test';
+import { NOVEL_DATASETS_STORE, NOVEL_MATERIALS_STORE, getDB } from '../storage/db';
 import type { NovelAnalysisJob, NovelDataset, NovelSegment } from './types';
 import {
   deleteNovelDataset,
@@ -84,5 +85,24 @@ describe('novel partitioned storage', () => {
     expect(await listNovelChapters(dataset.id)).toEqual([]);
     expect(await listNovelSegments(dataset.id)).toEqual([]);
     expect(await listNovelJobs(dataset.id)).toEqual([]);
+  });
+
+  test('keeps the authored material overlay in the material partition and clears it with the dataset', async () => {
+    const base = sampleDataset(`novel-store-${Date.now()}-overlay`);
+    const withOverlay: NovelDataset = {
+      ...base,
+      staticMaterial: { ...base.staticMaterial, summary: '作者概述' },
+      materialDocument: { version: 1, generated: { summary: '模型概述' }, edits: [{ field: 'summary', baseline: '模型概述', value: '作者概述', remove: false }] },
+    };
+    await saveNovelDataset(withOverlay);
+
+    const stored = await getNovelDataset(withOverlay.id);
+    expect(stored?.staticMaterial.summary).toBe('作者概述');
+    expect(stored?.materialDocument?.edits).toHaveLength(1);
+    expect(Object.hasOwn(await (await getDB()).get(NOVEL_DATASETS_STORE, withOverlay.id), 'materialDocument')).toBe(false);
+
+    await deleteNovelDataset(withOverlay.id);
+    expect(await getNovelDataset(withOverlay.id)).toBeUndefined();
+    expect(await (await getDB()).get(NOVEL_MATERIALS_STORE, withOverlay.id)).toBeUndefined();
   });
 });

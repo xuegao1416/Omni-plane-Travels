@@ -7,7 +7,8 @@ import { useConfigStore } from '../stores/configStore';
 import { useIsPhone } from '../hooks/useIsMobile';
 import GeneralSettingsTab from './settings/GeneralSettingsTab';
 import ApiSettingsTab,{ type ApiSettingsRef } from './settings/ApiSettingsTab';
-import ImageGenSettingsTab from './settings/ImageGenSettingsTab';
+import ImageGenSettingsTab, { type ImageSettingsRef } from './settings/ImageGenSettingsTab';
+import { useImageStore } from '../stores/imageStore';
 import PresetSettingsTab from './settings/PresetSettingsTab';
 import DawnFrameV4 from './shared/dawn/DawnFrameV4';
 
@@ -27,6 +28,11 @@ export default function SettingsScreen() {
   const apiConfig = useConfigStore(s => s.apiConfig);
   const setApiConfig = useConfigStore(s => s.setApiConfig);
   const [tab, setTab] = useState<SettingsTab>('general');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const savingRef = useRef(false);
+  const ownerAlive = useRef(true);
+  useEffect(() => { ownerAlive.current = true; return () => { ownerAlive.current = false; }; }, []);
 
   useEffect(() => {
     if (!SETTINGS_TABS.find(t => t.id === tab)) {
@@ -35,15 +41,24 @@ export default function SettingsScreen() {
   }, [tab]);
 
   const apiRef = useRef<ApiSettingsRef>(null);
+  const imageRef = useRef<ImageSettingsRef>(null);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setIsSaving(true); setSaveError('');
     const apiValues = apiRef.current?.getValues();
-
-    if (apiValues) {
-      setApiConfig(apiValues.config);
-    }
-
-    goBack();
+    const imageValues = imageRef.current?.getValues();
+    try {
+      if (apiValues?.dirty) await setApiConfig(apiValues.config, { proxyUrl: apiValues.proxyUrl });
+      if (imageValues?.dirty) await useImageStore.getState().setConfig(imageValues.config);
+      if (!ownerAlive.current) return;
+      if ((apiValues && apiRef.current?.getValues().revision !== apiValues.revision)
+        || (imageValues && imageRef.current?.getValues().revision !== imageValues.revision)) {
+        setSaveError('刚才的配置已保存，但还有新的修改未保存。请再次保存。'); return;
+      }
+      goBack();
+    } catch (error) { setSaveError(`保存未完成：${error instanceof Error ? error.message : String(error)}。草稿仍保留，请重试。`); }
+    finally { savingRef.current = false; setIsSaving(false); }
   }, [goBack, setApiConfig]);
 
   return (
@@ -101,8 +116,8 @@ export default function SettingsScreen() {
           <main className="settings-screen__scroll">
             <div className="settings-screen__content">
               {tab === 'general' && <GeneralSettingsTab />}
-              {tab === 'api' && <ApiSettingsTab ref={apiRef} initialConfig={apiConfig} t={t} onSave={handleSave} onBack={goBack} />}
-              {tab === 'image' && <ImageGenSettingsTab />}
+              <div hidden={tab !== 'api'} style={tab !== 'api' ? { display: 'none' } : undefined}><ApiSettingsTab ref={apiRef} initialConfig={apiConfig} t={t} onSave={handleSave} onBack={goBack} active={tab === 'api'} /></div>
+              <div hidden={tab !== 'image'} style={tab !== 'image' ? { display: 'none' } : undefined}><ImageGenSettingsTab ref={imageRef} /></div>
               {tab === 'preset' && <PresetSettingsTab />}
             </div>
           </main>
@@ -111,7 +126,8 @@ export default function SettingsScreen() {
         {tab !== 'api' && (
           <footer className="settings-screen__footer">
             <button className="btn-secondary" onClick={goBack}>取消</button>
-            <button className="btn-primary" onClick={handleSave}>{t('settings.save')}</button>
+            {saveError && <p role="alert">{saveError}</p>}
+            <button className="btn-primary" onClick={handleSave} disabled={isSaving}>{isSaving ? '正在保存…' : t('settings.save')}</button>
           </footer>
         )}
       </DawnFrameV4>

@@ -11,3 +11,7 @@ dist
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+
+# omni-plane-change-map skill：由 scan.cjs 现场重建的派生物（约 10MB，3 秒可再生），不入库
+.qoder/skills/omni-plane-change-map/kb/
+.qoder/skills/omni-plane-change-map/.work/

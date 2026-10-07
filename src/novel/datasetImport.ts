@@ -1,7 +1,9 @@
+import { readNovelPreparationCheckpoint, readNovelTaskPreparation } from './preparationModel';
 import { v4 as uuid } from 'uuid';
+import { projectNovelMaterial, readNovelMaterialDocument } from './materialDocument';
 import { extractNovelStaticMaterial } from './sourceImport';
 import { splitNovelChapters } from './plainText';
-import { buildNovelSegments, hashNovelText } from './segmentation';
+import { buildNovelSemanticSegments, hashNovelText } from './segmentation';
 import type { NovelChapter, NovelDataset, NovelEvent, NovelSegment, NovelEvidenceRef } from './types';
 
 const text = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
@@ -93,6 +95,7 @@ export function importNovelDataset(raw: unknown): NovelDataset {
   }
   if (source.schemaVersion !== undefined && (!Number.isInteger(source.schemaVersion) || Number(source.schemaVersion) < 1 || Number(source.schemaVersion) > 3)) throw new Error('schemaVersion: 不支持的数据版本。');
   if (source.staticMaterial !== undefined && (!source.staticMaterial || typeof source.staticMaterial !== 'object' || Array.isArray(source.staticMaterial))) throw new Error('staticMaterial: 必须是资料对象。');
+  const materialDocument = readNovelMaterialDocument(source.materialDocument);
   const now = Date.now();
   const id = text(source.id) || uuid();
   const rawTextValue = source.原始文本 ?? source.rawText;
@@ -132,6 +135,8 @@ export function importNovelDataset(raw: unknown): NovelDataset {
   const result: NovelDataset = {
     ...source as unknown as NovelDataset,
     id,
+    preparation: readNovelPreparationCheckpoint(source.preparation),
+    taskPreparation: readNovelTaskPreparation(source.taskPreparation),
     title: text(source.标题 ?? source.title ?? source.作品名) || '未命名小说',
     sourceType: source.sourceType === 'epub' || source.sourceType === 'structured' || source.sourceType === 'txt'
       ? source.sourceType : rawText || chapters.length > 0 ? 'txt' : 'structured',
@@ -147,8 +152,9 @@ export function importNovelDataset(raw: unknown): NovelDataset {
     rawTextLength: rawText.length || Number(source.rawTextLength) || chapters.reduce((sum, chapter) => sum + chapter.content.length, 0),
     ...(rawText ? { rawText } : {}),
     chapters: chapters.map(chapter => ({ ...chapter, sourceVersion: chapter.sourceVersion || version, contentHash: hashNovelText(chapter.content) })),
-    staticMaterial: material,
-    segments: importedSegments.length > 0 ? importedSegments : buildNovelSegments(id, chapters),
+    staticMaterial: materialDocument ? projectNovelMaterial(materialDocument) : material,
+    materialDocument,
+    segments: importedSegments.length > 0 ? importedSegments : buildNovelSemanticSegments(id, chapters),
     createdAt: Number(source.createdAt) || now,
     updatedAt: now,
   };
@@ -198,6 +204,7 @@ export function copyNovelDataset(dataset: NovelDataset): NovelDataset {
   const result = visit(copy) as NovelDataset;
   // Identity participates in model inputs. Keep reviewed outputs, invalidate caches.
   result.overviewInputHash = undefined;
+  result.preparation = undefined;
   result.overviewCheckpoints = undefined;
   result.segments = result.segments.map(segment => ({ ...segment, evidenceInputHash: undefined, analysisInputHash: undefined,
     inputHash: segment.sourceText ? hashNovelText(`${segment.chapterIds.join('|')}\n${segment.sourceText}`) : undefined,

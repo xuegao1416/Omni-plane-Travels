@@ -9,6 +9,7 @@ Package,Palette,Pencil,Puzzle,Trash2,TrendingUp,Upload,User,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { STORAGE_KEYS } from '../../config/storageKeys';
+import { safeSetItem } from '../../storage/safeStorage';
 import { useAuthStore } from '../../stores/authStore';
 import { useConfigStore } from '../../stores/configStore';
 import { useDialog } from '../shared/Dialog';
@@ -246,7 +247,7 @@ export default function LocalAssetsTab() {
     const index = list.findIndex((item, itemIndex) => (item.id || `${type}_${itemIndex}`) === assetId);
     if (index < 0) throw new Error('找不到要编辑的本地资产');
     list[index] = next;
-    localStorage.setItem(info.storageKey, JSON.stringify(list));
+    safeSetItem(info.storageKey, JSON.stringify(list));
   };
 
   const handleStructuredSave = async () => {
@@ -345,7 +346,7 @@ export default function LocalAssetsTab() {
         const list: any[] = JSON.parse(localStorage.getItem(info.storageKey!) || '[]');
         const index = list.findIndex((item, itemIndex) => (item.id || `${activeType}_${itemIndex}`) === asset.id);
         if (index >= 0) list.splice(index, 1);
-        localStorage.setItem(info.storageKey!, JSON.stringify(list));
+        safeSetItem(info.storageKey!, JSON.stringify(list));
       }
       refresh();
     } catch {

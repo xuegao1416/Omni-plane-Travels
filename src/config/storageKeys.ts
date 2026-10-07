@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
   NPC_TEMPLATES: 'world_travel_guide_npc_templates',
   CUSTOM_WORLDS: 'world_travel_guide_custom_worlds',
   WORLD_DRAFTS: 'world_travel_guide_world_drafts',
+  JOURNEY_CREATION_DRAFT: 'omni.journey.creation-draft.v1',
 
   // 存档系统
   ACTIVE_SAVE: 'world_travel_guide_active_save_id',

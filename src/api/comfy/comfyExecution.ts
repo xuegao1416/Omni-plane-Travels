@@ -12,6 +12,7 @@ export interface ComfyHistorySnapshot {
 }
 
 export interface WaitForComfyExecutionOptions {
+  signal?: AbortSignal;
   promptId: string;
   fetchHistory: () => Promise<ComfyHistorySnapshot>;
   websocketUrl?: string;
@@ -107,6 +108,8 @@ function startOptionalWebSocketWatch(
 }
 
 export async function waitForComfyExecution(options: WaitForComfyExecutionOptions): Promise<ComfyExecutionResult> {
+  const abortSignal = options.signal;
+  abortSignal?.throwIfAborted();
   const {
     promptId,
     fetchHistory,
@@ -143,18 +146,23 @@ export async function waitForComfyExecution(options: WaitForComfyExecutionOption
       settled = true;
       wakeRef.current = null;
       clearTimeout(timer);
+      abortSignal?.removeEventListener('abort', finish);
       resolve();
     };
     const timer = setTimeout(finish, pollIntervalMs);
     wakeRef.current = finish;
+    abortSignal?.addEventListener('abort', finish, { once: true });
+    if (abortSignal?.aborted) finish();
   });
 
   try {
     while (Date.now() - startedAt <= timeoutMs) {
+      abortSignal?.throwIfAborted();
       if (websocketError) throw websocketError;
 
       try {
         const history = await fetchHistory();
+        abortSignal?.throwIfAborted();
         consecutiveErrors = 0;
         const entry = history?.[promptId];
 
@@ -188,6 +196,7 @@ export async function waitForComfyExecution(options: WaitForComfyExecutionOption
           legacyStablePolls = 0;
         }
       } catch (error) {
+        abortSignal?.throwIfAborted();
         const isExecutionError = error instanceof Error && /^ComfyUI 执行失败/.test(error.message);
         if (isExecutionError) throw error;
 

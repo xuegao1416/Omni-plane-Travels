@@ -1,7 +1,7 @@
-import { useState,useEffect,useCallback } from 'react';
+import { useState } from 'react';
 import { Users } from 'lucide-react';
 import EmptyState from '../../shared/EmptyState';
-import { imageDb } from '../../../storage/imageDb';
+import { useStoredImageUrls } from '../../../hooks/useStoredImageUrl';
 import type { CharacterGridProps } from './characterGrid/types';
 import { NPCCard } from './characterGrid/NPCCard';
 import { NPCDetail } from './characterGrid/NPCDetail';
@@ -10,32 +10,10 @@ import { selectPlayerKnownNPCs } from '../../../engine/playerKnowledge';
 export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, onMergeChronicles, onDeleteNpc }: CharacterGridProps) {
   const npcs = selectPlayerKnownNPCs(gameState);
   const [selected, setSelected] = useState<string | null>(null);
-  const [portraitUrls, setPortraitUrls] = useState<Record<string, string>>({});
-
-  const handlePortraitChange = useCallback((npcId: string, url: string) => {
-    setPortraitUrls(prev => ({ ...prev, [npcId]: url }));
-  }, []);
 
   const sorted = Object.entries(npcs).sort((a, b) => (b[1]?.关系数据?.好感度 ?? -Infinity) - (a[1]?.关系数据?.好感度 ?? -Infinity));
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const urls: Record<string, string> = {};
-      for (const [id, npc] of sorted) {
-        const ext = npc as any;
-        const blobKey = ext.portraitBlobKey || `portrait-${id}`;
-        try {
-          const record = await imageDb.getBlob(blobKey);
-          if (!cancelled && record?.blob) {
-            urls[id] = URL.createObjectURL(record.blob);
-          }
-        } catch { /* no portrait */ }
-      }
-      if (!cancelled) setPortraitUrls(urls);
-    })();
-    return () => { cancelled = true; };
-  }, [sorted.map(([id]) => id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const portraitUrls = useStoredImageUrls(Object.fromEntries(sorted.map(([id, npc]) => [id, (npc as any).portraitBlobKey || `portrait-${id}`])));
 
   return (
     <div style={{ padding: '12px 16px' }}>
@@ -56,7 +34,6 @@ export default function CharacterGrid({ gameState, worldId, onUpdateChronicles, 
           onMergeChronicles={onMergeChronicles}
           onDeleteNpc={onDeleteNpc}
           worldId={worldId}
-          onPortraitChange={handlePortraitChange}
           onDeleted={() => setSelected(null)}
         />
       )}

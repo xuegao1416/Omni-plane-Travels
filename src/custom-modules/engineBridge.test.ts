@@ -49,19 +49,11 @@ describe('custom module lifecycle commit bridge', () => {
     await runCustomModuleTurnLifecycles(state, 'tick-world', { round: 2, tick: 1, settled: false }, callbacks);
     expect(state.customModules?.[record.module.id]?.values.pulseCount).toBe(21);
   });
-  test('keeps card closing and world creation independent from custom module failures', () => {
+  test('keeps card closing independent from custom module failures', () => {
     expect(cardOverlaySource.indexOf('setTimeout(close, 600)')).toBeLessThan(cardOverlaySource.indexOf('onChoice?.({'));
     expect(cardOverlaySource).toContain('Promise.resolve');
     expect(cardOverlaySource).toContain('console.warn');
 
-    const gameStartSection = startScreenSource.slice(
-      startScreenSource.indexOf("'onGameStart'"),
-      startScreenSource.indexOf('// 构建初始消息列表'),
-    );
-    expect(gameStartSection).toContain('catch');
-    expect(gameStartSection).toContain('console.warn');
-    expect(gameStartSection).not.toContain('autoSave');
-    expect(gameStartSection).not.toContain('scheduleAutoSave');
   });
 
   test('routes game start, choice, and the exact module button through the same commit bridge', async () => {

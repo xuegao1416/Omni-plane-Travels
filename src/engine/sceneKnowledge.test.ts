@@ -76,3 +76,49 @@ test('开局自建角色（setInitialNPCs 路径）会登记为玩家已知', ()
   expect(Object.keys(known).sort()).toEqual(['NPC_同伴', 'old'].sort());
   expect(known['NPC_同伴']?.关系数据?.关系类型).toBe('同伴');
 });
+
+test('已认识的角色离场后，面板不再停留在旧的“在场”', () => {
+  const state = seeded();
+  state.人物档案.old = {
+    ...state.人物档案.old,
+    人物分类: '离场',
+    个人信息: { 当前状态: '已经回家休息' },
+  } as NPCData;
+  const text = '店里静悄悄的，只剩你一个人。';
+  const observations = collectSceneObservations(state, text);
+  expect(observations).toEqual([{ npcId: 'old', path: '人物分类', value: '离场', quote: '', mode: 'observed' }]);
+
+  const result = applyPlayerObservations(state, {
+    id: 'scene:leave', turnId: 'leave', eventId: 'leave', turnNumber: 9, committed: true, text, observations,
+  });
+  expect(result.rejected).toHaveLength(0);
+  const known = selectPlayerKnownNPCs(result.state).old;
+  expect(known?.人物分类).toBe('离场');
+  // 离场者的其他公开字段不随之刷新，避免把幕后状态泄露给玩家
+  expect(known?.个人信息?.当前状态).toBeUndefined();
+});
+
+test('没见过的离场角色不会被凭空放进面板', () => {
+  const state = seeded();
+  state.人物档案['潜伏者'] = {
+    姓名: '潜伏者', 人物分类: '离场', 关系数据: { 好感度: 0, 关系类型: '陌生人' },
+  } as NPCData;
+  expect(collectSceneObservations(state, '潜伏者在暗处注视着这里。').some(o => o.npcId === '潜伏者')).toBe(false);
+});
+
+test('正文只出现代称时，AI 的出场声明仍能把代称连回正式姓名', () => {
+  const state = seeded();
+  state.人物档案['刘大爷'] = {
+    姓名: '刘大爷', 人物分类: '在场', 关系数据: { 好感度: 15, 关系类型: '熟悉顾客' },
+  } as NPCData;
+  const text = '进来的是个穿着运动装的老头，手里牵着一只胖得像猪一样的柯基。';
+  // 系统投影按姓名/ID 匹配，代称场景下匹配不到
+  expect(collectSceneObservations(state, text).some(o => o.npcId === '刘大爷')).toBe(false);
+
+  const result = applyPlayerObservations(state, {
+    id: 'obs:epithet', turnId: 'epithet', eventId: 'epithet', turnNumber: 2, committed: true, text,
+    observations: [{ npcId: '刘大爷', path: '姓名', value: '刘大爷', quote: '老头', mode: 'observed', introduces: true }],
+  });
+  expect(result.rejected).toHaveLength(0);
+  expect(selectPlayerKnownNPCs(result.state)['刘大爷']?.姓名).toBe('刘大爷');
+});

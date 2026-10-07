@@ -1,8 +1,6 @@
 // 变量管理器
 import type { GameState } from '../schema/variables';
 import { createDefaultGameState } from '../schema/variables';
-import type { ApiConfig } from '../api/types';
-import { requestCompletion } from '../api/client';
 import { cloneDeep, get, set, merge } from 'lodash-es';
 import { formatWorldClock, normalizeTimeSystemConfig, normalizeWorldClockState, reconcileEditedWorldClock, type WorldClockConfig, type WorldClockState } from '../time/worldClock';
 import { toDisplayText } from '../utils/displayText';
@@ -114,6 +112,17 @@ export class VariableManager {
   private state: GameState;
   private readonly moduleRegistry: ModuleRuntimeRegistry;
   private worldClockConfig: WorldClockConfig;
+  private lastAiUpdateRejection: string | null = null;
+
+  /** Ephemeral validation feedback for the next extraction attempt, never saved. */
+  getLastAiUpdateRejection(): string | null {
+    return this.lastAiUpdateRejection;
+  }
+
+  private rejectAiUpdate(reason: string): false {
+    this.lastAiUpdateRejection = reason;
+    return false;
+  }
 
   constructor(initial?: GameState, moduleRuntime?: {
     saveId: string;
@@ -355,14 +364,15 @@ export class VariableManager {
     if (result.status === 'applied' && !this.hasValidCoreStateShape(result.state as GameState)) {
       // AI transactions must not be able to replace a core container with a
       // scalar/null value. Keep the original state and report rejection.
-      return false;
+      return this.rejectAiUpdate('更新会破坏世界、玩家或人物档案的必需对象结构');
     }
     // Failed/blocked results still carry the kernel log; preserve that state.
     this.state = result.state as GameState;
     if (result.status === 'applied') {
       this.normalizeState();
     }
-    return result.status === 'applied';
+    if (result.status !== 'applied') return this.rejectAiUpdate(`事务未应用：${result.reason ?? result.status}`);
+    return true;
   }
 
   private applyGameplayTransactionPayload(payload: Record<string, unknown>): boolean {
@@ -376,9 +386,9 @@ export class VariableManager {
       )) return true;
       return Object.values(value).some(hasProtectedClockPath);
     };
-    if (hasProtectedClockPath(payload)) return false;
+    if (hasProtectedClockPath(payload)) return this.rejectAiUpdate('权威时钟由本地规则维护，禁止更新世界.时间系统、时钟或当前时间');
     const normalized = this.normalizeCanonicalTransaction(payload);
-    if (!normalized) return false;
+    if (!normalized) return this.rejectAiUpdate('变量路径无法规范化；人物必须使用已有规范ID，或先完整创建新人物，不能更新未知人物的局部字段');
     const transaction: GameplayTransaction = {
       ...(normalized as unknown as GameplayTransaction),
       id: typeof payload.id === 'string' && payload.id
@@ -388,8 +398,8 @@ export class VariableManager {
     };
     try {
       return this.commitGameplayTransaction(transaction);
-    } catch {
-      return false;
+    } catch (error) {
+      return this.rejectAiUpdate(`事务校验失败：${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -397,13 +407,16 @@ export class VariableManager {
   private normalizeCanonicalTransaction(payload: Record<string, unknown>): Record<string, unknown> | null {
     const transaction = cloneDeep(payload) as Record<string, any>;
     const chronicleCache = new Map<string, string[]>();
+    // Resolve subsequent effects against already declared NPC identities in this
+    // transaction, without mutating the owner before all paths have passed validation.
+    const identityState = { ...this.state, 人物档案: cloneDeep(this.state.人物档案) };
 
     const normalizePath = (rawPath: unknown, operation: string, value?: unknown): string | null => {
       if (typeof rawPath !== 'string') return null;
       const parts = rawPath.split('.').map(part => part.trim()).filter(Boolean);
       if (parts.length === 0 || parts.some(part => !isSafePath(part))) return null;
       if (parts[0] === '人物档案' && parts.length >= 2) {
-        const resolution = resolveNpcId(parts[1], this.state);
+        const resolution = resolveNpcId(parts[1], identityState);
         if (resolution.ok) {
           parts[1] = resolution.npcId!;
         } else if (parts.length === 2 && canCreateNpcFromPatch(parts, operation === 'set' ? 'replace' : operation, value)) {
@@ -441,6 +454,7 @@ export class VariableManager {
           const normalizedItems = value.map(item => String(item ?? '').trim()).filter(Boolean);
           value = normalizedItems.filter((item, index) => normalizedItems.indexOf(item) === index) as unknown as GameplayValue;
         }
+        if (path.startsWith('人物档案.')) set(identityState, path, cloneDeep(value));
         return { set: { path, value } };
       }
       if (isRecord(rawEffect.add)) {
@@ -470,7 +484,7 @@ export class VariableManager {
         const path = normalizePath(rawEffect.append.path, 'append', rawEffect.append.value);
         if (!path) return null;
         if (path.endsWith('.人物事迹')) {
-          const existing = chronicleCache.get(path) ?? (Array.isArray(get(this.state, path)) ? [...get(this.state, path)] : []);
+          const existing = chronicleCache.get(path) ?? (Array.isArray(get(identityState, path)) ? [...get(identityState, path)] : []);
           const value = String(rawEffect.append.value ?? '').trim();
           if (value && !existing.includes(value)) existing.push(value);
           chronicleCache.set(path, existing);
@@ -539,17 +553,22 @@ export class VariableManager {
 
   // 从 AI 响应中的更新标签解析并应用当前 GameplayTransaction。
   applyUpdateVariable(updateText: string): boolean {
+    this.lastAiUpdateRejection = null;
     let parsed: unknown;
     try {
       parsed = JSON.parse(updateText);
-    } catch {
-      return false;
+    } catch (error) {
+      return this.rejectAiUpdate(`JSON解析失败：${error instanceof Error ? error.message : String(error)}`);
     }
-    if (!isRecord(parsed)) return false;
+    if (!isRecord(parsed)) return this.rejectAiUpdate('GameplayTransaction 必须是 JSON 对象');
+
+    const unknownKeys = Object.keys(parsed).filter(key => !AI_TRANSACTION_KEYS.has(key));
+    if (unknownKeys.length > 0) return this.rejectAiUpdate(`不允许的顶层字段：${unknownKeys.join('、')}；允许字段：${[...AI_TRANSACTION_KEYS].join('、')}`);
 
     const canonical = ['conditions', 'costs', 'effects', 'rewards', 'events']
       .some(key => Array.isArray(parsed[key]));
-    if (!canonical || !isAllowedAiTransaction(parsed)) return false;
+    if (!canonical) return this.rejectAiUpdate('缺少事务数组：conditions、costs、effects、rewards 或 events');
+    if (!isAllowedAiTransaction(parsed)) return this.rejectAiUpdate('事务结构或权限校验失败；conditions、costs、effects、rewards 必须符合契约，只能访问世界、玩家、人物档案的允许路径，禁止 before/after 字段');
     return this.applyGameplayTransactionPayload(parsed);
   }
 
@@ -616,63 +635,6 @@ export class VariableManager {
 
     delete items[itemKey];
     return true;
-  }
-
-  // 用主API总结NPC事迹，防止条目过多
-  async summarizeNpcChronicles(npcId: string, apiConfig: ApiConfig): Promise<boolean> {
-    const npc = this.state.人物档案[npcId];
-    if (!npc) return false;
-    const chronicles = (npc as any).人物事迹;
-    if (!Array.isArray(chronicles) || chronicles.length <= 5) return false;
-
-    const npcName = (npc as any).姓名 || npcId;
-    const prompt = `你是叙事记录员。以下是NPC「${npcName}」的事迹记录，请按时间线合并总结为简洁条目（5-8条），保留关键事件和转折点，去除重复和琐碎内容。只输出总结后的条目，每条一行，不要编号以外的前缀。\n\n原始事迹：\n${chronicles.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
-
-    try {
-      const result = await requestCompletion(apiConfig, [
-        { role: 'user', content: prompt },
-      ], { temperature: 0.3 });
-      const lines = result.text.split('\n').map(l => l.replace(/^\d+[\.\)、]\s*/, '').trim()).filter(Boolean);
-      if (lines.length > 0) {
-        (npc as any).人物事迹 = lines;
-        return true;
-      }
-    } catch (e) {
-      console.warn('[VariableManager] 事迹总结失败:', e);
-    }
-    return false;
-  }
-
-  // 合并指定范围的事迹条目为一条
-  async mergeNpcChronicles(npcId: string, startIndex: number, endIndex: number, apiConfig: ApiConfig): Promise<boolean> {
-    const npc = this.state.人物档案[npcId];
-    if (!npc) return false;
-    const chronicles = (npc as any).人物事迹;
-    if (!Array.isArray(chronicles)) return false;
-    if (startIndex < 0 || endIndex >= chronicles.length || startIndex >= endIndex) return false;
-
-    const npcName = (npc as any).姓名 || npcId;
-    const selectedDeeds = chronicles.slice(startIndex, endIndex + 1);
-    const prompt = `你是叙事记录员。以下是NPC「${npcName}」的${selectedDeeds.length}条事迹记录，请将它们合并总结为1条简洁的事迹摘要（30-60字），保留关键事件，去除冗余。只输出合并后的1条文本，不要编号或其他前缀。\n\n原始事迹：\n${selectedDeeds.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
-
-    try {
-      const result = await requestCompletion(apiConfig, [
-        { role: 'user', content: prompt },
-      ], { temperature: 0.3 });
-      const merged = result.text.replace(/^\d+[\.\)、]\s*/, '').trim();
-      if (merged) {
-        const newChronicles = [
-          ...chronicles.slice(0, startIndex),
-          merged,
-          ...chronicles.slice(endIndex + 1),
-        ];
-        (npc as any).人物事迹 = newChronicles;
-        return true;
-      }
-    } catch (e) {
-      console.warn('[VariableManager] 事迹合并失败:', e);
-    }
-    return false;
   }
 
   /**

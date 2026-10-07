@@ -116,7 +116,7 @@ test('published v5 database preserves saves and rollback data while TXT import b
     assert.deepEqual(exported.save.messages,[records.messages.message]);
     db.close();
     const reopened = await openDB('omni-plane-travels',10);
-    assert.deepEqual(await reopened.get('saves','save'),{...records.saves,gameState:{...records.saves.gameState,customModules:{},customModuleBindingsInitialized:true,customModuleBindingWarnings:[]}});
+    assert.deepEqual(await reopened.get('saves','save'),{...records.saves,schemaVersion:5,gameState:{...records.saves.gameState,customModules:{},customModuleBindingsInitialized:true,customModuleBindingWarnings:[]}});
     assert.equal((await reopened.get('novel_sources',dataset.id)).rawText,text);
     reopened.close();
   `;

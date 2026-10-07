@@ -1,4 +1,5 @@
 // 生图设置 Tab — 精简编排层，具体配置由子组件负责
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useImageStore } from '@/stores/imageStore';
 import {
 Section,
@@ -8,7 +9,7 @@ Field,
 TextArea,
 Button,
 } from './SettingsUIComponents';
-import { DEFAULT_IMAGE_CONFIG } from '@/api/imageGenTypes';
+import { DEFAULT_IMAGE_CONFIG, type ImageGenConfig } from '@/api/imageGenTypes';
 import { ImageIcon,Users,Cpu,Wand2 } from 'lucide-react';
 
 import EngineSelector from './imageGenSettings/EngineSelector';
@@ -17,13 +18,26 @@ import ComfyConfig from './imageGenSettings/ComfyConfig';
 import OpenAIConfig from './imageGenSettings/OpenAIConfig';
 import KreaConfig from './imageGenSettings/KreaConfig';
 
-export default function ImageGenSettingsTab() {
-  const config = useImageStore((s) => s.config);
-  const updateConfig = useImageStore((s) => s.updateConfig);
-  const setConfig = useImageStore((s) => s.setConfig);
+export interface ImageSettingsRef { getValues: () => { config: ImageGenConfig; dirty: boolean; revision: number }; }
+const ImageGenSettingsTab = forwardRef<ImageSettingsRef>(function ImageGenSettingsTab(_props, ref) {
+  const committed = useImageStore(s => s.config);
+  const loaded = useImageStore(s => s.configLoaded);
+  const error = useImageStore(s => s.configRecoveryError);
+  const warning = useImageStore(s => s.configWarning);
+  const [config, setDraft] = useState(() => structuredClone(committed));
+  const dirty = useRef(false), revision = useRef(0);
+  useEffect(() => { if (!dirty.current) setDraft(structuredClone(committed)); }, [committed]);
+  const setConfig = (value: ImageGenConfig) => { dirty.current = true; revision.current++; setDraft(structuredClone(value)); };
+  const updateConfig = <K extends keyof ImageGenConfig>(key: K, value: ImageGenConfig[K]) => {
+    dirty.current = true; revision.current++; setDraft(current => ({ ...current, [key]: value }));
+  };
+  useImperativeHandle(ref, () => ({ getValues: () => ({ config: structuredClone(config), dirty: dirty.current, revision: revision.current }) }));
 
   return (
     <div className="settings-tab-panel settings-tab-panel--image">
+      {(error || warning) && <p role="alert">{error || warning} <button type="button" onClick={() => { void useImageStore.getState().initImageConfig(); }}>重新读取</button></p>}
+      <p>修改后保存生效；返回会保留已保存的配置。</p>
+      <fieldset disabled={!loaded && !error} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       {/* ─── 正文生图 ─── */}
       <Section variant="paper" icon={<ImageIcon size={16} />} title="正文生图">
         <SettingRow label="启用正文生图" desc="开启后，正文中的 image###提示词### 标签将变为「点击生图」按钮">
@@ -124,6 +138,8 @@ export default function ImageGenSettingsTab() {
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 0' }}>
         <Button onClick={() => setConfig({ ...DEFAULT_IMAGE_CONFIG })}>恢复默认设置</Button>
       </div>
+      </fieldset>
     </div>
   );
-}
+});
+export default ImageGenSettingsTab;

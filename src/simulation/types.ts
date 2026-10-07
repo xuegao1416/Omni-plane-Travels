@@ -227,7 +227,15 @@ export interface SimulationState {
   mainline?: import('./mainline').MainlineState;
   lastMechanicalSummary?: string;
   /** 与后台 AI 开关、成功次数解耦的本地周期时钟。 */
-  mechanics?: { lastTurnId: string; lastRound: number; lastTime: string; tickCount: number };
+  mechanics?: {
+    lastTurnId: string; lastRound: number; lastTime: string; tickCount: number;
+    /** 成功结算的检查回执；没有变量变化也保留结果。旧档可缺省。 */
+    lastSettlement?: {
+      round: number; turnId: string; time: string;
+      effectCount: number; notificationCount: number;
+      origin: 'live' | 'replay';
+    };
+  };
   /** 模拟配置 */
   config: SimConfig;
   /** 当前活跃的世界事件（以事件 ID 为键） */

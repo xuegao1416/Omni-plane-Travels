@@ -5,7 +5,7 @@
 import { useState,useCallback,useEffect } from 'react';
 import { RefreshCw,AlertTriangle,Database,Download,CheckCircle2,Trash2 } from 'lucide-react';
 import type { MemorySystemConfig } from '../../../memory/types';
-import type { ApiPreset } from '../apiPresetUtils';
+import type { ApiPreset } from '../../../api/presets';
 import { fetchModels } from '../../../api/client';
 import { Section,FieldGrid,Field,Select,Toggle } from '../SettingsUIComponents';
 import {

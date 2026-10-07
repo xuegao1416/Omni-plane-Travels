@@ -20,10 +20,12 @@ export function SkillsSection({ skills }: Props) {
         <p style={{ margin: '0 0 6px', color: 'var(--text-muted)', fontSize: '10px' }}>剧情中学习的生活技艺与通用技能；它们独立于职业树，不会重复占用职业能力点。</p>
         {Object.entries(skills).filter(([_, s]) => s != null).map(([name, skill]) => {
           const qColor = getQualityColor(skill?.品质 ?? '普通');
+          // 显示名优先取技能自带的名称；旧存档没有该字段时回落到字典键。
+          const displayName = skill?.名称 || name;
           return (
             <div
               key={name}
-              onClick={() => setSelectedSkill({ name, data: skill })}
+              onClick={() => setSelectedSkill({ name: displayName, data: skill })}
               style={{
                 padding: '6px 8px',
                 display: 'flex',
@@ -37,7 +39,7 @@ export function SkillsSection({ skills }: Props) {
               onMouseLeave={e => e.currentTarget.style.background = ''}
             >
               <span style={{ color: qColor, fontSize: '11px' }}>●</span>
-              <span style={{ fontWeight: '600', fontSize: 'var(--font-size-sm)', flex: 1 }}>{name}</span>
+              <span style={{ fontWeight: '600', fontSize: 'var(--font-size-sm)', flex: 1 }}>{displayName}</span>
               <span style={{
                 fontSize: '10px', padding: '1px 6px', borderRadius: '8px',
                 background: qColor + '18', color: qColor,

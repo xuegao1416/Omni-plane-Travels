@@ -2,6 +2,7 @@ import { isMemoryVisibleInRuntime, projectMemoryRuntime, sameMemoryVisibility, m
 // 记忆系统管线执行器 - 从 useGameEngine.ts 提取
 import { fetchRerank, requestCompletion } from '../api/client';
 import { waitForRateLimit } from '../api/rateLimiter';
+import { abortableDelay } from '../utils/abortableDelay';
 import type { MemoryPipelineContext } from './useMemorySystem';
 import type {
   NarrativeMemoryRuntime, VectorMemoryItem,
@@ -97,7 +98,7 @@ function appendSourceEvent(memStore: MemoryStore, ctx: MemoryPipelineContext): s
     assistantText: String(ctx.assistantText ?? extractAssistantText(ctx.batchText)),
     createdAt: Date.now(),
   };
-  runtime.sourceEvents = [...runtime.sourceEvents, event];
+  memStore.appendSourceEvent(event);
   return id;
 }
 
@@ -111,7 +112,8 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
     vectorApiKey: config.vectorApiKey.trim() || ctx.apiConfig.apiKey,
   });
 
-  const eligible = memStore.vectorMemory.filter(item =>
+  const vectors = memStore.vectorMemory;
+  const eligible = vectors.filter(item =>
     isMemoryVisibleInRuntime(item, memStore.getMemoryRuntime()) && item.state !== 'expired'
       && item.conflictStatus !== 'superseded'
       && item.conflictStatus !== 'rejected'
@@ -125,19 +127,21 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
     const batchSize = 64;
     for (let start = 0; start < missing.length; start += batchSize) {
       const chunk = missing.slice(start, start + batchSize);
-      const embeddings = await embeddingClient.embed(chunk.map(vectorSearchText));
+      const embeddings = await embeddingClient.embed(chunk.map(vectorSearchText), { signal: ctx.signal });
+      ctx.signal?.throwIfAborted();
       chunk.forEach((item, index) => {
         item.embedding = embeddings[index];
         item.embeddingTimestamp = Date.now();
       });
     }
-    memStore.setVectorMemory([...memStore.vectorMemory]);
+    memStore.setVectorMemory(vectors);
   }
 
   const queryText = config.vectorRetrieveUseContextQuery
     ? `${ctx.inputText}\n${ctx.recentContext.slice(-1000)}`
     : ctx.inputText;
-  const [queryEmbedding] = await embeddingClient.embed([queryText]);
+  const [queryEmbedding] = await embeddingClient.embed([queryText], { signal: ctx.signal });
+  ctx.signal?.throwIfAborted();
   if (!queryEmbedding) return;
   const scored = eligible
     .filter(item => Array.isArray(item.embedding) && item.embedding.length > 0)
@@ -157,7 +161,8 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
       baseUrl: config.vectorRerankApiUrl.trim(),
       apiKey: config.vectorRerankApiKey.trim() || config.vectorApiKey.trim() || ctx.apiConfig.apiKey,
       model: config.vectorRerankModel.trim(),
-    }, queryText, scored.map(vectorSearchText));
+    }, queryText, scored.map(vectorSearchText), { signal: ctx.signal });
+    ctx.signal?.throwIfAborted();
     const scoreByIndex = new Map(reranked.map(item => [item.index, item.relevance_score]));
     ranked = scored
       .map((item, index) => ({ ...item, similarity: scoreByIndex.get(index) ?? item.similarity }))
@@ -178,16 +183,6 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
   }).slice(0, config.vectorRetrieveTopK);
 }
 
-/** 带超时的 Promise 包装 */
-function withTimeout<T>(promise: Promise<T>, ms: number, label = '操作'): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label}超时(${ms / 1000}s)`)), ms)
-    ),
-  ]);
-}
-
 /** 调用记忆系统 AI */
 export async function callMemoryAI(
   apiConfig: { baseUrl: string; apiKey: string; model: string },
@@ -195,25 +190,28 @@ export async function callMemoryAI(
   userContent: string,
   temperature = 0.3,
   timeoutMs = 120000,
+  signal?: AbortSignal,
 ): Promise<string> {
-  // 限流保护
-  await waitForRateLimit();
-
+  signal?.throwIfAborted();
+  const controller = new AbortController();
+  const abort = () => controller.abort(signal?.reason);
+  signal?.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(() => controller.abort(new DOMException(`记忆AI调用超时(${timeoutMs / 1000}s)`, 'TimeoutError')), timeoutMs);
   try {
-    // 非流式调用，加大超时到 120 秒
-    const result = await withTimeout(
-      requestCompletion(
-        { ...apiConfig, provider: 'openai' },
-        [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
-        { temperature },
-      ),
-      timeoutMs,
-      '记忆AI调用',
+    await waitForRateLimit({ ...apiConfig, provider: 'openai' }, controller.signal);
+    const result = await requestCompletion(
+      { ...apiConfig, provider: 'openai' },
+      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
+      { temperature, signal: controller.signal },
     );
+    controller.signal.throwIfAborted();
     return result.text;
   } catch (err) {
     console.error('[记忆AI] 调用失败:', err);
     throw err;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
   }
 }
 
@@ -236,6 +234,8 @@ export async function executeMemoryPrepareForMain(memStore: MemoryStore, ctx: Me
   try {
     await recallVectorFacts(memStore, ctx);
   } catch (error) {
+    ctx.signal?.throwIfAborted();
+    if (error instanceof Error && error.name === 'AbortError') throw error;
     const message = error instanceof Error ? error.message : String(error);
     if (!memStore.config.retrieval.vectorFallbackEnabled) {
       ctx._degradedStages = [...(ctx._degradedStages || []), 'memory_vector_strict_failure'];
@@ -295,14 +295,16 @@ export function applyMemoryConflictDecision<T extends object>(
 // ─── 阶段1: 记忆写入（带重试）───
 
 export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipelineContext): Promise<void> {
-  const runtime = memStore.getMemoryRuntime();
   const sourceEventId = appendSourceEvent(memStore, ctx);
+  const baseline = structuredClone(memStore.getMemoryRuntime());
+  const runtime = structuredClone(baseline);
+  const expectedVersion = memStore.getRuntimeVersion();
   const templates = memStore.config.narrativePromptTemplates;
   const retryCount = memStore.config.writePipeline.retryCount ?? 2;
   const retryDelayMs = memStore.config.writePipeline.retryDelayMs ?? 1200;
   const maxAttempts = retryCount + 1;
 
-  memStore.setLoading(true, '正在写入叙事记忆...');
+  const finishLoading = memStore.beginLoading('正在写入叙事记忆...');
   runtime.lastIngestAttemptAt = Date.now();
 
   let lastError: Error | null = null;
@@ -316,7 +318,7 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
           .replace(/\{\{叙事写入参考\}\}/g, referenceBlock)
           .replace(/\{\{剧情原文\}\}/g, ctx.batchText);
 
-        const rawResult = await callMemoryAI(ctx.writeApiConfig ?? ctx.apiConfig, prompt, '请分析上述剧情并输出结构化叙事记忆 JSON。');
+        const rawResult = await callMemoryAI(ctx.writeApiConfig ?? ctx.apiConfig, prompt, '请分析上述剧情并输出结构化叙事记忆 JSON。', 0.3, 120000, ctx.signal);
         const parsed = annotateNarrativeDiscoveries(runtime, parseNarrativeIngestResult(rawResult) as unknown as Record<string, unknown>, sourceEventId, ctx.floor);
         const conflictDecisions: ConflictDecisionMap = new WeakMap();
 
@@ -363,7 +365,7 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
                       .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
                       .replace(/\{\{currentObject\}\}/g, JSON.stringify(existing))
                       .replace(/\{\{incomingObject\}\}/g, JSON.stringify(incoming));
-                    const judgeRaw = await callMemoryAI(ctx.conflictJudgeApiConfig ?? ctx.apiConfig, judgePrompt, '请裁决冲突，输出 JSON。');
+                    const judgeRaw = await callMemoryAI(ctx.conflictJudgeApiConfig ?? ctx.apiConfig, judgePrompt, '请裁决冲突，输出 JSON。', 0.3, 120000, ctx.signal);
                     const judgeResult = parseNarrativeConflictJudgeResult(judgeRaw);
                     if (judgeResult.action === 'reject_incoming') {
                       incomingList[i] = null;
@@ -376,7 +378,9 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
                         applyMemoryConflictDecision(spec.runtimeList, existingIndex, judgeResult, ctx.floor, spec.supersededStatus);
                       }
                     }
-                  } catch {
+                  } catch (error) {
+                    ctx.signal?.throwIfAborted();
+                    if (error instanceof Error && error.name === 'AbortError') throw error;
                     // 裁决不可用时保留双方，避免一次 AI 失败静默覆盖旧事实。
                     conflictDecisions.set(incoming, 'keep_both');
                   }
@@ -405,16 +409,18 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
             resolvedAt: Date.now(),
           };
         }
-        memStore.bumpRuntimeVersion();
+        memStore.commitMemoryRuntime(runtime, expectedVersion, baseline);
         memStore.appendWriteDebugLog({ kind: 'ingest', message: '写入完成', sourceStartIndex: ctx.floor, sourceEndIndex: ctx.floor });
         return; // 成功，退出
       } catch (err: unknown) {
+        ctx.signal?.throwIfAborted();
+        if (err instanceof Error && err.name === 'AbortError') throw err;
         lastError = err instanceof Error ? err : new Error(String(err));
         console.warn(`[记忆写入] 第 ${attempt}/${maxAttempts} 次尝试失败:`, lastError.message);
 
         if (attempt < maxAttempts) {
           // 等待后重试
-          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+          await abortableDelay(retryDelayMs, ctx.signal);
         }
       }
     }
@@ -434,12 +440,12 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
       status: 'active',
       resolvedAt: 0,
     };
-    memStore.bumpRuntimeVersion();
+    memStore.commitMemoryRuntime(runtime, expectedVersion, baseline);
     memStore.appendWriteDebugLog({ kind: 'ingest', message: `写入失败: ${errorMessage}`, mode: 'error', sourceStartIndex: ctx.floor, sourceEndIndex: ctx.floor });
     console.error('[记忆写入] 所有重试都失败:', errorMessage);
     throw new Error(`记忆写入失败: ${errorMessage}`);
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -452,7 +458,7 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
   const retryDelayMs = memStore.config.writePipeline.retryDelayMs ?? 1200;
   const maxAttempts = retryCount + 1;
 
-  memStore.setLoading(true, '正在保存剧情摘要...');
+  const finishLoading = memStore.beginLoading('正在保存剧情摘要...');
 
   try {
     let lastError: Error | null = null;
@@ -463,7 +469,7 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
           .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
           .replace(/\{\{batchText\}\}/g, ctx.batchText);
 
-        const rawResult = await callMemoryAI(ctx.summaryApiConfig ?? ctx.apiConfig, prompt, '请为当前剧情批次产出结构化摘要 JSON。');
+        const rawResult = await callMemoryAI(ctx.summaryApiConfig ?? ctx.apiConfig, prompt, '请为当前剧情批次产出结构化摘要 JSON。', 0.3, 120000, ctx.signal);
         const parsed = parseNarrativeSummaryResult(rawResult);
         const savedAt = Date.now();
         const sourceEventId = appendSourceEvent(memStore, ctx);
@@ -488,11 +494,13 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
         memStore.bumpRuntimeVersion();
         return; // 成功，退出
       } catch (err: unknown) {
+        ctx.signal?.throwIfAborted();
+        if (err instanceof Error && err.name === 'AbortError') throw err;
         lastError = err instanceof Error ? err : new Error(String(err));
         console.warn(`[摘要保存] 第 ${attempt}/${maxAttempts} 次尝试失败:`, lastError.message);
 
         if (attempt < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+          await abortableDelay(retryDelayMs, ctx.signal);
         }
       }
     }
@@ -503,7 +511,7 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
     console.error('[摘要保存] 所有重试都失败:', errorMessage);
     throw new Error(`摘要保存失败: ${errorMessage}`);
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -512,14 +520,14 @@ export async function executeMemorySummary(memStore: MemoryStore, ctx: MemoryPip
 export async function executeMemoryVector(memStore: MemoryStore, ctx: MemoryPipelineContext): Promise<void> {
   if (!memStore.config.vectorEnabled) return;
   const templates = memStore.config.narrativePromptTemplates;
-  memStore.setLoading(true, '正在提取向量事实...');
+  const finishLoading = memStore.beginLoading('正在提取向量事实...');
 
   try {
     const prompt = templates.vectorExtract
       .replace(/\{\{玩家名字\}\}/g, ctx.playerName)
       .replace(/\{\{剧情原文\}\}/g, ctx.batchText);
 
-    const rawResult = await callMemoryAI(ctx.vectorApiConfig ?? ctx.apiConfig, prompt, '请提取长期事实，输出 JSON 数组。');
+    const rawResult = await callMemoryAI(ctx.vectorApiConfig ?? ctx.apiConfig, prompt, '请提取长期事实，输出 JSON 数组。', 0.3, 120000, ctx.signal);
     const parsed = parseNarrativePayload(rawResult);
     const factsArray = Array.isArray(parsed) ? parsed : Array.isArray(parsed.facts) ? parsed.facts : Array.isArray(parsed.data) ? parsed.data : [];
     const sourceEventId = appendSourceEvent(memStore, ctx);
@@ -550,7 +558,7 @@ export async function executeMemoryVector(memStore: MemoryStore, ctx: MemoryPipe
         const embeddings = await createEmbeddingClient({
           ...config,
           vectorApiKey: config.vectorApiKey.trim() || ctx.apiConfig.apiKey,
-        }).embed(vectorItems.map(vectorSearchText));
+        }).embed(vectorItems.map(vectorSearchText), { signal: ctx.signal });
         const embeddedAt = Date.now();
         vectorItems = vectorItems.map((item, index) => ({
           ...item,
@@ -558,6 +566,8 @@ export async function executeMemoryVector(memStore: MemoryStore, ctx: MemoryPipe
           embeddingTimestamp: embeddedAt,
         }));
       } catch (error) {
+        ctx.signal?.throwIfAborted();
+        if (error instanceof Error && error.name === 'AbortError') throw error;
         const message = error instanceof Error ? error.message : String(error);
         memStore.appendWriteDebugLog({ kind: 'vector_embedding', message, mode: 'error' });
         console.warn('[向量写入] Embedding 失败，已保留文本事实:', message);
@@ -567,7 +577,7 @@ export async function executeMemoryVector(memStore: MemoryStore, ctx: MemoryPipe
     memStore.appendVectorMemories(vectorItems);
     memStore.bumpRuntimeVersion();
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -578,7 +588,7 @@ export async function executeMemoryQueryRewrite(memStore: MemoryStore, ctx: Memo
   if (!rConfig.useQueryRewrite) return;
 
   const templates = memStore.config.narrativePromptTemplates;
-  memStore.setLoading(true, '正在查询改写...');
+  const finishLoading = memStore.beginLoading('正在查询改写...');
 
   try {
     const qrPrompt = templates.queryRewrite
@@ -586,11 +596,13 @@ export async function executeMemoryQueryRewrite(memStore: MemoryStore, ctx: Memo
       .replace(/\{\{inputText\}\}/g, ctx.inputText)
       .replace(/\{\{recentContext\}\}/g, ctx.recentContext.slice(-800))
       .replace(/\{\{entityTerms\}\}/g, '').replace(/\{\{timeTerms\}\}/g, '');
-    const qrRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, qrPrompt, '请分析当前输入并输出查询改写 JSON。');
+    const qrRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, qrPrompt, '请分析当前输入并输出查询改写 JSON。', 0.3, 120000, ctx.signal);
     const qrResult = parseVectorQueryRewriteResult(qrRaw);
     ctx._retrievalKeywords = qrResult.retrievalKeywords;
     ctx._semanticQuery = qrResult.semanticQuery || ctx.inputText;
   } catch (err: unknown) {
+    ctx.signal?.throwIfAborted();
+    if (err instanceof Error && err.name === 'AbortError') throw err;
     const message = err instanceof Error ? err.message : '查询改写失败';
     console.warn('[查询改写] 失败:', message);
     ctx._retrievalKeywords = [];
@@ -598,7 +610,7 @@ export async function executeMemoryQueryRewrite(memStore: MemoryStore, ctx: Memo
     ctx._degradedStages = ctx._degradedStages || [];
     ctx._degradedStages.push('memory_query_rewrite');
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -613,7 +625,7 @@ export async function executeMemoryRetrievePlan(memStore: MemoryStore, ctx: Memo
 
   const templates = memStore.config.narrativePromptTemplates;
   const rConfig = memStore.config.retrieval;
-  memStore.setLoading(true, '正在检索规划...');
+  const finishLoading = memStore.beginLoading('正在检索规划...');
 
   try {
     const semanticQuery = ctx._semanticQuery || ctx.inputText;
@@ -630,13 +642,15 @@ export async function executeMemoryRetrievePlan(memStore: MemoryStore, ctx: Memo
       .replace(/\{\{summaryHistory\}\}/g, `共 ${runtime.summarySaveHistory.length} 条摘要`)
       .replace(/\{\{memoryCandidates\}\}/g, candidateList || '无候选');
 
-    const plannerRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, plannerPrompt, '请规划需要注入的记忆，输出 JSON。');
+    const plannerRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, plannerPrompt, '请规划需要注入的记忆，输出 JSON。', 0.3, 120000, ctx.signal);
     const plannerResult = parseNarrativeRetrievePlannerResult(plannerRaw);
     ctx._plannerResult = plannerResult;
     ctx._finalSelectedTitles = [...plannerResult.items.map(i => i.title)];
     ctx._candidateList = candidateList;
     ctx._allMemories = allMemories;
   } catch (err: unknown) {
+    ctx.signal?.throwIfAborted();
+    if (err instanceof Error && err.name === 'AbortError') throw err;
     const message = err instanceof Error ? err.message : '检索规划失败';
     console.warn('[检索规划] 失败:', message);
     ctx._plannerResult = undefined;
@@ -644,7 +658,7 @@ export async function executeMemoryRetrievePlan(memStore: MemoryStore, ctx: Memo
     ctx._degradedStages = ctx._degradedStages || [];
     ctx._degradedStages.push('memory_retrieve_plan');
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -656,7 +670,7 @@ export async function executeMemoryMultiRound(memStore: MemoryStore, ctx: Memory
 
   const runtime = memStore.getMemoryRuntime();
   const templates = memStore.config.narrativePromptTemplates;
-  memStore.setLoading(true, '正在多轮补充...');
+  const finishLoading = memStore.beginLoading('正在多轮补充...');
 
   try {
     const semanticQuery = ctx._semanticQuery || ctx.inputText;
@@ -682,7 +696,7 @@ export async function executeMemoryMultiRound(memStore: MemoryStore, ctx: Memory
           .replace(/\{\{memoryCandidates\}\}/g, candidateList || '无候选')
           .replace(/\{\{previousResults\}\}/g, previousResults);
 
-        const multiRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, multiFilled, '请补充遗漏的记忆，输出 JSON。');
+        const multiRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, multiFilled, '请补充遗漏的记忆，输出 JSON。', 0.3, 120000, ctx.signal);
         const multiResult = parseNarrativeRetrievePlannerResult(multiRaw);
 
         const multiTitles = multiResult.items.map(i => i.title);
@@ -697,12 +711,14 @@ export async function executeMemoryMultiRound(memStore: MemoryStore, ctx: Memory
       }
     }
   } catch (err: unknown) {
+    ctx.signal?.throwIfAborted();
+    if (err instanceof Error && err.name === 'AbortError') throw err;
     const message = err instanceof Error ? err.message : '多轮补充失败';
     console.warn('[多轮补充] 失败:', message);
     ctx._degradedStages = ctx._degradedStages || [];
     ctx._degradedStages.push('memory_multi_round');
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -721,7 +737,7 @@ export async function executeMemoryRerank(memStore: MemoryStore, ctx: MemoryPipe
   }
 
   const templates = memStore.config.narrativePromptTemplates;
-  memStore.setLoading(true, '正在精排...');
+  const finishLoading = memStore.beginLoading('正在精排...');
 
   try {
     // 先做本地匹配
@@ -734,7 +750,7 @@ export async function executeMemoryRerank(memStore: MemoryStore, ctx: MemoryPipe
       .replace(/\{\{query\}\}/g, ctx.inputText)
       .replace(/\{\{candidates\}\}/g, titleSelected.map((m, i) => `[${i}] ${m.title}: ${m.summary}`).join('\n'));
 
-    const rerankRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, rerankPrompt, '请对候选记忆精排打分，输出 JSON。');
+    const rerankRaw = await callMemoryAI(ctx.retrievalApiConfig ?? ctx.apiConfig, rerankPrompt, '请对候选记忆精排打分，输出 JSON。', 0.3, 120000, ctx.signal);
     const rerankResult = parseRerankResult(rerankRaw);
     ctx._rerankResult = rerankResult;
 
@@ -747,6 +763,8 @@ export async function executeMemoryRerank(memStore: MemoryStore, ctx: MemoryPipe
 
     ctx._selectedEntries = sortedEntries;
   } catch (err: unknown) {
+    ctx.signal?.throwIfAborted();
+    if (err instanceof Error && err.name === 'AbortError') throw err;
     const message = err instanceof Error ? err.message : '精排失败';
     console.warn('[精排] 失败:', message);
     // 精排失败，使用原始排序
@@ -757,7 +775,7 @@ export async function executeMemoryRerank(memStore: MemoryStore, ctx: MemoryPipe
     ctx._degradedStages = ctx._degradedStages || [];
     ctx._degradedStages.push('memory_rerank');
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -767,7 +785,7 @@ export async function executeMemoryRetrieveFinalize(memStore: MemoryStore, ctx: 
   const runtime = memStore.getMemoryRuntime();
   const allMemories = collectAllMemoriesFromRuntime(runtime);
   const rConfig = memStore.config.retrieval;
-  memStore.setLoading(true, '正在检索收尾...');
+  const finishLoading = memStore.beginLoading('正在检索收尾...');
 
   try {
     const finalSelectedTitles = ctx._finalSelectedTitles || [];
@@ -809,7 +827,7 @@ export async function executeMemoryRetrieveFinalize(memStore: MemoryStore, ctx: 
       strategy: `AI规划 ${ctx._plannerResult?.items.length ?? 0} 条 + 关键词补充 ${keywordSelected.length} 条 → ${deduped.length} 条`,
     });
   } finally {
-    memStore.setLoading(false);
+    finishLoading();
   }
 }
 
@@ -880,14 +898,15 @@ function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, _playerName:
     const sa = runtime.sceneAnchor;
     parts.push(`场景：${sa.locationLabel || '未知'} | ${sa.timeLabel || '未知'} | 目标：${sa.immediateGoal || '无'} | 风险：${sa.immediateRisk || '无'}`);
   }
-  const threads = runtime.activeThreads.filter(t => t.status === 'open' || t.status === 'blocked');
+  const current = (value: { conflictStatus?: string; validUntilRound?: number | null }) => value.conflictStatus !== 'superseded' && value.conflictStatus !== 'rejected' && value.validUntilRound == null;
+  const threads = runtime.activeThreads.filter(t => current(t) && (t.status === 'open' || t.status === 'blocked'));
   if (threads.length > 0) parts.push(`活跃线程：${threads.map(t => `${t.title}(${t.status})`).join('、')}`);
-  const slots = runtime.stateSlots.filter(s => s.status === 'active');
+  const slots = runtime.stateSlots.filter(s => current(s) && s.status === 'active');
   if (slots.length > 0) parts.push(`状态槽：${slots.map(s => `${s.slotType}(${s.scopeId})`).join('、')}`);
   // 关系网带地点标注，帮助 AI 理解空间上下文
   if (runtime.relationNetwork.length > 0) {
     const rels = runtime.relationNetwork
-      .filter(r => r.status === 'active' || r.status === 'changed')
+      .filter(r => current(r) && (r.status === 'active' || r.status === 'changed'))
       .slice(0, 8)
       .map(r => {
         const loc = r.locationScope ? `[${r.locationScope}]` : '';
@@ -980,9 +999,10 @@ function versionedUpsert<T extends { id: string }>(
     return;
   }
   const oldId = existing.id;
+  const archivedId = uniqueVersionId(list, oldId, currentRound);
   list[idx] = {
     ...existing,
-    id: uniqueVersionId(list, oldId, currentRound),
+    id: archivedId,
     conflictStatus: 'superseded',
     validUntilRound: currentRound,
     updatedAt: Date.now(),
@@ -990,7 +1010,7 @@ function versionedUpsert<T extends { id: string }>(
   list.push({
     ...incoming,
     id: incoming.id || oldId,
-    previousVersionId: oldId,
+    previousVersionId: archivedId,
     ...(incomingRecord.createdAt == null ? { createdAt: Date.now() } : {}),
     updatedAt: Date.now(),
   } as T);
@@ -1134,8 +1154,9 @@ export function applyIngestToRuntime(
           while (runtime.entityCards.some(item => item.id === branchId)) branchId = `${baseId}@branch${branchIndex++}`;
           runtime.entityCards.push({ ...candidate, id: branchId, previousVersionId: candidate.previousVersionId ?? oldId, createdAt: Date.now(), updatedAt: Date.now() });
         } else {
-          runtime.entityCards[idx] = { ...runtime.entityCards[idx], id: uniqueVersionId(runtime.entityCards, oldId, currentRound), conflictStatus: 'superseded', validUntilRound: currentRound, updatedAt: Date.now() };
-          runtime.entityCards.push({ ...candidate, id: String(patch.id || oldId), previousVersionId: oldId, createdAt: Date.now(), updatedAt: Date.now() });
+          const archivedId = uniqueVersionId(runtime.entityCards, oldId, currentRound);
+          runtime.entityCards[idx] = { ...runtime.entityCards[idx], id: archivedId, conflictStatus: 'superseded', validUntilRound: currentRound, updatedAt: Date.now() };
+          runtime.entityCards.push({ ...candidate, id: String(patch.id || oldId), previousVersionId: archivedId, createdAt: Date.now(), updatedAt: Date.now() });
         }
       } else runtime.entityCards.push({ ...candidate, id: runtime.entityCards.some(item => item.id === candidate.id) ? uniqueVersionId(runtime.entityCards, candidate.id, currentRound) : candidate.id, createdAt: Date.now(), updatedAt: Date.now() });
     }

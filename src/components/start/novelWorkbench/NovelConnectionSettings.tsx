@@ -1,37 +1,51 @@
-import { useEffect,useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchModels,testConnection } from '../../../api/client';
 import { useConfigStore } from '../../../stores/configStore';
 import { useNovelConfigStore,type NovelWorkbenchConfig } from '../../../stores/novelConfigStore';
 
 export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boolean; onMessage: (message: string) => void }) {
-  const { config, initialize, save } = useNovelConfigStore();
+  const { config, initialize, save, loaded, recoveryError, warning } = useNovelConfigStore();
   const shared = useConfigStore(state => state.apiConfig);
   const [draft, setDraft] = useState(config);
   const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const dirty = useRef(false);
+  const request = useRef<AbortController | null>(null);
+  const cancel = () => { request.current?.abort(); request.current = null; setBusy(false); };
   useEffect(() => { void initialize().catch(error => onMessage(`配置读取失败：${String(error)}`)); }, [initialize]);
-  useEffect(() => setDraft(config), [config]);
-  const patch = (value: Partial<NovelWorkbenchConfig>) => setDraft(current => ({ ...current, ...value }));
-  const patchApi = (value: Partial<NovelWorkbenchConfig['api']>) => setDraft(current => ({ ...current, api: { ...current.api, ...value } }));
+  useEffect(() => { if (!dirty.current) setDraft(structuredClone(config)); }, [config]);
+  useEffect(() => () => { request.current?.abort(); request.current = null; }, []);
+  const patch = (value: Partial<NovelWorkbenchConfig>) => { cancel(); dirty.current = true; setDraft(current => ({ ...current, ...value })); };
+  const patchApi = (value: Partial<NovelWorkbenchConfig['api']>) => { cancel(); dirty.current = true; setDraft(current => ({ ...current, api: { ...current.api, ...value } })); };
   const perform = async (action: 'save' | 'models' | 'test') => {
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    const isCurrent = () => request.current === controller && !controller.signal.aborted;
     setBusy(true);
     try {
       if (action === 'models') {
-        const listed = await fetchModels(draft.api);
+        const listed = await fetchModels(draft.api, { signal: controller.signal });
+        if (!isCurrent()) return;
         setModels(listed);
         const flash = listed.filter(model => /flash/i.test(model)).sort((a, b) => Number(/preview|exp/i.test(a)) - Number(/preview|exp/i.test(b)))[0];
-        if (!draft.api.model && flash) patchApi({ model: flash });
+        if (!draft.api.model && flash) { dirty.current = true; setDraft(current => ({ ...current, api: { ...current.api, model: flash } })); }
         onMessage(`发现 ${listed.length} 个模型${flash ? `；推荐 ${flash}` : '；请明确选择拆解模型'}。`);
       } else if (action === 'test') {
-        const result = await testConnection(draft.api);
+        const result = await testConnection(draft.api, { signal: controller.signal });
+        if (!isCurrent()) return;
         onMessage(`${result.success ? '连接通过' : '连接失败'}：${result.message}`);
-      } else { await save(draft); onMessage('拆解专用配置已保存，密钥使用项目密钥库保护。'); }
-    } catch (error) { onMessage(`配置操作失败：${error instanceof Error ? error.message : String(error)}`); }
-    finally { setBusy(false); }
+      } else {
+        await save(draft);
+        if (!isCurrent()) return;
+        dirty.current = false;
+        onMessage(useNovelConfigStore.getState().warning ?? '拆解专用配置已保存，密钥使用项目密钥库保护。');
+      }
+    } catch (error) { if (isCurrent()) onMessage(`配置操作失败：${error instanceof Error ? error.message : String(error)}`); }
+    finally { if (request.current === controller) { request.current = null; setBusy(false); } }
   };
   return <details className="novel-import-workbench__settings" open={!config.api.model}>
     <summary>拆解专用 API 与检索配置</summary>
-    <fieldset disabled={disabled || busy}>
+    {(recoveryError || warning) && <p role="alert">{recoveryError || warning} <button type="button" onClick={() => { void initialize().catch(error => onMessage(`配置读取失败：${String(error)}`)); }}>重新读取</button></p>}
+    <fieldset disabled={disabled || busy || (!loaded && !recoveryError)}>
       <p className="novel-import-workbench__hint">修改后保存生效。设置独立于游戏对话；模型列表优先推荐稳定 Flash，不自动切换 Pro。</p>
       <div className="novel-import-workbench__range-fields">
         <label className="novel-import-workbench__field">接口协议<select value={draft.api.provider} onChange={e => patchApi({ provider: e.target.value as NovelWorkbenchConfig['api']['provider'] })}><option value="custom">OpenAI 兼容</option><option value="google">Google</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select></label>
@@ -51,7 +65,7 @@ export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boo
         <label className="novel-import-workbench__field">本地模型 ID<input value={draft.embeddingModel} onChange={e => patch({ embeddingModel: e.target.value })} placeholder="填入本地服务实际返回的模型 ID" /></label>
       </div>}
       <div className="novel-import-workbench__structure-actions">
-        {shared && <button type="button" onClick={() => setDraft(current => ({ ...current, api: { ...shared } }))}>复制游戏 API 配置</button>}
+        {shared && <button type="button" onClick={() => patch({ api: { ...shared } })}>复制游戏 API 配置</button>}
         <button type="button" onClick={() => void perform('models')}>获取模型列表</button>
         <button type="button" onClick={() => void perform('test')}>测试生成连接</button>
         <button type="button" onClick={() => void perform('save')}>保存专用配置</button>

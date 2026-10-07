@@ -9,6 +9,8 @@
     "build": "bun run build.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "typecheck:server": "tsc -p tsconfig.server.json",
+    "typecheck:server-tests": "tsc -p tsconfig.server-tests.json",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

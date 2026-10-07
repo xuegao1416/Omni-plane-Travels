@@ -143,6 +143,14 @@ export interface ImageTask {
   errorMessage: string;
   category: ImageCategory;
   characterName: string;
+  sourcePrompt?: string;
+  deliveryKey?: string;
+  sessionId?: string;
+  worldId?: string;
+  messageId?: string;
+  npcId?: string;
+  /** Result bytes belong to imageDb, including a retained result when quota blocks saving. */
+  hasResult?: boolean;
 }
 
 export interface ImageGenResult {

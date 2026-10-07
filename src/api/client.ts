@@ -1,5 +1,6 @@
 import type { ApiConfig,Message,RequestOptions,StreamOptions,CompletionResult } from './types';
 import { nativeFetch } from '../utils/nativeFetch';
+import { abortableDelay } from '../utils/abortableDelay';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { notifyRateLimited,bucketKeyForConfig,parseRetryAfter } from './rateLimiter';
 
@@ -30,8 +31,8 @@ export function getProxyUrl(): string | null {
 }
 
 /** 统一准备请求 URL 和 Headers（处理代理逻辑） */
-export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>): { url: string; headers: Record<string, string> } {
-  const proxyUrl = getProxyUrl();
+export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>, proxyOverride?: string | null): { url: string; headers: Record<string, string> } {
+  const proxyUrl = proxyOverride === undefined ? getProxyUrl() : validateProxyUrl(proxyOverride);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...extraHeaders,
@@ -62,19 +63,34 @@ export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHead
   return { url: endpoint, headers };
 }
 
+/**
+ * 基址是否已经带版本段（/v1、/v4、/v1beta，允许结尾不带斜杠）。
+ *
+ * 判断"要不要再补 /v1"必须用这个：只看 `/v1` 结尾会漏掉别的版本号，
+ * 例如智谱 GLM 的端点是 https://open.bigmodel.cn/api/paas/v4 —— 误补一个
+ * /v1 会直接打到 https://open.bigmodel.cn/api/paas/v4/v1/chat/completions。
+ */
+function hasVersionSegment(base: string): boolean {
+  return /\/v\d+(\/|$)/i.test(base);
+}
+
 // URL拼接 - 支持多种provider
 export function buildEndpoint(config: ApiConfig): string {
   const base = config.baseUrl.replace(/\/+$/, '');
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
-  // URL 已含版本路径（如 /v2/xxx）时直接追加 /chat/completions，不插入多余的 /v1
-  if (/\/v\d+\//.test(base)) return `${base}/chat/completions`;
+  // Gemini 的 OpenAI 兼容层挂在 /v1beta/openai 下；裸域名直接拼 /v1/chat/completions 会打到不存在的路径。
+  if (config.provider === 'google' && !hasVersionSegment(base)) return `${base}/v1beta/openai/chat/completions`;
+  // URL 已含版本路径（/v1、/v4、/v2/xxx 等）时只追加路径，不插多余的 /v1
+  if (hasVersionSegment(base)) return `${base}/chat/completions`;
   return `${base}/v1/chat/completions`;
 }
 
 /** DeepSeek 推理模型首 token 和完整生成通常更慢，避免 2 分钟硬中止截断正文。 */
 export function getRequestTimeoutMs(config: ApiConfig): number {
+  const custom = config.requestTimeoutMs;
+  if (typeof custom === 'number' && Number.isFinite(custom) && custom > 0) return custom;
   return config.provider === 'deepseek' ? 300_000 : 120_000;
 }
 
@@ -172,6 +188,7 @@ async function parseSSEStream(
   response: Response,
   onDelta: (delta: string, accumulated: string) => void,
   onReasoning?: (reasoning: string) => void,
+  signal?: AbortSignal,
 ): Promise<{ text: string; reasoning: string; finishReason?: string }> {
   if (!response.body) {
     throw new Error('SSE 响应体为空（服务端可能未返回流式数据）');
@@ -187,6 +204,7 @@ async function parseSSEStream(
   const processSSELines = (raw: string) => {
     const parts = raw.split('\n\n');
     for (const line of parts) {
+      signal?.throwIfAborted();
       const trimmed = line.trim();
       if (!trimmed || !trimmed.startsWith('data: ')) continue;
       const data = trimmed.slice(6).trim();
@@ -209,38 +227,46 @@ async function parseSSEStream(
             onDelta(content, accumulated);
           }
         }
+        signal?.throwIfAborted();
         if (reasoning && onReasoning) {
           reasoningAccum += reasoning;
           onReasoning(reasoningAccum);
         }
       } catch {
+        signal?.throwIfAborted();
         // 跳过解析失败的行
       }
     }
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  let completed = false;
+  try {
+    while (true) {
+      signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      signal?.throwIfAborted();
+      if (done) { completed = true; break; }
+      buffer += decoder.decode(value, { stream: true });
 
-    const lastDoubleNewline = buffer.lastIndexOf('\n\n');
-    if (lastDoubleNewline === -1) continue;
+      const lastDoubleNewline = buffer.lastIndexOf('\n\n');
+      if (lastDoubleNewline === -1) continue;
 
-    const complete = buffer.slice(0, lastDoubleNewline);
-    buffer = buffer.slice(lastDoubleNewline + 2);
-    processSSELines(complete);
+      const complete = buffer.slice(0, lastDoubleNewline);
+      buffer = buffer.slice(lastDoubleNewline + 2);
+      processSSELines(complete);
+    }
+
+    // Flush remaining buffer content that didn't end with \n\n
+    if (buffer.trim()) processSSELines(buffer);
+    signal?.throwIfAborted();
+    return { text: accumulated, reasoning: reasoningAccum, finishReason };
+  } finally {
+    if (!completed) await reader.cancel(signal?.reason).catch(() => {});
+    reader.releaseLock();
   }
-
-  // Flush remaining buffer content that didn't end with \n\n
-  if (buffer.trim()) {
-    processSSELines(buffer);
-  }
-
-  return { text: accumulated, reasoning: reasoningAccum, finishReason };
 }
 
-// 非流式请求（使用 nativeFetch 绕过 CORS）
+// 非流式请求（浏览器与原生共享传输）
 export async function requestCompletion(
   config: ApiConfig,
   messages: Message[],
@@ -259,6 +285,7 @@ export async function requestCompletion(
     headers: fetchHeaders,
     body: JSON.stringify(body),
     signal: options.signal,
+    timeoutMs: getRequestTimeoutMs(config),
   });
 
   if (!res.ok) {
@@ -315,11 +342,12 @@ export async function requestCompletionStream(
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify(body),
     signal: options.signal,
+    timeoutMs: getRequestTimeoutMs(config),
   });
 
   if (!res.ok) {
@@ -339,12 +367,12 @@ export async function requestCompletionStream(
     throw Object.assign(new Error(`API ${res.status}: ${errText.slice(0, 200)}`), { status: res.status, retryAfterMs: parseRetryAfter(res.headers.get('Retry-After')) ?? undefined });
   }
 
-  const { text, reasoning, finishReason } = await parseSSEStream(res, options.onDelta, options.onReasoning);
+  const { text, reasoning, finishReason } = await parseSSEStream(res, options.onDelta, options.onReasoning, options.signal);
   return { text, reasoning: reasoning || undefined, finishReason, elapsed: Date.now() - start };
 }
 
 // 重试包装
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, signal?: AbortSignal, maxRetries = 3, baseDelay = 1000): Promise<T> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
@@ -355,7 +383,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 10
       if (attempt < maxRetries && retryable) {
         const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
         console.warn(`[API] 请求失败 (${status})，${attempt + 1}/${maxRetries} 次重试，等待 ${Math.round(delay)}ms...`);
-        await new Promise(r => setTimeout(r, delay));
+        await abortableDelay(delay, signal);
         continue;
       }
       throw err;
@@ -402,46 +430,25 @@ export async function requestStreamWithRetry(
   messages: Message[],
   options: StreamOptions,
 ): Promise<CompletionResult> {
-  const timeoutMs = getRequestTimeoutMs(config);
   return withRetry(async () => {
-    if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-    // 内部控制器：超时或被外部 signal 中止时，真正 abort 底层 fetch
-    const controller = new AbortController();
-    const onExternalAbort = () => controller.abort();
-    if (options.signal) {
-      if (options.signal.aborted) controller.abort();
-      else options.signal.addEventListener('abort', onExternalAbort, { once: true });
-    }
-
-    const timeoutId = setTimeout(() => {
-      if (!controller.signal.aborted) {
-        console.warn(`[API] 请求已超过 ${Math.round(timeoutMs / 1000)}s，强制中止`);
-        controller.abort(new DOMException('Streaming timeout exceeded', 'TimeoutError'));
-      }
-    }, timeoutMs);
-
-    try {
-      // 用合并后的 signal 替代调用方的 signal，确保超时也能中止
-      return await requestWithFallback(config, messages, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(timeoutId);
-      if (options.signal) options.signal.removeEventListener('abort', onExternalAbort);
-    }
-  });
+    options.signal?.throwIfAborted();
+    return requestWithFallback(config, messages, options);
+  }, options.signal);
 }
 
 function getModelListUrls(config: ApiConfig): string[] {
   const base = config.baseUrl.replace(/\/+$/, '');
   if (config.provider === 'google') {
-    return [`${base}/v1beta/models?key=${config.apiKey}`];
+    // 基址已带版本段时沿用，避免拼出 /v1beta/v1beta/models。
+    const root = /\/v\d/i.test(base) ? base : `${base}/v1beta`;
+    return [`${root}/models?key=${config.apiKey}`];
   }
 
   const standardUrl = base.endsWith('/v1') || base.endsWith('/openai')
     ? `${base}/models`
     : base.endsWith('/v1/chat/completions')
       ? base.replace(/\/chat\/completions$/, '/models')
-      : /\/v\d+\//.test(base)
+      : hasVersionSegment(base)
         ? `${base}/models`
         : `${base}/v1/models`;
 
@@ -454,33 +461,49 @@ function getModelListUrls(config: ApiConfig): string[] {
   return [...new Set([`${root}/models`, standardUrl])];
 }
 
-// 获取模型列表（使用 nativeFetch 绕过 CORS）
-export async function fetchModels(config: ApiConfig): Promise<string[]> {
+export interface ConnectionRequestOptions { signal?: AbortSignal; proxyUrl?: string | null; }
+function validateProxyUrl(value: string | null): string | null {
+  if (!value?.trim()) return null;
+  const url = new URL(value.trim());
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('代理地址必须以 http:// 或 https:// 开头');
+  return value.trim();
+}
+
+// 获取模型列表（浏览器与原生共享传输）
+export async function fetchModels(config: ApiConfig, options?: ConnectionRequestOptions): Promise<string[]> {
   const urls = getModelListUrls(config);
   const failures: string[] = [];
 
   for (const url of urls) {
+    options?.signal?.throwIfAborted();
     const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
       url,
       config.provider !== 'google' ? config.apiKey : undefined,
+      undefined, options?.proxyUrl,
     );
 
     // 每个候选地址单独计时，避免某个公益站端点无响应时按钮一直转圈。
     const controller = new AbortController();
+    const abort = () => controller.abort(options?.signal?.reason);
+    options?.signal?.addEventListener('abort', abort, { once: true });
+    if (options?.signal?.aborted) abort();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
       const res = await nativeFetch(fetchUrl, { headers: fetchHeaders, signal: controller.signal });
+      options?.signal?.throwIfAborted();
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         failures.push(`${url} → ${res.status} ${errText.slice(0, 120)}`);
         continue;
       }
       const json = await res.json();
+      options?.signal?.throwIfAborted();
       const models = Array.isArray(json.data) ? json.data : Array.isArray(json.models) ? json.models : [];
       const modelIds = models.map((m: any) => m.id || m.name).filter(Boolean);
       if (modelIds.length > 0) return modelIds;
       failures.push(`${url} → 返回了空模型列表`);
     } catch (err: unknown) {
+      options?.signal?.throwIfAborted();
       const errMsg = err instanceof Error ? err.message : String(err);
       if (err instanceof Error && err.name === 'AbortError') {
         failures.push(`${url} → 请求超时(30秒)`);
@@ -491,14 +514,15 @@ export async function fetchModels(config: ApiConfig): Promise<string[]> {
       }
     } finally {
       clearTimeout(timeoutId);
+      options?.signal?.removeEventListener('abort', abort);
     }
   }
 
   throw new Error(`获取模型列表失败：${failures.join('；')}。部分公益站不开放模型列表时，可直接手动填写模型名称。`);
 }
 
-// 测试连接（使用 nativeFetch 绕过 CORS）
-export async function testConnection(config: ApiConfig): Promise<{ success: boolean; message: string; elapsed: number }> {
+// 测试连接（浏览器与原生共享传输）
+export async function testConnection(config: ApiConfig, options?: ConnectionRequestOptions): Promise<{ success: boolean; message: string; elapsed: number }> {
   const start = Date.now();
   let endpoint = '';
   let fetchUrl = '';
@@ -511,15 +535,18 @@ export async function testConnection(config: ApiConfig): Promise<{ success: bool
       stream: false,
     };
 
-    const { url: resolvedFetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
+    const { url: resolvedFetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey, undefined, options?.proxyUrl);
     fetchUrl = resolvedFetchUrl;
 
     const res = await nativeFetch(fetchUrl, {
       method: 'POST',
       headers: fetchHeaders,
       body: JSON.stringify(body),
+      signal: options?.signal,
+      timeoutMs: getRequestTimeoutMs(config),
     });
 
+    options?.signal?.throwIfAborted();
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       const proxyUrl = getProxyUrl();
@@ -532,8 +559,12 @@ export async function testConnection(config: ApiConfig): Promise<{ success: bool
       return { success: false, message: `API ${res.status}: ${errText.slice(0, 200)}`, elapsed: Date.now() - start };
     }
 
+    await res.body?.cancel().catch(() => {});
+    options?.signal?.throwIfAborted();
     return { success: true, message: `连接成功 (${Date.now() - start}ms)`, elapsed: Date.now() - start };
   } catch (err: unknown) {
+    options?.signal?.throwIfAborted();
+    if (err instanceof Error && err.name === 'TimeoutError') return { success: false, message: '连接测试超时，请检查地址或服务状态后重试。', elapsed: Date.now() - start };
     const msg = err instanceof Error ? err.message : String(err);
     const proxyUrl = getProxyUrl();
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Network request failed')) {
@@ -574,22 +605,24 @@ export interface EmbeddingConfig {
 export async function fetchEmbedding(
   config: EmbeddingConfig,
   text: string,
+  options?: { signal?: AbortSignal },
 ): Promise<number[]> {
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/embeddings')) {
-    url = base.endsWith('/v1') ? `${base}/embeddings` : `${base}/v1/embeddings`;
+    url = hasVersionSegment(base) ? `${base}/embeddings` : `${base}/v1/embeddings`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify({
       model: config.model,
       input: text,
     }),
+    signal: options?.signal,
   });
 
   if (!res.ok) {
@@ -612,12 +645,12 @@ export async function fetchEmbeddingBatch(
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/embeddings')) {
-    url = base.endsWith('/v1') ? `${base}/embeddings` : `${base}/v1/embeddings`;
+    url = hasVersionSegment(base) ? `${base}/embeddings` : `${base}/v1/embeddings`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify({
@@ -686,16 +719,18 @@ export async function fetchRerank(
   config: RerankConfig,
   query: string,
   documents: string[],
+  options?: { signal?: AbortSignal },
 ): Promise<RerankResult[]> {
+  options?.signal?.throwIfAborted();
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/rerank') && !base.endsWith('/rerank/')) {
-    url = base.endsWith('/v1') ? `${base}/rerank` : `${base}/v1/rerank`;
+    url = hasVersionSegment(base) ? `${base}/rerank` : `${base}/v1/rerank`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify({
@@ -704,6 +739,7 @@ export async function fetchRerank(
       documents,
       top_n: documents.length,
     }),
+    signal: options?.signal,
   });
 
   if (!res.ok) {

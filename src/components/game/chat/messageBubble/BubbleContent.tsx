@@ -2,13 +2,17 @@ import type { ChatMessage } from '../../../../engine/types';
 import { useUISettings } from '../../../../context/UISettingsContext';
 import { createIframeSrcDoc } from '../../../../utils/markdown';
 import type { RenderedContent } from './renderPipeline';
+import { useMemo, useRef } from 'react';
+import { useInlinePortals } from './InlinePortals';
+import type { WorldSystemData, DiceRoll } from '../../../../modules/schema';
 
 interface BubbleContentProps {
   message: ChatMessage;
   isUser: boolean;
   renderedContent: RenderedContent;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  messageHtmlRef: React.RefObject<HTMLDivElement | null>;
+  worldSystem?: WorldSystemData | null;
+  onDiceRoll?: (roll: DiceRoll) => void;
   onOptionClick?: (optionText: string) => void;
 }
 
@@ -20,10 +24,16 @@ export default function BubbleContent({
   isUser,
   renderedContent,
   iframeRef,
-  messageHtmlRef,
+  worldSystem,
+  onDiceRoll,
   onOptionClick,
 }: BubbleContentProps) {
   const { t } = useUISettings();
+  const messageHtmlRef = useRef<HTMLDivElement>(null);
+  // Portals and display leases follow the actual HTML node, including editing
+  // unmount/remount. An unrelated render must not reset its hydrated children.
+  useInlinePortals(messageHtmlRef, renderedContent, worldSystem, onDiceRoll, isUser, message);
+  const html = useMemo(() => ({ __html: renderedContent?.content ?? '' }), [renderedContent?.content]);
 
   if (isUser) {
     return (
@@ -57,7 +67,7 @@ export default function BubbleContent({
         <div
           ref={messageHtmlRef}
           className="message-html-content"
-          dangerouslySetInnerHTML={{ __html: renderedContent.content }}
+          dangerouslySetInnerHTML={html}
           style={{
             wordBreak: 'break-word',
             overflowWrap: 'break-word',

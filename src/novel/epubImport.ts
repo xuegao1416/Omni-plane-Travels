@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { v4 as uuid } from 'uuid';
-import { buildNovelSegments, hashNovelText } from './segmentation';
+import { buildNovelSemanticSegments, hashNovelText } from './segmentation';
 import type { NovelChapter, NovelDataset } from './types';
 
 function decodeEntities(source: string): string {
@@ -206,7 +206,7 @@ export async function createNovelDatasetFromEpub(
     id, title, sourceType: 'epub', schemaVersion: 2,
     sourceVersion, sourceVerified: !issues.some(item => item.severity === 'error'), importIssues: issues,
     rawTextLength: rawText.length, rawText, chapters, staticMaterial: {},
-    segments: buildNovelSegments(id, chapters),
+    segments: buildNovelSemanticSegments(id, chapters),
     analysisStatus: 'draft', analysisVersion: 1,
     createdAt: now, updatedAt: now,
   };

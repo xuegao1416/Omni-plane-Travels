@@ -1,5 +1,5 @@
 import type { GameState } from '../schema/variables';
-import { executeGameplayTransaction, getGameplayPath } from '../gameplay/kernel';
+import { createGameplayStateDiff, executeGameplayTransaction, getGameplayPath } from '../gameplay/kernel';
 import type { GameplayCost, GameplayEffect, GameplayValue } from '../gameplay/types';
 import { executeCustomModuleActions } from './actionExecutor';
 import { buildCustomModuleHostContext, type CustomModuleHostContext } from './context';
@@ -12,6 +12,8 @@ export interface CustomModuleGameExecutionOptions {
   eventId: string;
   now?: number;
   context?: CustomModuleHostContext;
+  /** Internal fixed-rule entry; ordinary lifecycle calls leave this absent. */
+  ruleId?: string;
 }
 export interface CustomModuleGameExecutionResult { gameState: GameState; applied: number; warnings: string[] }
 
@@ -25,10 +27,11 @@ export function executeCustomModuleInGame(
   if (!validation.valid || !validation.normalized) return { gameState, applied: 0, warnings: validation.errors.map(e => `${e.code}: ${e.message}`) };
   const module = validation.normalized;
   if (!options.eventId?.trim()) return { gameState, applied: 0, warnings: ['缺少稳定游戏事件 ID'] };
+  if (options.ruleId && !gameState.customModules?.[module.id]) return { gameState: source, applied: 0, warnings: ['指定规则模块尚未安装'] };
   gameState.customModules ??= {};
   gameState.customModules[module.id] ??= createInitialCustomModuleState(module);
   const initial = gameState.customModules[module.id];
-  if (!initial.enabled) return { gameState, applied: 0, warnings: [] };
+  if (!initial.enabled) return { gameState, applied: 0, warnings: options.ruleId ? ['指定规则模块未启用'] : [] };
   // Version changes must pass the explicit save-application migration gate.
   if (initial.moduleVersion !== module.version || (initial.definition && JSON.stringify(initial.definition) !== JSON.stringify(module))) {
     return { gameState, applied: 0, warnings: ['存档模块定义与请求版本不一致，请先预览并应用更新'] };
@@ -36,7 +39,9 @@ export function executeCustomModuleInGame(
   const warnings: string[] = [];
   let applied = 0;
   let remaining = 128;
-  for (const rule of module.logic[lifecycle]) {
+  const rules = options.ruleId ? module.logic[lifecycle].filter(rule => rule.id === options.ruleId) : module.logic[lifecycle];
+  if (options.ruleId && rules.length !== 1) return { gameState: source, applied: 0, warnings: ['指定规则不存在'] };
+  for (const rule of rules) {
     const runtimeState = gameState.customModules![module.id];
     const key = JSON.stringify([options.eventId, rule.id]);
     if (runtimeState.runtime.processedEvents?.includes(key)) continue;
@@ -47,7 +52,10 @@ export function executeCustomModuleInGame(
       round: options.context?.game.round, time: options.context?.game.time });
     if (options.context) context.event = options.context.event;
     const operands = buildV2Operands(module, context);
-    if (rule.when && !evaluateV2Condition(rule.when, runtimeState.values, operands, 0, 16)) continue;
+    if (rule.when && !evaluateV2Condition(rule.when, runtimeState.values, operands, 0, 16)) {
+      if (options.ruleId) warnings.push('指定规则前置条件不满足');
+      continue;
+    }
     const own = rule.actions.filter((action): action is V2Action => !('amount' in action));
     const changed = executeCustomModuleActions(module, runtimeState, own, lifecycle, options.now ?? 0, 128, operands);
     if (changed.warnings.length) { warnings.push(...changed.warnings); continue; }
@@ -95,7 +103,11 @@ export function executeCustomModuleInGame(
     changed.nextState.runtime.lastLifecycle = lifecycle;
     changed.nextState.runtime.lastRunAt = options.now ?? 0;
     changed.nextState.runtime.processedEvents = [...(runtimeState.runtime.processedEvents ?? []), key];
-    effects.push({ set: { path: `customModules.${module.id}`, value: changed.nextState as unknown as GameplayValue } });
+    // Log only mutable differences. Copying a fixed definition into every before/
+    // after entry makes long director histories grow by megabytes per turn.
+    const beforeModule: Pick<GameState, 'customModules'> = { customModules: { [module.id]: runtimeState } };
+    const afterModule: Pick<GameState, 'customModules'> = { customModules: { [module.id]: changed.nextState } };
+    effects.push(...createGameplayStateDiff(beforeModule, afterModule));
     const transaction = executeGameplayTransaction(gameState, {
       id: `custom:${module.id}:${key}`, moduleId: module.id, source: 'custom-module',
       costs: [...costs.values()], effects,
@@ -105,4 +117,18 @@ export function executeCustomModuleInGame(
     applied += rule.actions.length;
   }
   return { gameState, applied, warnings };
+}
+
+/** A fixed rule is resolved solely from the installed immutable definition. */
+export function executeCustomModuleRuleInGame(
+  source: GameState, moduleId: string, moduleVersion: string, lifecycle: CustomModuleLifecycle,
+  ruleId: string, options: Omit<CustomModuleGameExecutionOptions, 'ruleId' | 'context'>,
+): CustomModuleGameExecutionResult {
+  const installed = source.customModules?.[moduleId];
+  if (!installed?.definition || installed.moduleVersion !== moduleVersion || installed.definition.version !== moduleVersion || installed.definition.id !== moduleId) {
+    return { gameState: source, applied: 0, warnings: ['指定规则模块或版本不匹配'] };
+  }
+  if (!Object.hasOwn(installed.definition.logic, lifecycle) || !ruleId?.trim()) return { gameState: source, applied: 0, warnings: ['指定规则生命周期无效'] };
+  const context = buildCustomModuleHostContext(source, { items: installed.definition.items, event: { type: 'button', moduleId, event: ruleId } });
+  return executeCustomModuleInGame(source, installed.definition, lifecycle, { ...options, context, ruleId });
 }

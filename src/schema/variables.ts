@@ -29,6 +29,8 @@ export interface SurvivalStats {
 }
 
 export interface SkillData {
+  /** 技能显示名。旧存档可能缺失，此时 UI 回落到字典键。 */
+  名称?: string;
   品质: '普通' | '精良' | '稀有' | '史诗' | '传说';
   描述: string;
   类型: string;
@@ -377,6 +379,8 @@ export interface NPCData {
 }
 
 export interface GameState {
+  /** Authored consequence deduplication lives in rollbackable save state. */
+  authoredEffectReceipts?: Record<string, { planId: string; effectSignature: string }>;
   playerIdentity?: { actorId: string; name: string; aliases: string[] };
   playerKnowledge?: import('../engine/playerKnowledge').PlayerKnowledgeState;
   世界: WorldState;

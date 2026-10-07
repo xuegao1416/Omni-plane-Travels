@@ -365,7 +365,7 @@ export function resolveAbilityProposalOnGameState(
   v3.abilityInstances = { ...(v3.abilityInstances ?? {}), [definition.id]: createAbilityInstance(definition, definition.category, acquiredAt) };
   state.玩家.技能系统 = {
     ...(state.玩家.技能系统 ?? {}),
-    [definition.id]: { 品质: definition.rarity, 描述: definition.description, 类型: definition.category === 'pet' ? '宠物能力' : definition.category === 'summon' ? '召唤能力' : '自由技能' },
+    [definition.name]: { 名称: definition.name, 品质: definition.rarity, 描述: definition.description, 类型: definition.category === 'pet' ? '宠物能力' : definition.category === 'summon' ? '召唤能力' : '自由技能' },
   };
   const abilityState = state.玩家.能力系统 ?? {
     天赋点: 0,

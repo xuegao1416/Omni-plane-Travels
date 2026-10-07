@@ -8,7 +8,7 @@ interface DependencyOwner {
   customWorld?: Record<string, unknown>;
 }
 
-function references(owner: DependencyOwner): Array<{ definitionId: string; version: string }> {
+export function directorDependencyReferences(owner: DependencyOwner): Array<{ definitionId: string; version: string }> {
   const sources: Array<{ definitionId?: string; version: string } | undefined> = [];
   const visit = (state?: SimulationState) => {
     if (!state) return;
@@ -22,7 +22,7 @@ function references(owner: DependencyOwner): Array<{ definitionId: string; versi
 }
 
 export async function collectDirectorDependencies(owner: DependencyOwner): Promise<DirectorDefinition[]> {
-  return Promise.all(references(owner).map(async ref => {
+  return Promise.all(directorDependencyReferences(owner).map(async ref => {
     const definition = await getDirectorDefinition(ref.definitionId, ref.version);
     if (!definition) throw new Error(`存档依赖的剧情版本缺失：${ref.definitionId} / ${ref.version}`);
     return definition;
@@ -32,7 +32,7 @@ export async function collectDirectorDependencies(owner: DependencyOwner): Promi
 export async function restoreDirectorDependencies(owner: DependencyOwner, input: unknown): Promise<void> {
   if (input !== undefined && !Array.isArray(input)) throw new Error('剧情依赖格式无效');
   const definitions: DirectorDefinition[] = (input ?? []).map((value: DirectorDefinition) => validateDirectorDefinition(value));
-  for (const ref of references(owner)) {
+  for (const ref of directorDependencyReferences(owner)) {
     if (!definitions.some(item => item.id === ref.definitionId && item.version === ref.version) && !await getDirectorDefinition(ref.definitionId, ref.version)) {
       throw new Error(`导入缺少剧情版本：${ref.definitionId} / ${ref.version}`);
     }

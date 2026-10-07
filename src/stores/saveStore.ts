@@ -1,24 +1,25 @@
 import { create } from 'zustand';
+import { SaveCoordinator, SaveScheduleCancelledError } from '../storage/saveCoordinator';
 import type { GameSave, SaveMeta, CompactSaveRecord } from '@/storage/db';
 import {
+  SaveCreationConflictError,
   saveGameIncremental,
+  planMessageSave,
   loadGame as loadGameFromDb,
   deleteSave as deleteSaveFromDb,
   forceDeleteSave as forceDeleteSaveFromDb,
   getAllSaveMeta,
   saveAllSaveMeta,
   invalidateSaveMetaCache,
-  generateSaveId,
   buildPreview,
   exportSave as exportSaveFromDb,
+  exportSaveCapture,
+  recoverPendingSaveImports,
   importSaveFromData,
-  getLastMessageSeq,
-  deleteMessages,
   autoPruneIfNeeded,
   ACTIVE_SAVE_KEY,
   SAVE_SCHEMA_VERSION,
 } from '@/storage/db';
-import { pruneModuleCheckpoints } from '@/storage/moduleStateDb';
 
 /** 校验 saveId 格式：save_<timestamp>_<random>，过滤 localStorage 脏数据 */
 function validateSaveId(raw: string | null): string | null {
@@ -35,6 +36,7 @@ interface SaveState {
   savesMeta: SaveMeta[];
   currentSaveId: string | null;
   currentSaveName: string;
+  currentAssetSourceSessionIds: string[];
   /** 本局激活的事件包 id 列表（二级开关：undefined = 用全局已启用列表，[] = 全部关掉） */
   sessionActivePacks: string[] | undefined;
 
@@ -42,16 +44,17 @@ interface SaveState {
   initialize: () => Promise<void>;
 
   // CRUD
-  createNewGame: (saveName: string) => Promise<string>;
+  createSave: (save: GameSave) => Promise<void>;
   loadSave: (saveId: string) => Promise<GameSave | null>;
+  activateSave: (save: GameSave) => string | undefined;
   deleteSave: (saveId: string) => Promise<void>;
   forceDeleteSave: (saveId: string) => Promise<void>;
   renameSave: (saveId: string, newName: string) => Promise<void>;
-  importSave: (data: any) => Promise<SaveMeta | null>;
+  importSave: (data: any) => Promise<SaveMeta>;
   exportSave: (saveId: string) => Promise<Blob>;
 
   // 保存（写入 DB + 更新元数据）
-  performSave: (saveData: GameSave) => Promise<void>;
+  performSave: (saveData: GameSave, options?: { createOnly?: boolean }) => Promise<void>;
 
   /** 设置本局激活的事件包列表（二级开关） */
   setSessionActivePacks: (packs: string[] | undefined) => void;
@@ -62,20 +65,22 @@ interface SaveState {
   // Debounce 自动存档
   scheduleAutoSave: () => void;
   flushAutoSave: () => Promise<void>;
+  saveFailure: { saveId: string; message: string } | null;
 }
 
-let _savePromise: Promise<void> | null = null;
-let _saveQueued = false;
-let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+const saveCoordinator = new SaveCoordinator({ save: capture => useSaveStore.getState().performSave(capture) });
 
 export const useSaveStore = create<SaveState>((set, get) => ({
   savesMeta: [],
   currentSaveId: validateSaveId(localStorage.getItem(ACTIVE_SAVE_KEY)),
   currentSaveName: '',
+  currentAssetSourceSessionIds: [],
   sessionActivePacks: undefined,
+  saveFailure: null,
 
   initialize: async () => {
     try {
+      await recoverPendingSaveImports();
       const metas = await getAllSaveMeta();
       set({ savesMeta: metas });
     } catch (err) {
@@ -83,32 +88,26 @@ export const useSaveStore = create<SaveState>((set, get) => ({
     }
   },
 
-  createNewGame: async (saveName) => {
-    const { savesMeta } = get();
-    if (savesMeta.some((s) => s.name === saveName)) {
-      throw new Error('存档名称已存在');
-    }
-
-    const saveId = generateSaveId();
-    localStorage.setItem(ACTIVE_SAVE_KEY, saveId);
-    set({ currentSaveId: saveId, currentSaveName: saveName });
-
-    return saveId;
-  },
+  createSave: save => get().performSave(structuredClone(save), { createOnly: true }),
 
   loadSave: async (saveId) => {
     try {
       const saveData = await loadGameFromDb(saveId);
       if (!saveData) return null;
 
-      localStorage.setItem(ACTIVE_SAVE_KEY, saveId);
-      set({ currentSaveId: saveId, currentSaveName: saveData.name });
-
       return saveData;
     } catch (err) {
       console.error('[存档] 加载失败:', err);
       return null;
     }
+  },
+
+  activateSave: (save) => {
+    let warning: string | undefined;
+    try { localStorage.setItem(ACTIVE_SAVE_KEY, save.id); }
+    catch { warning = '旅程已载入，但未能保存恢复入口。关闭页面前请导出备份。'; }
+    set({ currentSaveId: save.id, currentSaveName: save.name, currentAssetSourceSessionIds: save.assetSourceSessionIds ?? [] });
+    return warning;
   },
 
   deleteSave: async (saveId) => {
@@ -123,6 +122,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       localStorage.removeItem(ACTIVE_SAVE_KEY);
       changes.currentSaveId = null;
       changes.currentSaveName = '';
+      changes.currentAssetSourceSessionIds = [];
       console.log(`[存档] 清除 ACTIVE_SAVE_KEY（删除的是当前存档）`);
     }
 
@@ -142,6 +142,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
     if (currentSaveId === saveId) {
       changes.currentSaveId = null;
       changes.currentSaveName = '';
+      changes.currentAssetSourceSessionIds = [];
     }
 
     set(changes);
@@ -193,7 +194,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       return meta;
     } catch (err) {
       console.error('[存档] 导入失败:', err);
-      return null;
+      throw err;
     }
   },
 
@@ -201,41 +202,19 @@ export const useSaveStore = create<SaveState>((set, get) => ({
     return exportSaveFromDb(saveId);
   },
 
-  performSave: async (saveData) => {
+  performSave: async (saveData, options) => {
     // 配额治理：检查配额，不足时自动清理冷消息
     await autoPruneIfNeeded(saveData.id);
 
-    // 获取上次保存的最后 seq 和消息数
-    const lastSeq = await getLastMessageSeq(saveData.id);
-
-    // 计算新增消息（使用 seq 判断，而不是数组索引）
     const allMessages = saveData.messages || [];
-
-    // ★ 检测截断/重roll：如果数据库中的消息数 > 当前消息数，
-    // 说明发生过 rollbackAndTruncate，旧消息残留在数据库中
-    // 需要全量重写（先删后写）以保证一致性
-    const dbMessageCount = lastSeq >= 0 ? lastSeq + 1 : 0;
-    const needsFullRewrite = dbMessageCount > allMessages.length;
-
-    if (needsFullRewrite) {
-      await deleteMessages(saveData.id);
-    }
-
-    let newMessages = needsFullRewrite
-      ? allMessages  // 全量重写：所有消息都是"新"的
-      : allMessages.filter(m => (m.seq ?? 0) > lastSeq);
-
-    // 随窗口前移，刚离开“最近10条”的旧消息可能被 optimizeSnapshots 去掉快照。
-    // 只重写这些刚发生变化的消息，避免整份长存档反复全量写入，也避免数据库残留悬空快照引用。
-    if (!needsFullRewrite && allMessages.length > dbMessageCount) {
-      const firstLeavingIndex = Math.max(0, dbMessageCount - 10);
-      const afterLeavingIndex = Math.max(firstLeavingIndex, allMessages.length - 10);
-      const leavingRecentWindow = allMessages.slice(firstLeavingIndex, afterLeavingIndex)
-        .filter(message => !message.snapshot && (message.seq ?? 0) <= lastSeq);
-      const bySeq = new Map(newMessages.map(message => [message.seq ?? 0, message]));
-      for (const message of leavingRecentWindow) bySeq.set(message.seq ?? 0, message);
-      newMessages = [...bySeq.values()];
-    }
+    const meta: SaveMeta = {
+      id: saveData.id, name: saveData.name, timestamp: saveData.timestamp, preview: buildPreview(saveData),
+      estBytes: allMessages.length * 500, messageCount: allMessages.length,
+      lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active', endedAt: saveData.endedAt, endReason: saveData.endReason,
+    };
+    // Replayed turns, edits and post-generation checkpoints can change a saved
+    // sequence. Persist changed content and delete removed slots atomically.
+    const { changedMessages: newMessages, replaceMessages: needsFullRewrite } = await planMessageSave(saveData.id, allMessages);
 
     // 快照只保存模块修订号；持久层也只保留当前修订和仍可回滚到的修订正文。
     const keptModuleRevisions = new Set<string>();
@@ -273,6 +252,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
       endedAt: saveData.endedAt,
       endReason: saveData.endReason,
+      assetSourceSessionIds: saveData.assetSourceSessionIds,
     };
 
     // 关键写入：存档数据（失败则导出兜底）
@@ -283,28 +263,14 @@ export const useSaveStore = create<SaveState>((set, get) => ({
         newMessages,
         saveData.moduleStates,
         moduleCheckpoints,
+        { replaceMessages: needsFullRewrite, keptModuleRevisions, createCommit: options?.createOnly ? meta : undefined },
       );
-      await pruneModuleCheckpoints(saveData.id, keptModuleRevisions);
     } catch (err) {
+      if (err instanceof SaveCreationConflictError) throw err;
       console.error('[存档] 存档数据写入失败:', err);
       // 尝试兜底导出
       try {
-        const recentMessages = (saveData.messages || []).slice(-50);
-        const backupData = {
-          type: 'omni-plane-travels-save-backup',
-          version: '2.0',
-          exportedAt: Date.now(),
-          reason: '存档数据写入失败自动备份（只含最近50条消息）',
-          save: {
-            id: saveData.id, name: saveData.name, timestamp: saveData.timestamp,
-            messages: recentMessages, gameState: saveData.gameState, worldId: saveData.worldId,
-            personalInfo: saveData.personalInfo, characterHistory: saveData.characterHistory,
-            memoryRuntime: saveData.memoryRuntime, memoryConfig: saveData.memoryConfig,
-            vectorMemory: saveData.vectorMemory, simulationState: saveData.simulationState,
-            lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active', endedAt: saveData.endedAt, endReason: saveData.endReason,
-          },
-        };
-        const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
+        const blob = await exportSaveCapture(saveData);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url; a.download = `save-backup-${Date.now()}.json`; a.click();
@@ -317,17 +283,6 @@ export const useSaveStore = create<SaveState>((set, get) => ({
     }
 
     // 非关键写入：元数据更新（失败不阻塞，下次 loadSave 会自愈）
-    const meta: SaveMeta = {
-      id: saveData.id,
-      name: saveData.name,
-      timestamp: saveData.timestamp,
-      preview: buildPreview(saveData),
-      estBytes: allMessages.length * 500,
-      messageCount: allMessages.length,
-      lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
-      endedAt: saveData.endedAt,
-      endReason: saveData.endReason,
-    };
 
     const { savesMeta } = get();
     const idx = savesMeta.findIndex(m => m.id === meta.id);
@@ -336,6 +291,7 @@ export const useSaveStore = create<SaveState>((set, get) => ({
       : [...savesMeta, meta];
 
     set({ savesMeta: updated });
+    if (options?.createOnly) { invalidateSaveMetaCache(); return; }
     try {
       await saveAllSaveMeta(updated);
     } catch (err) {
@@ -345,56 +301,21 @@ export const useSaveStore = create<SaveState>((set, get) => ({
   },
 
   saveGame: async (buildSaveData) => {
-    if (_savePromise) {
-      _saveQueued = true;
-      return _savePromise;
-    }
-
-    const run = async () => {
-      do {
-        _saveQueued = false;
-        const saveData = buildSaveData();
-        if (saveData) {
-          await get().performSave(saveData);
-        }
-      } while (_saveQueued);
-    };
-
-    _savePromise = run();
-    try {
-      await _savePromise;
-    } finally {
-      _savePromise = null;
-    }
+    const capture = buildSaveData();
+    if (!capture) throw new Error('无法捕获当前旅程，进度尚未保存。');
+    await saveCoordinator.request(capture);
   },
 
   scheduleAutoSave: () => {
-    if (_saveTimer) clearTimeout(_saveTimer);
-    // debounce 500ms 后通过全局注入的 _autoSaveBuilder 执行保存
-    _saveTimer = setTimeout(() => {
-      _saveTimer = null;
-      if (_autoSaveBuilder) {
-        console.log('[auto-save] 触发自动存档...');
-        get().saveGame(_autoSaveBuilder).catch(err => {
-          // 不再静默吞掉，让错误暴露
-          console.error('[auto-save] 保存失败（需要用户注意）:', err);
-          // 可以在这里触发 UI 通知
-        });
-      } else {
-        console.warn('[auto-save] _autoSaveBuilder 未注入，跳过存档');
-      }
-    }, 500);
+    const capture = _autoSaveBuilder?.();
+    if (!capture) return;
+    void saveCoordinator.schedule(capture).catch(error => {
+      if (!(error instanceof SaveScheduleCancelledError)) console.error('[auto-save] 保存失败，当前完整进度仍可重试或导出:', error);
+    });
   },
 
   flushAutoSave: async () => {
-    if (_saveTimer) {
-      clearTimeout(_saveTimer);
-      _saveTimer = null;
-    }
-    if (!_autoSaveBuilder) {
-      throw new Error('[auto-save] _autoSaveBuilder 未注入，无法立即存档');
-    }
-    await get().saveGame(_autoSaveBuilder);
+    await saveCoordinator.request(captureCurrentSave());
   },
 
   setSessionActivePacks: (packs) => {
@@ -403,9 +324,22 @@ export const useSaveStore = create<SaveState>((set, get) => ({
 
 }));
 
+saveCoordinator.subscribe(outcome => {
+  if (outcome.status === 'failed') useSaveStore.setState({ saveFailure: {
+    saveId: outcome.capture.id, message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
+  } });
+  else if (useSaveStore.getState().saveFailure?.saveId === outcome.capture.id) useSaveStore.setState({ saveFailure: null });
+});
+
 // ─── 自动存档 builder（由 GameContext 注入） ───
 
 let _autoSaveBuilder: (() => GameSave | null) | null = null;
+
+export function captureCurrentSave(): GameSave {
+  const capture = _autoSaveBuilder?.();
+  if (!capture || capture.id !== useSaveStore.getState().currentSaveId) throw new Error('当前旅程身份或捕获尚未就绪，进度未保存。');
+  return structuredClone(capture);
+}
 
 /** 注入自动存档的 buildSaveData 函数（由 GameContext 调用） */
 export function setAutoSaveBuilder(builder: () => GameSave | null) {
@@ -415,12 +349,7 @@ export function setAutoSaveBuilder(builder: () => GameSave | null) {
 
 /** 重置模块级变量，防止新建存档时旧存档的数据污染 */
 export function resetForNewGame() {
-  if (_saveTimer) {
-    clearTimeout(_saveTimer);
-    _saveTimer = null;
-  }
-  _saveQueued = false;
-  _savePromise = null;
+  saveCoordinator.cancelScheduled();
   // 注意：不要清空 _autoSaveBuilder，否则自动存档会失效
   // _autoSaveBuilder 由 GameContext 的 useEffect 注入，生命周期与组件一致
 }

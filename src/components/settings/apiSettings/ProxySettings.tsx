@@ -1,24 +1,10 @@
-import { useState,useCallback } from 'react';
+import { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
-import { STORAGE_KEYS } from '@/config/storageKeys';
 import ProxyTutorialOverlay from '../ProxyTutorialOverlay';
 import { rowStyle } from './types';
 
-export default function ProxySettings() {
-  const [proxyUrl, setProxyUrl] = useState<string>(() => {
-    try { return localStorage.getItem(STORAGE_KEYS.PROXY_URL) || ''; } catch { return ''; }
-  });
+export default function ProxySettings({ proxyUrl, onChange }: { proxyUrl: string; onChange: (value: string) => void }) {
   const [showTutorial, setShowTutorial] = useState(false);
-
-  const handleChange = useCallback((url: string) => {
-    setProxyUrl(url);
-    try { localStorage.setItem(STORAGE_KEYS.PROXY_URL, url); } catch {}
-  }, []);
-
-  const handleApplyProxy = useCallback((url: string) => {
-    setProxyUrl(url);
-    try { localStorage.setItem(STORAGE_KEYS.PROXY_URL, url); } catch {}
-  }, []);
 
   return (
     <>
@@ -57,7 +43,7 @@ export default function ProxySettings() {
           <input
             className="input-field"
             value={proxyUrl}
-            onChange={e => handleChange(e.target.value)}
+            onChange={e => onChange(e.target.value)}
             placeholder="https://你的worker名字.workers.dev"
             style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 10px' }}
           />
@@ -70,14 +56,14 @@ export default function ProxySettings() {
             background: 'var(--bg-tertiary)',
             borderRadius: '6px',
           }}>
-            ✅ 代理已启用：{proxyUrl}
+            保存后使用代理：{proxyUrl}
           </div>
         )}
       </div>
       {showTutorial && (
         <ProxyTutorialOverlay
           onClose={() => setShowTutorial(false)}
-          onApplyProxy={handleApplyProxy}
+          onApplyProxy={onChange}
         />
       )}
     </>

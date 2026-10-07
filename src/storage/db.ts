@@ -1,5 +1,10 @@
 // IndexedDB 存储层
 import { openDB, type IDBPDatabase } from 'idb';
+import { mapStorageBatch } from './mapStorageBatch';
+import { encodeStorageValue, decodeStorageValue, type StorageEncoding } from './storageCodec';
+import { decodeSaveFile } from './saveFileCodec';
+import { assetReferences, collectSaveAssets, decodePortableAssets } from './saveAssets';
+import { imageDb } from './imageDb';
 import type { ChatMessage } from '../engine/types';
 import type { GameState } from '../schema/variables';
 import { STORAGE_KEYS } from '@/config/storageKeys';
@@ -9,6 +14,10 @@ import { findWorldDef } from '@/data/worldLoader';
 import type { ModuleStateRecord } from '@/gameplay/moduleRuntime/types';
 import { extractModulePartitions } from '@/gameplay/moduleRuntime/facade';
 import type { CombatRiskMode } from '../gameplay/protocols';
+import type { DirectorDefinition } from '../director/definitionTypes';
+import { directorDefinitionKey, type DirectorDefinitionRecord } from '../director/definitionStore';
+import { applyImportedEvents, applyImportedWorld, encodeEventDependency, equalDirectorContent, prepareSaveDependencies,
+  rollbackImportedEvents, rollbackImportedWorld, type ImportedEventChange, type ImportedWorldChange } from './saveDependencyImport';
 
 // ─── 类型定义 ─────────────────────────────────────────
 
@@ -120,7 +129,7 @@ export type SaveLifecycle = 'active' | 'ended';
 
 /** 完整存档记录（写入 IndexedDB saves store） */
 export interface GameSave {
-  /** v3/v4 internal save schema marker; imports are normalized before persistence. */
+  /** v4/v5 internal save schema marker; imports are normalized before persistence. */
   schemaVersion?: number;
   id: string;
   name: string;
@@ -150,6 +159,8 @@ export interface GameSave {
   lifecycle?: SaveLifecycle;
   endedAt?: number;
   endReason?: string;
+  /** Original image-generation scopes retained when a portable save receives a new id. */
+  assetSourceSessionIds?: string[];
 }
 
 /** Additive lifecycle migration: legacy saves remain active and retryable by default. */
@@ -275,6 +286,78 @@ export interface MessageRecord {
   seq: number;
   /** 完整消息 */
   message: ChatMessage;
+  encodedSnapshot?: StorageEncoding;
+  /** Digest of the complete decoded message, including accepted checkpoints. */
+  contentFingerprint?: string;
+}
+
+async function messageFingerprint(message: ChatMessage): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(message));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
+}
+
+/** Sequence identifies a slot, not a revision. Compare against durable content. */
+export async function planMessageSave(saveId: string, messages: ChatMessage[]): Promise<{ changedMessages: ChatMessage[]; replaceMessages: boolean }> {
+  const db = await getDB();
+  // Keep only comparison metadata; getAll also clones every compressed snapshot
+  // and recovery payload into memory even though none of it is needed here.
+  const fingerprints = new Map<number, string | undefined>();
+  const tx = db.transaction(MESSAGES_STORE, 'readonly');
+  const index = tx.store.index('saveId_seq');
+  let nextSeq = 0;
+  while (nextSeq <= Number.MAX_SAFE_INTEGER) {
+    const range = IDBKeyRange.bound([saveId, nextSeq], [saveId, Number.MAX_SAFE_INTEGER]);
+    const records = await index.getAll(range, 32) as MessageRecord[];
+    for (const record of records) fingerprints.set(record.seq, record.contentFingerprint);
+    if (records.length < 32) break;
+    nextSeq = records.at(-1)!.seq + 1;
+  }
+  await tx.done;
+  const currentSequences = new Set(messages.map(message => message.seq ?? 0));
+  const replaceMessages = [...fingerprints.keys()].some(seq => !currentSequences.has(seq));
+  if (replaceMessages) return { changedMessages: messages, replaceMessages };
+  const changed = await mapStorageBatch(messages, async message => {
+    const previous = fingerprints.get(message.seq ?? 0);
+    // Older records acquire a fingerprint on their next successful save.
+    return !previous || previous !== await messageFingerprint(message) ? message : undefined;
+  });
+  return { changedMessages: changed.filter((message): message is ChatMessage => !!message), replaceMessages };
+}
+
+async function encodeMessageRecord(saveId: string, message: ChatMessage, seq: number): Promise<MessageRecord> {
+  const contentFingerprint = await messageFingerprint(message);
+  const encodedSnapshot = await encodeStorageValue(message.snapshot);
+  if (!encodedSnapshot) return { key: `${saveId}#${seq}`, saveId, seq, message, contentFingerprint };
+  const { snapshot, ...plainMessage } = message;
+  return { key: `${saveId}#${seq}`, saveId, seq, message: plainMessage as ChatMessage, encodedSnapshot, contentFingerprint };
+}
+
+async function decodeMessageRecord(record: MessageRecord): Promise<ChatMessage> {
+  if (record.encodedSnapshot === undefined) return record.message;
+  return { ...record.message, snapshot: await decodeStorageValue(record.encodedSnapshot) } as ChatMessage;
+}
+
+async function encodeSaveHead<T extends { memoryRuntime?: unknown; simulationState?: SimulationState; encodedHistory?: StorageEncoding }>(head: T): Promise<T> {
+  // Opaque compact heads may be passed through metadata/module paths.
+  if (head.encodedHistory !== undefined && !('memoryRuntime' in head) && !('simulationState' in head)) return head;
+  const { encodedHistory: previousEncoding, ...plainHead } = head;
+  const encodedHistory = await encodeStorageValue({ memoryRuntime: head.memoryRuntime, simulationState: head.simulationState });
+  if (!encodedHistory) return plainHead as T;
+  const { memoryRuntime, simulationState, ...rest } = plainHead;
+  return { ...rest, encodedHistory } as T;
+}
+
+async function decodeSaveHead(head: CompactSaveRecord): Promise<CompactSaveRecord> {
+  if (head.encodedHistory === undefined) return head;
+  const { encodedHistory, ...plainHead } = head;
+  const history = await decodeStorageValue(encodedHistory);
+  if (!history || typeof history !== 'object' || Array.isArray(history)
+    || Object.keys(history).some(key => key !== 'memoryRuntime' && key !== 'simulationState')) {
+    throw new Error('存档历史压缩数据损坏');
+  }
+  const payload = history as { memoryRuntime?: unknown; simulationState?: SimulationState };
+  return { ...plainHead, memoryRuntime: payload.memoryRuntime, simulationState: payload.simulationState };
 }
 
 // ─── 消息分片操作 ─────────────────────────────────────
@@ -303,12 +386,13 @@ export async function getLastMessageSeq(saveId: string): Promise<number> {
 /** 获取指定存档的最近 N 条消息 */
 export async function getRecentMessages(saveId: string, count: number): Promise<ChatMessage[]> {
   const db = await getDB();
-  const tx = db.transaction(MESSAGES_STORE, 'readonly');
-  const index = tx.store.index('saveId_seq');
 
   // 先获取最后一条的 seq
   const lastSeq = await getLastMessageSeq(saveId);
   if (lastSeq < 0) return [];
+
+  const tx = db.transaction(MESSAGES_STORE, 'readonly');
+  const index = tx.store.index('saveId_seq');
 
   // 计算起始 seq
   const startSeq = Math.max(0, lastSeq - count + 1);
@@ -317,14 +401,15 @@ export async function getRecentMessages(saveId: string, count: number): Promise<
     [saveId, lastSeq],
   );
 
-  const messages: ChatMessage[] = [];
+  const records: MessageRecord[] = [];
   let cursor = await index.openCursor(range, 'prev');
   while (cursor) {
-    messages.unshift(cursor.value.message);
+    records.unshift(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages;
+  await tx.done;
+  return mapStorageBatch(records, decodeMessageRecord);
 }
 
 /** 获取指定存档的指定 seq 范围的消息 */
@@ -338,32 +423,23 @@ export async function getMessageRange(saveId: string, startSeq: number, endSeq: 
     [saveId, endSeq],
   );
 
-  const messages: ChatMessage[] = [];
+  const records: MessageRecord[] = [];
   let cursor = await index.openCursor(range, 'next');
   while (cursor) {
-    messages.push(cursor.value.message);
+    records.push(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages;
+  await tx.done;
+  return mapStorageBatch(records, decodeMessageRecord);
 }
 
 /** 增量写入消息（批量 put，幂等：key 含 seq） */
 export async function putMessages(saveId: string, messages: ChatMessage[], startSeq: number): Promise<void> {
+  const records = await mapStorageBatch(messages, (message, i) => encodeMessageRecord(saveId, message, startSeq + i));
   const db = await getDB();
   const tx = db.transaction(MESSAGES_STORE, 'readwrite');
-
-  for (let i = 0; i < messages.length; i++) {
-    const seq = startSeq + i;
-    const record: MessageRecord = {
-      key: `${saveId}#${seq}`,
-      saveId,
-      seq,
-      message: messages[i],
-    };
-    await tx.store.put(record);
-  }
-
+  for (const record of records) await tx.store.put(record);
   await tx.done;
 }
 
@@ -532,14 +608,15 @@ export async function getAllMessages(saveId: string): Promise<ChatMessage[]> {
     [saveId, Number.MAX_SAFE_INTEGER],
   );
 
-  const messages: ChatMessage[] = [];
+  const records: MessageRecord[] = [];
   let cursor = await index.openCursor(range, 'next');
   while (cursor) {
-    messages.push(cursor.value.message);
+    records.push(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages;
+  await tx.done;
+  return mapStorageBatch(records, decodeMessageRecord);
 }
 
 // ─── Global store（键值对，存元数据列表等） ─────────────
@@ -634,7 +711,7 @@ export function invalidateSaveMetaCache(): void {
 // ─── 老存档迁移 ────────────────────────────────────────
 
 /** 存档 schema 版本 */
-export const SAVE_SCHEMA_VERSION = 4;
+export const SAVE_SCHEMA_VERSION = 5;
 
 /** 紧凑头部（不含 messages） */
 export interface CompactSaveRecord {
@@ -653,139 +730,49 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
+  encodedHistory?: StorageEncoding;
   messageCount: number;
   lastMessageSeq: number;
   estBytes?: number;
   lifecycle?: SaveLifecycle;
   endedAt?: number;
   endReason?: string;
+  assetSourceSessionIds?: string[];
 }
 
-/**
- * 纯函数：规划直接上一代 v3（内联 messages）→ 当前 v4（分片）迁移。
- * 不接触 IndexedDB，便于单测（L-16）。
- * - 仅接受 schemaVersion === 3；当前 v4 返回 null，更早版本不再进入自动迁移链
- * - 否则返回紧凑头部 compactHead + 消息分片记录 messageRecords
- *   - 无消息 → messageRecords 为空，compactHead.messageCount=0 / lastMessageSeq=-1
- *   - 有消息 → 每条消息生成一条分片，seq 从 0 递增
- */
-export function planV3ToV4Migration(oldSave: GameSave): {
-  head: CompactSaveRecord;
-  messageRecords: MessageRecord[];
-} | null {
-  const schemaVersion = Number((oldSave as any).schemaVersion ?? 0);
-  if (schemaVersion >= SAVE_SCHEMA_VERSION) return null;
-  if (schemaVersion !== SAVE_SCHEMA_VERSION - 1) {
-    throw new Error(`不支持从存档 schema v${schemaVersion} 直接迁移到 v${SAVE_SCHEMA_VERSION}；仅保留 v${SAVE_SCHEMA_VERSION - 1} → v${SAVE_SCHEMA_VERSION}`);
+/** Only the direct previous compact schema is migrated; existing shards stay lossless. */
+export function planV4ToV5Migration(oldHead: CompactSaveRecord): CompactSaveRecord | null {
+  if (oldHead.schemaVersion === SAVE_SCHEMA_VERSION) return null;
+  if (oldHead.schemaVersion !== SAVE_SCHEMA_VERSION - 1 || 'messages' in oldHead) {
+    throw new Error('不支持的内部存档格式；仅保留 v4 → v5');
   }
-
-  const messages = oldSave.messages || [];
-
-  const compactHead: CompactSaveRecord = {
-    id: oldSave.id,
-    name: oldSave.name,
-    timestamp: oldSave.timestamp,
-    schemaVersion: SAVE_SCHEMA_VERSION,
-    round: messages.reduce((max, m) => Math.max(max, m.round), 0),
-    gameState: oldSave.gameState,
-    worldId: oldSave.worldId,
-    personalInfo: oldSave.personalInfo,
-    characterHistory: oldSave.characterHistory,
-    memoryRuntime: oldSave.memoryRuntime,
-    memoryConfig: oldSave.memoryConfig,
-    vectorMemory: oldSave.vectorMemory,
-    variableConfig: oldSave.variableConfig,
-    customWorld: oldSave.customWorld,
-    simulationState: oldSave.simulationState,
-    lifecycle: oldSave.lifecycle === 'ended' ? 'ended' : 'active',
-    endedAt: oldSave.endedAt,
-    endReason: oldSave.endReason,
-    messageCount: messages.length,
-    lastMessageSeq: messages.length > 0 ? messages.length - 1 : -1,
-  };
-
-  const messageRecords: MessageRecord[] = messages.map((m, i) => ({
-    key: `${oldSave.id}#${i}`,
-    saveId: oldSave.id,
-    seq: i,
-    message: { ...m, seq: i },
-  }));
-
-  return { head: compactHead, messageRecords };
+  return { ...oldHead, schemaVersion: SAVE_SCHEMA_VERSION };
 }
 
-/**
- * 迁移直接上一代存档（v3 内联 messages）到当前格式（v4 分片存储）
- * - 将内联的 messages 拆到 messages store
- * - 生成紧凑头部（不含 messages）
- * - 一次性事务完成，失败不动老记录
- * 实现基于纯函数 planV3ToV4Migration，保证迁移逻辑可单测。
- */
-export async function migrateV3ToV4(oldSave: GameSave): Promise<boolean> {
-  try {
-    const plan = planV3ToV4Migration(oldSave);
-    if (!plan) return true; // 已迁移，跳过
-
-    const db = await getDB();
-    const { head: compactHead, messageRecords } = plan;
-
-    if (messageRecords.length > 0) {
-      // 一次性事务：写消息分片 + 更新头部
-      const tx = db.transaction([MESSAGES_STORE, SAVES_STORE], 'readwrite');
-      const msgStore = tx.objectStore(MESSAGES_STORE);
-      for (const rec of messageRecords) {
-        await msgStore.put(rec);
-      }
-      await tx.objectStore(SAVES_STORE).put(compactHead as any);
-      await tx.done;
-    } else {
-      await db.put(SAVES_STORE, compactHead as any);
-    }
-
-    console.log(`[存档迁移] 成功迁移存档 ${oldSave.id}，共 ${messageRecords.length} 条消息`);
-    return true;
-  } catch (err) {
-    console.warn(`[存档迁移] 迁移存档 ${oldSave.id} 失败（不影响原存档）:`, err);
-    return false;
-  }
-}
-
-/**
- * 加载存档时自动迁移（按需）
- * 如果检测到老格式存档，自动迁移到新格式
- */
 export async function loadSaveWithMigration(saveId: string): Promise<GameSave | null> {
   const db = await getDB();
   let record = await db.get(SAVES_STORE, saveId);
-
   if (!record) return null;
-
-  // 检查是否需要迁移
-  const schemaVersion = (record as any).schemaVersion ?? 0;
-  if (schemaVersion === SAVE_SCHEMA_VERSION || schemaVersion === SAVE_SCHEMA_VERSION - 1) {
-    await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(saveId);
-    record = await db.get(SAVES_STORE, saveId);
-    if (!record) return null;
-  }
-  if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
-    // 直接上一代 v3，需要迁移
-    const oldSave = record as GameSave;
-    const migrated = await migrateV3ToV4(oldSave);
-    if (migrated) {
-      // 迁移成功，重新读取（现在是紧凑头部）
-      const migratedRecord = await db.get(SAVES_STORE, saveId) as GameSave | undefined;
-      return migratedRecord ? normalizeSaveLifecycle(migratedRecord) : null;
+  const schemaVersion = record.schemaVersion ?? 0;
+  if (schemaVersion !== SAVE_SCHEMA_VERSION && schemaVersion !== SAVE_SCHEMA_VERSION - 1) return null;
+  if ('messages' in record) return null;
+  await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(saveId);
+  record = await db.get(SAVES_STORE, saveId);
+  if (!record) return null;
+  if (record.schemaVersion === SAVE_SCHEMA_VERSION - 1) {
+    // Reread under the write lock: a concurrent save may have replaced the head.
+    const tx = db.transaction(SAVES_STORE, 'readwrite');
+    const current = await tx.store.get(saveId);
+    if (!current) {
+      await tx.done;
+      return null;
     }
-    // 迁移失败时不把旧结构继续送入当前运行时。
-    return null;
+    const migrated = planV4ToV5Migration(current);
+    if (migrated) await tx.store.put(migrated);
+    await tx.done;
+    record = migrated ?? current;
   }
-
-  if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
-    return normalizeSaveLifecycle(record as GameSave);
-  }
-
-  console.warn(`[存档迁移] 存档 ${saveId} 使用不受支持的 schema v${schemaVersion}`);
-  return null;
+  return normalizeSaveLifecycle(await decodeSaveHead(record) as unknown as GameSave);
 }
 
 // ─── 存档 CRUD ────────────────────────────────────────
@@ -797,168 +784,147 @@ export async function loadSaveWithMigration(saveId: string): Promise<GameSave | 
  * @param compactHead 紧凑头部（不含 messages）
  * @param newMessages 新增消息列表（每条消息必须有 seq 字段）
  */
+export class SaveCreationConflictError extends Error {
+  constructor(message: string) { super(message); this.name = 'SaveCreationConflictError'; }
+}
+
 export async function saveGameIncremental(
   saveId: string,
   compactHead: Omit<CompactSaveRecord, 'messageCount' | 'lastMessageSeq'>,
   newMessages: ChatMessage[],
   moduleStates: readonly ModuleStateRecord[] = [],
   moduleCheckpoints: readonly ModuleStateRecord[] = [],
+  options: { replaceMessages?: boolean; keptModuleRevisions?: ReadonlySet<string>; importCommit?: { journalKey?: string; meta: SaveMeta;
+    directorDefinitions?: readonly DirectorDefinition[]; directorReferences?: readonly { definitionId: string; version: string }[] }; createCommit?: SaveMeta } = {},
 ): Promise<void> {
   const db = await getDB();
 
-  // 1) 增量写消息（单事务批量 put，幂等：key 含 seq）
-  let maxSeq = -1;
-  if (newMessages.length > 0) {
-    const tx = db.transaction(MESSAGES_STORE, 'readwrite');
-    for (const msg of newMessages) {
-      const seq = msg.seq ?? 0;
-      const record: MessageRecord = {
-        key: `${saveId}#${seq}`,
-        saveId,
-        seq,
-        message: msg,
-      };
-      await tx.store.put(record);
-      maxSeq = Math.max(maxSeq, seq);
-    }
-    await tx.done;
-  }
-
-  // 2) 写紧凑头部（无 messages，体积稳定）
-  // 计算最后 seq：取 maxSeq 和当前头部中的 lastMessageSeq 的较大值
-  const existingHead = await db.get(SAVES_STORE, saveId) as CompactSaveRecord | undefined;
-  const currentLastSeq = (compactHead as any).lastMessageSeq ?? existingHead?.lastMessageSeq ?? -1;
-  const newLastSeq = Math.max(currentLastSeq, maxSeq);
-  const fullHead: CompactSaveRecord = {
-    ...compactHead,
-    schemaVersion: SAVE_SCHEMA_VERSION,
-    messageCount: newLastSeq + 1,
-    lastMessageSeq: newLastSeq,
-  };
+  // Compression finishes before opening any write transaction.
+  const messageRecords = await mapStorageBatch(newMessages, msg => encodeMessageRecord(saveId, msg, msg.seq ?? 0));
+  const encodedHead = await encodeSaveHead(compactHead);
   const tx = db.transaction(
-    [SAVES_STORE, MODULE_STATES_STORE, MODULE_CHECKPOINTS_STORE],
+    [SAVES_STORE, MESSAGES_STORE, MODULE_STATES_STORE, MODULE_CHECKPOINTS_STORE, ...(options.importCommit || options.createCommit ? [GLOBAL_STORE] : []),
+      ...(options.importCommit ? [DIRECTOR_DEFINITIONS_STORE] : [])],
     'readwrite',
   );
-  await tx.objectStore(SAVES_STORE).put(fullHead as any);
-  const stateStore = tx.objectStore(MODULE_STATES_STORE);
-  for (const record of moduleStates) {
-    const key = `${saveId}#${record.moduleId}`;
-    const persisted = await stateStore.get(key) as ModuleStateRecord | undefined;
-    if (persisted?.revision === record.revision) continue;
-    await stateStore.put({ ...record, saveId, key });
+  try {
+    if (options.importCommit) {
+      if (await tx.objectStore(SAVES_STORE).get(saveId)) throw new Error('存档身份在导入期间已被占用，未覆盖已有旅程。');
+      const existing = await tx.objectStore(GLOBAL_STORE).get('saves');
+      const metas: SaveMeta[] = Array.isArray(existing?.value) ? existing.value : [];
+      if (metas.some(meta => meta.name === options.importCommit!.meta.name)) throw new Error('存档同名冲突，请重新导入。');
+      let cursor = await tx.objectStore(SAVES_STORE).openCursor();
+      while (cursor) {
+        if (cursor.value.name === options.importCommit.meta.name) throw new Error('存档同名冲突，请重新导入。');
+        cursor = await cursor.continue();
+      }
+      const definitions = tx.objectStore(DIRECTOR_DEFINITIONS_STORE);
+      for (const definition of options.importCommit.directorDefinitions ?? []) {
+        const key = directorDefinitionKey(definition.id, definition.version);
+        const current = await definitions.get(key) as DirectorDefinitionRecord | undefined;
+        if (current && !equalDirectorContent(current.definition, definition)) throw new Error('剧情版本在导入期间发生内容冲突，未覆盖本机版本。');
+        if (!current) await definitions.add({ id: key, definition });
+      }
+      for (const reference of options.importCommit.directorReferences ?? []) {
+        if (!await definitions.get(directorDefinitionKey(reference.definitionId, reference.version))) throw new Error('剧情依赖在导入期间被删除，未提交存档。');
+      }
+    }
+    if (options.createCommit) {
+      if (await tx.objectStore(SAVES_STORE).get(saveId)) throw new SaveCreationConflictError('存档身份已存在，未覆盖已有旅程。');
+      const existing = await tx.objectStore(GLOBAL_STORE).get('saves');
+      const metas: SaveMeta[] = Array.isArray(existing?.value) ? existing.value : [];
+      if (metas.some(meta => meta.name === options.createCommit!.name)) throw new SaveCreationConflictError('存档名称已存在，请重新命名。');
+      // Older metadata writes could fail independently of the durable head.
+      // Names remain reserved by those saves even before metadata is repaired.
+      let cursor = await tx.objectStore(SAVES_STORE).openCursor();
+      while (cursor) {
+        if (cursor.value.name === options.createCommit.name) throw new SaveCreationConflictError('存档名称已存在，请重新命名。');
+        cursor = await cursor.continue();
+      }
+    }
+    const messageStore = tx.objectStore(MESSAGES_STORE);
+    if (options.replaceMessages) {
+      let cursor = await messageStore.index('saveId').openCursor(saveId);
+      while (cursor) { await cursor.delete(); cursor = await cursor.continue(); }
+    }
+    for (const record of messageRecords) {
+      await messageStore.put(record);
+    }
+    const last = await messageStore.index('saveId_seq').openCursor(
+      IDBKeyRange.bound([saveId, 0], [saveId, Number.MAX_SAFE_INTEGER]), 'prev',
+    );
+    const fullHead: CompactSaveRecord = {
+      ...encodedHead,
+      schemaVersion: SAVE_SCHEMA_VERSION,
+      messageCount: await messageStore.index('saveId').count(saveId),
+      lastMessageSeq: last?.value.seq ?? -1,
+    };
+    await tx.objectStore(SAVES_STORE).put(fullHead as any);
+    const stateStore = tx.objectStore(MODULE_STATES_STORE);
+    for (const record of moduleStates) {
+      const key = `${saveId}#${record.moduleId}`;
+      const persisted = await stateStore.get(key) as ModuleStateRecord | undefined;
+      if (persisted?.revision === record.revision) continue;
+      await stateStore.put({ ...record, saveId, key });
+    }
+    const checkpointStore = tx.objectStore(MODULE_CHECKPOINTS_STORE);
+    for (const record of moduleCheckpoints) {
+      const key = `${saveId}#${record.moduleId}#${record.revision}`;
+      if (await checkpointStore.get(key)) continue;
+      await checkpointStore.put({ ...record, saveId, key });
+    }
+    if (options.keptModuleRevisions) {
+      let cursor = await checkpointStore.index('saveId').openCursor(saveId);
+      while (cursor) {
+        if (!options.keptModuleRevisions.has(`${cursor.value.moduleId}#${cursor.value.revision}`)) await cursor.delete();
+        cursor = await cursor.continue();
+      }
+    }
+    if (options.importCommit) {
+      const global = tx.objectStore(GLOBAL_STORE);
+      const key = options.importCommit.journalKey;
+      if (key) {
+        const journal = await global.get(key);
+        if (!journal?.value || journal.value.saveId !== saveId) throw new Error('导入恢复记录缺失，未提交存档。');
+        await global.put({ key, value: { ...journal.value, phase: 'committed' } });
+      }
+      const existing = await global.get('saves');
+      const meta = options.importCommit.meta;
+      const metas: SaveMeta[] = Array.isArray(existing?.value) ? existing.value : [];
+      await global.put({ key: 'saves', value: [...metas.filter(item => item.id !== meta.id), meta] });
+    }
+    if (options.createCommit) {
+      const global = tx.objectStore(GLOBAL_STORE), existing = await global.get('saves');
+      const metas: SaveMeta[] = Array.isArray(existing?.value) ? existing.value : [];
+      await global.put({ key: 'saves', value: [...metas, options.createCommit] });
+    }
+    await tx.done;
+  } catch (error) {
+    try { tx.abort(); } catch { /* The database may already have aborted. */ }
+    await tx.done.catch(() => {});
+    throw error;
   }
-  const checkpointStore = tx.objectStore(MODULE_CHECKPOINTS_STORE);
-  for (const record of moduleCheckpoints) {
-    const key = `${saveId}#${record.moduleId}#${record.revision}`;
-    if (await checkpointStore.get(key)) continue;
-    await checkpointStore.put({
-      ...record,
-      saveId,
-      key,
-    });
-  }
-  await tx.done;
 }
 
 /**
- * 加载完整存档（当前 v4；仅自动迁移直接上一代 v3）
+ * 加载完整存档（当前 v5；仅自动迁移直接上一代 v4）
  * @param id 存档 ID
  * @param messageLimit 消息加载限制（0 = 全量，> 0 = 只加载最近 N 条）
  */
 export async function loadGame(id: string, messageLimit: number = 0): Promise<GameSave | undefined> {
-  try {
-    const db = await getDB();
-    let record = await db.get(SAVES_STORE, id);
-    if (!record) return undefined;
-
-    // 检查是否是新格式（有 schemaVersion，无 messages）
-    const schemaVersion = (record as any).schemaVersion ?? 0;
-    if (schemaVersion === SAVE_SCHEMA_VERSION || schemaVersion === SAVE_SCHEMA_VERSION - 1) {
-      await (await import('../custom-modules/saveDefinitions')).ensureSaveCustomModuleDefinitions(id);
-      record = await db.get(SAVES_STORE, id);
-      if (!record) return undefined;
-    }
-    if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
-      // 新格式：从 messages store 加载消息
-      const compactHead = record as CompactSaveRecord;
-      let messages = messageLimit > 0
-        ? await getRecentMessages(id, messageLimit)  // lazy 加载：只加载最近 N 条
-        : await getAllMessages(id);                    // 全量加载
-
-      // 检查消息是否有 seq 字段，如果没有则补充
-      const hasSeq = messages.some(m => m.seq !== undefined);
-      if (!hasSeq && messages.length > 0) {
-        console.log(`[DB] 新格式存档 ${id} 的消息缺少 seq 字段，补充 seq...`);
-        messages = messages.map((m, i) => ({ ...m, seq: i }));
-      }
-
-      return {
-        id: compactHead.id,
-        name: compactHead.name,
-        timestamp: compactHead.timestamp,
-        messages,
-        gameState: compactHead.gameState,
-        worldId: compactHead.worldId,
-        personalInfo: compactHead.personalInfo,
-        characterHistory: compactHead.characterHistory,
-        memoryRuntime: compactHead.memoryRuntime,
-        memoryConfig: compactHead.memoryConfig,
-        vectorMemory: compactHead.vectorMemory,
-        variableConfig: compactHead.variableConfig,
-        customWorld: compactHead.customWorld,
-        simulationState: compactHead.simulationState,
-        lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
-        endedAt: compactHead.endedAt,
-        endReason: compactHead.endReason,
-        moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
-        moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
-      };
-    }
-
-    // 直接上一代 v3（内联 messages）：自动迁移到 v4。更早版本不再串联迁移。
-    if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
-      console.log(`[DB] 检测到 v3 存档 ${id}，开始迁移到 v4...`);
-      const oldSave = record as GameSave;
-      const migrated = await migrateV3ToV4(oldSave);
-      if (migrated) {
-        // 迁移成功，重新读取（现在是新格式）
-        const newRecord = await db.get(SAVES_STORE, id);
-        if (newRecord) {
-          const compactHead = newRecord as CompactSaveRecord;
-          const messages = messageLimit > 0
-            ? await getRecentMessages(id, messageLimit)
-            : await getAllMessages(id);
-          return {
-            id: compactHead.id,
-            name: compactHead.name,
-            timestamp: compactHead.timestamp,
-            messages,
-            gameState: compactHead.gameState,
-            worldId: compactHead.worldId,
-            personalInfo: compactHead.personalInfo,
-            characterHistory: compactHead.characterHistory,
-            memoryRuntime: compactHead.memoryRuntime,
-            memoryConfig: compactHead.memoryConfig,
-            vectorMemory: compactHead.vectorMemory,
-            variableConfig: compactHead.variableConfig,
-            customWorld: compactHead.customWorld,
-            simulationState: compactHead.simulationState,
-                lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
-            endedAt: compactHead.endedAt,
-            endReason: compactHead.endReason,
-            moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
-            moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
-          };
-        }
-      }
-      throw new Error(`存档 ${id} 从 v3 迁移到 v4 失败`);
-    }
-
-    throw new Error(`存档 ${id} 使用不受支持的 schema v${schemaVersion}；当前仅支持 v4 与直接上一代 v3`);
-  } catch (err) {
-    console.error('[DB] 加载失败:', err);
-    throw new Error('存档加载失败');
+  const head = await loadSaveWithMigration(id);
+  if (!head) {
+    if (await (await getDB()).get(SAVES_STORE, id)) throw new Error('存档使用不受支持的内部格式；当前仅支持 v5 与直接上一代 v4');
+    return undefined;
   }
+  let messages = messageLimit > 0 ? await getRecentMessages(id, messageLimit) : await getAllMessages(id);
+  if (messages.length > 0 && !messages.some(m => m.seq !== undefined)) messages = messages.map((m, i) => ({ ...m, seq: i }));
+  return {
+    ...head,
+    messages,
+    moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
+    moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(id),
+  };
 }
 
 /** 删除存档（同时清理 messages 分片） */
@@ -1028,37 +994,11 @@ export function generateSaveId(): string {
 // ─── 快照优化 ─────────────────────────────────────
 
 /**
- * 保存前瘦身消息快照：
- * 1. 始终保留第一条消息的快照（兜底）
- * 2. 始终保留最后 10 条消息的快照（高频悔棋/重发）
- * 3. 更早的消息每隔 10 条保留一个关键帧快照
+ * 保留逐轮状态。持久层已压缩快照，不能通过丢弃历史状态来节省空间：
+ * 重发依赖前一轮的精确变量，旧关键帧会让变量与记忆/导演回到不同轮。
  */
 export function optimizeSnapshots(messages: ChatMessage[]): ChatMessage[] {
-  if (!messages || messages.length === 0) return messages;
-
-  const total = messages.length;
-  let firstSnapshotFound = false;
-
-  return messages.map((msg, i) => {
-    if (!msg.snapshot) return msg;
-
-    // 始终保留第一条有 snapshot 的消息
-    if (!firstSnapshotFound) {
-      firstSnapshotFound = true;
-      return msg;
-    }
-
-    const isRecent = i >= total - 10;
-    const isKeyframe = i % 10 === 0;
-
-    if (!isRecent && !isKeyframe) {
-      // 清除冗余快照，释放内存
-      const { snapshot, snapshotTime, ...rest } = msg;
-      return rest as ChatMessage;
-    }
-
-    return msg;
-  });
+  return messages;
 }
 
 // ─── 导出/导入 ────────────────────────────────────────
@@ -1073,56 +1013,43 @@ const PREVIOUS_SAVE_EXPORT_VERSION = '1.0';
  *  事件包：导出全局已启用的事件包完整内容（排重用）。
  */
 export async function exportSave(saveId: string): Promise<Blob> {
-  const db = await getDB();
-  const record = await db.get(SAVES_STORE, saveId);
-  if (!record) throw new Error('存档不存在');
+  const record = await loadGame(saveId);
+  if (!record) throw new Error('存档不存在或格式不受支持');
+  return exportSaveCapture(record);
+}
 
-  let messages: ChatMessage[];
-  const schemaVersion = (record as any).schemaVersion ?? 0;
-
-  if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
-    // 新格式：从 messages store 拉全量
-    messages = await getAllMessages(saveId);
-  } else {
-    // 老格式：直接用内联的 messages
-    messages = (record as GameSave).messages || [];
-  }
+/** Use the same complete export for unsaved recovery captures and durable archives. */
+export async function exportSaveCapture(capture: GameSave): Promise<Blob> {
+  const record = structuredClone(capture);
 
   // 收集全局已启用的事件包完整内容（供导入时排重恢复）
-  let eventPacks: Array<{ id: string; manifest: unknown; files: Record<string, string | Blob> }> = [];
-  try {
-    const { collectPacksForExport, getWebEnabledEventIds } = await import('../modules/webEventStore');
-    const enabledIds = await getWebEnabledEventIds();
-    eventPacks = await collectPacksForExport(enabledIds);
-  } catch {
-    /* 非 Tauri 环境或 IndexedDB 不可用时静默降级 */
-  }
+  const { allWebEvents } = await import('../modules/eventDb');
+  const availableEvents = await allWebEvents(), byId = new Map(availableEvents.map(event => [event.id, event]));
+  const selectedEvents = new Map(availableEvents.filter(event => event.enabled).map(event => [event.id, event]));
+  // Disabled dependencies still belong to the backup's content closure.
+  const visitEvent = (id: string, visiting = new Set<string>()) => {
+    if (visiting.has(id)) return;
+    const event = byId.get(id);
+    if (!event) throw new Error(`存档事件包缺少依赖 ${id}，无法生成完整备份。`);
+    selectedEvents.set(id, event); visiting.add(id);
+    for (const dependency of event.manifest.dependencies ?? []) visitEvent(dependency, visiting);
+  };
+  for (const id of [...selectedEvents.keys()]) visitEvent(id);
+  const eventPacks = await Promise.all([...selectedEvents.values()].map(encodeEventDependency));
 
   const exportData = {
     type: SAVE_EXPORT_TYPE,
     version: SAVE_EXPORT_VERSION,
     exportedAt: Date.now(),
     save: {
-      id: record.id,
-      name: record.name,
-      timestamp: record.timestamp,
-      messages,
-      gameState: record.gameState,
-      worldId: record.worldId,
-      personalInfo: record.personalInfo,
-      characterHistory: record.characterHistory,
+      ...record,
       memoryRuntime: record.memoryRuntime ? slimMemoryRuntimeForSave(record.memoryRuntime) : undefined,
-      memoryConfig: record.memoryConfig,
-      vectorMemory: record.vectorMemory,
-      customWorld: record.customWorld,
-      simulationState: record.simulationState,
       directorDefinitions: await (await import('../director/dependencies')).collectDirectorDependencies(record),
       lifecycle: record.lifecycle === 'ended' ? 'ended' : 'active',
       endedAt: record.endedAt,
       endReason: record.endReason,
       eventPacks, // 新版：事件包完整内容
-      moduleStates: await (await import('./moduleStateDb')).getModuleStates(saveId),
-      moduleCheckpoints: await (await import('./moduleStateDb')).getModuleCheckpoints(saveId),
+      ...await collectSaveAssets(record),
     },
   };
 
@@ -1131,19 +1058,53 @@ export async function exportSave(saveId: string): Promise<Blob> {
 
 /** 从文件导入存档，返回新 SaveMeta */
 export async function importSaveFromFile(file: File): Promise<SaveMeta> {
-  const text = await file.text();
-  let rawData: any;
-  try {
-    rawData = JSON.parse(text);
-  } catch {
-    throw new Error('文件格式无效，无法解析 JSON');
-  }
-
-  return importSaveFromData(rawData);
+  return importSaveFromData(await decodeSaveFile(file));
 }
 
 /** 从原始数据导入存档（normalize + 新 ID + 唯一名称） */
-export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
+export function importSaveFromData(rawData: any): Promise<SaveMeta> {
+  const captured = structuredClone(rawData);
+  return exclusiveImport(async () => {
+    await recoverPendingDependencyImports();
+    return performSaveImport(captured);
+  });
+}
+
+const IMAGE_IMPORT_PREFIX = 'save-image-import:';
+const SAVE_IMPORT_PREFIX = 'save-import:';
+interface SaveImportJournal { owner: string; saveId: string; keys: string[]; phase: 'applying' | 'committed';
+  world?: ImportedWorldChange; events?: ImportedEventChange[] }
+let importQueue: Promise<unknown> = Promise.resolve();
+function exclusiveImport<T>(work: () => Promise<T>): Promise<T> {
+  const result = importQueue.then(() => typeof navigator !== 'undefined' && navigator.locks
+    ? navigator.locks.request('omni-plane-travels-save-import', work) : work());
+  importQueue = result.catch(() => {});
+  return result;
+}
+
+async function recoverPendingDependencyImports(): Promise<void> {
+  const db = await getDB();
+  const pending = (await db.getAll(GLOBAL_STORE)) as Array<{ key: string; value: SaveImportJournal }>;
+  for (const record of pending) if (record.key.startsWith(IMAGE_IMPORT_PREFIX) || record.key.startsWith(SAVE_IMPORT_PREFIX)) {
+    const journal = record.value;
+    if (!journal || !Array.isArray(journal.keys) || journal.keys.some(key => typeof key !== 'string') || typeof journal.owner !== 'string' || typeof journal.saveId !== 'string'
+      || !['applying', 'committed'].includes(journal.phase)
+      || (journal.events !== undefined && (!Array.isArray(journal.events) || journal.events.some(change => !change || typeof change.id !== 'string' || change.owner !== journal.owner)))
+      || (journal.world !== undefined && (!journal.world || typeof journal.world.id !== 'string' || journal.world.owner !== journal.owner || journal.world.after?.id !== journal.world.id))) throw new Error('导入恢复记录损坏，请保留本机数据。');
+    if (journal.phase === 'applying') await compensateSaveImport(journal);
+    await db.delete(GLOBAL_STORE, record.key);
+  }
+}
+async function compensateSaveImport(journal: SaveImportJournal): Promise<void> {
+  await imageDb.rollbackTransferRecords(journal.keys, journal.owner);
+  await rollbackImportedEvents(journal.events ?? []);
+  if (journal.world) rollbackImportedWorld(journal.world);
+}
+
+/** Recovery and live imports share a queue, so startup cannot undo an import still in flight. */
+export function recoverPendingSaveImports(): Promise<void> { return exclusiveImport(recoverPendingDependencyImports); }
+
+async function performSaveImport(rawData: any): Promise<SaveMeta> {
   if (!rawData || typeof rawData !== 'object' || rawData.type !== SAVE_EXPORT_TYPE || !rawData.save) {
     throw new Error('存档数据格式无效');
   }
@@ -1156,22 +1117,23 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
   if (!save.messages && !save.gameState) {
     throw new Error('文件中未找到有效存档数据');
   }
-  await (await import('../director/dependencies')).restoreDirectorDependencies(save, save.directorDefinitions);
-
-  // 导入事件包到 IndexedDB（排重：同 ID 跳过）
-  if (Array.isArray(save.eventPacks) && save.eventPacks.length > 0) {
-    try {
-      const { importPacksFromSave } = await import('../modules/webEventStore');
-      await importPacksFromSave(save.eventPacks);
-    } catch (e) {
-      console.warn('[导入] 事件包同步失败（已跳过）:', e);
+  const assets = save.assets === undefined ? undefined : decodePortableAssets(save.assets);
+  if (assets) {
+    const suppliedKeys = new Set(assets.map(record => record.key));
+    for (const key of assetReferences(save).required) if (!suppliedKeys.has(key)) {
+      throw new Error(`图片备份缺少图片 ${key}，未导入存档。`);
     }
+    await imageDb.checkTransferRecords(assets);
   }
+  const owner = crypto.randomUUID();
+  const dependencies = await prepareSaveDependencies(save, save.directorDefinitions, save.eventPacks, owner);
 
   // 生成新 ID 避免冲突
-  const metas = await getAllSaveMeta();
+  const metas = [...await getAllSaveMeta()];
+  // Heads also reserve identities/names when an older metadata write was incomplete.
+  for (const head of await (await getDB()).getAll(SAVES_STORE)) if (!metas.some(meta => meta.id === head.id)) metas.push(head as SaveMeta);
   let finalId = String(save.id || '').trim() || generateSaveId();
-  while (metas.some(s => s.id === finalId)) {
+  while (metas.some(s => s.id === finalId) || await (await getDB()).get(SAVES_STORE, finalId)) {
     finalId = generateSaveId();
   }
 
@@ -1198,33 +1160,34 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     name: finalName,
     timestamp: finalTimestamp,
     messages: Array.isArray(save.messages) ? save.messages : [],
-    gameState: previousVersionPartitions?.coreState ?? (save.gameState || {}),
-    worldId: save.worldId || 'default',
+    gameState: structuredClone(previousVersionPartitions?.coreState ?? (save.gameState || {})),
+    worldId: dependencies.worldId,
     personalInfo: save.personalInfo || undefined,
     characterHistory: save.characterHistory || undefined,
     memoryRuntime: save.memoryRuntime || undefined,
     memoryConfig: save.memoryConfig || undefined,
     vectorMemory: Array.isArray(save.vectorMemory) ? save.vectorMemory : undefined,
     variableConfig: save.variableConfig || undefined,
-    customWorld: save.customWorld || undefined,
+    customWorld: dependencies.customWorld,
     simulationState: (await import('./importOwnership')).rebindImportedSimulation(save.simulationState || undefined, finalId),
     lifecycle: save.lifecycle === 'ended' ? 'ended' : 'active',
     endedAt: save.endedAt,
     endReason: save.endReason,
     moduleStates: importedModuleStates ?? previousVersionPartitions?.records,
     moduleCheckpoints: importedModuleCheckpoints ?? previousVersionPartitions?.records,
+    assetSourceSessionIds: [...new Set([String(save.id || finalId),
+      ...(Array.isArray(save.assetSourceSessionIds) ? save.assetSourceSessionIds.filter((id: unknown) => typeof id === 'string') : [])])],
   };
 
-  // 如果导入的存档包含自建世界，注册到 localStorage 以便 findWorldDef 能找到
-  if (saveData.customWorld && saveData.worldId) {
-    try {
-      const existing: Record<string, unknown>[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
-      if (!existing.some((w: any) => w?.id === saveData.worldId)) {
-        existing.push(saveData.customWorld);
-        localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(existing));
-      }
-    } catch { /* localStorage 不可用时静默失败 */ }
+  if (saveData.simulationState && dependencies.worldId !== save.worldId) {
+    const rebind = (state: SimulationState) => {
+      if (state.director?.pendingReview) state.director.pendingReview.worldId = dependencies.worldId;
+      for (const proposal of Object.values(state.director?.offscreenProposals ?? {})) if (proposal.worldId === save.worldId) proposal.worldId = dependencies.worldId;
+      for (const child of state.snapshots ?? []) if (child?.snapshot) rebind(child.snapshot);
+    };
+    rebind(saveData.simulationState);
   }
+  saveData.messages = (await import('./importOwnership')).rebindImportedTurnRecovery(save, saveData);
 
   // 走分片存储
   const messages = saveData.messages || [];
@@ -1253,15 +1216,8 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     lifecycle: saveData.lifecycle === 'ended' ? 'ended' : 'active',
     endedAt: saveData.endedAt,
     endReason: saveData.endReason,
+    assetSourceSessionIds: saveData.assetSourceSessionIds,
   };
-
-  await saveGameIncremental(
-    finalId,
-    compactHead,
-    messages,
-    saveData.moduleStates,
-    saveData.moduleCheckpoints,
-  );
 
   const meta: SaveMeta = {
     id: finalId,
@@ -1275,8 +1231,31 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     endReason: saveData.endReason,
   };
 
-  const updated = [...metas, meta];
-  await saveAllSaveMeta(updated);
+  const db = await getDB();
+  const journalKey = `${SAVE_IMPORT_PREFIX}${owner}`;
+  const journal: SaveImportJournal = { owner, saveId: finalId, keys: assets?.map(record => record.key) ?? [], phase: 'applying',
+    world: dependencies.world, events: dependencies.events.filter(plan => !plan.existing).map(plan => ({ id: plan.value.id, owner })) };
+  await putGlobal(journalKey, journal);
+  try {
+    applyImportedWorld(dependencies);
+    await applyImportedEvents(dependencies.events, owner);
+    if (assets) await imageDb.installTransferRecords(assets, owner);
+    await saveGameIncremental(finalId, compactHead, messages, saveData.moduleStates, saveData.moduleCheckpoints,
+      { importCommit: { journalKey, meta, directorDefinitions: dependencies.definitions, directorReferences: dependencies.references } });
+  } catch (error) {
+    // Keep the durable journal if compensation fails; startup/import will retry it.
+    try { await compensateSaveImport(journal); await db.delete(GLOBAL_STORE, journalKey); }
+    catch (recoveryError) {
+      console.error('[导入] 依赖恢复待重试:', recoveryError);
+      throw new Error(`导入失败，依赖恢复未完成；请保留本机数据，恢复存储后重新打开或重试导入。原错误：${error instanceof Error ? error.message : String(error)}`, { cause: recoveryError });
+    }
+    throw error;
+  }
+  invalidateSaveMetaCache();
+  if (journalKey) {
+    // A cleanup error is not a failed import: the save and commit marker are already atomic.
+    await db.delete(GLOBAL_STORE, journalKey).catch(error => console.warn('[导入] 恢复标记待清理:', error));
+  }
 
   return meta;
 }

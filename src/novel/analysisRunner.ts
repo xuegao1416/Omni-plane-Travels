@@ -1,7 +1,9 @@
 import { v4 as uuid } from 'uuid';
+import { obtainNovelProduct, novelProductInputHash } from './paidProducts';
 import type { ApiConfig } from '../api/types';
 import type { EmbeddingClient } from '../memory/embeddingRuntime';
 import {
+  generateNovelPreparationBatch,
   generateNovelEvidenceNote,
   generateNovelOverview,
   generateNovelSegmentAnalysis,
@@ -9,16 +11,25 @@ import {
 } from './analysisClient';
 import type { ParsedNovelSegmentAnalysis } from './analysisSchema';
 import { compileNovelArchives, collectNovelStaticObservations } from './archiveCompiler';
+import { applyGeneratedMaterial, novelGeneratedMaterial } from './materialDocument';
 import { createNovelAnalysisRequest } from './requestScheduler';
+import {
+  buildNovelTaskPlan,
+  NOVEL_ANALYSIS_VERSION,
+  novelChapterContext,
+  novelEvidenceInputHash,
+  novelEvidenceReusable,
+  novelSegmentSource,
+  novelStoryInputHash,
+} from './taskPlan';
 import {
   getNovelDataset,
   listNovelChunks,
   listNovelJobs,
   saveNovelChunks,
-  saveNovelDatasetHeader,
+  saveNovelAnalysisResult, novelAnalysisSourceIdentity,
   saveNovelJob,
-  saveNovelSegment,
-  upsertNovelChunks, saveNovelArchives, getNovelOverviewCheckpoint, saveNovelOverviewCheckpoint,
+  upsertNovelChunks, getNovelOverviewCheckpoint,
 } from './novelStore';
 import {
   buildNovelChunks,
@@ -26,17 +37,21 @@ import {
   renderNovelRetrievedEvidence,
   retrieveNovelChunks,
 } from './semanticIndex';
+import { mergeNovelEvidence, mergeNovelStories, type NovelRequestBatch, type NovelBatchArtifact } from './preparationModel';
 import { estimateNovelTokens, hashNovelText } from './segmentation';
 import type {
+  NovelAnalysisGoal,
   NovelAnalysisJob,
   NovelChapter,
   NovelDataset,
   NovelEvidenceNote,
   NovelSegment,
-  NovelStaticMaterial,
+  NovelStaticMaterial, NovelArchiveRecord,
 } from './types';
 
 export interface NovelAnalysisGenerators {
+  prepareBatch?(params: { config: ApiConfig; novelTitle: string; batch: NovelRequestBatch; sourceChapters: NovelChapter[];
+    signal?: AbortSignal; onDelta?: (text: string) => void }): Promise<NovelBatchArtifact>;
   evidence(params: {
     config: ApiConfig;
     novelTitle: string;
@@ -84,12 +99,13 @@ export interface NovelAnalysisProgress {
 }
 
 const defaultGenerators: NovelAnalysisGenerators = {
+  prepareBatch: generateNovelPreparationBatch,
   evidence: generateNovelEvidenceNote,
   overview: generateNovelOverview,
   segment: generateNovelSegmentAnalysis,
 };
 
-export const NOVEL_ANALYSIS_VERSION = 4;
+export { NOVEL_ANALYSIS_VERSION };
 
 export function partitionNovelEvidenceNotes(notes: NovelEvidenceNote[], maxTokens = 12000): NovelEvidenceNote[][] {
   const budget = Math.max(1, Math.floor(maxTokens) || 12000);
@@ -166,25 +182,6 @@ function supportedStaticMaterial(material: NovelStaticMaterial, notes: NovelEvid
   };
 }
 
-function segmentSource(dataset: NovelDataset, segment: NovelSegment): string {
-  if (segment.sourceText?.trim()) return segment.sourceText.trim();
-  const chapterIds = new Set(segment.chapterIds);
-  return dataset.chapters
-    .filter(chapter => chapterIds.has(chapter.id))
-    .sort((left, right) => left.index - right.index)
-    .map(chapter => chapter.content)
-    .join('\n\n')
-    .trim();
-}
-
-function chapterContext(dataset: NovelDataset, segment: NovelSegment): string {
-  const chapterIds = new Set(segment.chapterIds);
-  return dataset.chapters
-    .filter(chapter => chapterIds.has(chapter.id))
-    .map(chapter => `${chapter.id} | ${chapter.title} | ${chapter.startOffset ?? 0}-${chapter.endOffset ?? 0}`)
-    .join('\n');
-}
-
 function isFatalChannelError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /API\s+(?:401|402|403|404)\b|通道暂时不可用|余额不足|额度不足|insufficient_quota|model.+(?:not found|不存在)/i.test(message);
@@ -240,12 +237,13 @@ async function prepareChunks(
   return indexed;
 }
 
-async function getOrCreateJob(datasetId: string, startSegmentIndex: number, total: number): Promise<NovelAnalysisJob> {
-  const existing = (await listNovelJobs(datasetId)).find(job => ['queued', 'running', 'paused', 'failed'].includes(job.status));
+async function getOrCreateJob(datasetId: string, startSegmentIndex: number, total: number, goal: NovelAnalysisGoal): Promise<NovelAnalysisJob> {
+  const existing = (await listNovelJobs(datasetId)).find(job => (job.goal ?? 'full') === goal && ['queued', 'running', 'paused', 'failed'].includes(job.status));
   const now = Date.now();
   return existing ? {
     ...existing,
     status: 'running',
+    goal,
     startSegmentIndex,
     total,
     completed: 0,
@@ -253,7 +251,7 @@ async function getOrCreateJob(datasetId: string, startSegmentIndex: number, tota
     lastError: undefined,
     updatedAt: now,
   } : {
-    id: uuid(), datasetId, status: 'running', phase: 'evidence', startSegmentIndex,
+    id: uuid(), datasetId, status: 'running', phase: 'evidence', goal, startSegmentIndex,
     total, completed: 0, failed: 0, retryCount: 0, createdAt: now, updatedAt: now,
   };
 }
@@ -266,8 +264,13 @@ export interface NovelAnalysisOptions {
   generators?: NovelAnalysisGenerators;
   /** Internal safety budget for hierarchical overview reduction. */
   overviewBatchTokens?: number;
+  inputBudget?: number;
   /** Explicit user action: refresh only world materials after versioned evidence extraction. */
   forceOverview?: boolean;
+  /** Explicit user action: ignore reusable evidence and extract it again for every segment. */
+  reExtractEvidence?: boolean;
+  /** 'background' stops after world material; plot compilation stays available later. */
+  goal?: NovelAnalysisGoal;
   signal?: AbortSignal;
   onProgress?: (value: NovelAnalysisProgress) => void;
   onCheckpoint?: (dataset: NovelDataset) => void;
@@ -298,26 +301,61 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   if ((initial.analysisVersion ?? 1) < NOVEL_ANALYSIS_VERSION && initial.staticMaterial.summary && !initial.legacyStaticMaterial) {
     dataset.legacyStaticMaterial = structuredClone(initial.staticMaterial);
   }
-  const total = dataset.segments.length * 2 + 1;
-  let job = await getOrCreateJob(dataset.id, startSegmentIndex, total);
+  const sourceIdentity = novelAnalysisSourceIdentity(initial);
+  const goal: NovelAnalysisGoal = params.goal ?? 'full';
+  const total = goal === 'full' ? dataset.segments.length * 2 + 1 : dataset.segments.length + 1;
+  let job = await getOrCreateJob(dataset.id, startSegmentIndex, total, goal);
+  const forceOverview = Boolean(params.forceOverview || job.overviewRefreshPending);
+  job.overviewRefreshPending = forceOverview;
+  if (params.forceOverview || params.reExtractEvidence) job.refreshOperationId = uuid();
+  const refreshIdentity = job.refreshOperationId ? [{ refreshOperationId: job.refreshOperationId }] : [];
+  // Channels already used on this dataset stay readable, so switching models keeps extracted evidence.
+  const usedFingerprints = (await listNovelJobs(dataset.id)).map(item => item.configFingerprint).filter((value): value is string => Boolean(value));
   job.runId = uuid(); job.model = params.config.model;
   job.configFingerprint = hashNovelText(JSON.stringify([params.config.baseUrl, params.config.model, params.config.provider]));
   job.requestCount = 0;
   job.embeddingMode = params.embedding ? 'enhanced' : 'basic';
   job.embeddingStatus = params.embedding ? 'preparing' : 'off';
   job.phaseCounts = { evidence: { completed: 0, total: dataset.segments.length, failed: 0 }, segments: { completed: 0, total: dataset.segments.length, failed: 0 }, overview: { completed: 0, total: 1, failed: 0 } };
-  const request = createNovelAnalysisRequest((result, message) => {
+  const transport = createNovelAnalysisRequest((result, message) => {
     if (message === 'request') job.requestCount = (job.requestCount ?? 0) + 1;
     if (result?.usage) job.tokenUsage = { prompt: (job.tokenUsage?.prompt ?? 0) + result.usage.promptTokens, completion: (job.tokenUsage?.completion ?? 0) + result.usage.completionTokens };
     if (message && message !== 'request') progress({ callback: params.onProgress, job, message });
   });
+  const request: typeof transport = async (config, messages, options) => obtainNovelProduct({ datasetId: dataset.id, kind: 'overview',
+    inputHash: await novelProductInputHash(['request', NOVEL_ANALYSIS_VERSION, config.baseUrl, config.model, config.provider,
+      config.reasoningEffort, config.temperature, config.topP, config.maxTokens, messages,
+      options.temperature, options.maxTokens, options.topP, options.responseFormat, ...refreshIdentity]) },
+    () => transport(config, messages, options), { signal: options.signal, refresh: false });
   if (!params.generators) generators = {
+    prepareBatch: options => generateNovelPreparationBatch({ ...options, request }),
     evidence: options => generateNovelEvidenceNote({ ...options, request }),
     overview: options => generateNovelOverview({ ...options, request }),
     segment: options => generateNovelSegmentAnalysis({ ...options, request }),
   };
-  await saveNovelDatasetHeader(dataset);
-  await saveNovelJob(job);
+  const unpaid = generators;
+  const paid = async <T>(kind: 'evidence' | 'overview' | 'story', input: unknown, generate: () => Promise<T>, refresh = false) =>
+    obtainNovelProduct({ datasetId: dataset.id, kind, inputHash: await novelProductInputHash([NOVEL_ANALYSIS_VERSION, job.configFingerprint, input, ...refreshIdentity]) },
+      generate, { signal: params.signal, refresh: refreshIdentity.length ? false : refresh });
+  if (params.generators) generators = {
+    ...(unpaid.prepareBatch ? { prepareBatch: (options: Parameters<NonNullable<NovelAnalysisGenerators['prepareBatch']>>[0]) => paid('evidence', ['batch', options.novelTitle, options.batch.parts, options.sourceChapters.map(c => [c.id, c.title, c.content])], () => unpaid.prepareBatch!(options), params.reExtractEvidence) } : {}),
+    evidence: options => paid('evidence', [options.novelTitle, options.segment.id, options.sourceText, options.chapterContext, options.sourceChapters?.map(c => [c.id, c.title, c.content])], () => unpaid.evidence(options), params.reExtractEvidence),
+    overview: options => paid('overview', [options.novelTitle, options.notes, options.compact], () => unpaid.overview(options), forceOverview),
+    segment: options => paid('story', [options.novelTitle, options.segment.id, options.sourceText, options.evidenceNote, options.previousEndingFacts, options.retrievedEvidence, options.sourceChapters?.map(c => [c.id, c.title, c.content])], () => unpaid.segment(options)),
+  };
+  const combined = Boolean(generators.prepareBatch);
+  const plan = buildNovelTaskPlan(dataset, { goal, config: params.config, channels: usedFingerprints, inputBudget: params.inputBudget,
+    forceOverview: forceOverview, reExtractEvidence: params.reExtractEvidence,
+    retrieval: params.embedding?.identity ?? params.embedding?.model ?? 'basic' });
+  const activePartIds = new Set(plan.batches.flatMap(batch => batch.parts.map(part => part.id)));
+  const batchArtifacts = new Map((params.reExtractEvidence ? [] : dataset.preparation?.batches ?? []).filter(batch => batch.sources?.every(source => plan.units.some(unit => unit.id === source.unitId && unit.sourceHash === source.sourceHash))).map(batch => [batch.batchId, batch]));
+  const partNotes = new Map([...batchArtifacts.values()].flatMap(batch => batch.parts.filter(part => activePartIds.has(part.partId)).map(part => [part.partId, part.evidence] as const)));
+  const saveHeader = async (generatedMaterial?: NovelStaticMaterial, archives?: NovelArchiveRecord[]) => {
+    dataset = await saveNovelAnalysisResult(dataset, sourceIdentity, { generatedMaterial, archives });
+  };
+  const saveSegment = (segment: NovelSegment) => saveNovelAnalysisResult(dataset, sourceIdentity, { segment, signal: params.signal });
+  await saveHeader();
+  await saveNovelJob(job, { requireDataset: true });
 
   const assertNotAborted = () => {
     if (params.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -328,14 +366,14 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     job.phaseCounts!.evidence = { completed: dataset.segments.filter(s => s.evidenceStatus === 'completed' || s.evidenceNotes).length, failed: dataset.segments.filter(s => s.evidenceStatus === 'failed').length, total: dataset.segments.length };
     job.phaseCounts!.segments = { completed: dataset.segments.filter(s => s.status === 'completed').length, failed: dataset.segments.filter(s => s.status === 'failed' && s.evidenceNotes).length, total: dataset.segments.length };
     const snapshot = structuredClone(job);
-    pendingWrite = pendingWrite.then(() => saveNovelJob(snapshot));
+    pendingWrite = pendingWrite.then(() => saveNovelJob(snapshot, { requireDataset: true }));
     await pendingWrite;
     params.onCheckpoint?.({ ...dataset, segments: [...dataset.segments] });
   };
 
   try {
-    let chunks;
-    try {
+    let chunks: ReturnType<typeof buildNovelChunks> = [];
+    if (goal === 'full') try {
       const selectedChapterIds = new Set(dataset.segments.flatMap(segment => segment.chapterIds));
       chunks = await prepareChunks(dataset, params.embedding, selectedChapterIds, { signal: params.signal, onProgress: (done, total) => {
         job.embeddedChunks = done; job.totalChunks = total;
@@ -352,17 +390,74 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     }
 
     await writeJob({ phase: 'evidence' });
+    if (combined) {
+      if (params.reExtractEvidence) {
+        dataset.preparation = undefined;
+        for (let index = 0; index < dataset.segments.length; index++) {
+          const segment = { ...dataset.segments[index], status: 'pending' as const, evidenceStatus: 'pending' as const,
+            evidenceNotes: undefined, evidenceInputHash: undefined, analysisInputHash: undefined, error: undefined };
+          dataset.segments[index] = segment; await saveSegment(segment);
+        }
+        await saveHeader();
+      }
+      for (const batch of plan.batches) {
+        assertNotAborted();
+        const missing = batch.parts.filter(part => !partNotes.has(part.id) && (params.reExtractEvidence || !novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints)));
+        if (!missing.length && batch.evidenceReusable) { job.completed += batch.parts.length; continue; }
+        progress({ callback: params.onProgress, job, segmentTitle: batch.parts[0]?.title, message: '正在准备原文证据与背景资料' });
+        try {
+          if (missing.length) {
+            const inputHash = hashNovelText(JSON.stringify(missing.map(part => part.inputHash)));
+            const requestBatch = { ...batch, id: `${dataset.id}:batch:${inputHash}`, parts: missing,
+              chapterIds: [...new Set(missing.map(part => part.range.chapterId))] };
+            if (params.generators) job.requestCount = (job.requestCount ?? 0) + 1;
+            const result = await generators.prepareBatch!({ config: params.config, novelTitle: dataset.title, batch: requestBatch,
+              sourceChapters: dataset.chapters.filter(chapter => requestBatch.chapterIds.includes(chapter.id)), signal: params.signal,
+              onDelta: streamText => progress({ callback: params.onProgress, job, message: '正在准备背景资料', streamText }) });
+            assertNotAborted();
+            // Reject incomplete injected capabilities as well as malformed production responses.
+            if (result.parts.length !== missing.length || new Set(result.parts.map(part => part.partId)).size !== missing.length
+              || result.parts.some(part => !missing.some(source => source.id === part.partId))) throw new Error('原文证据窗口不完整或重复，不能接纳批次');
+            batchArtifacts.set(result.batchId, { ...result, sources: [...new Set(missing.map(part => part.unitId))].map(unitId => ({ unitId, sourceHash: plan.units.find(unit => unit.id === unitId)!.sourceHash })) });
+            for (const part of result.parts) partNotes.set(part.partId, part.evidence);
+          }
+          dataset.preparation = { version: 1, batches: [...batchArtifacts.values()] };
+          await saveHeader();
+          for (let index = 0; index < dataset.segments.length; index++) {
+            const segment = dataset.segments[index];
+            if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, usedFingerprints)) continue;
+            const parts = plan.batches.flatMap(batch => batch.parts).filter(part => part.unitId === segment.id);
+            if (!parts.length || !parts.every(part => partNotes.has(part.id))) continue;
+            const accepted = { ...segment, status: 'pending' as const, error: undefined, analysisInputHash: undefined,
+              evidenceNotes: mergeNovelEvidence(parts.map(part => partNotes.get(part.id)!)), evidenceStatus: 'completed' as const,
+              evidenceInputHash: novelEvidenceInputHash(dataset, segment), analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
+            dataset.segments[index] = accepted;
+            await saveSegment(accepted);
+          }
+          await writeJob({ completed: dataset.segments.filter(segment => segment.evidenceNotes).length });
+        } catch (error) {
+          if (isFatalChannelError(error) || (error instanceof Error && error.name === 'AbortError')) throw error;
+          for (const part of batch.parts) {
+            const index = dataset.segments.findIndex(segment => segment.id === part.unitId);
+            const segment = dataset.segments[index];
+            if (segment.evidenceNotes) continue;
+            const failed = { ...segment, status: 'failed' as const, evidenceStatus: 'failed' as const, error: error instanceof Error ? error.message : String(error), updatedAt: Date.now() };
+            dataset.segments[index] = failed; await saveSegment(failed);
+          }
+          await writeJob({ failed: job.failed + 1, lastError: error instanceof Error ? error.message : String(error) });
+        }
+      }
+    } else {
     for (let index = 0; index < dataset.segments.length; index += 1) {
       assertNotAborted();
       let segment = dataset.segments[index];
-      const sourceText = segmentSource(dataset, segment);
-      const sourceHash = hashNovelText(JSON.stringify({
-        sourceText,
-        chapterContext: chapterContext(dataset, segment),
-        analysisVersion: NOVEL_ANALYSIS_VERSION,
-        model: job.configFingerprint,
-      }));
-      if (segment.evidenceNotes && segment.analysisVersion === NOVEL_ANALYSIS_VERSION && segment.evidenceInputHash === sourceHash) {
+      const sourceText = novelSegmentSource(dataset, segment);
+      const context = novelChapterContext(dataset, segment);
+      // Evidence extraction is grounded in the original text, not in the channel, so switching
+      // models keeps it; the former per-channel identity stays readable so stored notes are reused.
+      const evidenceInputHash = novelEvidenceInputHash(dataset, segment);
+      const priorChannels = [...usedFingerprints, job.configFingerprint].filter((value): value is string => Boolean(value));
+      if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, [job.configFingerprint, ...priorChannels])) {
         job.completed += 1;
         continue;
       }
@@ -370,7 +465,8 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       try {
         segment = {
           ...segment,
-          status: 'processing',
+          // A background run never enters the plot lane, so keep the stale unit pending instead of claiming work in flight.
+          status: goal === 'background' ? 'pending' : 'processing',
           evidenceStatus: 'processing',
           error: undefined,
           analysisInputHash: undefined,
@@ -379,30 +475,32 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           updatedAt: Date.now(),
         };
         dataset.segments[index] = segment;
-        await saveNovelSegment(segment);
+        await saveSegment(segment);
         if (params.generators) job.requestCount = (job.requestCount ?? 0) + 1;
         const evidenceNotes = await generators.evidence({
           config: params.config,
           novelTitle: dataset.title,
           segment,
           sourceText,
-          chapterContext: chapterContext(dataset, segment),
+          chapterContext: context,
           sourceChapters: dataset.chapters.filter(chapter => segment.chapterIds.includes(chapter.id)),
           signal: params.signal,
           onDelta: streamText => progress({ callback: params.onProgress, job, segmentTitle: segment.title, message: '正在提取章节证据', streamText }),
         });
         assertNotAborted();
-        segment = { ...segment, evidenceNotes, evidenceStatus: 'completed', evidenceInputHash: sourceHash, analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
+        segment = { ...segment, evidenceNotes, evidenceStatus: 'completed', evidenceInputHash, analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
         dataset.segments[index] = segment;
-        await saveNovelSegment(segment);
+        await saveSegment(segment);
         await writeJob({ completed: job.completed + 1, currentSegmentId: segment.id });
       } catch (error) {
         if (isFatalChannelError(error) || (error instanceof Error && error.name === 'AbortError')) throw error;
         segment = { ...segment, status: 'failed', evidenceStatus: 'failed', error: error instanceof Error ? error.message : String(error), updatedAt: Date.now() };
         dataset.segments[index] = segment;
-        await saveNovelSegment(segment);
+        await saveSegment(segment);
         await writeJob({ failed: job.failed + 1, lastError: segment.error, currentSegmentId: segment.id });
       }
+    }
+
     }
 
     assertNotAborted();
@@ -410,7 +508,28 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     const overviewInputHash = hashNovelText(JSON.stringify({ notes, analysisVersion: NOVEL_ANALYSIS_VERSION, configFingerprint: job.configFingerprint }));
     const compileOverview = async () => {
     await writeJob({ phase: 'overview' });
-    if (notes.length > 0 && (params.forceOverview || dataset.overviewInputHash !== overviewInputHash)) {
+    if (combined && !forceOverview && notes.length > 0 && dataset.overviewInputHash !== overviewInputHash) {
+      const archives = await compileNovelArchives(dataset.id, dataset.segments);
+      const observations = collectNovelStaticObservations(dataset.segments);
+      const materials = [...batchArtifacts.values()].map(batch => batch.material);
+      const generated: NovelStaticMaterial = { ...archives.material,
+        summary: [...new Set(materials.map(material => material.summary).filter(Boolean))].join('\n') || notes.map(note => note.summary).join('\n'),
+        settings: [...new Set([...materials.flatMap(material => material.settings ?? []), ...observations.settings])],
+        rules: [...new Set([...materials.flatMap(material => material.rules ?? []), ...observations.rules])],
+        culture: [...new Set([...materials.flatMap(material => material.culture ?? []), ...observations.culture])],
+        relations: [...new Set(materials.flatMap(material => material.relations ?? []))],
+        powerSystem: [...new Set([...materials.map(material => material.powerSystem ?? ''), ...observations.powerSystem])].filter(Boolean).join('\n') || undefined,
+        economy: materials.reduce<NonNullable<NovelStaticMaterial['economy']>>((merged, material) => ({ ...merged, ...material.economy }), {}),
+      };
+      const merged = supportedStaticMaterial(generated, notes);
+      dataset = applyGeneratedMaterial({ ...dataset, overviewInputHash, overviewError: undefined, analysisVersion: NOVEL_ANALYSIS_VERSION }, merged);
+      dataset.staticCoverage = assessNovelStaticCoverage(dataset.staticMaterial, notes);
+      await saveHeader(merged, archives.records);
+      job.phaseCounts!.overview = { completed: 1, total: 1, failed: 0 };
+      await writeJob({ completed: job.completed + 1, overviewRefreshPending: false });
+      return;
+    }
+    if (notes.length > 0 && (forceOverview || dataset.overviewInputHash !== overviewInputHash)) {
       const archives = await compileNovelArchives(dataset.id, dataset.segments, !params.generators ? {
         resolve: async group => {
           assertNotAborted();
@@ -419,25 +538,20 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           if (cached?.material.settings) return JSON.parse(cached.material.settings[0]) as string[][];
           return resolveNovelArchiveIdentities(params.config, group, params.signal, request);
         },
-        onCheckpoint: async (group, resolution) => {
-          const inputHash = hashNovelText(`identity-v1:${JSON.stringify(group)}`);
-          await saveNovelOverviewCheckpoint({ id: `${dataset.id}:${inputHash}`, datasetId: dataset.id, inputHash, material: { settings: [JSON.stringify(resolution)] } });
-        },
       } : {});
       assertNotAborted();
-      await saveNovelArchives(dataset.id, archives.records);
-      dataset = { ...dataset, staticMaterial: { ...dataset.staticMaterial, ...archives.material } };
-      await saveNovelDatasetHeader(dataset);
+      dataset = applyGeneratedMaterial(dataset, { ...novelGeneratedMaterial(dataset), ...archives.material });
+      await saveHeader(novelGeneratedMaterial(dataset), archives.records);
       const groups = partitionNovelEvidenceNotes(notes, params.overviewBatchTokens);
       let overviewNotes = notes;
       if (groups.length > 1) {
-        await writeJob({ total: dataset.segments.length * 2 + groups.length + 1 });
+        await writeJob({ total: goal === 'full' ? dataset.segments.length * 2 + groups.length + 1 : dataset.segments.length + groups.length + 1 });
         const reduced: NovelEvidenceNote[] = [];
         for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
           assertNotAborted();
           progress({ callback: params.onProgress, job, message: `正在归并全书证据 ${groupIndex + 1}/${groups.length}` });
           const inputHash = hashNovelText(JSON.stringify({ notes: groups[groupIndex], analysisVersion: NOVEL_ANALYSIS_VERSION }));
-          const checkpoint = !params.forceOverview && (await getNovelOverviewCheckpoint(dataset.id, inputHash) ?? dataset.overviewCheckpoints?.find(item => item.inputHash === inputHash));
+          const checkpoint = !forceOverview && (await getNovelOverviewCheckpoint(dataset.id, inputHash) ?? dataset.overviewCheckpoints?.find(item => item.inputHash === inputHash));
           const partial = checkpoint ? checkpoint.material : await generators.overview({
             config: params.config,
             novelTitle: `${dataset.title}（证据分区 ${groupIndex + 1}/${groups.length}）`,
@@ -447,7 +561,6 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
             onDelta: streamText => progress({ callback: params.onProgress, job, message: `正在归并全书证据 ${groupIndex + 1}/${groups.length}`, streamText }),
           });
           assertNotAborted();
-          await saveNovelOverviewCheckpoint({ id: `${dataset.id}:${inputHash}`, datasetId: dataset.id, inputHash, material: partial });
           reduced.push(overviewAsEvidenceNote(partial));
           await writeJob({ completed: job.completed + 1 });
         }
@@ -462,9 +575,8 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
         for (const batch of partitionNovelEvidenceNotes(overviewNotes, overviewBudget)) {
           assertNotAborted();
           const inputHash = hashNovelText(`overview-level:${job.configFingerprint}:${NOVEL_ANALYSIS_VERSION}:${JSON.stringify(batch)}`);
-          const cached = !params.forceOverview && await getNovelOverviewCheckpoint(dataset.id, inputHash);
+          const cached = !forceOverview && await getNovelOverviewCheckpoint(dataset.id, inputHash);
           const material = cached ? cached.material : await generators.overview({ config: params.config, novelTitle: dataset.title, notes: batch, compact: true, signal: params.signal });
-          await saveNovelOverviewCheckpoint({ id: `${dataset.id}:${inputHash}`, datasetId: dataset.id, inputHash, material });
           smaller.push(overviewAsEvidenceNote(material));
         }
         if (estimateNovelTokens(JSON.stringify(smaller)) >= beforeSize) throw new Error('模型未能缩短世界总览，完整档案已保留');
@@ -480,17 +592,18 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           onDelta: streamText => progress({ callback: params.onProgress, job, message: '正在生成全书总览', streamText }),
         });
       const observations = collectNovelStaticObservations(dataset.segments);
-      const staticMaterial = supportedStaticMaterial({ ...generatedMaterial, ...archives.material,
+      const merged = supportedStaticMaterial({ ...generatedMaterial, ...archives.material,
         settings: [...new Set([...(generatedMaterial.settings ?? []), ...observations.settings])],
         rules: [...new Set([...(generatedMaterial.rules ?? []), ...observations.rules])],
         culture: [...new Set([...(generatedMaterial.culture ?? []), ...observations.culture])],
         powerSystem: [...new Set([generatedMaterial.powerSystem ?? '', ...observations.powerSystem])].filter(Boolean).join('\n') || undefined,
       }, notes);
       assertNotAborted();
-      dataset = { ...dataset, staticMaterial, overviewInputHash, overviewError: undefined,
-        staticCoverage: assessNovelStaticCoverage(staticMaterial, notes), analysisVersion: NOVEL_ANALYSIS_VERSION };
-      await saveNovelDatasetHeader(dataset);
-      await writeJob({ completed: job.completed + 1 });
+      // Authored overrides survive the merge; the baseline moves so changed fields surface as conflicts.
+      dataset = applyGeneratedMaterial({ ...dataset, overviewInputHash, overviewError: undefined, analysisVersion: NOVEL_ANALYSIS_VERSION }, merged);
+      dataset = { ...dataset, staticCoverage: assessNovelStaticCoverage(dataset.staticMaterial, notes) };
+      await saveHeader(merged);
+      await writeJob({ completed: job.completed + 1, overviewRefreshPending: false });
       job.phaseCounts!.overview = { completed: 1, total: 1, failed: 0 };
     } else if (dataset.overviewInputHash === overviewInputHash) {
       job.completed += 1;
@@ -504,14 +617,12 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       let segment = dataset.segments[index];
       if (!segment.evidenceNotes) continue;
       const previous = dataset.segments[index - 1];
-      const analysisInputHash = hashNovelText(JSON.stringify({
-        source: segmentSource(dataset, segment),
-        evidence: segment.evidenceNotes,
-        previousEndingFacts: previous?.endingFacts ?? [],
-        contextGap: Boolean(previous && previous.status !== 'completed'),
-        model: job.configFingerprint,
-        retrieval: job.embeddingMode === 'enhanced' ? params.embedding?.identity ?? params.embedding?.model : 'basic',
-      }));
+      const analysisInputHash = novelStoryInputHash(
+        dataset,
+        index,
+        job.configFingerprint,
+        job.embeddingMode === 'enhanced' ? params.embedding?.identity ?? params.embedding?.model : 'basic',
+      );
       if (segment.status === 'completed' && segment.analysisVersion === NOVEL_ANALYSIS_VERSION && segment.analysisInputHash === analysisInputHash) {
         job.completed += 1;
         continue;
@@ -537,18 +648,23 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           limit: 8,
         });
         if (params.generators) job.requestCount = (job.requestCount ?? 0) + 1;
-        const generated = await generators.segment({
-          config: params.config,
-          novelTitle: dataset.title,
-          segment,
-          sourceText: segmentSource(dataset, segment),
-          evidenceNote: segment.evidenceNotes,
-          previousEndingFacts: previous?.endingFacts ?? [],
-          retrievedEvidence: renderNovelRetrievedEvidence(retrieved),
-          sourceChapters: dataset.chapters.filter(chapter => dataset.segments.some(candidate => candidate.chapterIds.includes(chapter.id))),
-          signal: params.signal,
-          onDelta: streamText => progress({ callback: params.onProgress, job, segmentTitle: segment.title, message: '正在编译正式分段', streamText }),
-        });
+        const storyParts = plan.batches.flatMap(batch => batch.parts).filter(part => part.unitId === segment.id);
+        const stories: ParsedNovelSegmentAnalysis[] = [];
+        for (const part of storyParts) {
+          assertNotAborted();
+          if (params.generators && stories.length) job.requestCount = (job.requestCount ?? 0) + 1;
+          stories.push(await generators.segment({
+            config: params.config, novelTitle: dataset.title,
+            segment: { ...segment, sourceRanges: [part.range] }, sourceText: part.sourceText,
+            evidenceNote: segment.evidenceNotes,
+            previousEndingFacts: stories.at(-1)?.endingFacts ?? previous?.endingFacts ?? [],
+            retrievedEvidence: renderNovelRetrievedEvidence(retrieved),
+            sourceChapters: dataset.chapters.filter(chapter => dataset.segments.some(candidate => candidate.chapterIds.includes(chapter.id))),
+            signal: params.signal,
+            onDelta: streamText => progress({ callback: params.onProgress, job, segmentTitle: segment.title, message: '正在编译正式分段', streamText }),
+          }));
+        }
+        const generated = mergeNovelStories(stories);
         assertNotAborted();
         segment = {
           ...segment,
@@ -563,13 +679,13 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           updatedAt: Date.now(),
         };
         dataset.segments[index] = segment;
-        await saveNovelSegment(segment);
+        await saveSegment(segment);
         await writeJob({ completed: job.completed + 1, currentSegmentId: segment.id });
       } catch (error) {
         if (isFatalChannelError(error) || (error instanceof Error && error.name === 'AbortError')) throw error;
         segment = { ...segment, status: 'failed', error: error instanceof Error ? error.message : String(error), updatedAt: Date.now() };
         dataset.segments[index] = segment;
-        await saveNovelSegment(segment);
+        await saveSegment(segment);
         await writeJob({ failed: job.failed + 1, lastError: segment.error, currentSegmentId: segment.id });
       }
     }
@@ -577,19 +693,21 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
 
     // Exactly two LLM lanes: serial static reduction and serial dependent segments.
     // Await both even on failure so no branch writes after this run has returned.
-    const branches = await Promise.allSettled([compileOverview(), compileSegments()]);
+    // Background mode stops after the static lane, so plot compilation is never paid for implicitly.
+    const branches = await Promise.allSettled(goal === 'background' ? [compileOverview()] : [compileOverview(), compileSegments()]);
     const overviewResult = branches[0];
     if (overviewResult.status === 'rejected') {
       dataset = { ...dataset, overviewInputHash: undefined, overviewError: overviewResult.reason instanceof Error ? overviewResult.reason.message : String(overviewResult.reason) };
-      await saveNovelDatasetHeader(dataset);
+      await saveHeader();
       await writeJob({ failed: job.failed + 1, lastError: dataset.overviewError });
     }
     for (const result of branches) {
       if (result.status === 'rejected' && (isFatalChannelError(result.reason) || result.reason?.name === 'AbortError')) throw result.reason;
     }
-    if (branches[1].status === 'rejected') throw branches[1].reason;
+    if (branches[1]?.status === 'rejected') throw branches[1].reason;
 
-    const worldReady = Boolean(dataset.overviewInputHash === overviewInputHash && dataset.staticMaterial.summary?.trim() && dataset.segments[startSegmentIndex]?.status === 'completed');
+    const plotReady = goal === 'background' || dataset.segments[startSegmentIndex]?.status === 'completed';
+    const worldReady = Boolean(dataset.overviewInputHash === overviewInputHash && dataset.staticMaterial.summary?.trim() && plotReady);
     const selectedChapters = new Set(dataset.segments.flatMap(s => s.chapterIds)).size;
     const totalChapters = dataset.chapters.filter(c => c.included !== false).length;
     const allCompleted = worldReady && dataset.segments.every(segment => segment.status === 'completed') && !dataset.overviewError
@@ -597,7 +715,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     dataset = { ...dataset, analysisStatus: allCompleted ? 'ready' : worldReady ? 'partial' : 'failed', coverage: {
       selectedChapters, totalChapters, evidenceCompleted: notes.length, segmentsCompleted: dataset.segments.filter(s => s.status === 'completed').length, totalSegments: dataset.segments.length,
     } };
-    await saveNovelDatasetHeader(dataset);
+    await saveHeader();
     await writeJob({
       phase: 'completed',
       status: job.failed > 0 ? 'failed' : 'completed',
@@ -609,10 +727,14 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     return { dataset: stored ?? dataset, job, worldReady };
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
-    const worldReady = Boolean(dataset.staticMaterial.summary?.trim() && dataset.segments[startSegmentIndex]?.status === 'completed');
+    const plotReady = goal === 'background' || dataset.segments[startSegmentIndex]?.status === 'completed';
+    const worldReady = Boolean(dataset.staticMaterial.summary?.trim() && plotReady);
     dataset = { ...dataset, analysisStatus: worldReady ? 'partial' : aborted ? 'draft' : 'failed' };
-    await saveNovelDatasetHeader(dataset);
-    await writeJob({ status: aborted ? 'paused' : 'failed', lastError: aborted ? undefined : (error instanceof Error ? error.message : String(error)) });
+    let acceptanceError: unknown;
+    try { await saveHeader(); } catch (failure) { acceptanceError = failure; }
+    const failure = acceptanceError ?? error;
+    await writeJob({ status: acceptanceError ? 'failed' : aborted ? 'paused' : 'failed', lastError: !acceptanceError && aborted ? undefined : (failure instanceof Error ? failure.message : String(failure)) });
+    if (acceptanceError) throw acceptanceError;
     progress({ callback: params.onProgress, job, message: aborted ? '已暂停并保存检查点' : `任务已停止：${job.lastError}` });
     if (aborted) {
       const stored = await getNovelDataset(dataset.id);

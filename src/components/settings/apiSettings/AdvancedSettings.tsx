@@ -8,6 +8,8 @@ interface Props {
 }
 
 export default function AdvancedSettings({ config, set }: Props) {
+  const defaultTimeoutSeconds = config.provider === 'deepseek' ? 300 : 120;
+  const timeoutSeconds = Math.max(1, Math.round((config.requestTimeoutMs ?? defaultTimeoutSeconds * 1000) / 1000));
   return (
     <>
       <div className="settings-api-section-title">
@@ -178,6 +180,65 @@ export default function AdvancedSettings({ config, set }: Props) {
               {ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* 请求超时 */}
+      <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>请求超时</div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
+              单次模型请求的最长等待时间。共创、剧情整理等耗时较长的任务若超过该值会被判定为超时中断。
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              type="number"
+              min={30}
+              max={3600}
+              step={30}
+              value={timeoutSeconds}
+              onChange={e => {
+                const seconds = parseInt(e.target.value, 10);
+                set('requestTimeoutMs', Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined);
+              }}
+              style={{ width: '100px', fontSize: 'var(--font-size-base)', padding: '5px 10px', textAlign: 'right', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}
+            />
+            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>秒</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {[60, 120, 300, 600, 900].map(seconds => {
+            const active = timeoutSeconds === seconds;
+            return (
+              <button
+                key={seconds}
+                onClick={() => set('requestTimeoutMs', seconds * 1000)}
+                style={{
+                  padding: '3px 10px', fontSize: 'var(--font-size-xs)',
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: '12px', cursor: 'pointer',
+                  background: active ? 'var(--accent-dim)' : 'var(--bg-primary)',
+                  color: active ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {seconds >= 60 ? `${seconds / 60} 分钟` : `${seconds} 秒`}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => set('requestTimeoutMs', undefined)}
+            style={{
+              padding: '3px 10px', fontSize: 'var(--font-size-xs)',
+              border: `1px solid ${config.requestTimeoutMs === undefined ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '12px', cursor: 'pointer',
+              background: config.requestTimeoutMs === undefined ? 'var(--accent-dim)' : 'var(--bg-primary)',
+              color: config.requestTimeoutMs === undefined ? 'var(--accent)' : 'var(--text-muted)',
+            }}
+          >
+            按模型默认（{defaultTimeoutSeconds}s）
+          </button>
         </div>
       </div>
     </>

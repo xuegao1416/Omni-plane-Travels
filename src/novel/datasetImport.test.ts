@@ -51,4 +51,16 @@ describe('novel dataset import', () => {
     expect(imported.chapters[0].startOffset).toBe(3);
     expect(imported.sourceType).toBe('epub');
   });
+
+  test('restores the authored overlay ahead of the generated baseline and rejects broken overlays', () => {
+    const imported = importNovelDataset({
+      id: 'overlay-set', 标题: '分层档案',
+      staticMaterial: { summary: '作者概述', rules: ['旧规则'] },
+      materialDocument: { version: 1, generated: { summary: '模型概述', rules: ['旧规则'] }, edits: [{ field: 'summary', baseline: '模型概述', value: '作者概述', remove: false }] },
+    });
+    expect(imported.staticMaterial).toEqual({ summary: '作者概述', rules: ['旧规则'] });
+    expect(imported.materialDocument?.edits).toHaveLength(1);
+
+    expect(() => importNovelDataset({ id: 'broken-overlay', 原始文本: '正文', materialDocument: { version: 1, generated: {}, edits: [{ field: 'nope', remove: false }] } })).toThrow();
+  });
 });

@@ -9,7 +9,8 @@ import { applyDirectorDecision, requestDirectorDecision, type DirectorDecision }
 import { StructuredOutputValidationError } from '../api/structuredOutput';
 import type { OffscreenMemoryPort } from './memoryConsumer';
 import { retryPendingOffscreenMemories, submitOffscreenEvent } from './offscreenPipeline';
-import { evaluateDirectiveOutcome } from './outcome';
+import { commitDirectiveOutcome, evaluateDirectiveOutcome } from './outcome';
+import { executeAuthoredEffects } from './authoredEffects';
 import { compileDirectorDirective, ensureDirectorState, getLatestDirectorDirective, migrateLegacySimulationToDirector } from './runtime';
 import { refreshSourceExhaustion } from './sourceAdapter';
 import type { DirectorReadContext, OffscreenEventProposal } from './types';
@@ -37,10 +38,13 @@ export interface DirectorReviewInput {
   onBackgroundError?: (message: string | null) => void;
   signal?: AbortSignal;
   canReview?: () => boolean;
+  /** Captured state owner remains the same even when facts happen to be equal. */
+  isCurrentOwner?: () => boolean;
 }
 
 export class DirectorReviewController {
-  constructor(private readonly requestDecision: typeof requestDirectorDecision = requestDirectorDecision) {}
+  constructor(private readonly requestDecision: typeof requestDirectorDecision = requestDirectorDecision,
+    private readonly evaluateOutcome: typeof evaluateDirectiveOutcome = evaluateDirectiveOutcome) {}
   private gate = new EvolutionTurnCoordinator();
   private foregroundBusy = true;
   private lastInput: DirectorReviewInput | undefined;
@@ -61,7 +65,12 @@ export class DirectorReviewController {
     /** 结构协议连续失败、本轮降级为沿用既有计划时调用，用于把失败暴露给用户。 */
     onDegraded?: (message: string) => void;
   }) {
-    if (this.lastInput?.canReview && !this.lastInput.canReview()) return undefined;
+    const pending = input.engine.state.director?.pendingReview;
+    if (pending?.saveId === input.context.saveId && pending.worldId === input.context.worldId && !pending.writesCommitted) return undefined;
+    const ticket = this.gate.open({ saveId: input.context.saveId, worldId: input.context.worldId, turnId: input.turnId, factVersion: input.context.stateVersion });
+    const signal = input.signal ? AbortSignal.any([input.signal, ticket.signal]) : ticket.signal;
+    signal.throwIfAborted();
+    if (!input.isCurrent()) return undefined;
     const simulation = structuredClone(input.engine.state);
     const director = migrateLegacySimulationToDirector(simulation);
     reconcileDirectorActors(director, input.context.variableProjection.人物档案);
@@ -70,7 +79,7 @@ export class DirectorReviewController {
     if (simulation.config.enabled) {
       let decision: DirectorDecision;
       try {
-        decision = await this.requestDecision(director, input.context, input.world.description || input.world.name, input.config, input.signal);
+        decision = await this.requestDecision(director, input.context, input.world.description || input.world.name, input.config, signal);
       } catch (error) {
         // 正文不能被结构协议失败拖住；本轮降级为沿用既有计划，但必须让调用方看到。
         if (!(error instanceof StructuredOutputValidationError)) throw error;
@@ -79,12 +88,12 @@ export class DirectorReviewController {
         else console.warn(`[Director] ${message}`);
         decision = { conditions: [], plans: [], offscreen: [] };
       }
-      if (input.signal?.aborted || !input.isCurrent()) return undefined;
+      if (signal.aborted || !input.isCurrent()) return undefined;
       applyDirectorDecision(director, decision, input.context);
       alignDirectorPlans(director, input.context);
       refreshSourceExhaustion(director);
     }
-    if (input.signal?.aborted || !input.isCurrent()) return undefined;
+    if (signal.aborted || !input.isCurrent()) return undefined;
     const directive = simulation.config.enabled ? compileDirectorDirective(simulation, input.context.completedTurnId, input.context.stateVersion, input.context.saveId, input.turnId) : undefined;
     input.engine.state.director = director;
     input.engine.saveState();
@@ -94,6 +103,7 @@ export class DirectorReviewController {
   /** One awaited review after committed variables/memory; no independent background worker. */
   async run(input: DirectorReviewInput, options: { backgroundOnly?: boolean; sourceAndOutcomeOnly?: boolean; forceBackground?: boolean } = {}): Promise<void> {
     if (!input.narrative.trim()) return;
+    if (input.signal?.aborted || input.isCurrentOwner?.() === false) return;
     if (input.saveId !== input.currentSaveId() || input.world.id !== input.currentWorldId() || input.turnId !== input.latestTurnId()) return;
     this.lastInput = input;
     const writesCommitted = !input.canReview || input.canReview();
@@ -106,18 +116,37 @@ export class DirectorReviewController {
     let expectedVersion = evolutionFactVersion(input.getState());
     const ticket = this.gate.open({ saveId: input.saveId, worldId: input.world.id, turnId: input.turnId, factVersion: expectedVersion });
     const signal = input.signal ? AbortSignal.any([input.signal, ticket.signal]) : ticket.signal;
-    const isCurrent = () => !signal.aborted && input.saveId === input.currentSaveId() && input.world.id === input.currentWorldId() && input.turnId === input.latestTurnId() && expectedVersion === evolutionFactVersion(input.getState());
+    const ownsReview = () => this.lastInput === input && !ticket.signal.aborted && input.isCurrentOwner?.() !== false
+      && input.saveId === input.currentSaveId() && input.world.id === input.currentWorldId() && input.turnId === input.latestTurnId();
+    const isCurrent = () => ownsReview() && !signal.aborted && expectedVersion === evolutionFactVersion(input.getState());
     const simulation = structuredClone(input.engine.state);
     const director = migrateLegacySimulationToDirector(simulation);
     const context: DirectorReadContext = { saveId: input.saveId, worldId: input.world.id, completedTurnId: input.turnId, stateVersion: expectedVersion, variableProjection: structuredClone(input.getState()), narrative: input.narrative, playerInput: input.playerInput, memories: input.getDirectorMemories?.() ?? [] };
     reconcileDirectorActors(director, context.variableProjection.人物档案);
-    const persist = () => { input.engine.state.director = director; input.engine.saveState(); };
+    let hasPersisted = false;
+    const persist = () => { input.engine.state.director = director; input.engine.saveState(); hasPersisted = true; };
     try {
       input.onMainlineBusy(true);
       const directive = getLatestDirectorDirective(simulation);
       if (!options.backgroundOnly && directive && (directive.issuedForTurnId ? directive.issuedForTurnId === input.turnId : directive.basedOnTurnId !== input.turnId)) {
-        await evaluateDirectiveOutcome({ director, directive, narrative: input.narrative, turnId: input.turnId, stateVersion: expectedVersion, config: input.config, signal });
+        const receipt = await this.evaluateOutcome({ director, directive, narrative: input.narrative, turnId: input.turnId, stateVersion: expectedVersion, config: input.config, signal, commit: false });
         if (!isCurrent()) return;
+        let draft = input.getState();
+        let effectsApplied = false;
+        const committed = commitDirectiveOutcome(director, directive, receipt, input.narrative, { turnId: input.turnId, stateVersion: expectedVersion }, plan => {
+          const result = executeAuthoredEffects(draft, plan, director, { eventId: `foreground:${input.saveId}:${plan.id}` });
+          if (!result.success) throw new Error(`作者效果未结算：${result.reason ?? plan.id}`);
+          draft = result.state;
+          effectsApplied = true;
+          return true;
+        });
+        if (!isCurrent()) return;
+        if (committed && effectsApplied) {
+          input.commitState(draft);
+          expectedVersion = evolutionFactVersion(input.getState());
+          context.stateVersion = expectedVersion;
+          context.variableProjection = structuredClone(input.getState());
+        }
       }
       alignDirectorPlans(director, context);
       refreshSourceExhaustion(director);
@@ -177,12 +206,16 @@ export class DirectorReviewController {
       if (!incompleteMemory) delete director.pendingReview;
       persist();
       input.onBackgroundError?.(incompleteMemory ? '部分幕后记忆尚未写入，重试只补交未完成的消费者。' : null);
-      input.onCommitted('mainline');
     } catch (error) {
       if (!signal.aborted && isCurrent()) input.onBackgroundError?.(`剧情导演未完成：${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      input.onMainlineBusy(false);
-      input.onBackgroundBusy(false);
+      if (ownsReview()) {
+        input.onMainlineBusy(false);
+        input.onBackgroundBusy(false);
+      }
+      // The owner already committed earlier progress even if a later API or
+      // memory operation failed. Notify save/sync once for that committed scope.
+      if (hasPersisted && isCurrent()) input.onCommitted('mainline');
     }
   }
 }

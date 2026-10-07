@@ -1,4 +1,8 @@
-import { useEffect } from 'react';
+import { CreateJourney } from '../../context/createJourney';
+import { useMemoryStore } from '../../memory/memoryStore';
+import { STORAGE_KEYS } from '../../config/storageKeys';
+import { useEffect, useRef, useState } from 'react';
+import { LoadJourney } from '../../context/journeyNavigation';
 import { useGame } from '../../context/GameContext';
 import { useUISettings } from '../../context/UISettingsContext';
 import { useDialog } from '../shared/Dialog';
@@ -6,41 +10,20 @@ import { useSaveStore,resetForNewGame } from '../../stores/saveStore';
 import { useConfigStore } from '../../stores/configStore';
 import { useWizard } from '../../hooks/useWizard';
 import { useAiFill } from '../../hooks/useAiFill';
-import { useCharacterHistory,clearSegmentsCache } from '../../hooks/useCharacterHistory';
+import { useCharacterHistory } from '../../hooks/useCharacterHistory';
 import { loadSaveWithMigration,type GameSave } from '../../storage/db';
-import type { ChatMessage } from '../../engine/types';
-import type { GameState } from '../../schema/variables';
-import { createDefaultGameState } from '../../schema/variables';
-import type { ProfessionModuleSchema,StatModuleSchema } from '../../modules/schema';
-import { resetSimulationEngine } from '../../simulation/SimulationApi';
+import { decodeSaveFile, encodeSaveFile, SAVE_FILE_EXTENSION } from '../../storage/saveFileCodec';
+import { isQuotaExceededError } from '../../storage/safeStorage';
 import { getDirectorDefinition } from '../../director/definitionStore';
-import { bindDirectorDefinition } from '../../director/sourceAdapter';
-import { ensureDirectorState } from '../../director/runtime';
-import { enforcePlayerIdentity, resolveDirectorInitialIdentity } from '../../director/initialIdentity';
-import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
-import { initializeProfessionSelection } from '../../gameplay/profession';
+import { runCustomModulesForWorld } from '../../custom-modules/engineBridge';
 import { resolveProfessionBinding } from '../../data/professions';
-import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
-import { normalizeGameStateV3 } from '../../gameplay/protocols';
-import { isDivineTalent } from '../../gameplay/creation/creationPoints';
-import { materializeNpcSurvivalStats,materializeNpcTierIndex } from '../../utils/npcStats';
 
 import { v4 as uuid } from 'uuid';
-
-function selectedTalentBudgetOverride(config: ProfessionModuleSchema, talentIds: readonly string[]): number {
-  const selectedIds = new Set(talentIds);
-  return config.innateTalents.reduce((total, talent) => (
-    selectedIds.has(talent.id) && !isDivineTalent(talent)
-      ? total + Math.max(0, Math.trunc(talent.cost))
-      : total
-  ), 0);
-}
 
 export function useStartScreen() {
   const { navigate, state, dispatch, engine, markNewGameStarted } = useGame();
   const savesMeta = useSaveStore(s => s.savesMeta);
   const currentSaveId = useSaveStore(s => s.currentSaveId);
-  const createNewGame = useSaveStore(s => s.createNewGame);
   const loadSaveFromStore = useSaveStore(s => s.loadSave);
   const deleteSaveFromStore = useSaveStore(s => s.deleteSave);
   const forceDeleteSaveFromStore = useSaveStore(s => s.forceDeleteSave);
@@ -50,349 +33,114 @@ export function useStartScreen() {
   const apiConfig = useConfigStore(s => s.apiConfig);
   const { t, settings } = useUISettings();
   const { DialogUI, confirm, alert: showAlert, prompt } = useDialog();
+  const loadPorts = useRef({ engine, navigate, dispatch, markNewGameStarted });
+  loadPorts.current = { engine, navigate, dispatch, markNewGameStarted };
+  const loadTask = useRef<LoadJourney<GameSave> | null>(null);
+  if (!loadTask.current) loadTask.current = new LoadJourney({
+    read: loadSaveFromStore,
+    restore: save => loadPorts.current.engine.loadSave(save),
+    activate: save => {
+      loadPorts.current.markNewGameStarted();
+      useSaveStore.getState().activateSave(save);
+      loadPorts.current.dispatch({ type: 'LOAD_SAVE', save });
+      loadPorts.current.navigate('game');
+    },
+  });
+  useEffect(() => () => loadTask.current?.cancel(), []);
   const locale = settings.language === 'en' ? 'en-US' : 'zh-CN';
 
   // ─── 向导 ───
   const wizard = useWizard({
     initialWorld: state.selectedWorld,
-    initialPersonalInfo: state.personalInfo,
   });
 
   // ─── AI 补全 ───
   const aiFill = useAiFill({
+    draftOwner: wizard.creationDraftOwner,
     apiConfig,
-    personalInfo: wizard.personalInfo,
     selectedWorld: wizard.selectedWorld,
     allWorlds: wizard.allWorlds,
     worldEntry: wizard.worldEntry,
-    setPersonalInfo: wizard.setPersonalInfo,
     navigate, showAlert,
   });
 
   // ─── 人物经历 ───
   const charHistory = useCharacterHistory({
+    draftOwner: wizard.creationDraftOwner,
     apiConfig,
-    personalInfo: wizard.personalInfo,
     selectedWorld: wizard.selectedWorld,
     allWorlds: wizard.allWorlds,
     worldEntry: wizard.worldEntry,
-    initialCharacterHistory: state.characterHistory,
-    perspective: wizard.personalInfo.perspective,
     navigate, showAlert,
   });
 
-  // 清理（组件卸载时保存 segments 到缓存）
-  useEffect(() => () => { aiFill.cleanup(); charHistory.cleanup(); }, []);
-
-  // ─── 构建初始 GameState ───
-  const buildInitialState = (): GameState => {
-    const gs = createDefaultGameState();
-    const pi = wizard.personalInfo;
-
-    // 初始化模块数据 → 写入 GameState 对应路径
-    // 数值属性 → 玩家.生存状态（血量/体力值/dim1-6/special）
-    // 成长体系 → 玩家.当前段位索引/当前经验值
-    // 其他模块（生存资源/经营资产/骰子/天赋）数据只存世界定义，不写入 GameState
-    const selectedWorldDef = wizard.allWorlds.find(w => w.id === wizard.selectedWorld);
-    if (selectedWorldDef?.modules?.length) {
-      for (const mod of selectedWorldDef.modules) {
-        if (!mod.enabled) continue;
-
-        // 从 initialState 初始化（新格式，优先）
-        if (mod.initialState && Object.keys(mod.initialState).length > 0) {
-          if (mod.moduleId === 'stat') {
-            const initState = mod.initialState as any;
-            const cfg = (mod.moduleConfig || {}) as any;
-            if (initState.attrA != null) gs.玩家.生存状态.血量 = initState.attrA;
-            if (initState.attrB != null) gs.玩家.生存状态.体力值 = initState.attrB;
-            for (let i = 1; i <= 6; i++) {
-              const val = initState[`dim${i}Value`];
-              if (val != null) gs.玩家.生存状态[`dim${i}`] = val;
-            }
-            if (Array.isArray(cfg.special)) {
-              for (const sp of cfg.special) {
-                const val = initState.special?.[sp.id];
-                if (val != null) gs.玩家.生存状态[sp.id] = val;
-              }
-            }
-          }
-          if (mod.moduleId === 'progression') {
-            const initState = mod.initialState as any;
-            gs.玩家.当前段位索引 = initState.currentTierIndex ?? 0;
-            gs.玩家.当前经验值 = initState.currentXP ?? 0;
-          }
-        }
-
-        // 从 moduleConfig 初始化（无 initialState 时的兜底，兼容纯配置的 JSON 世界文件）
-        if (!mod.initialState && mod.moduleConfig) {
-          if (mod.moduleId === 'stat') {
-            const cfg = mod.moduleConfig as any;
-            if (cfg.attrA?.current != null) gs.玩家.生存状态.血量 = cfg.attrA.current;
-            if (cfg.attrB?.current != null) gs.玩家.生存状态.体力值 = cfg.attrB.current;
-            for (let i = 1; i <= 6; i++) {
-              const dimCfg = cfg[`dim${i}`];
-              if (dimCfg?.value != null) gs.玩家.生存状态[`dim${i}`] = dimCfg.value;
-            }
-            if (Array.isArray(cfg.special)) {
-              for (const sp of cfg.special) {
-                if (sp.id && sp.value != null) gs.玩家.生存状态[sp.id] = sp.value;
-              }
-            }
-          }
-          if (mod.moduleId === 'progression') {
-            const cfg = mod.moduleConfig as any;
-            gs.玩家.当前段位索引 = cfg.currentTierIndex ?? 0;
-            gs.玩家.当前经验值 = cfg.currentXP ?? 0;
-          }
-        }
+  const [isCreatingJourney, setIsCreatingJourney] = useState(false);
+  const creationController = useRef<AbortController | null>(null);
+  const creationPorts = useRef({ engine, dispatch, markNewGameStarted, prompt, showAlert, completeDraft: charHistory.clearCompletedDraft });
+  creationPorts.current = { engine, dispatch, markNewGameStarted, prompt, showAlert, completeDraft: charHistory.clearCompletedDraft };
+  const creation = useRef<CreateJourney | null>(null);
+  if (!creation.current) creation.current = new CreateJourney({
+    chooseName: async defaultName => {
+      let name = defaultName;
+      while (true) {
+        const answer = await creationPorts.current.prompt('请为这次冒险取一个存档名称：', { title: '存档命名', defaultValue: name, placeholder: '输入存档名称', confirmText: '开始冒险' });
+        if (answer === null) return null;
+        name = answer.trim() || defaultName;
+        if (!useSaveStore.getState().savesMeta.some(save => save.name === name)) return name;
+        await creationPorts.current.showAlert('存档名称已存在，请换个名字。', { title: '名称重复', danger: true });
       }
-    }
-
-    // 经营模块启用时，删除默认的货币资源（资金由经营资产统一管理）
-    const hasBusinessModule = selectedWorldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
-    const professionModule = isProfessionModuleEnabled(selectedWorldDef) ? selectedWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
-    const statModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled);
-    const statConfig = (statModule?.moduleConfig) as StatModuleSchema | undefined;
-    const progressionModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'progression' && module.enabled);
-    const progressionConfig = (progressionModule?.moduleConfig) as Record<string, unknown> | undefined;
-    if (hasBusinessModule) {
-      delete (gs.玩家 as any).货币资源;
-    }
-
-    gs.玩家.姓名 = pi.name;
-    gs.玩家.性别 = pi.gender;
-    gs.玩家.年龄 = pi.age;
-    gs.玩家.身份信息.背景信息 = pi.background;
-    gs.玩家.性格 = pi.personality || '';
-    gs.玩家.外貌 = pi.appearance || '';
-    gs.玩家.身份信息.职业 = pi.career || '';
-    if (!professionModule && pi.initialSkills) gs.玩家.技能系统 = { ...gs.玩家.技能系统, ...pi.initialSkills };
-    if (pi.initialItems) {
-      for (const [k, v] of Object.entries(pi.initialItems)) {
-        gs.玩家.物品栏[k] = { ...v };
-      }
-    }
-    for (const npc of pi.customNpcs) {
-      const npcId = `NPC_${npc.name}`;
-
-      const npcSurvivalState = materializeNpcSurvivalStats(npc.survivalStats, statConfig);
-      const npcTierIndex = progressionModule
-        ? materializeNpcTierIndex(npc.tierIndex, progressionConfig?.currentTierIndex as number | undefined)
-        : undefined;
-
-      gs.人物档案[npcId] = {
-        姓名: npc.name, 种族: npc.race || '人类', 性别: npc.gender || '', 年龄: npc.age || '',
-        背景: npc.background || '',
-        生存状态: npcSurvivalState,
-        社会身份: {
-          职业: npc.occupation || '',
-          社会地位: npc.socialStatus || '',
-        },
-        关系数据: { 好感度: 0, 关系类型: npc.relationshipType || '同伴' },
-        个人信息: {
-          外貌: npc.appearance || '',
-          表性格: npc.personality || '',
-          里性格: npc.hiddenPersonality || '',
-          当前想法: npc.currentThought || '',
-          当前穿着: npc.currentOutfit || '',
-          当前位置: npc.currentLocation || '', 当前状态: npc.currentState || '',
-          备注: '',
-        },
-        重要NPC: true, _关注: true,
-        $time: Date.now(), 人物分类: '在场',
-        当前行动: npc.currentAction || '',
-        短期目标: npc.shortTermGoal || '',
-        长期目标: npc.longTermGoal || '',
-        人物事迹: npc.chronicles || [],
-        技能列表: npc.skillsList || {},
-        物品列表: npc.itemsList || {},
-        ...(npcTierIndex !== undefined ? { 成长状态: { 当前段位索引: npcTierIndex, 当前经验值: 0 } } : {}),
-      };
-    }
-    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig) : undefined;
-    const initialized = professionConfig?.professions.length
-      ? initializeProfessionSelection(gs, professionConfig, pi.professionId ?? null, pi.innateTalentIds ?? [], {
-        talentBudgetOverride: selectedTalentBudgetOverride(professionConfig, pi.innateTalentIds ?? []),
-      })
-      : gs;
-    const migrated = normalizeGameStateV3(initialized);
-    migrated.v3!.featureFlags = {
-      ...migrated.v3!.featureFlags,
-      professionsEnabled: Boolean(professionConfig?.professions.length),
-      combatEnabled: Boolean(selectedWorldDef?.modules?.some(module => module.moduleId === 'combat' && module.enabled)),
-      combatRiskMode: pi.combatRiskMode ?? 'normal',
-    };
-    return migrated;
+    },
+    getDefinition: getDirectorDefinition,
+    resolveProfession: config => resolveProfessionBinding(config as Parameters<typeof resolveProfessionBinding>[0]),
+    runModules: async (manager, worldId, signal) => {
+      const draft = structuredClone(manager.getState());
+      const result = await runCustomModulesForWorld(draft, worldId, 'onGameStart', { round: 0 });
+      signal?.throwIfAborted(); manager.setState(draft); return result;
+    },
+    persist: save => useSaveStore.getState().createSave(save),
+    activate: save => {
+      creationPorts.current.engine.loadSave(save);
+      resetForNewGame(); creationPorts.current.markNewGameStarted();
+      const warning = useSaveStore.getState().activateSave(save);
+      creationPorts.current.dispatch({ type: 'LOAD_SAVE', save });
+      if (warning) void creationPorts.current.showAlert(warning, { title: '旅程已保存' });
+    },
+  });
+  const cancelJourneyCreation = () => {
+    creationController.current?.abort(); creationController.current = null; setIsCreatingJourney(false);
   };
-
-  // ─── 开始游戏 ───
+  useEffect(() => () => { aiFill.cleanup(); charHistory.cleanup(); cancelJourneyCreation(); }, [wizard.view, wizard.step]);
   const handleStartGame = async () => {
-    const currentWorldDef = wizard.allWorlds.find(w => w.id === wizard.selectedWorld);
-    let startingProfile = { ...wizard.personalInfo, customNpcs: [...wizard.personalInfo.customNpcs] };
-    let definition;
+    if (creationController.current) return;
+    aiFill.cleanup(); charHistory.cleanup();
+    const controller = new AbortController(); creationController.current = controller; setIsCreatingJourney(true);
     try {
-      if (currentWorldDef?.directorSource) {
-        definition = await getDirectorDefinition(currentWorldDef.directorSource.definitionId, currentWorldDef.directorSource.version);
-        if (!definition) throw new Error('主线剧情版本缺失，请先导入对应剧情资料');
-        if (!definition.stages.some(stage => stage.id === currentWorldDef.directorSource!.startStageId)) throw new Error('所选主线开局阶段不存在，请重新选择');
-        const identity = resolveDirectorInitialIdentity(definition, startingProfile.directorRole, Object.fromEntries(startingProfile.customNpcs.map(npc => [npc.id, { 姓名: npc.name }])));
-        if (identity.playerName && startingProfile.name !== identity.playerName) throw new Error(`当前扮演原角色「${identity.playerName}」，请保持原角色姓名或切回自创角色`);
-        startingProfile.customNpcs = startingProfile.customNpcs.filter(npc => !identity.excludedNpcIds.includes(npc.id));
+      let variablePreset: string | null = null;
+      try { variablePreset = localStorage.getItem(STORAGE_KEYS.VARIABLE_API_PRESET); } catch { /* optional */ }
+      const result = await creation.current!.start({ worldId: wizard.selectedWorld, world: wizard.allWorlds.find(world => world.id === wizard.selectedWorld),
+        profile: wizard.personalInfo, characterHistory: charHistory.buildFullCharacterHistory(), memoryConfig: useMemoryStore.getState().config,
+        variableConfig: variablePreset ? { apiPresetId: variablePreset } : undefined,
+      }, controller.signal);
+      if (result.status === 'created' && result.activated) {
+        if (result.warnings.length) await showAlert(result.warnings.join('\n'), { title: '旅程已创建 · 扩展提示' });
+        if (!controller.signal.aborted) {
+          // Navigate before completing the document: clearing it changes the wizard
+          // step, whose cleanup cancels work that is still preparing a journey.
+          navigate(apiConfig ? 'game' : 'settings');
+          creationPorts.current.completeDraft();
+        }
       }
     } catch (error) {
-      await showAlert(error instanceof Error ? error.message : String(error), { title: '无法开始冒险', danger: true });
-      return;
+      if (!controller.signal.aborted) await showAlert('无法启程：' + (error instanceof Error ? error.message : String(error)) + '\n\n创建资料仍保留，可修改后重试。', { title: '无法创建旅程', danger: true });
+    } finally {
+      if (creationController.current === controller) { creationController.current = null; setIsCreatingJourney(false); }
     }
-    // 开始游戏时清除缓存，下次进向导从头开始
-    clearSegmentsCache();
-    const characterHistory = charHistory.buildFullCharacterHistory();
-    // 获取世界名（中文）
-    const world = wizard.allWorlds.find((w: any) => w.id === wizard.selectedWorld);
-    const worldName = world?.name || '默认世界';
-    const characterName = wizard.personalInfo.name || '未命名';
-    const defaultSaveName = `${characterName} - ${worldName}`;
-
-    // ─── 取名环节 ───
-    let saveName: string | null = defaultSaveName;
-    while (true) {
-      saveName = await prompt('请为这次冒险取一个存档名称：', {
-        title: '存档命名',
-        defaultValue: saveName || defaultSaveName,
-        placeholder: '输入存档名称',
-        confirmText: '开始冒险',
-      });
-      if (saveName === null) return; // 用户取消
-      saveName = saveName.trim() || defaultSaveName;
-      if (savesMeta.some(s => s.name === saveName)) {
-        await showAlert(`存档名「${saveName}」已存在，请换个名字。`, { title: '名称重复', danger: true });
-        continue;
-      }
-      break;
-    }
-
-    dispatch({ type: 'SET_WORLD', worldId: wizard.selectedWorld });
-    wizard.setPersonalInfo(startingProfile);
-    dispatch({ type: 'SET_PERSONAL_INFO', info: startingProfile });
-    dispatch({ type: 'SET_CHARACTER_HISTORY', history: characterHistory });
-
-    resetForNewGame();
-    const directorEngine = resetSimulationEngine();
-    markNewGameStarted();
-    engine.reset(currentWorldDef);
-    const professionModule = isProfessionModuleEnabled(currentWorldDef) ? currentWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
-    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig) : undefined;
-    engine.setPlayerProfile(professionConfig?.professions.length ? { ...startingProfile, initialSkills: {} } : startingProfile);
-    if (professionConfig?.professions.length) {
-      engine.variableManager.setState(initializeProfessionSelection(
-        engine.variableManager.getState(),
-        professionConfig,
-        wizard.personalInfo.professionId ?? null,
-        wizard.personalInfo.innateTalentIds ?? [],
-        { talentBudgetOverride: selectedTalentBudgetOverride(professionConfig, wizard.personalInfo.innateTalentIds ?? []) },
-      ));
-    }
-
-    // 应用 AI 生成的模块初始化数据（覆盖世界定义的默认值）
-    if (wizard.personalInfo.moduleInitData && Object.keys(wizard.personalInfo.moduleInitData).length > 0) {
-      engine.applyModuleInitData(wizard.personalInfo.moduleInitData);
-    }
-
-    // Optional v3 modules are explicitly selected by the world and risk choice;
-    // the world difficulty field is intentionally not consulted here.
-    const startedState = normalizeGameStateV3(engine.variableManager.getState());
-    startedState.v3!.featureFlags = {
-      ...startedState.v3!.featureFlags,
-      professionsEnabled: Boolean(professionConfig?.professions.length),
-      combatEnabled: Boolean(currentWorldDef?.modules?.some(module => module.moduleId === 'combat' && module.enabled)),
-      combatRiskMode: wizard.personalInfo.combatRiskMode ?? 'normal',
-    };
-    engine.variableManager.setState(startedState);
-
-    if (startingProfile.customNpcs.length > 0) {
-      engine.setInitialNPCs(startingProfile.customNpcs);
-    }
-
-    if (definition) {
-      const initialState = engine.variableManager.getState();
-      const selection = startingProfile.directorRole;
-      const identity = resolveDirectorInitialIdentity(definition, selection, initialState.人物档案);
-      if (selection?.mode === 'original') {
-        const actor = definition.characters.find(character => character.id === selection.actorId)!;
-        initialState.playerIdentity = { actorId: actor.id, name: actor.name, aliases: [...actor.aliases] };
-        enforcePlayerIdentity(initialState);
-        engine.variableManager.setState(initialState);
-      }
-      bindDirectorDefinition(ensureDirectorState(directorEngine.state), definition, { startStageId: selection?.startStageId ?? currentWorldDef?.directorSource?.startStageId, roleBinding: identity.roleBinding });
-      directorEngine.saveState();
-    }
-
-    // 自定义模块在初始 GameState 完整后启动；提交顺序与其它生命周期一致。
-    try {
-      const customModuleOwner = engine.variableManager;
-      const customModuleSaveId = useSaveStore.getState().currentSaveId;
-      await runCustomModulesForWorldAndCommit(engine.variableManager.getState(), wizard.selectedWorld, 'onGameStart', {
-        round: 0,
-      }, {
-        getCurrentState: () => customModuleOwner.getState(),
-        isCurrent: () => engine.variableManager === customModuleOwner && useSaveStore.getState().currentSaveId === customModuleSaveId,
-        commit: (nextState) => engine.variableManager.setState(nextState),
-      });
-    } catch (error) {
-      console.warn('[custom-modules] onGameStart failed; continuing world creation', error);
-    }
-
-    // 构建初始消息列表（直接构造，不依赖 React 批量更新）
-    const initialMessages: ChatMessage[] = [];
-    if (characterHistory.trim()) {
-      // 附加快照到初始消息，确保第一轮重新发送时能回滚到初始状态
-      const initialSnapshot = engine.variableManager.createSnapshot();
-      const directorSnapshot = directorEngine.createSnapshot(0, engine.variableManager.getState().世界.时间系统.当前时间, true, '开局');
-      const historyMsg: ChatMessage = {
-        id: uuid(), role: 'assistant', rawText: characterHistory, round: 0, timestamp: Date.now(),
-        snapshot: initialSnapshot, snapshotTime: Date.now(),
-        simulationSnapshotId: directorSnapshot.id,
-      };
-      initialMessages.push(historyMsg);
-      engine.addMessage(historyMsg);
-    }
-
-    const saveId = await createNewGame(saveName);
-
-    const moduleBundle = engine.variableManager.createModulePersistenceBundle(saveId);
-    const save: GameSave = {
-      id: saveId, name: saveName, timestamp: Date.now(),
-      messages: initialMessages, gameState: moduleBundle.coreState,
-      moduleStates: moduleBundle.current,
-      moduleCheckpoints: moduleBundle.checkpoints,
-      worldId: wizard.selectedWorld, personalInfo: startingProfile, characterHistory,
-      customWorld: currentWorldDef ? structuredClone(currentWorldDef) as unknown as Record<string, unknown> : undefined,
-      simulationState: structuredClone(directorEngine.state),
-    };
-    // 使用 performSave 保存存档（会同时更新 savesMeta 列表）
-    const performSave = useSaveStore.getState().performSave;
-    try {
-      await performSave(save);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error('[开始游戏] 存档保存失败:', err);
-      // performSave 失败时已自动导出备份 JSON，提示用户
-      await showAlert(
-        `存档保存失败，已自动导出备份文件。\n\n错误信息：${errMsg}\n\n请通过「导入存档」加载备份文件进入游戏。`,
-        { title: '存档保存失败', danger: true },
-      );
-      return; // 不跳转，留在当前页面
-    }
-    navigate(apiConfig ? 'game' : 'settings');
   };
 
   // ─── 存档操作 ───
-  const handleLoadSave = async (save: GameSave) => {
-    const loaded = await loadSaveFromStore(save.id);
-    if (loaded) {
-      dispatch({ type: 'LOAD_SAVE', save: loaded });
-      engine.loadSave(loaded);
-      navigate('game');
-    }
+  const handleLoadSave = async (saveId: string) => {
+    try { await loadTask.current!.run(saveId); }
+    catch (error) { await showAlert(error instanceof Error ? error.message : String(error), { title: '未能载入旅程', danger: true }); }
   };
 
   const handleDeleteSave = async (id: string) => {
@@ -443,11 +191,13 @@ export function useStartScreen() {
 
   const handleImportSave = async (file: File) => {
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      await importSaveToStore(data);
+      const data = await decodeSaveFile(file);
+      const meta = await importSaveToStore(data);
+      await showAlert(`已导入「${meta.name}」，共 ${meta.messageCount ?? 0} 条消息。请在存档列表中选择它并继续旅程。`, { title: '导入成功' });
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = isQuotaExceededError(err)
+        ? '浏览器存储空间不足，存档未能导入。请释放设备空间或导出并清理不需要的旧存档，再重试。'
+        : err instanceof Error ? err.message : String(err);
       console.error('[导入] 失败:', err);
       await showAlert(`导入失败: ${errMsg}`, { title: '导入失败', danger: true });
     }
@@ -455,11 +205,11 @@ export function useStartScreen() {
 
   const handleExportSave = async (saveId: string) => {
     try {
-      const blob = await exportSaveFromStore(saveId);
+      const blob = await encodeSaveFile(await exportSaveFromStore(saveId));
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `world-wanderer-save-${Date.now()}.json`;
+      a.download = `world-wanderer-save-${Date.now()}${SAVE_FILE_EXTENSION}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: unknown) {
@@ -479,6 +229,9 @@ export function useStartScreen() {
     // wizard
     view: wizard.view, setView: wizard.setView,
     resetForNewJourney: wizard.resetForNewJourney,
+    hasCreationDraft: wizard.hasCreationDraft, resumeCreationDraft: wizard.resumeCreationDraft,
+    draftWarning: wizard.draftWarning, retryDraftSave: wizard.retryDraftSave,
+    confirmReplaceCreationDraft: () => confirm('重新创建将替换尚未完成的角色资料。确定重新开始吗？', { title: '已有创建草稿', confirmText: '重新创建' }),
     step: wizard.step, setStep: wizard.setStep,
     selectedWorld: wizard.selectedWorld, setSelectedWorld: wizard.setSelectedWorld,
     worldEntry: wizard.worldEntry,
@@ -500,7 +253,8 @@ export function useStartScreen() {
     handleGenerateAll: charHistory.handleGenerateAll,
     handleRegenerateSegment: charHistory.handleRegenerateSegment,
     handleLoadPreset: charHistory.loadPreset,
-    buildInitialState,
+    isCreatingJourney, cancelJourneyCreation,
+    cancelHistoryGeneration: charHistory.cancelGeneration,
     // handlers
     handleStartGame,
     handleLoadSave, handleDeleteSave, handleForceDeleteSave,

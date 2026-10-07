@@ -8,7 +8,7 @@ interface DesktopLayoutProps {
   navButtons: NavButton[];
   overlay: OverlayPanel;
   onOverlayChange: (panel: OverlayPanel) => void;
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: 'start' | 'settings') => void;
 
   // Fullscreen
   isFullscreen: boolean;

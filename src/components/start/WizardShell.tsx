@@ -71,6 +71,11 @@ interface WizardShellProps {
   onRegenerateSegment: (id: string, draft?: string) => void;
   onLoadPreset: (preset: HistoryPreset) => void;
   onStartGame: () => void;
+  isCreatingJourney?: boolean;
+  onCancelCreation?: () => void;
+  onCancelGeneration?: () => void;
+  draftWarning?: string;
+  onRetryDraftSave?: () => void;
   // world editor
   onSaveWorld?: (world: WorldDef) => void;
   apiConfig: any;
@@ -86,6 +91,7 @@ export default function WizardShell({
   hasApiConfig,
   onGenerateAll, onRegenerateSegment, onLoadPreset, onStartGame, onSaveWorld,
   apiConfig,
+  isCreatingJourney = false, onCancelCreation, onCancelGeneration, draftWarning, onRetryDraftSave,
 }: WizardShellProps) {
   // 动态计算年龄阶段（根据开关决定是否包含）
   const segmentDefs = useMemo(
@@ -134,7 +140,7 @@ export default function WizardShell({
   const { professionStep, loadoutStep, historyStep, confirmStep } = stepLayout;
   const selectedWorldScene = selectedWorldDef ? resolveWorldArtwork(selectedWorldDef).src : undefined;
   const identityReady = Boolean(personalInfo.name.trim() && personalInfo.gender && personalInfo.age.trim());
-  const historyReady = segmentDefs.every(def => segments[def.id]?.trim().length > 0);
+  const hasHistory = segmentDefs.some(def => segments[def.id]?.trim());
   const creationSpending = computeCreationSpending(professionConfig ?? EMPTY_PROFESSION_CONFIG, {
     riskMode: personalInfo.combatRiskMode ?? 'normal',
     pointScale,
@@ -154,9 +160,9 @@ export default function WizardShell({
   const canAdvance = currentStep === 1 ? identityReady
     : currentStep === professionStep ? professionReady
       : currentStep === loadoutStep ? loadoutReady
-      : currentStep === historyStep ? historyReady
+      : currentStep === historyStep ? true
         : true;
-  const navigationBlocked = modalOpen || professionLibraryOpen;
+  const navigationBlocked = modalOpen || professionLibraryOpen || isCreatingJourney;
 
   const professionBinding: ProfessionWorldBinding = isProfessionBinding(professionModule?.moduleConfig)
     ? professionModule.moduleConfig
@@ -216,6 +222,7 @@ export default function WizardShell({
           <div>{selectedWorldName}</div>
           <h1>世界降临仪式</h1>
           <p>{subtitle || title}</p>
+          {draftWarning && <p role="alert">{draftWarning} <button type="button" onClick={onRetryDraftSave}>重试保存创建资料</button></p>}
         </div>
       </header>
 
@@ -255,7 +262,7 @@ export default function WizardShell({
             )}
           </div>
 
-          <main key={currentStep} className="creation-ritual-shell__scroll">
+          <main key={currentStep} className="creation-ritual-shell__scroll" inert={isCreatingJourney} aria-busy={isCreatingJourney}>
             {currentStep === 1 && (
               <>
               <div className="ritual-identity-layout">
@@ -341,6 +348,7 @@ export default function WizardShell({
                 includeAgeStages={includeAgeStages} setIncludeAgeStages={setIncludeAgeStages}
                 hasApiConfig={hasApiConfig}
                 onGenerateAll={onGenerateAll} onRegenerateSegment={onRegenerateSegment}
+                onCancelGeneration={onCancelGeneration}
                 onLoadPreset={onLoadPreset}
                 onModalStateChange={setModalOpen}
                 onStartGame={() => setStep(confirmStep)}
@@ -369,15 +377,16 @@ export default function WizardShell({
         </section>
           </DawnFrameV4>
 
-          <footer className={`creation-ritual-shell__footer${currentStep === historyStep ? ' is-step-3' : ''}${navigationBlocked ? ' is-modal-blocked' : ''}`} aria-disabled={navigationBlocked}>
+          <footer className={`creation-ritual-shell__footer${currentStep === historyStep ? ' is-step-3' : ''}${modalOpen || professionLibraryOpen ? ' is-modal-blocked' : ''}`}>
             <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-secondary" onClick={handleBack} disabled={navigationBlocked}>
               {currentStep === 1 ? '返回大厅' : '← 上一步'}
             </EntrySlicedButton>
             <div>
               <span>{currentStep} / {stepLabels.length}</span>
-              {currentStep === historyStep && !historyReady && <span className="creation-ritual-shell__next-reason" role="status">请完成当前/全部编年阶段后继续</span>}
+              {currentStep === historyStep && <span className="creation-ritual-shell__next-reason">经历可选，可手写、生成或直接启程</span>}
+              {isCreatingJourney && <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-secondary" onClick={onCancelCreation}>取消创建</EntrySlicedButton>}
               <EntrySlicedButton type="button" frame="dawn-v4-compact" className="btn-primary" onClick={handleNext} disabled={navigationBlocked || !canAdvance}>
-                {currentStep === confirmStep ? '开始冒险' : '下一步'} →
+                {isCreatingJourney ? '正在创建旅程…' : currentStep === confirmStep ? '开始冒险' : currentStep === historyStep && !hasHistory ? '跳过经历' : '下一步'} →
               </EntrySlicedButton>
             </div>
           </footer>

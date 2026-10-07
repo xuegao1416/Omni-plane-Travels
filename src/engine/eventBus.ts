@@ -39,6 +39,8 @@ export const EVENTS = {
   GENERATION_ENDED: 'generation_ended',
   GENERATION_STOPPED: 'generation_stopped',
   VARIABLE_UPDATE_ENDED: 'variable_update_ended',
+  /** Accepted deterministic turn settlement; UI subscribers read results only. */
+  TURN_SETTLED: 'turn_settled',
   VARIABLE_EXTRACTION_FAILED: 'variable_extraction_failed',
   CHAT_CHANGED: 'chat_changed',
   AUTO_SAVE: 'auto_save',
