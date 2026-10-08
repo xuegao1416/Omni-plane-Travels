@@ -7,6 +7,27 @@ beforeEach(() => {
 });
 
 describe('memory checkpoint vector snapshot', () => {
+  test('structured draft commits detach facts while preserving store-owned ledgers', () => {
+    const store = useMemoryStore.getState();
+    store.updateSceneAnchor({ locationLabel: '旅店' });
+    const checkpoint = store.createCheckpoint()!;
+    const current = store.getMemoryRuntime();
+    const baseline = structuredClone({ ...current, checkpoints: [] });
+    const draft = structuredClone(baseline);
+    draft.sceneAnchor!.locationLabel = '城门';
+    store.appendSourceEvent({ id: 'parallel-source', round: 1, userText: '前进', assistantText: '到达城门', createdAt: 1 });
+    const ledgers = store.getMemoryRuntime();
+    store.commitMemoryRuntime(draft, store.getRuntimeVersion(), baseline);
+    const committed = store.getMemoryRuntime();
+    expect(committed.checkpoints).toBe(ledgers.checkpoints);
+    expect(committed.sourceEvents).toBe(ledgers.sourceEvents);
+    expect(committed.sourceEvents[0]?.id).toBe('parallel-source');
+    draft.sceneAnchor!.locationLabel = '过期修改';
+    expect(committed.sceneAnchor?.locationLabel).toBe('城门');
+    expect(store.restoreCheckpoint(checkpoint.id)).toBe(true);
+    expect(store.getMemoryRuntime().sceneAnchor?.locationLabel).toBe('旅店');
+  });
+
   test('loading keeps historical checkpoint bindings and new checkpoints retain those referenced by messages', () => {
     const snapshot = structuredClone(useMemoryStore.getState().getMemoryRuntime());
     const checkpoints = Array.from({ length: 20 }, (_, i) => ({

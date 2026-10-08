@@ -186,10 +186,12 @@ test('accepted write commits its cloneable runtime draft and rejects a stale sam
   useMemoryStore.getState().initMemoryRuntime('current');
   useMemoryStore.getState().updateSceneAnchor({ locationLabel: '旅店' });
   const checkpoint = useMemoryStore.getState().createCheckpoint()!;
+  const checkpoints = useMemoryStore.getState().memoryRuntime!.checkpoints;
   globalThis.fetch = (async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ scenePatch: { locationLabel: '城门' } }) } }] }))) as unknown as typeof fetch;
   const guarded = guardTurnMemory(useMemoryStore.getState(), () => true, useMemoryStore.getState);
   await executeMemoryWrite(guarded, { ...context(), apiConfig: { ...api, baseUrl: 'https://memory-accepted.test' } });
   expect(useMemoryStore.getState().memoryRuntime?.sceneAnchor?.locationLabel).toBe('城门');
+  expect(useMemoryStore.getState().memoryRuntime?.checkpoints).toBe(checkpoints);
   expect(useMemoryStore.getState().memoryRuntime?.sourceEvents).toHaveLength(1);
   const baseline = guarded.getMemoryRuntime();
   const version = guarded.getRuntimeVersion();

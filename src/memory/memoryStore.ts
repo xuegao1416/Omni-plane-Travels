@@ -459,7 +459,10 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     if (!current || state.runtimeVersion < expectedVersion || JSON.stringify(structuredFacts(current)) !== JSON.stringify(structuredFacts(baseline))) {
       throw new DOMException('记忆版本已变化，请重试当前阶段', 'AbortError');
     }
-    set({ memoryRuntime: structuredClone({ ...current, ...structuredFacts(runtime) }), runtimeVersion: state.runtimeVersion + 1 });
+    // Only the incoming facts belong to the mutable task draft. Store-owned
+    // ledgers are already immutable; cloning them duplicates every historical
+    // rollback snapshot whenever a turn finishes writing memory.
+    set({ memoryRuntime: { ...current, ...structuredClone(structuredFacts(runtime)) }, runtimeVersion: state.runtimeVersion + 1 });
   },
 
   resetMemoryRuntime: () => {
