@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import { expect, test } from 'bun:test';
+import JSZip from 'jszip';
 import { encodeStorageValue, decodeStorageValue } from './storageCodec';
 import { getDB, putMessages, getAllMessages, getRecentMessages, getMessageRange, saveGameIncremental, loadGame, loadSaveWithMigration, exportSave, SAVE_SCHEMA_VERSION } from './db';
 
@@ -12,6 +13,94 @@ test('storage codec preserves large JSON and rejects unknown or corrupt encoding
   expect(await encodeStorageValue({ small: true })).toBeUndefined();
   await expect(decodeStorageValue({ ...encoded!, version: 9 } as any)).rejects.toThrow();
   await expect(decodeStorageValue({ ...encoded!, data: new Uint8Array([1, 2]) })).rejects.toThrow();
+});
+
+test('shared historical branches are serialized once and restored without expanding their graph', async () => {
+  const shared = { facts: Array.from({ length: 200 }, (_, index) => ({ id: index, text: '完整历史事实'.repeat(30) })) };
+  const value = { checkpoints: Array.from({ length: 120 }, (_, round) => ({ round, snapshot: { shared, changed: { round } } })) };
+  const encoded = await encodeStorageValue(value);
+  expect(encoded).toMatchObject({ version: 2, type: 'zip-json-graph' });
+  const graphJson = await (await JSZip.loadAsync(encoded!.data)).file('value.json')!.async('string');
+  expect(graphJson.length).toBeLessThan(JSON.stringify(value).length / 20);
+  const restored = await decodeStorageValue(encoded!) as typeof value;
+  expect(restored).toEqual(value);
+  expect(restored.checkpoints[0]!.snapshot.shared).toBe(restored.checkpoints[119]!.snapshot.shared);
+  expect(restored.checkpoints[0]!.snapshot.changed).not.toBe(restored.checkpoints[1]!.snapshot.changed);
+  expect(JSON.parse(JSON.stringify(restored))).toEqual(value);
+});
+
+test('graph encoding cannot confuse user keys or array values with reference markers', async () => {
+  const shared = JSON.parse('{"__proto__":{"polluted":true},"constructor":"user","root":[0],"nodes":[["object",[]]],"type":"reference","index":0}');
+  const value = { text: 'large'.repeat(2000), shared, second: shared, arrays: [[0], [1], ['array', []]] };
+  const restored = await decodeStorageValue((await encodeStorageValue(value))!) as typeof value;
+  expect(restored).toEqual(value);
+  expect(restored.shared).toBe(restored.second);
+  expect(Object.prototype.hasOwnProperty.call(restored.shared, '__proto__')).toBe(true);
+  expect(Object.getPrototypeOf(restored.shared)).toBe(Object.prototype);
+  expect(({} as any).polluted).toBeUndefined();
+});
+
+test('codec keeps small canonical values plain even when graph metadata would be larger', async () => {
+  const small = Array.from({ length: 500 }, () => ({}));
+  expect(JSON.stringify(small).length).toBeLessThan(4096);
+  expect(await encodeStorageValue(small)).toBeUndefined();
+  expect(await encodeStorageValue(undefined)).toBeUndefined();
+});
+
+test('graph encoding preserves canonical JSON values and rejects cyclic input', async () => {
+  const value = { text: 'json'.repeat(2000), omitted: undefined, array: [undefined, Number.NaN, Number.POSITIVE_INFINITY, false], empty: {}, date: new Date('2026-10-08T00:00:00Z') };
+  expect(await decodeStorageValue((await encodeStorageValue(value))!)).toEqual(JSON.parse(JSON.stringify(value)));
+  const cyclic: any = { text: 'cyclic'.repeat(2000) }; cyclic.self = cyclic;
+  await expect(encodeStorageValue(cyclic)).rejects.toThrow();
+});
+
+test('direct previous zip-json encoding remains readable', async () => {
+  const value = { text: 'previous'.repeat(2000), nested: [{ old: true }] };
+  const zip = new JSZip(); zip.file('value.json', JSON.stringify(value));
+  const data = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  expect(await decodeStorageValue({ version: 1, type: 'zip-json', data })).toEqual(value);
+  await expect(decodeStorageValue({ version: 1, type: 'zip-json-graph', data } as any)).rejects.toThrow();
+});
+
+test('previous zip-json shards and save heads load through the canonical persistence adapter', async () => {
+  const id = `previous-encoding-${Date.now()}`;
+  const snapshot = { text: 'old snapshot'.repeat(2000) };
+  const history = { memoryRuntime: { checkpoints: [{ id: 'old-cp', snapshot: { text: 'memory'.repeat(2000) } }] }, simulationState: { snapshots: [] } };
+  const encodePrevious = async (value: unknown) => {
+    const zip = new JSZip(); zip.file('value.json', JSON.stringify(value));
+    return { version: 1 as const, type: 'zip-json' as const, data: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }) };
+  };
+  const message = { id: 'old', role: 'assistant', round: 1, timestamp: 1, seq: 0 } as any;
+  const db = await getDB();
+  await db.put('messages', { key: `${id}#0`, saveId: id, seq: 0, message, encodedSnapshot: await encodePrevious(snapshot) });
+  await db.put('saves', { id, name: 'previous encoding', timestamp: 1, schemaVersion: SAVE_SCHEMA_VERSION, round: 1, worldId: 'default', gameState: {} as any, messageCount: 1, lastMessageSeq: 0, encodedHistory: await encodePrevious(history) });
+  const loaded = await loadGame(id);
+  expect(loaded?.messages).toEqual([{ ...message, snapshot }]);
+  expect(loaded?.memoryRuntime).toEqual(history.memoryRuntime);
+  expect(loaded?.simulationState as unknown).toEqual(history.simulationState);
+  expect((await db.get('saves', id)).encodedHistory.version).toBe(1);
+});
+
+test('graph decoder rejects malformed references, cycles, duplicate keys and unexpected zip entries', async () => {
+  const badGraphs = [
+    { root: [1], nodes: [['object', []]] },
+    { root: [-1], nodes: [['object', []]] },
+    { root: [0.5], nodes: [['object', []]] },
+    { root: [0, 1], nodes: [['object', []]] },
+    { root: [0], nodes: [['object', [['self', [0]]]]] },
+    { root: [0], nodes: [['object', [['x', [1]]]], ['array', [[0]]]] },
+    { root: [0], nodes: [['object', [['x', 1], ['x', 2]]]] },
+    { root: [0], nodes: [['unexpected', []]] },
+    { root: [0], nodes: [['object', [['bad', { reference: 0 }]]]] },
+    { root: null, nodes: [], overwritten: true },
+  ];
+  for (const graph of badGraphs) {
+    const zip = new JSZip(); zip.file('value.json', JSON.stringify(graph));
+    const data = await zip.generateAsync({ type: 'uint8array' });
+    await expect(decodeStorageValue({ version: 2, type: 'zip-json-graph', data } as any)).rejects.toThrow();
+  }
+  const zip = new JSZip(); zip.file('value.json', '{"root":null,"nodes":[]}'); zip.file('extra.json', '{}');
+  await expect(decodeStorageValue({ version: 2, type: 'zip-json-graph', data: await zip.generateAsync({ type: 'uint8array' }) } as any)).rejects.toThrow();
 });
 
 test('mixed message shards and compressed head restore canonical saves and JSON exports', async () => {

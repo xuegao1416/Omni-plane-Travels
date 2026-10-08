@@ -2,6 +2,7 @@
 import type { GameState } from '../schema/variables';
 import { createDefaultGameState } from '../schema/variables';
 import { cloneDeep, get, set, merge } from 'lodash-es';
+import { cloneSnapshotWithSharing } from '../utils/snapshotSharing';
 import { formatWorldClock, normalizeTimeSystemConfig, normalizeWorldClockState, reconcileEditedWorldClock, type WorldClockConfig, type WorldClockState } from '../time/worldClock';
 import { toDisplayText } from '../utils/displayText';
 import {
@@ -110,6 +111,7 @@ function safeClamp(value: unknown, min: number, max: number, fallback: number): 
 
 export class VariableManager {
   private state: GameState;
+  private lastSnapshot?: GameState;
   private readonly moduleRegistry: ModuleRuntimeRegistry;
   private worldClockConfig: WorldClockConfig;
   private lastAiUpdateRejection: string | null = null;
@@ -944,15 +946,10 @@ export class VariableManager {
   }
 
   // 创建快照（挂载到消息上，用于回滚）
-  // 使用 JSON 序列化替代 cloneDeep，避免超大对象导致 "Invalid string length"
   createSnapshot(): GameState {
     // 先瘦身：截断 NPC 长字段、限制事迹条数，防止序列化爆内存
     const slim = this._slimForSnapshot(this.syncModuleRuntime());
-    try {
-      return JSON.parse(JSON.stringify(slim));
-    } catch {
-      return cloneDeep(slim);
-    }
+    return this.lastSnapshot = cloneSnapshotWithSharing(slim, this.lastSnapshot);
   }
 
   /** 瘦身 state 用于快照：截断长文本、限制数组长度 */

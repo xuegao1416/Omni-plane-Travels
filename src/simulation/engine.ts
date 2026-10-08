@@ -4,6 +4,7 @@ import { createEmptySimState, createDefaultWorldContext } from './types';
 import type { ApiConfig } from '../api/types';
 import { SIM_STORAGE_KEY } from './storage';
 import { migrateLegacySimulationToDirector } from '../director/runtime';
+import { cloneSnapshotWithSharing, shareSnapshotHistory } from '../utils/snapshotSharing';
 
 /** 规范化 activePresetId：过滤空/垃圾值，回退到 'default' */
 function sanitizeActivePresetId(raw: unknown): string {
@@ -31,6 +32,7 @@ export class DirectorRuntime extends MechanicalRuntime {
   constructor(state?: SimulationState) {
     super(state ?? createEmptySimState());
     migrateLegacySimulationToDirector(this.state);
+    this.state.snapshots = shareSnapshotHistory(this.state.snapshots ?? []);
   }
 
   /** 设置主 API 配置（回退用） */
@@ -217,7 +219,9 @@ export class DirectorRuntime extends MechanicalRuntime {
   /** 持久化到 localStorage + 通知 UI */
   saveState() {
     try {
-      localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(this.state));
+      // The global cache is only a current-state fallback. Exact historical
+      // rollback belongs to the active save in IndexedDB, not this cache.
+      localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify({ ...this.state, snapshots: [] }));
     } catch (err) {
       console.warn('[WorldSim] 保存状态失败:', err);
     }
@@ -247,6 +251,7 @@ export class DirectorRuntime extends MechanicalRuntime {
   replaceState(state: SimulationState) {
     this.state = state;
     migrateLegacySimulationToDirector(this.state);
+    this.state.snapshots = shareSnapshotHistory(this.state.snapshots ?? []);
     this.saveState();
   }
 
@@ -279,7 +284,7 @@ export class DirectorRuntime extends MechanicalRuntime {
       activeEventCount: Object.keys(this.state.events).length,
       storylineCount: Object.keys(this.state.storylines).length,
       pendingInteractionCount: this.state.pendingInteractions.length,
-      snapshot: JSON.parse(JSON.stringify(slimState)),
+      snapshot: cloneSnapshotWithSharing(slimState, this.state.snapshots?.at(-1)?.snapshot),
       isInitial,
       note,
     };

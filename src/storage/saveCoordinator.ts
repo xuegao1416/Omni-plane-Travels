@@ -2,12 +2,18 @@ import type { GameSave } from './db';
 
 export interface SavePersistence { save(capture: GameSave): Promise<void>; create?(capture: GameSave): Promise<void> }
 interface PendingSave { capture: GameSave; revision: number; create?: boolean; waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> }
-interface ScheduledSave extends PendingSave { timer: ReturnType<typeof setTimeout> }
+interface ScheduledSave {
+  capture?: GameSave;
+  buildCapture?: () => GameSave | null;
+  revision: number;
+  timer: ReturnType<typeof setTimeout>;
+  waiters: PendingSave['waiters'];
+}
 export class SaveScheduleCancelledError extends Error { constructor() { super('Scheduled save cancelled'); } }
 interface SaveQueue { running: boolean; pending?: PendingSave; failed?: { capture: GameSave; revision: number; create?: boolean } }
 export interface SaveOutcome { status: 'saved' | 'failed'; saveId: string; revision: number; error?: unknown }
 
-/** Captures immediately; each save has independent serialization and latest-request coalescing. */
+/** Explicit requests capture immediately; autosave builders capture after debounce. Journeys serialize independently. */
 export class SaveCoordinator {
   private readonly queues = new Map<string, SaveQueue>();
   private readonly scheduled = new Map<string, ScheduledSave>();
@@ -59,20 +65,28 @@ export class SaveCoordinator {
 
   schedule(save: GameSave, delay = 500): Promise<void> {
     if (this.creating.has(save.id)) return Promise.reject(new Error('旅程正在创建，请等待创建完成。'));
-    const capture = structuredClone(save);
-    const existing = this.scheduled.get(capture.id);
+    return this.scheduleOperation(save.id, { capture: structuredClone(save) }, delay);
+  }
+
+  scheduleCapture(saveId: string, buildCapture: () => GameSave | null, delay = 500): Promise<void> {
+    if (this.creating.has(saveId)) return Promise.reject(new Error('旅程正在创建，请等待创建完成。'));
+    return this.scheduleOperation(saveId, { buildCapture }, delay);
+  }
+
+  private scheduleOperation(saveId: string, source: Pick<ScheduledSave, 'capture' | 'buildCapture'>, delay: number): Promise<void> {
+    const existing = this.scheduled.get(saveId);
     if (existing) clearTimeout(existing.timer);
     const waiters = existing?.waiters ?? [];
     const promise = new Promise<void>((resolve, reject) => waiters.push({ resolve, reject }));
-    const timer = setTimeout(() => { void this.runScheduled(capture.id).catch(() => {}); }, delay);
-    this.scheduled.set(capture.id, { capture, revision: this.nextRevision(capture.id), timer, waiters });
+    const timer = setTimeout(() => { void this.runScheduled(saveId).catch(() => {}); }, delay);
+    this.scheduled.set(saveId, { ...source, revision: this.nextRevision(saveId), timer, waiters });
     return promise;
   }
 
   async flush(save?: GameSave): Promise<void> {
     if (save) {
       const existing = this.scheduled.get(save.id);
-      if (existing) existing.capture = structuredClone(save);
+      if (existing) { existing.capture = structuredClone(save); existing.buildCapture = undefined; }
     }
     const scheduledIds = [...this.scheduled.keys()];
     await Promise.all([
@@ -95,8 +109,19 @@ export class SaveCoordinator {
     if (!pending) return;
     clearTimeout(pending.timer);
     this.scheduled.delete(saveId);
+    let capture: GameSave;
     try {
-      await this.enqueue(pending.capture, pending.revision, []);
+      const value = pending.capture ?? pending.buildCapture?.();
+      if (!value) throw new SaveScheduleCancelledError();
+      if (value.id !== saveId) throw new Error('保存捕获的旅程身份与请求不一致，进度未保存。');
+      capture = pending.capture ?? structuredClone(value);
+    } catch (error) {
+      if (!(error instanceof SaveScheduleCancelledError)) this.notify({ status: 'failed', saveId, revision: pending.revision, error });
+      for (const waiter of pending.waiters) waiter.reject(error);
+      throw error;
+    }
+    try {
+      await this.enqueue(capture, pending.revision, []);
       for (const waiter of pending.waiters) waiter.resolve();
     } catch (error) {
       for (const waiter of pending.waiters) waiter.reject(error);

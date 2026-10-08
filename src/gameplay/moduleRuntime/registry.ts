@@ -4,6 +4,7 @@ import type {
   ModuleRuntimeMetrics,
   ModuleStateRecord,
 } from './types';
+import { cloneSnapshotWithSharing } from '../../utils/snapshotSharing';
 
 function cloneValue<T>(value: T): T {
   if (typeof structuredClone === 'function') return structuredClone(value);
@@ -63,8 +64,8 @@ export class ModuleRuntimeRegistry {
     if (record.saveId !== this.saveId) {
       throw new Error(`Module checkpoint belongs to ${record.saveId}, expected ${this.saveId}`);
     }
-    const copy = cloneValue(record) as ModuleStateRecord;
     const revisions = this.history.get(record.moduleId) ?? new Map<number, ModuleStateRecord>();
+    const copy = cloneSnapshotWithSharing(record, [...revisions.values()].at(-1)) as ModuleStateRecord;
     revisions.set(record.revision, copy);
     this.history.set(record.moduleId, revisions);
   }
@@ -93,9 +94,9 @@ export class ModuleRuntimeRegistry {
   listCheckpointRecords(): ModuleStateRecord[] {
     const records: ModuleStateRecord[] = [];
     for (const revisions of this.history.values()) {
-      for (const record of revisions.values()) records.push(cloneValue(record));
+      for (const record of revisions.values()) records.push(record);
     }
-    return records.sort((a, b) => a.moduleId.localeCompare(b.moduleId) || a.revision - b.revision);
+    return cloneValue(records.sort((a, b) => a.moduleId.localeCompare(b.moduleId) || a.revision - b.revision));
   }
 
   update<T = Record<string, any>>(
@@ -163,7 +164,8 @@ export class ModuleRuntimeRegistry {
   }
 
   private remember<T>(record: ModuleStateRecord<T>): void {
-    const copy = cloneValue(record) as ModuleStateRecord;
+    const previous = this.current.get(record.moduleId) ?? [...(this.history.get(record.moduleId)?.values() ?? [])].at(-1);
+    const copy = cloneSnapshotWithSharing(record, previous) as ModuleStateRecord;
     this.current.set(record.moduleId, copy);
     const revisions = this.history.get(record.moduleId) ?? new Map<number, ModuleStateRecord>();
     revisions.set(record.revision, copy);

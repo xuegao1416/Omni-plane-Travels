@@ -2,6 +2,25 @@ import { describe, expect, test } from 'bun:test';
 import { ModuleRuntimeRegistry } from './registry';
 
 describe('ModuleRuntimeRegistry', () => {
+  test('unchanged module payloads share history across revisions, captures and reload without exposing mutable owners', () => {
+    const registry = new ModuleRuntimeRegistry('shared');
+    const payload = { text: '模块事实'.repeat(500), embedding: [1, 2, 3] };
+    registry.initialize('stat', { hp: 100, payload });
+    for (let turn = 1; turn <= 30; turn++) registry.update('stat', state => ({ ...state, hp: 100 - turn }));
+    const history = registry.listCheckpointRecords();
+    expect((history[30]!.state as any).payload).toBe((history[0]!.state as any).payload);
+    const loaded = new ModuleRuntimeRegistry('shared');
+    for (const record of JSON.parse(JSON.stringify(history))) loaded.importHistoryRecord(record);
+    const restoredHistory = loaded.listCheckpointRecords();
+    expect((restoredHistory[30]!.state as any).payload).toBe((restoredHistory[0]!.state as any).payload);
+    loaded.restore({ stat: 7 });
+    expect(loaded.read<any>('stat').hp).toBe(93);
+    registry.update('stat', state => ({ ...state, payload: { ...state.payload, text: '改变' } }));
+    expect((history[0]!.state as any).payload.text).toBe(payload.text);
+    loaded.read<any>('stat').payload.embedding[0] = 99;
+    expect((restoredHistory[0]!.state as any).payload.embedding).toEqual([1, 2, 3]);
+  });
+
   test('tracks and drains only changed module partitions', () => {
     const registry = new ModuleRuntimeRegistry('save-a');
     registry.initialize('stat', { values: { hp: 100 } });

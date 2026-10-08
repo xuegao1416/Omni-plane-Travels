@@ -32,8 +32,10 @@ import { prepareGameplayState } from '../gameplay/statePreparation';
 import { canRollbackCombat, normalizeGameStateV3, synchronizeV3FeatureFlagsForWorld } from '../gameplay/protocols';
 import { PipelineExecutor, type PipelineResult } from './pipelineExecutor';
 import { settleAcceptedTurn, type TurnSettlementInput } from './turnSettlement';
-import { readTurnRecovery, recoverableMemoryContext, recoveryVersion, needsTurnRecovery, type TurnRecovery } from './turnRecovery';
+import { readTurnRecovery, recoverableMemoryContext, recoveryVersion, needsTurnRecovery,
+  memoryRecoveryVersion as fingerprintMemory, matchesRecoveryVersion, matchesMemoryRecoveryVersion, type TurnRecovery } from './turnRecovery';
 import { TurnOperations, guardTurnMemory, detachTurnMemoryValue } from './turnSafety';
+import { shareSnapshotHistory } from '../utils/snapshotSharing';
 import { loadPipelineConfig, type PipelineConfig, type PipelineStatus, type PipelineTaskId } from './pipelineTypes';
 import type { ChatMessage, GameEngine, SendMessageOptions, SendMessageOutcome } from './types';
 import { PROMPT_INLINE_IMAGE } from '../data/builtinPresets';
@@ -46,7 +48,7 @@ import { useImageStore } from '../stores/imageStore';
 import { ROLE_COGNITION_FIREWALL_TITLE, ROLE_COGNITION_FIREWALL_CONTENT } from '../utils/roleCognitionFirewall';
 import { assembleSystemPrompt, injectAtDepthEntries } from './promptAssembler';
 import { MacroEngine } from './macroEngine';
-import { useMemoryStore } from '../memory/memoryStore';
+import { useMemoryStore, slimMemoryRuntimeForSave } from '../memory/memoryStore';
 import { collectMemoryEntries } from '../memory/memoryCandidates';
 import { useSimulationStore } from '../stores/simulationStore';
 import { useSaveStore } from '../stores/saveStore';
@@ -311,8 +313,10 @@ export function useGameEngine(
     setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
   }, []);
   const memoryRecoveryVersion = () => {
-    const { memoryRuntime, vectorMemory } = useMemoryStore.getState().toJSON();
-    return recoveryVersion({ memoryRuntime, vectorMemory });
+    const { memoryRuntime, vectorMemory } = useMemoryStore.getState();
+    // Hash the same persisted facts without traversing the rollback ledger.
+    return fingerprintMemory({ memoryRuntime: memoryRuntime
+      ? slimMemoryRuntimeForSave({ ...memoryRuntime, checkpoints: [] }) : null, vectorMemory });
   };
   const captureTurnRecovery = () => {
     const ctx = lastPipelineCtxRef.current, executor = lastExecutorRef.current;
@@ -665,7 +669,16 @@ export function useGameEngine(
   const loadSave = useCallback((save: GameSave) => {
     if (generatingRef.current) throw new Error('当前旅程仍在处理，请停止并等待完成后再读取存档。');
     if (!save?.id || !save.worldId || !Array.isArray(save.messages) || !save.gameState) throw new Error('存档缺少完整的旅程状态，未替换当前旅程。');
-    save = structuredClone(save);
+    // Rebuild sharing in older plain/ZIP JSON before capturing another complete
+    // save. New graph-encoded saves already preserve those historical branches.
+    const savedMemory = save.memoryRuntime && typeof save.memoryRuntime === 'object'
+      ? save.memoryRuntime as Record<string, unknown> : null;
+    save = structuredClone({ ...save, messages: optimizeSnapshots(save.messages),
+      memoryRuntime: savedMemory && Array.isArray(savedMemory.checkpoints)
+        ? { ...savedMemory, checkpoints: shareSnapshotHistory(savedMemory.checkpoints) } : save.memoryRuntime,
+      simulationState: save.simulationState
+        ? { ...save.simulationState, snapshots: shareSnapshotHistory(save.simulationState.snapshots ?? []) } : save.simulationState,
+    });
     const saveWorldDef = (save.customWorld as WorldDef | undefined) ?? findWorldDef(save.worldId);
     const migratedClockState = ensureWorldClockOnGameState(save.gameState, saveWorldDef);
     const saveClockConfig = getTimeSystemFromWorld(saveWorldDef);
@@ -706,7 +719,7 @@ export function useGameEngine(
     // 恢复全局初始快照：优先从第一条消息的 snapshot 获取，否则用存档的 gameState
     const firstMsg = save.messages.find(m => m.snapshot);
     if (firstMsg?.snapshot) {
-      initialSnapshotRef.current = ensureWorldClockOnGameState(firstMsg.snapshot as any, saveWorldDef);
+      initialSnapshotRef.current = ensureWorldClockOnGameState(structuredClone(firstMsg.snapshot) as any, saveWorldDef);
     } else {
       initialSnapshotRef.current = varMgrRef.current.createSnapshot();
     }
@@ -760,8 +773,10 @@ export function useGameEngine(
     const recovery = readTurnRecovery(lastMessage?.turnRecovery);
     if (recovery && recovery.aiMsgId === lastMessage?.id && recovery.rawText === lastMessage.rawText
       && recovery.worldId === save.worldId && recovery.saveId === save.id
-      && recovery.stateVersion === recoveryVersion(varMgrRef.current.getState())
-      && recovery.memoryVersion === memoryRecoveryVersion()) {
+      && matchesRecoveryVersion(varMgrRef.current.getState(), recovery.stateVersion)
+      && matchesMemoryRecoveryVersion(memStore.toJSON(), recovery.memoryVersion)) {
+      recovery.stateVersion = recoveryVersion(varMgrRef.current.getState());
+      recovery.memoryVersion = memoryRecoveryVersion();
       pendingRecoveryRef.current = recovery;
       const restored = new PipelineExecutor(recovery.round, { onUpdate: () => {} }, recovery.result);
       setPipelineStatus(restored.getStatus());
@@ -1348,13 +1363,6 @@ ${perspectiveInstruction}
         ...(mainContent ? { content: mainContent } : {}),
       };
 
-      // 管线完成 — 保存当前变量快照到 AI 消息（用于回滚）
-      const gameTimeStr = (varMgrRef.current.getState() as any)?.世界?.时间系统?.当前时间 || '';
-      saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTimeStr, messagesRef.current);
-
-      // 清理内存中的冗余快照，防止内存无限增长
-      setMessages(prev => optimizeSnapshots(prev));
-
       setPipelineStatus(pipelineResult.status);
 
     } catch (err: unknown) {
@@ -1386,6 +1394,7 @@ ${perspectiveInstruction}
         if (executor.getMainResult()) {
           const gameTime = manager.getState().世界?.时间系统?.当前时间 ?? '';
           saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTime, messagesRef.current);
+          setMessages(prev => optimizeSnapshots(prev));
         }
         captureTurnRecovery();
       }

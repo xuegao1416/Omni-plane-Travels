@@ -118,7 +118,25 @@ test('capturing a completed turn does not rebuild recovery or rewrite chat messa
   } finally { globalThis.fetch = oldFetch; restore(); }
 });
 
-test('saved accepted narrative survives a new engine and settles time only once', async () => {
+test('a successful narrative creates its rollback checkpoint only once', async () => {
+  const restore = setup(), oldFetch = globalThis.fetch;
+  globalThis.fetch = (async () => response('你等待十分钟。')) as unknown as typeof fetch;
+  const createCheckpoint = useMemoryStore.getState().createCheckpoint;
+  let checkpoints = 0;
+  useMemoryStore.setState({ createCheckpoint: (...args) => { checkpoints++; return createCheckpoint(...args); } });
+  try {
+    const engine = mountEngine(); engine.reset();
+    useMemoryStore.getState().initMemoryRuntime('single-checkpoint');
+    await engine.sendMessage('等待十分钟');
+    expect(checkpoints).toBe(1);
+    expect(engine.messages.at(-1)?.snapshot).toBeDefined();
+    expect(engine.messages.at(-1)?.memoryCheckpointId).toBeTruthy();
+  } finally {
+    useMemoryStore.setState({ createCheckpoint }); globalThis.fetch = oldFetch; restore();
+  }
+});
+
+for (const legacy of [false, true]) test(`saved accepted narrative (${legacy ? 'previous JSON' : 'compact hash'} recovery) survives a new engine and settles time only once`, async () => {
   const restore = setup(), oldFetch = globalThis.fetch;
   const previousSave = useSaveStore.getState().currentSaveId;
   useSaveStore.setState({ currentSaveId: 'refresh-save' });
@@ -134,6 +152,13 @@ test('saved accepted narrative survives a new engine and settles time only once'
     const capture = structuredClone({ id: 'refresh-save', name: 'refresh', timestamp: 1, worldId: 'default',
       messages: first.messages, gameState: bundle.coreState, moduleStates: bundle.current, moduleCheckpoints: bundle.checkpoints,
       memoryRuntime: memory.memoryRuntime, memoryConfig: memory.config, vectorMemory: memory.vectorMemory });
+    if (legacy) {
+      const version = (value: unknown) => JSON.stringify(value, (key, item) => key === 'moduleRevisions' ? undefined
+        : item && typeof item === 'object' && !Array.isArray(item)
+          ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+      capture.messages.at(-1)!.turnRecovery!.stateVersion = version(first.variableManager.getState());
+      capture.messages.at(-1)!.turnRecovery!.memoryVersion = version({ memoryRuntime: memory.memoryRuntime, vectorMemory: memory.vectorMemory });
+    }
     await useSaveStore.getState().performSave(capture);
     const saved = (await loadGame('refresh-save'))!;
     expect(saved.messages.at(-1)?.turnRecovery?.settlement.narrativeDecisionRequest.saveId).toBe(saved.id);
@@ -143,7 +168,10 @@ test('saved accepted narrative survives a new engine and settles time only once'
         save: { ...saved, name: '主流程恢复验收' } }));
     }
     const next = mountEngine(); next.loadSave(saved);
-    expect(JSON.parse(saved.messages.at(-1)!.turnRecovery!.stateVersion)).toEqual(JSON.parse(recoveryVersion(next.variableManager.getState())));
+    if (!legacy) {
+      expect(saved.messages.at(-1)!.turnRecovery!.stateVersion).toBe(recoveryVersion(next.variableManager.getState()));
+      expect(saved.messages.at(-1)!.turnRecovery!.stateVersion.length).toBe(71);
+    }
     await next.retryPipeline();
     expect(next.variableManager.getState().世界.时间系统.时钟!.elapsedMinutes).toBe(before + 10);
     const again = mountEngine(); again.loadSave({ ...saved, messages: structuredClone(next.messages), gameState: next.variableManager.getState(), ...useMemoryStore.getState().toJSON() });

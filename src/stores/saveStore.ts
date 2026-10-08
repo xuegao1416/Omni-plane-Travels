@@ -307,15 +307,19 @@ export const useSaveStore = create<SaveState>((set, get) => ({
   },
 
   scheduleAutoSave: () => {
-    const capture = _autoSaveBuilder?.();
-    if (!capture) return;
-    void saveCoordinator.schedule(capture).catch(error => {
+    const saveId = get().currentSaveId, builder = _autoSaveBuilder;
+    if (!saveId || !builder) return;
+    void saveCoordinator.scheduleCapture(saveId, () => {
+      if (get().currentSaveId !== saveId || _autoSaveBuilder !== builder) return null;
+      const capture = builder();
+      return capture?.id === saveId ? capture : null;
+    }).catch(error => {
       if (!(error instanceof SaveScheduleCancelledError)) console.error('[auto-save] 保存失败，当前完整进度仍可重试或导出:', error);
     });
   },
 
   flushAutoSave: async () => {
-    await saveCoordinator.request(captureCurrentSave());
+    await saveCoordinator.request(buildCurrentSave());
   },
 
   setSessionActivePacks: (packs) => {
@@ -331,19 +335,30 @@ saveCoordinator.subscribe(outcome => {
   else if (useSaveStore.getState().saveFailure?.saveId === outcome.saveId) useSaveStore.setState({ saveFailure: null });
 });
 
+// A delayed builder reads live engine state. Discard it when its journey owner
+// changes; normal leave/navigation flushes the old journey before switching.
+useSaveStore.subscribe((state, previous) => {
+  if (state.currentSaveId !== previous.currentSaveId && previous.currentSaveId) saveCoordinator.cancelScheduled(previous.currentSaveId);
+});
+
 // ─── 自动存档 builder（由 GameContext 注入） ───
 
 let _autoSaveBuilder: (() => GameSave | null) | null = null;
 
-export function captureCurrentSave(): GameSave {
+function buildCurrentSave(): GameSave {
   const capture = _autoSaveBuilder?.();
   if (!capture || capture.id !== useSaveStore.getState().currentSaveId) throw new Error('当前旅程身份或捕获尚未就绪，进度未保存。');
-  return structuredClone(capture);
+  return capture;
+}
+
+export function captureCurrentSave(): GameSave {
+  return structuredClone(buildCurrentSave());
 }
 
 /** 注入自动存档的 buildSaveData 函数（由 GameContext 调用） */
 export function setAutoSaveBuilder(builder: () => GameSave | null) {
   console.log('[auto-save] 注入 _autoSaveBuilder');
+  saveCoordinator.cancelScheduled();
   _autoSaveBuilder = builder;
 }
 

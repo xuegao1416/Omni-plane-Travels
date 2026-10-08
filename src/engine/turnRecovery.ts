@@ -2,6 +2,7 @@ import type { MemoryPipelineContext } from '../memory/useMemorySystem';
 import { createPipelineStatus, type PipelineConfig } from './pipelineTypes';
 import type { PipelineResult } from './pipelineExecutor';
 import type { TurnSettlementInput } from './turnSettlement';
+import { stateFingerprint } from '../utils/stateFingerprint';
 
 const MEMORY_FIELDS = ['floor', 'batchText', 'inputText', 'assistantText', 'recentContext', 'playerName',
   '_queryRewriteResult', '_plannerResult', '_rerankResult', '_selectedEntries', '_selectedVectorFacts',
@@ -16,10 +17,29 @@ export function recoverableMemoryContext(context: Partial<MemoryPipelineContext>
 }
 
 export function recoveryVersion(value: unknown): string {
+  return stateFingerprint(value);
+}
+
+/** Only the immediately previous recovery representation stored full JSON. */
+export function matchesRecoveryVersion(value: unknown, version: string): boolean {
+  if (version.startsWith('sha256:')) return recoveryVersion(value) === version;
   // Partition revision pointers are materialized during save/load; their data is
   // already compared in the reconstructed state and must not invalidate a retry.
   return JSON.stringify(value, (key, item) => key === 'moduleRevisions' ? undefined : item && typeof item === 'object' && !Array.isArray(item)
-    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item) === version;
+}
+
+interface RecoverableMemory { memoryRuntime?: unknown; vectorMemory?: unknown }
+/** Historical rollback ledgers do not change the current turn's memory facts. */
+export function memoryRecoveryVersion(memory: RecoverableMemory): string {
+  const runtime = memory.memoryRuntime;
+  return recoveryVersion({ memoryRuntime: runtime && typeof runtime === 'object'
+    ? { ...runtime, checkpoints: [] } : runtime ?? null, vectorMemory: memory.vectorMemory ?? [] });
+}
+
+export function matchesMemoryRecoveryVersion(memory: RecoverableMemory, version: string): boolean {
+  return version.startsWith('sha256:') ? memoryRecoveryVersion(memory) === version
+    : matchesRecoveryVersion({ memoryRuntime: memory.memoryRuntime ?? null, vectorMemory: memory.vectorMemory ?? [] }, version);
 }
 
 export interface TurnRecovery {

@@ -42,6 +42,7 @@ import {
   normalizeProvenance,
 } from './normalize';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { cloneSnapshotWithSharing, shareSnapshotHistory } from '../utils/snapshotSharing';
 
 // Task scopes prevent cancelled finalizers from closing a replacement task.
 let loadingEpoch = 0;
@@ -774,15 +775,16 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       eventCards,
     };
 
+    const previous = state.memoryRuntime.checkpoints.at(-1);
     const checkpoint: NarrativeCheckpoint = {
-      id: `cp_${Date.now()}`,
+      id: `cp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       createdAt: Date.now(),
       lastIngestCursor: prunedRuntime.lastIngestCursor,
       activeThreadCount: prunedRuntime.activeThreads.length,
       eventCount: prunedRuntime.eventCards.length,
       entityCount: prunedRuntime.entityCards.length,
-      snapshot: JSON.parse(JSON.stringify(slimCheckpointSnapshot(prunedRuntime))),
-      vectorMemory: JSON.parse(JSON.stringify(state.vectorMemory)),
+      snapshot: cloneSnapshotWithSharing(slimCheckpointSnapshot(prunedRuntime), previous?.snapshot),
+      vectorMemory: cloneSnapshotWithSharing(state.vectorMemory, previous?.vectorMemory),
     };
 
     set((s) => {
@@ -805,13 +807,13 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const checkpoint = state.memoryRuntime.checkpoints.find(cp => cp.id === checkpointId);
     if (!checkpoint?.snapshot) return false;
 
-    const restored = normalizeMemoryRuntime(checkpoint.snapshot);
+    const restored = normalizeMemoryRuntime(structuredClone(checkpoint.snapshot));
     restored.checkpoints = state.memoryRuntime.checkpoints;
 
     // 新 checkpoint 带有独立的向量快照。旧 checkpoint 没有该字段时保留当前向量，
     // 这是唯一不会静默丢失记忆的兼容行为；未来重新提取时仍可继续更新它。
     const restoredVectorMemory = Array.isArray(checkpoint.vectorMemory)
-      ? checkpoint.vectorMemory
+      ? structuredClone(checkpoint.vectorMemory)
           .map((item: unknown) => item && typeof item === 'object' ? normalizeProvenance(item as Record<string, unknown>) : null)
           .filter((item): item is Record<string, unknown> => Boolean(item))
           .map((item) => item as unknown as VectorMemoryItem)
@@ -1013,6 +1015,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const memoryRuntime = data.memoryRuntime
       ? slimMemoryRuntimeForSave(normalizeMemoryRuntime(data.memoryRuntime))
       : null;
+    if (memoryRuntime) memoryRuntime.checkpoints = shareSnapshotHistory(memoryRuntime.checkpoints);
 
     const vectorMemory = Array.isArray(data.vectorMemory)
       ? data.vectorMemory

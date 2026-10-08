@@ -7,6 +7,31 @@ beforeEach(() => {
 });
 
 describe('memory checkpoint vector snapshot', () => {
+  test('long history shares unchanged facts and restores an isolated exact turn after reload', () => {
+    const store = useMemoryStore.getState();
+    const ids: string[] = [];
+    for (let round = 0; round < 30; round++) {
+      store.updateSceneAnchor({ locationLabel: `第${round}轮` });
+      store.appendSourceEvent({ id: `source-${round}`, round, userText: '继续', assistantText: '正文'.repeat(500), createdAt: round });
+      const checkpoint = store.createCheckpoint(ids)!;
+      ids.push(checkpoint.id);
+    }
+    const history = store.getMemoryRuntime().checkpoints;
+    expect(new Set(ids).size).toBe(30);
+    expect(history).toHaveLength(30);
+    expect(history[29]!.snapshot!.sourceEvents[0]).toBe(history[0]!.snapshot!.sourceEvents[0]);
+    store.fromJSON(JSON.parse(JSON.stringify(store.toJSON())));
+    const loaded = store.getMemoryRuntime().checkpoints;
+    expect(loaded[29]!.snapshot!.sourceEvents[0]).toBe(loaded[0]!.snapshot!.sourceEvents[0]);
+    expect(store.restoreCheckpoint(ids[7]!)).toBe(true);
+    expect(store.getMemoryRuntime().sceneAnchor?.locationLabel).toBe('第7轮');
+    expect(store.getMemoryRuntime().sourceEvents).toHaveLength(8);
+    store.getMemoryRuntime().sourceEvents[0]!.assistantText = '恢复后的编辑';
+    expect(loaded[0]!.snapshot!.sourceEvents[0]!.assistantText).toBe('正文'.repeat(500));
+    expect(store.restoreCheckpoint(ids[29]!)).toBe(true);
+    expect(store.getMemoryRuntime().sourceEvents).toHaveLength(30);
+  });
+
   test('structured draft commits detach facts while preserving store-owned ledgers', () => {
     const store = useMemoryStore.getState();
     store.updateSceneAnchor({ locationLabel: '旅店' });

@@ -1,5 +1,6 @@
 // IndexedDB 存储层
 import { openDB, type IDBPDatabase } from 'idb';
+import { cloneSnapshotWithSharing } from '../utils/snapshotSharing';
 import { mapStorageBatch } from './mapStorageBatch';
 import { encodeStorageValue, decodeStorageValue, type StorageEncoding } from './storageCodec';
 import { decodeSaveFile } from './saveFileCodec';
@@ -994,11 +995,28 @@ export function generateSaveId(): string {
 // ─── 快照优化 ─────────────────────────────────────
 
 /**
- * 保留逐轮状态。持久层已压缩快照，不能通过丢弃历史状态来节省空间：
+ * 无损共享相邻快照的不变数据，保留逐轮状态，不能通过丢弃历史状态来节省空间：
  * 重发依赖前一轮的精确变量，旧关键帧会让变量与记忆/导演回到不同轮。
  */
+const sharedMessageSnapshots = new WeakMap<object, unknown>();
 export function optimizeSnapshots(messages: ChatMessage[]): ChatMessage[] {
-  return messages;
+  let previous: unknown;
+  let changed = false;
+  const shared = messages.map(message => {
+    const snapshot = message.snapshot;
+    if (!snapshot || typeof snapshot !== 'object') return message;
+    let compact = sharedMessageSnapshots.get(snapshot);
+    if (!compact) {
+      compact = cloneSnapshotWithSharing(snapshot, previous);
+      sharedMessageSnapshots.set(snapshot, compact);
+      sharedMessageSnapshots.set(compact as object, compact);
+    }
+    previous = compact;
+    if (compact === snapshot) return message;
+    changed = true;
+    return { ...message, snapshot: compact };
+  });
+  return changed ? shared : messages;
 }
 
 // ─── 导出/导入 ────────────────────────────────────────

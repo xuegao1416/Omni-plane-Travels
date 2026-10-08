@@ -3,7 +3,7 @@ import type { GameSave } from './db';
 import type { ChatMessage } from '../engine/types';
 import type { WorldDef } from '../data/worlds-schema';
 import { VariableManager } from '../engine/variableManager';
-import { readTurnRecovery, recoveryVersion } from '../engine/turnRecovery';
+import { readTurnRecovery, recoveryVersion, memoryRecoveryVersion, matchesRecoveryVersion, matchesMemoryRecoveryVersion } from '../engine/turnRecovery';
 import { getTimeSystemFromWorld } from '../time/worldClock';
 import { findWorldDef } from '../data/worldLoader';
 import type { GameState } from '../schema/variables';
@@ -42,12 +42,12 @@ export function rebindImportedTurnRecovery(source: GameSave, target: GameSave): 
     || recovery.round !== sourceLast.round || recovery.saveId !== source.id || recovery.worldId !== source.worldId
     || recovery.settlement.narrativeDecisionRequest.saveId !== source.id
     || (recovery.settlement.world && recovery.settlement.world.id !== source.worldId)
-    || recovery.memoryVersion !== recoveryVersion({ memoryRuntime: source.memoryRuntime ?? null, vectorMemory: source.vectorMemory ?? [] })) return messages;
+    || !matchesMemoryRecoveryVersion({ memoryRuntime: source.memoryRuntime, vectorMemory: source.vectorMemory }, recovery.memoryVersion)) return messages;
   try {
     const sourceWorld = source.customWorld as unknown as WorldDef | undefined ?? findWorldDef(source.worldId);
     const original = VariableManager.fromJSON({ state: source.gameState, saveId: source.id, moduleStates: source.moduleStates,
       moduleCheckpoints: source.moduleCheckpoints }, getTimeSystemFromWorld(sourceWorld));
-    if (recovery.stateVersion !== recoveryVersion(original.getState())) return messages;
+    if (!matchesRecoveryVersion(original.getState(), recovery.stateVersion)) return messages;
     recovery.saveId = target.id; recovery.worldId = target.worldId;
     recovery.settlement.narrativeDecisionRequest.saveId = target.id;
     rebindDecisions(recovery.settlement.protectedState);
@@ -56,6 +56,7 @@ export function rebindImportedTurnRecovery(source: GameSave, target: GameSave): 
     const imported = VariableManager.fromJSON({ state: target.gameState, saveId: target.id, moduleStates: target.moduleStates,
       moduleCheckpoints: target.moduleCheckpoints }, getTimeSystemFromWorld(targetWorld));
     recovery.stateVersion = recoveryVersion(imported.getState());
+    recovery.memoryVersion = memoryRecoveryVersion({ memoryRuntime: target.memoryRuntime, vectorMemory: target.vectorMemory });
     const last = messages.filter(message => message.role === 'assistant').at(-1);
     if (last?.id === recovery.aiMsgId && last.rawText === recovery.rawText) last.turnRecovery = recovery;
   } catch { /* Invalid state cannot acquire a new recovery owner; the paid narrative is retained. */ }
