@@ -67,6 +67,15 @@ test('paid results recover their metadata after task projection reload', async (
   expect(f.calls()).toBe(1);
 });
 
+test('unused negative prompts are not restored into generated image metadata', async () => {
+  const f = fixture();
+  const task = await f.queue.generate('source', { ...DEFAULT_IMAGE_CONFIG, engine: 'openai_compatible' }, {
+    storageKey: 'compatible-image', negativePrompt: 'unsupported negative prompt',
+  });
+  expect(task.negativePrompt).toBe('');
+  expect(f.records.get('compatible-image')?.generation?.negativePrompt).toBe('');
+});
+
 test('queued requests use their captured configuration and cancelled paid responses are still saved', async () => {
   let release!: (value: ImageGenResult) => void;
   const configs: ImageGenConfig[] = [];

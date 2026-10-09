@@ -123,7 +123,9 @@ const ImageGenSettingsTab = forwardRef<ImageSettingsRef>(function ImageGenSettin
           </Field>
         </div>
         <div style={{ padding: '12px 16px' }}>
-          <Field label="负向提示词" hint="会自动与每次请求的负向提示词合并去重">
+          <Field label="负向提示词" hint={config.engine === 'openai_compatible'
+            ? '此引擎不发送独立负向参数；需要避免的内容请写入正向提示词'
+            : '会自动与每次请求的负向提示词合并去重'}>
             <TextArea
               value={config.negativePrompt}
               onChange={(v) => updateConfig('negativePrompt', v)}

@@ -1173,7 +1173,7 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
   const apiKey = String(config.openaiCompatibleApiKey || '').trim();
   const model = String(config.openaiCompatibleModel || '').trim();
   const providerInfo = getOpenAICompatibleProviderInfo(provider);
-  const { positivePrompt, negativePrompt } = resolveOpenAICompatibleMergedPrompts(prompt, {}, config);
+  const { positivePrompt } = resolveOpenAICompatibleMergedPrompts(prompt, {}, config);
 
   if (!endpoint) throw new Error('未配置其他生图地址');
   if (!apiKey) throw new Error('未配置其他生图 API Key');
@@ -1191,7 +1191,8 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
     response_format: 'b64_json',
   };
 
-  if (negativePrompt) requestBody.negative_prompt = negativePrompt;
+  // Compatible queues reject nonstandard parameters such as negative_prompt.
+  // Keep this payload within the shared images/generations contract.
 
   const { url: oaiUrl, headers: oaiHeaders } = withProxy(endpoint, {
     'Content-Type': 'application/json',
@@ -1257,7 +1258,7 @@ export async function generateOpenAICompatibleImage(prompt: string, config: Part
     blob: imageBlob,
     seed: null,
     prompt: positivePrompt,
-    negativePrompt,
+    negativePrompt: '',
     width,
     height,
     model: `${providerInfo.label}: ${model}`,

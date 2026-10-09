@@ -105,7 +105,7 @@ export class ImageTaskQueue {
       paid = true;
       const params = { seed: result.seed, width: result.width, height: result.height, model: result.model,
         sampler: result.sampler, steps: result.steps, scale: result.scale };
-      const task = { ...job.task, prompt: result.prompt || job.task.prompt, negativePrompt: result.negativePrompt || job.task.negativePrompt, params };
+      const task = { ...job.task, prompt: result.prompt || job.task.prompt, negativePrompt: result.negativePrompt ?? job.task.negativePrompt, params };
       const generation: ImageGenerationMetadata = { id: task.id, prompt: task.prompt, negativePrompt: task.negativePrompt,
         category: task.category, characterName: task.characterName, params, createdAt: task.createdAt,
         deliveryKey: task.deliveryKey, sourcePrompt: task.sourcePrompt, sessionId: task.sessionId,
