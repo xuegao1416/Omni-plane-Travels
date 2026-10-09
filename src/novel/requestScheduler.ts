@@ -1,7 +1,7 @@
 import { requestCompletion, requestCompletionStream } from '../api/client';
 import { bucketKeyForConfig, setRateLimitInterval, waitForRateLimit } from '../api/rateLimiter';
 import type { ApiConfig, CompletionResult } from '../api/types';
-import type { NovelAnalysisRequest } from './analysisClient';
+import { assertNovelContentAllowed, type NovelAnalysisRequest } from './analysisClient';
 
 interface Pool { active: number; limit: number; blockedUntil: number; }
 const pools = new Map<string, Pool>();
@@ -58,6 +58,7 @@ export function createNovelAnalysisRequest(onResult?: (result?: CompletionResult
         onResult?.(undefined, 'request');
         const request = transport ?? (config.stream === false ? requestCompletion : requestCompletionStream);
         const result = await request(config, messages, { ...options, signal: controller.signal });
+        assertNovelContentAllowed(result);
         if (!result.text.trim()) throw new Error('API 503: 返回内容为空');
         onResult?.(result); return result;
       } catch (error) {

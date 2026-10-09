@@ -116,29 +116,35 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
   }, [base]);
 
   const field = 'world-weave-field world-weave-field--wide';
-  return <details className="world-weave-accordion">
-    <summary><span>主线剧情</span><em>{binding ? '已选择版本' : required ? '创建世界前必需' : '可选'}</em></summary>
+  const Container = required ? 'section' : 'details';
+  const DraftDetails = novelDatasetId ? 'details' : 'div';
+  return <Container className="world-weave-accordion">
+    {required ? <h3>主线剧情 · {binding ? '已保存，可以创建世界' : '先完成下面这一步，才能按原作故事开局'}</h3> : <summary><span>主线剧情</span><em>{binding ? '已选择版本' : '可选'}</em></summary>}
     <div className="world-weave-accordion-body">
-      <p>写下核心冲突、人物动机和故事走向，整理后可逐项修改。剧情只引导未来发展，玩家行动仍会改变路径。</p>
-      <label className={field}><span>作者原稿</span><textarea rows={7} value={raw} disabled={busy} onChange={e => setRaw(e.target.value)} placeholder="例如：港城不断有人失踪，调查者发现商会与教团的联系……写到哪里，剧情就提供到哪里。" /></label>
+      <p>{novelDatasetId ? binding ? '剧情已经保存。现在回到上方绿色按钮创建世界；只有想更新剧情时才需要重新整理。' : '小说已经上传，不用再写一份剧情。先点「整理本世界小说剧情」，等待整理完成，再点结果下方的「保存剧情版本并选用」。' : '写下核心冲突、人物动机和故事走向，整理后可逐项修改。剧情只引导未来发展，玩家行动仍会改变路径。'}</p>
+      {!novelDatasetId && <label className={field}><span>作者原稿</span><textarea rows={7} value={raw} disabled={busy} onChange={e => setRaw(e.target.value)} placeholder="例如：港城不断有人失踪，调查者发现商会与教团的联系……写到哪里，剧情就提供到哪里。" /></label>}
       <div className="world-weave-artwork-actions">
-        <button type="button" className="btn-ghost" disabled={busy || !raw.trim()} onClick={() => void compile('author')}>AI 整理原稿</button>
+        {!novelDatasetId && <button type="button" className="btn-ghost" disabled={busy || !raw.trim()} onClick={() => void compile('author')}>AI 整理原稿</button>}
         {novelDatasetId && <button type="button" className="btn-ghost" disabled={busy} onClick={() => void compile('novel')}>整理本世界小说剧情</button>}
         {job && job.status !== 'completed' && <button type="button" className="btn-ghost" disabled={busy} onClick={() => void compile('resume')}>恢复上次整理</button>}
         {busy && abort.current && <button type="button" className="btn-ghost" onClick={() => abort.current?.abort()}>取消并保留进度</button>}
       </div>
+      {novelDatasetId && <details><summary>我想自己改写故事（可选，不用填）</summary><label className={field}><span>作者原稿</span><textarea rows={7} value={raw} disabled={busy} onChange={e => setRaw(e.target.value)} placeholder="只有想用自己的故事替代原作时才需要写。" /></label><button type="button" className="btn-ghost" disabled={busy || !raw.trim()} onClick={() => void compile('author')}>AI 整理原稿</button></details>}
       {job && <p role="status">已完成 {Object.keys(job.checkpoints).length} 个处理单元；原始资料 {job.units.length} 批。{busy ? '正在整理…' : ''}</p>}
       {error && <p role="alert" className="world-weave-validation world-weave-validation--error">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {!!history.length && <label className={field}><span>历史剧情版本</span><select value={base?.editedByAuthor ? base.version : ''} disabled={busy} onChange={e => { const selected = history.find(item => item.version === e.target.value); if (!selected) return; setBase(selected); setDraft(editable(selected)); if (selected.source.kind === 'author') setRaw(selected.source.text); setStart(selected.stages[0]?.id ?? ''); setNotice('已载入历史剧情版本；保存并选用前不会改变世界绑定。'); }}><option value="">选择人工修订版本</option>{history.map(item => <option key={item.version} value={item.version}>{item.title} · 人工修订</option>)}</select><small>查看旧版不会自动改动世界绑定；只有“保存剧情版本并选用”才会更新新开局使用的版本。</small></label>}
       {draft && <fieldset disabled={busy} style={{ border: 0, padding: 0, marginTop: 16 }}>
-        <legend>检查与修改整理结果</legend>
+        <legend>{novelDatasetId ? 'AI 已整理出可用剧情' : '检查与修改整理结果'}</legend>
+        {novelDatasetId && <><p>{draft.title} · {draft.characters.length} 位人物 · {draft.stages.length} 个故事阶段 · {draft.nodes.length} 个事件。不需要逐项填写，直接保存就能继续。</p><label className={field}><span>默认起始阶段</span><select value={start} onChange={e => setStart(e.target.value)}>{draft.stages.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label><div className="world-weave-artwork-actions"><button type="button" className="btn-ghost" onClick={() => void save()}>保存剧情版本并选用</button>{binding && <button type="button" className="btn-ghost" onClick={() => { onBind(undefined); setNotice('已取消新开局的主线选择，保存世界后生效。'); }}>取消选用</button>}</div></>}
+        <DraftDetails>
+        {novelDatasetId && <summary>查看或修改剧情细节（可选，直接保存也能玩）</summary>}
         <label className={field}><span>剧情名称</span><input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
         <label className={field}><span>核心冲突</span><textarea value={draft.coreConflict} onChange={e => setDraft({ ...draft, coreConflict: e.target.value })} /></label>
         <label className={field}><span>应保持的大方向（每行一项）</span><textarea value={draft.anchors.join('\n')} onChange={e => setDraft({ ...draft, anchors: lines(e.target.value) })} /></label>
         <label className={field}><span>内容边界</span><textarea value={draft.coverage.boundary} onChange={e => setDraft({ ...draft, coverage: { ...draft.coverage, boundary: e.target.value } })} /></label>
         <label className={field}><span>未知与缺口（每行一项）</span><textarea value={draft.coverage.gaps.join('\n')} onChange={e => setDraft({ ...draft, coverage: { ...draft.coverage, complete: false, gaps: lines(e.target.value) } })} /></label>
-        <label className={field}><span>默认起始阶段</span><select value={start} onChange={e => setStart(e.target.value)}>{draft.stages.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>
+        {!novelDatasetId && <label className={field}><span>默认起始阶段</span><select value={start} onChange={e => setStart(e.target.value)}>{draft.stages.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>}
         <details className="world-weave-accordion"><summary>参与人物 · {draft.characters.length} 人</summary><div className="world-weave-accordion-body">
           {draft.characters.map((actor, index) => <div key={actor.id}>
             <label className={field}><span>人物姓名 {index + 1}</span><input value={actor.name} onChange={e => setDraft({ ...draft, characters: draft.characters.map((a, i) => i === index ? { ...a, name: e.target.value } : a) })} /></label>
@@ -168,8 +174,9 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
             </div></details>)}
           </div>
         </details>)}
-        <div className="world-weave-artwork-actions"><button type="button" className="btn-ghost" onClick={() => void save()}>保存剧情版本并选用</button>{binding && <button type="button" className="btn-ghost" onClick={() => { onBind(undefined); setNotice('已取消新开局的主线选择，保存世界后生效。'); }}>取消选用</button>}</div>
+        </DraftDetails>
+        {!novelDatasetId && <div className="world-weave-artwork-actions"><button type="button" className="btn-ghost" onClick={() => void save()}>保存剧情版本并选用</button>{binding && <button type="button" className="btn-ghost" onClick={() => { onBind(undefined); setNotice('已取消新开局的主线选择，保存世界后生效。'); }}>取消选用</button>}</div>}
       </fieldset>}
     </div>
-  </details>;
+  </Container>;
 }

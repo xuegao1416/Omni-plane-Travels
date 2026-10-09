@@ -5,6 +5,13 @@ import type { ApiConfig, CompletionResult } from '../api/types';
 const config = (name: string) => ({ baseUrl: `https://${name}.invalid/v1`, model: 'test', apiKey: '', provider: 'custom' } as ApiConfig);
 const result = { text: '{}', elapsed: 1, finishReason: 'stop' } as CompletionResult;
 
+test.each(['content_filter', 'content-filter', 'SAFETY', 'RECITATION'])('empty platform refusal %s is not retried as a temporary outage', async finishReason => {
+  let calls = 0;
+  const request = createNovelAnalysisRequest(undefined, async () => { calls++; return { text: '', elapsed: 1, finishReason }; });
+  await expect(request(config(`refusal-${finishReason}`), [], { onDelta: () => {} })).rejects.toThrow('模型平台已拦截');
+  expect(calls).toBe(1);
+});
+
 test('fatal credentials stop immediately and rate limits obey the shared retry window', async () => {
   let calls = 0;
   const fatal = createNovelAnalysisRequest(undefined, async () => { calls++; throw new Error('API 401: unauthorized'); });

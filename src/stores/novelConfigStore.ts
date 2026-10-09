@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import type { ApiConfig } from '../api/types';
 import { isSealed, sealResult, unsealResult } from '../security/keyVault';
+import { DEFAULT_NOVEL_ANALYSIS_PRESET, readNovelAnalysisPreset, type NovelAnalysisPreset } from '../novel/analysisPresets';
 
 export interface NovelWorkbenchConfig {
   api: ApiConfig;
+  analysisPreset: NovelAnalysisPreset;
   embeddingMode: 'off' | 'inherit' | 'local_endpoint';
   embeddingEndpoint: string;
   embeddingModel: string;
@@ -13,6 +15,7 @@ export interface NovelWorkbenchConfig {
   embeddingRateLimitMs: number;
 }
 export const DEFAULT_NOVEL_CONFIG: NovelWorkbenchConfig = {
+  analysisPreset: { ...DEFAULT_NOVEL_ANALYSIS_PRESET },
   api: { provider: 'custom', baseUrl: '', apiKey: '', model: '', temperature: 0.2, maxTokens: 8192, stream: true },
   embeddingMode: 'off', embeddingEndpoint: 'http://127.0.0.1:1234/v1', embeddingModel: '',
   analysisRateLimitMs: 3000, embeddingRateLimitMs: 1000,
@@ -36,11 +39,12 @@ export const useNovelConfigStore = create<{
         const raw = localStorage.getItem(STORAGE_KEY);
         const stored = raw ? JSON.parse(raw) as NovelWorkbenchConfig : DEFAULT_NOVEL_CONFIG;
         if (!stored || typeof stored !== 'object' || !stored.api || typeof stored.api.apiKey !== 'string') throw Error('拆解配置格式无效，原记录已保留。');
+        const analysisPreset = readNovelAnalysisPreset(stored.analysisPreset);
         const decoded = await unsealResult(stored.api.apiKey);
         if (decoded.status === 'error') throw Error(decoded.message);
         if (revision !== expected) return;
         if (localStorage.getItem(STORAGE_KEY) !== raw) throw Error('拆解配置在读取期间已变化，请重新读取。');
-        set({ config: { ...DEFAULT_NOVEL_CONFIG, ...stored, api: { ...DEFAULT_NOVEL_CONFIG.api, ...stored.api, apiKey: decoded.value } }, loaded: true, recoveryError: null });
+        set({ config: { ...DEFAULT_NOVEL_CONFIG, ...stored, analysisPreset, api: { ...DEFAULT_NOVEL_CONFIG.api, ...stored.api, apiKey: decoded.value } }, loaded: true, recoveryError: null });
         if (raw && stored.api.apiKey && !isSealed(stored.api.apiKey)) {
           try {
             const sealed = await sealResult(decoded.value);
@@ -63,6 +67,7 @@ export const useNovelConfigStore = create<{
   save: config => {
     const captured = structuredClone(config); revision++;
     const operation = saveQueue.then(async () => {
+      captured.analysisPreset = readNovelAnalysisPreset(captured.analysisPreset);
       const original = localStorage.getItem(STORAGE_KEY);
       if (isSealed(captured.api.apiKey)) throw Error('拆解密钥尚未解密，未保存。');
       const sealed = await sealResult(captured.api.apiKey);

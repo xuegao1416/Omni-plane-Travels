@@ -97,3 +97,22 @@ test('queued novel saves freeze their input and cannot finish out of order', asy
     expect(useNovelConfigStore.getState().config.api.model).toBe('newer');
   } finally { encrypt.mockRestore(); f.restore(); }
 });
+
+test('legacy novel config defaults to general analysis and custom instructions survive saving and hydration', async () => {
+  const f = await fixture();
+  const { config, loaded, recoveryError, warning } = useNovelConfigStore.getState();
+  const previous = { config: structuredClone(config), loaded, recoveryError, warning };
+  const { analysisPreset: _preset, ...legacy } = DEFAULT_NOVEL_CONFIG;
+  f.values.set('omni-plane-travels.novel-config.v1', JSON.stringify(legacy));
+  const decrypt = spyOn(vault, 'unsealResult').mockResolvedValue({ status: 'empty', value: '' });
+  const encrypt = spyOn(vault, 'sealResult').mockResolvedValue({ status: 'empty', value: '' });
+  try {
+    useNovelConfigStore.setState({ loaded: false });
+    await useNovelConfigStore.getState().initialize();
+    expect(useNovelConfigStore.getState().config.analysisPreset).toEqual({ id: 'general', customInstructions: '' });
+    await useNovelConfigStore.getState().save({ ...DEFAULT_NOVEL_CONFIG, analysisPreset: { id: 'custom', customInstructions: '重点分析关系变化' } });
+    useNovelConfigStore.setState({ config: structuredClone(DEFAULT_NOVEL_CONFIG), loaded: false });
+    await useNovelConfigStore.getState().initialize();
+    expect(useNovelConfigStore.getState().config.analysisPreset).toEqual({ id: 'custom', customInstructions: '重点分析关系变化' });
+  } finally { useNovelConfigStore.setState(previous); decrypt.mockRestore(); encrypt.mockRestore(); f.restore(); }
+});

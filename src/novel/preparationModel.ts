@@ -33,6 +33,7 @@ export interface NovelRequestBatch {
 }
 export interface NovelBatchArtifact {
   batchId: string;
+  presetFingerprint?: string;
   sources?: Array<{ unitId: string; sourceHash: string }>;
   inputHash: string;
   parts: Array<{ partId: string; evidence: NovelEvidenceNote }>;
@@ -156,6 +157,7 @@ export function readNovelPreparationCheckpoint(value: unknown): NovelPreparation
   const identity = z.string().min(1);
   const schema = z.object({ version: z.literal(1), batches: z.array(z.object({
     batchId: identity, inputHash: identity,
+    presetFingerprint: identity.optional(),
     sources: z.array(z.object({ unitId: identity, sourceHash: identity })).min(1),
     parts: z.array(z.object({ partId: identity, evidence: novelEvidenceNoteSchema })).min(1), material: novelOverviewSchema,
   })) });

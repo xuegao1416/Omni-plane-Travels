@@ -3,6 +3,18 @@ import { generateNovelSegmentAnalysis } from './analysisClient';
 import type { ApiConfig, CompletionResult } from '../api/types';
 import type { NovelEvidenceNote } from './types';
 
+test.each(['content_filter', 'content-filter', 'SAFETY', 'RECITATION'])('platform refusal %s stops without JSON repair or split retries', async finishReason => {
+  let calls = 0;
+  await expect(generateNovelSegmentAnalysis({
+    config: { baseUrl: 'https://example.invalid', model: 'test', apiKey: '', provider: 'custom' },
+    novelTitle: '测试', sourceText: '甲'.repeat(1300),
+    segment: { id: 's1', index: 0, title: '第一段', chapterIds: [], summary: '', hardConstraints: [], events: [] },
+    evidenceNote: {} as NovelEvidenceNote, previousEndingFacts: [], retrievedEvidence: '',
+    request: async () => { calls++; return { text: '{"summary":"被截断的结果"}', elapsed: 1, finishReason }; },
+  })).rejects.toThrow('模型平台已拦截');
+  expect(calls).toBe(1);
+});
+
 test('repairs an event without its own evidence instead of borrowing the segment citation', async () => {
   const content = '城门已经关闭。顾澄把密信交给了守卫。';
   const chapter = { id: 'c1', index: 0, title: '第一章', content, startOffset: 100 };

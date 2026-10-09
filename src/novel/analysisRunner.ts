@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { obtainNovelProduct, novelProductInputHash } from './paidProducts';
 import type { ApiConfig } from '../api/types';
+import { applyNovelAnalysisPreset, novelPresetFingerprint, readNovelAnalysisPreset, type NovelAnalysisPreset } from './analysisPresets';
 import type { EmbeddingClient } from '../memory/embeddingRuntime';
 import {
   generateNovelPreparationBatch,
@@ -17,6 +18,7 @@ import {
   buildNovelTaskPlan,
   NOVEL_ANALYSIS_VERSION,
   novelChapterContext,
+  novelAnalysisChannel,
   novelEvidenceInputHash,
   novelEvidenceReusable,
   novelSegmentSource,
@@ -259,6 +261,7 @@ async function getOrCreateJob(datasetId: string, startSegmentIndex: number, tota
 export interface NovelAnalysisOptions {
   datasetId: string;
   config: ApiConfig;
+  preset?: NovelAnalysisPreset;
   startSegmentIndex?: number;
   embedding?: { client: EmbeddingClient; model: string; identity?: string; rateLimitMs?: number };
   generators?: NovelAnalysisGenerators;
@@ -292,6 +295,8 @@ export async function runNovelAnalysis(params: NovelAnalysisOptions): Promise<{ 
 }
 
 async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dataset: NovelDataset; job: NovelAnalysisJob; worldReady: boolean }> {
+  const preset = readNovelAnalysisPreset(params.preset);
+  const presetFingerprint = novelPresetFingerprint(preset);
   const initial = await getNovelDataset(params.datasetId);
   if (!initial) throw new Error('未找到小说数据集');
   if (!initial.segments.length) throw new Error('小说没有可分析分段');
@@ -312,7 +317,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   // Channels already used on this dataset stay readable, so switching models keeps extracted evidence.
   const usedFingerprints = (await listNovelJobs(dataset.id)).map(item => item.configFingerprint).filter((value): value is string => Boolean(value));
   job.runId = uuid(); job.model = params.config.model;
-  job.configFingerprint = hashNovelText(JSON.stringify([params.config.baseUrl, params.config.model, params.config.provider]));
+  job.configFingerprint = novelAnalysisChannel(params.config, preset)!;
   job.requestCount = 0;
   job.embeddingMode = params.embedding ? 'enhanced' : 'basic';
   job.embeddingStatus = params.embedding ? 'preparing' : 'off';
@@ -322,11 +327,15 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     if (result?.usage) job.tokenUsage = { prompt: (job.tokenUsage?.prompt ?? 0) + result.usage.promptTokens, completion: (job.tokenUsage?.completion ?? 0) + result.usage.completionTokens };
     if (message && message !== 'request') progress({ callback: params.onProgress, job, message });
   });
-  const request: typeof transport = async (config, messages, options) => obtainNovelProduct({ datasetId: dataset.id, kind: 'overview',
+  const request: typeof transport = async (config, messages, options) => {
+    const preparedMessages = applyNovelAnalysisPreset(messages, preset);
+    return obtainNovelProduct({ datasetId: dataset.id, kind: 'overview',
     inputHash: await novelProductInputHash(['request', NOVEL_ANALYSIS_VERSION, config.baseUrl, config.model, config.provider,
-      config.reasoningEffort, config.temperature, config.topP, config.maxTokens, messages,
-      options.temperature, options.maxTokens, options.topP, options.responseFormat, ...refreshIdentity]) },
-    () => transport(config, messages, options), { signal: options.signal, refresh: false });
+      config.reasoningEffort, config.temperature, config.topP, config.maxTokens, preparedMessages,
+      options.temperature, options.maxTokens, options.topP, options.responseFormat,
+      ...(presetFingerprint ? [{ preset: presetFingerprint }] : []), ...refreshIdentity]) },
+    () => transport(config, preparedMessages, options), { signal: options.signal, refresh: false });
+  };
   if (!params.generators) generators = {
     prepareBatch: options => generateNovelPreparationBatch({ ...options, request }),
     evidence: options => generateNovelEvidenceNote({ ...options, request }),
@@ -344,11 +353,11 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     segment: options => paid('story', [options.novelTitle, options.segment.id, options.sourceText, options.evidenceNote, options.previousEndingFacts, options.retrievedEvidence, options.sourceChapters?.map(c => [c.id, c.title, c.content])], () => unpaid.segment(options)),
   };
   const combined = Boolean(generators.prepareBatch);
-  const plan = buildNovelTaskPlan(dataset, { goal, config: params.config, channels: usedFingerprints, inputBudget: params.inputBudget,
+  const plan = buildNovelTaskPlan(dataset, { goal, config: params.config, preset, channels: usedFingerprints, inputBudget: params.inputBudget,
     forceOverview: forceOverview, reExtractEvidence: params.reExtractEvidence,
     retrieval: params.embedding?.identity ?? params.embedding?.model ?? 'basic' });
   const activePartIds = new Set(plan.batches.flatMap(batch => batch.parts.map(part => part.id)));
-  const batchArtifacts = new Map((params.reExtractEvidence ? [] : dataset.preparation?.batches ?? []).filter(batch => batch.sources?.every(source => plan.units.some(unit => unit.id === source.unitId && unit.sourceHash === source.sourceHash))).map(batch => [batch.batchId, batch]));
+  const batchArtifacts = new Map((params.reExtractEvidence ? [] : dataset.preparation?.batches ?? []).filter(batch => batch.presetFingerprint === presetFingerprint && batch.sources?.every(source => plan.units.some(unit => unit.id === source.unitId && unit.sourceHash === source.sourceHash))).map(batch => [batch.batchId, batch]));
   const partNotes = new Map([...batchArtifacts.values()].flatMap(batch => batch.parts.filter(part => activePartIds.has(part.partId)).map(part => [part.partId, part.evidence] as const)));
   const saveHeader = async (generatedMaterial?: NovelStaticMaterial, archives?: NovelArchiveRecord[]) => {
     dataset = await saveNovelAnalysisResult(dataset, sourceIdentity, { generatedMaterial, archives });
@@ -391,9 +400,10 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
 
     await writeJob({ phase: 'evidence' });
     if (combined) {
-      if (params.reExtractEvidence) {
-        dataset.preparation = undefined;
+      if (params.reExtractEvidence || dataset.segments.some(segment => segment.evidenceNotes && !novelEvidenceReusable(dataset, segment, usedFingerprints, presetFingerprint))) {
+        dataset.preparation = { version: 1, batches: [...batchArtifacts.values()] };
         for (let index = 0; index < dataset.segments.length; index++) {
+          if (!params.reExtractEvidence && novelEvidenceReusable(dataset, dataset.segments[index], usedFingerprints, presetFingerprint)) continue;
           const segment = { ...dataset.segments[index], status: 'pending' as const, evidenceStatus: 'pending' as const,
             evidenceNotes: undefined, evidenceInputHash: undefined, analysisInputHash: undefined, error: undefined };
           dataset.segments[index] = segment; await saveSegment(segment);
@@ -402,7 +412,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       }
       for (const batch of plan.batches) {
         assertNotAborted();
-        const missing = batch.parts.filter(part => !partNotes.has(part.id) && (params.reExtractEvidence || !novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints)));
+        const missing = batch.parts.filter(part => !partNotes.has(part.id) && (params.reExtractEvidence || !novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints, presetFingerprint)));
         if (!missing.length && batch.evidenceReusable) { job.completed += batch.parts.length; continue; }
         progress({ callback: params.onProgress, job, segmentTitle: batch.parts[0]?.title, message: '正在准备原文证据与背景资料' });
         try {
@@ -418,19 +428,19 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
             // Reject incomplete injected capabilities as well as malformed production responses.
             if (result.parts.length !== missing.length || new Set(result.parts.map(part => part.partId)).size !== missing.length
               || result.parts.some(part => !missing.some(source => source.id === part.partId))) throw new Error('原文证据窗口不完整或重复，不能接纳批次');
-            batchArtifacts.set(result.batchId, { ...result, sources: [...new Set(missing.map(part => part.unitId))].map(unitId => ({ unitId, sourceHash: plan.units.find(unit => unit.id === unitId)!.sourceHash })) });
+            batchArtifacts.set(result.batchId, { ...result, presetFingerprint, sources: [...new Set(missing.map(part => part.unitId))].map(unitId => ({ unitId, sourceHash: plan.units.find(unit => unit.id === unitId)!.sourceHash })) });
             for (const part of result.parts) partNotes.set(part.partId, part.evidence);
           }
           dataset.preparation = { version: 1, batches: [...batchArtifacts.values()] };
           await saveHeader();
           for (let index = 0; index < dataset.segments.length; index++) {
             const segment = dataset.segments[index];
-            if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, usedFingerprints)) continue;
+            if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, usedFingerprints, presetFingerprint)) continue;
             const parts = plan.batches.flatMap(batch => batch.parts).filter(part => part.unitId === segment.id);
             if (!parts.length || !parts.every(part => partNotes.has(part.id))) continue;
             const accepted = { ...segment, status: 'pending' as const, error: undefined, analysisInputHash: undefined,
               evidenceNotes: mergeNovelEvidence(parts.map(part => partNotes.get(part.id)!)), evidenceStatus: 'completed' as const,
-              evidenceInputHash: novelEvidenceInputHash(dataset, segment), analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
+              evidenceInputHash: novelEvidenceInputHash(dataset, segment, undefined, presetFingerprint), analysisVersion: NOVEL_ANALYSIS_VERSION, updatedAt: Date.now() };
             dataset.segments[index] = accepted;
             await saveSegment(accepted);
           }
@@ -455,9 +465,9 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       const context = novelChapterContext(dataset, segment);
       // Evidence extraction is grounded in the original text, not in the channel, so switching
       // models keeps it; the former per-channel identity stays readable so stored notes are reused.
-      const evidenceInputHash = novelEvidenceInputHash(dataset, segment);
+      const evidenceInputHash = novelEvidenceInputHash(dataset, segment, undefined, presetFingerprint);
       const priorChannels = [...usedFingerprints, job.configFingerprint].filter((value): value is string => Boolean(value));
-      if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, [job.configFingerprint, ...priorChannels])) {
+      if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, [job.configFingerprint, ...priorChannels], presetFingerprint)) {
         job.completed += 1;
         continue;
       }
@@ -533,7 +543,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       const archives = await compileNovelArchives(dataset.id, dataset.segments, !params.generators ? {
         resolve: async group => {
           assertNotAborted();
-          const inputHash = hashNovelText(`identity-v1:${JSON.stringify(group)}`);
+          const inputHash = hashNovelText(`identity-v1:${presetFingerprint ? `${presetFingerprint}:` : ''}${JSON.stringify(group)}`);
           const cached = await getNovelOverviewCheckpoint(dataset.id, inputHash);
           if (cached?.material.settings) return JSON.parse(cached.material.settings[0]) as string[][];
           return resolveNovelArchiveIdentities(params.config, group, params.signal, request);
@@ -550,7 +560,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
         for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
           assertNotAborted();
           progress({ callback: params.onProgress, job, message: `正在归并全书证据 ${groupIndex + 1}/${groups.length}` });
-          const inputHash = hashNovelText(JSON.stringify({ notes: groups[groupIndex], analysisVersion: NOVEL_ANALYSIS_VERSION }));
+          const inputHash = hashNovelText(JSON.stringify({ notes: groups[groupIndex], analysisVersion: NOVEL_ANALYSIS_VERSION, ...(presetFingerprint ? { preset: presetFingerprint } : {}) }));
           const checkpoint = !forceOverview && (await getNovelOverviewCheckpoint(dataset.id, inputHash) ?? dataset.overviewCheckpoints?.find(item => item.inputHash === inputHash));
           const partial = checkpoint ? checkpoint.material : await generators.overview({
             config: params.config,

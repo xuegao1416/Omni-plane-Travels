@@ -1,4 +1,5 @@
 import type { ApiConfig } from '../api/types';
+import { novelPresetFingerprint, type NovelAnalysisPreset } from './analysisPresets';
 import { hashNovelText } from './segmentation';
 import { buildNovelSemanticUnits, packNovelRequestBatches, type NovelSemanticUnit, type NovelRequestBatch } from './preparationModel';
 import type { NovelAnalysisGoal, NovelDataset, NovelSegment } from './types';
@@ -26,23 +27,25 @@ export function novelChapterContext(dataset: NovelDataset, segment: NovelSegment
   return dataset.chapters.filter(chapter => ids.has(chapter.id)).map(chapter => `${chapter.id} | ${chapter.title} | ${chapter.startOffset ?? 0}-${chapter.endOffset ?? 0}`).join('\n');
 }
 
-export function novelAnalysisChannel(config?: ApiConfig): string | undefined {
-  return config ? hashNovelText(JSON.stringify([config.baseUrl, config.model, config.provider])) : undefined;
+export function novelAnalysisChannel(config?: ApiConfig, preset?: NovelAnalysisPreset): string | undefined {
+  const fingerprint = novelPresetFingerprint(preset);
+  return config ? hashNovelText(JSON.stringify([config.baseUrl, config.model, config.provider, ...(fingerprint ? [fingerprint] : [])])) : undefined;
 }
 
-export function novelEvidenceInputHash(dataset: NovelDataset, segment: NovelSegment, channel?: string): string {
+export function novelEvidenceInputHash(dataset: NovelDataset, segment: NovelSegment, channel?: string, presetFingerprint?: string): string {
   return hashNovelText(JSON.stringify({
     sourceText: novelSegmentSource(dataset, segment),
     chapterContext: novelChapterContext(dataset, segment),
     analysisVersion: NOVEL_ANALYSIS_VERSION,
+    ...(presetFingerprint ? { preset: presetFingerprint } : {}),
     ...(channel ? { model: channel } : {}),
   }));
 }
 
 /** Evidence is grounded in the source text, so results from earlier channels stay usable. */
-export function novelEvidenceReusable(dataset: NovelDataset, segment: NovelSegment, channels: string[] = []): boolean {
+export function novelEvidenceReusable(dataset: NovelDataset, segment: NovelSegment, channels: string[] = [], presetFingerprint?: string): boolean {
   if (!segment.evidenceNotes || segment.analysisVersion !== NOVEL_ANALYSIS_VERSION || !segment.evidenceInputHash) return false;
-  return [undefined, ...channels].map(channel => novelEvidenceInputHash(dataset, segment, channel)).includes(segment.evidenceInputHash);
+  return [undefined, ...channels].map(channel => novelEvidenceInputHash(dataset, segment, channel, presetFingerprint)).includes(segment.evidenceInputHash);
 }
 
 export function novelStoryInputHash(dataset: NovelDataset, index: number, channel?: string, retrieval = 'basic'): string {
@@ -62,19 +65,21 @@ export function buildNovelTaskPlan(dataset: NovelDataset, options: {
   goal: NovelAnalysisGoal;
   inputBudget?: number;
   config?: ApiConfig;
+  preset?: NovelAnalysisPreset;
   channels?: string[];
   forceOverview?: boolean;
   reExtractEvidence?: boolean;
   retrieval?: string;
 }): NovelTaskPlan {
-  const channel = novelAnalysisChannel(options.config);
+  const channel = novelAnalysisChannel(options.config, options.preset);
+  const presetFingerprint = novelPresetFingerprint(options.preset);
   const channels = [...new Set([...(options.channels ?? []), ...(channel ? [channel] : [])])];
-  const reusableEvidence = options.reExtractEvidence ? 0 : dataset.segments.filter(segment => novelEvidenceReusable(dataset, segment, channels)).length;
+  const reusableEvidence = options.reExtractEvidence ? 0 : dataset.segments.filter(segment => novelEvidenceReusable(dataset, segment, channels, presetFingerprint)).length;
   const notesReady = !options.reExtractEvidence && reusableEvidence === dataset.segments.length;
   const overviewReusable = !options.forceOverview && notesReady && Boolean(dataset.overviewInputHash && !dataset.overviewError && dataset.staticMaterial.summary?.trim()) ? 1 : 0;
   const units = buildNovelSemanticUnits(dataset);
   const inputBudget = Math.max(1000, Math.min(12000, Math.floor(options.inputBudget ?? dataset.taskPreparation?.maxTokens ?? 6000)));
-  const reusableIds = new Set(options.reExtractEvidence ? [] : dataset.segments.filter(segment => novelEvidenceReusable(dataset, segment, channels)).map(segment => segment.id));
+  const reusableIds = new Set(options.reExtractEvidence ? [] : dataset.segments.filter(segment => novelEvidenceReusable(dataset, segment, channels, presetFingerprint)).map(segment => segment.id));
   const batches = packNovelRequestBatches(dataset, units, inputBudget).map(batch => ({ ...batch, evidenceReusable: batch.parts.every(part => reusableIds.has(part.unitId)) }));
   const stages: NovelTaskPlan['stages'] = [
     { kind: 'background', label: '证据与背景批次', total: batches.length, reusable: batches.filter(batch => batch.evidenceReusable).length },

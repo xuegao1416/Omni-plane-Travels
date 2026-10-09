@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fetchModels,testConnection } from '../../../api/client';
 import { useConfigStore } from '../../../stores/configStore';
 import { useNovelConfigStore,type NovelWorkbenchConfig } from '../../../stores/novelConfigStore';
+import { NOVEL_ANALYSIS_PRESETS, NOVEL_CUSTOM_INSTRUCTIONS_LIMIT, type NovelAnalysisPreset } from '../../../novel/analysisPresets';
 
 export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boolean; onMessage: (message: string) => void }) {
   const { config, initialize, save, loaded, recoveryError, warning } = useNovelConfigStore();
@@ -43,10 +44,13 @@ export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boo
     finally { if (request.current === controller) { request.current = null; setBusy(false); } }
   };
   return <details className="novel-import-workbench__settings" open={!config.api.model}>
-    <summary>拆解专用 API 与检索配置</summary>
+    <summary>拆解预设、专用 API 与检索配置</summary>
     {(recoveryError || warning) && <p role="alert">{recoveryError || warning} <button type="button" onClick={() => { void initialize().catch(error => onMessage(`配置读取失败：${String(error)}`)); }}>重新读取</button></p>}
     <fieldset disabled={disabled || busy || (!loaded && !recoveryError)}>
       <p className="novel-import-workbench__hint">修改后保存生效。设置独立于游戏对话；模型列表优先推荐稳定 Flash，不自动切换 Pro。</p>
+      <label className="novel-import-workbench__field">拆解预设<select value={draft.analysisPreset.id} onChange={e => patch({ analysisPreset: { ...draft.analysisPreset, id: e.target.value as NovelAnalysisPreset['id'] } })}>{NOVEL_ANALYSIS_PRESETS.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
+      <p className="novel-import-workbench__hint">{NOVEL_ANALYSIS_PRESETS.find(preset => preset.id === draft.analysisPreset.id)?.description} 切换后再次分析会更新受影响的资料。预设不能解除模型平台的内容限制。</p>
+      {draft.analysisPreset.id === 'custom' && <label className="novel-import-workbench__field">补充分析指令<textarea rows={5} maxLength={NOVEL_CUSTOM_INSTRUCTIONS_LIMIT} value={draft.analysisPreset.customInstructions} placeholder="例如：重点分析人物动机、关系变化与事件因果，使用简洁的中性表达。" onChange={e => patch({ analysisPreset: { ...draft.analysisPreset, customInstructions: e.target.value } })} /></label>}
       <div className="novel-import-workbench__range-fields">
         <label className="novel-import-workbench__field">接口协议<select value={draft.api.provider} onChange={e => patchApi({ provider: e.target.value as NovelWorkbenchConfig['api']['provider'] })}><option value="custom">OpenAI 兼容</option><option value="google">Google</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select></label>
         <label className="novel-import-workbench__field">接口地址<input type="url" value={draft.api.baseUrl} placeholder="https://example.com/v1" onChange={e => patchApi({ baseUrl: e.target.value })} autoComplete="off" /></label>

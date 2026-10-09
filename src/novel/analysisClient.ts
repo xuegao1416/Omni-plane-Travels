@@ -60,6 +60,10 @@ function shouldSplitFailedInput(error: unknown, sourceText: string): boolean {
     || (error instanceof Error && error.message.includes('token 上限')));
 }
 
+export function assertNovelContentAllowed(result: CompletionResult): void {
+  if (['content_filter', 'content-filter', 'SAFETY', 'RECITATION'].includes(result.finishReason ?? '')) throw new Error('模型平台已拦截本段内容，拆解预设无法解除平台限制。');
+}
+
 async function requestJson(
   config: ApiConfig,
   prompt: string,
@@ -78,6 +82,7 @@ async function requestJson(
     maxTokens: Math.min(16_384, config.maxTokens ?? 16_384),
     onDelta: (_delta, accumulated) => onDelta?.(accumulated),
   });
+  assertNovelContentAllowed(result);
   if (result.finishReason === 'length') throw new Error('小说拆解响应达到 token 上限（包含模型推理）；请降低 API 推理强度后重试，或缩小分段');
   return result.text;
 }
