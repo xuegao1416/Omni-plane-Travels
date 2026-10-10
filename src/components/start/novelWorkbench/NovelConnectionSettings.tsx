@@ -3,6 +3,8 @@ import { fetchModels,testConnection } from '../../../api/client';
 import { useConfigStore } from '../../../stores/configStore';
 import { useNovelConfigStore,type NovelWorkbenchConfig } from '../../../stores/novelConfigStore';
 import { NOVEL_ANALYSIS_PRESETS, NOVEL_CUSTOM_INSTRUCTIONS_LIMIT, type NovelAnalysisPreset } from '../../../novel/analysisPresets';
+import { NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS } from '../../../novel/analysisClient';
+import { REASONING_OPTIONS } from '../../settings/apiSettings/types';
 
 export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boolean; onMessage: (message: string) => void }) {
   const { config, initialize, save, loaded, recoveryError, warning } = useNovelConfigStore();
@@ -59,6 +61,11 @@ export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boo
         <label className="novel-import-workbench__field">API 密钥<input type="password" value={draft.api.apiKey} onChange={e => patchApi({ apiKey: e.target.value })} autoComplete="new-password" /></label>
         <label className="novel-import-workbench__field">拆解模型<input list="novel-model-options" value={draft.api.model} onChange={e => patchApi({ model: e.target.value })} placeholder="获取模型列表后选择 Flash" /><datalist id="novel-model-options">{models.map(model => <option key={model} value={model} />)}</datalist></label>
       </div>
+      <div className="novel-import-workbench__range-fields">
+        <label className="novel-import-workbench__field">推理强度<select value={draft.api.reasoningEffort ?? '关闭'} onChange={e => patchApi({ reasoningEffort: e.target.value })}>{REASONING_OPTIONS.map(effort => <option key={effort} value={effort}>{effort}</option>)}</select></label>
+        <label className="novel-import-workbench__field">最大响应 Tokens<input type="number" min={1024} max={NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS} step={1024} value={Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, draft.api.maxTokens ?? 8192)} onChange={e => patchApi({ maxTokens: Math.max(1024, Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, Number(e.target.value) || 8192)) })} /></label>
+      </div>
+      <p className="novel-import-workbench__hint">响应上限包含接口计入的推理消耗。触顶时可尝试 low，或提高响应上限；「关闭」表示不发送推理强度参数，服务端仍可能使用默认思考设置。</p>
       <div className="novel-import-workbench__range-fields">
         <label className="novel-import-workbench__field">拆解限流间隔（毫秒）<input type="number" min={0} max={60000} step={500} value={draft.analysisRateLimitMs} onChange={e => patch({ analysisRateLimitMs: Math.max(0, Math.min(60000, Number(e.target.value) || 0)) })} /></label>
         <label className="novel-import-workbench__field">Embedding 限流间隔（毫秒）<input type="number" min={0} max={60000} step={500} value={draft.embeddingRateLimitMs} onChange={e => patch({ embeddingRateLimitMs: Math.max(0, Math.min(60000, Number(e.target.value) || 0)) })} /></label>

@@ -50,6 +50,8 @@ export type NovelAnalysisRequest = (
   options: StreamOptions,
 ) => Promise<CompletionResult>;
 
+export const NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS = 16_384;
+
 /** The segment's own chapter ranges, so a repeated quote resolves to the passage this segment quoted. */
 function evidenceWindows(segment: NovelSegment): NovelEvidenceWindow[] | undefined {
   return segment.sourceRanges?.map(range => ({ chapterId: range.chapterId, startOffset: range.startOffset, endOffset: range.endOffset }));
@@ -79,11 +81,11 @@ async function requestJson(
     stream: config.stream,
     responseFormat: 'json',
     temperature: 0.2,
-    maxTokens: Math.min(16_384, config.maxTokens ?? 16_384),
+    maxTokens: Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, config.maxTokens ?? NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS),
     onDelta: (_delta, accumulated) => onDelta?.(accumulated),
   });
   assertNovelContentAllowed(result);
-  if (result.finishReason === 'length') throw new Error('小说拆解响应达到 token 上限（包含模型推理）；请降低 API 推理强度后重试，或缩小分段');
+  if (result.finishReason === 'length') throw new Error('小说拆解响应达到 token 上限（包含模型推理）；请在「拆解预设、专用 API 与检索配置」中调低推理强度、提高最大响应 Tokens 并保存，或缩小每次请求原文预算后重试');
   return result.text;
 }
 
