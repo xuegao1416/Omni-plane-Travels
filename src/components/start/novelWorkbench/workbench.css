@@ -25,6 +25,7 @@
 .novel-import-workbench [hidden]{display:none!important}
 @media(max-width:640px){.novel-quick-guide{padding:12px}.novel-workbench-help-bar>span{display:none}}
 .novel-workbench-select-list{list-style:none;padding:0;margin:12px 0}.novel-workbench-select-list button{width:100%;justify-content:flex-start;text-align:left;flex-wrap:wrap}.novel-workbench-select-list small{display:block;width:100%;color:var(--text-muted)}
+.novel-workbench-checkpoint{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}.novel-workbench-checkpoint>button:first-child{flex:1;min-width:0;overflow-wrap:anywhere}.novel-workbench-select-list .novel-workbench-checkpoint__retry{width:auto;flex-shrink:0;justify-content:center;white-space:nowrap}
 .novel-import-workbench__dropzone{width:100%;flex-direction:column;padding:25px!important;border-style:dashed!important}
 .novel-import-workbench__frame{position:relative;width:min(1180px,100%);height:min(920px,95dvh)}
 .novel-import-workbench__frame>.dawn-frame-v4__fill{background:#edf0e2!important;opacity:1;z-index:0!important}

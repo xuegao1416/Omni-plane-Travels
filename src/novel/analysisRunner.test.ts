@@ -34,6 +34,56 @@ const note = (name: string): NovelEvidenceNote => ({
 const overview: NovelStaticMaterial = { summary: '全书总览', rules: ['不得编造'] };
 
 describe('novel analysis runner', () => {
+  test('single-unit evidence retry limits a shared batch and preserves the other failed unit', async () => {
+    const source = dataset(crypto.randomUUID()); await saveNovelDataset(source);
+    let fail = true;
+    const requests: string[][] = [];
+    const generators: NovelAnalysisGenerators = {
+      prepareBatch: async ({ batch }) => {
+        requests.push(batch.parts.map(part => part.unitId));
+        if (fail) throw new Error('格式错误');
+        return { batchId: batch.id, inputHash: hashNovelText(JSON.stringify(batch.parts.map(part => part.inputHash))), parts: batch.parts.map(part => ({ partId: part.id, evidence: note(part.title) })), material: overview };
+      },
+      evidence: async () => { throw new Error('batch only'); }, overview: async () => overview,
+      segment: async () => { throw new Error('background only'); },
+    };
+    const first = await runNovelAnalysis({ datasetId: source.id, config, generators, goal: 'background' });
+    expect(first.dataset.segments.map(segment => segment.evidenceStatus)).toEqual(['failed', 'failed']);
+    const untouched = structuredClone(first.dataset.segments[1]);
+    await runNovelAnalysis({ datasetId: source.id, config, generators, goal: 'background', retrySegmentId: source.segments[0].id });
+    expect((await getNovelDataset(source.id))!.segments[1]).toEqual(untouched);
+    fail = false;
+    const retried = await runNovelAnalysis({ datasetId: source.id, config, generators, goal: 'background', retrySegmentId: source.segments[0].id });
+    expect(requests.slice(1)).toEqual([[source.segments[0].id], [source.segments[0].id]]);
+    expect(retried.dataset.segments[0].evidenceStatus).toBe('completed');
+    expect(retried.dataset.segments[1]).toEqual(untouched);
+  });
+
+  test('single-unit plot retry reuses evidence and preserves a later completed plot', async () => {
+    const source = dataset(crypto.randomUUID()); await saveNovelDataset(source);
+    let fail = true, evidenceCalls = 0;
+    const plotCalls: string[] = [];
+    const generators: NovelAnalysisGenerators = {
+      evidence: async ({ segment }) => { evidenceCalls++; return note(segment.title); },
+      overview: async () => overview,
+      segment: async ({ segment }) => {
+        plotCalls.push(segment.id);
+        if (fail && segment.index === 0) throw new Error('剧情格式错误');
+        return { summary: segment.title, openingFacts: [], carryFacts: [], endingFacts: ['已抵达'], nextReference: [], hardConstraints: [], constraintDetails: [], foreshadowing: [], events: [], characterProgress: [], worldRules: [], relationships: [], timelineStart: '', timelineEnd: '', evidenceRefs: [] };
+      },
+    };
+    const first = await runNovelAnalysis({ datasetId: source.id, config, generators });
+    const untouched = structuredClone(first.dataset.segments[1]);
+    expect(untouched.status).toBe('completed');
+    fail = false; plotCalls.length = 0;
+    const retried = await runNovelAnalysis({ datasetId: source.id, config, generators, retrySegmentId: source.segments[0].id });
+    expect(evidenceCalls).toBe(2);
+    expect(plotCalls).toEqual([source.segments[0].id]);
+    expect(retried.dataset.segments[0].status).toBe('completed');
+    expect(retried.dataset.segments[1]).toEqual(untouched);
+    expect(retried.dataset.analysisStatus).toBe('partial');
+  });
+
   test('source edits reject stale analysis while keeping its paid response and failed task record', async () => {
     const source = dataset(crypto.randomUUID()); await saveNovelDataset(source);
     const generators: NovelAnalysisGenerators = {

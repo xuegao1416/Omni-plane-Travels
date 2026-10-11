@@ -239,8 +239,8 @@ async function prepareChunks(
   return indexed;
 }
 
-async function getOrCreateJob(datasetId: string, startSegmentIndex: number, total: number, goal: NovelAnalysisGoal): Promise<NovelAnalysisJob> {
-  const existing = (await listNovelJobs(datasetId)).find(job => (job.goal ?? 'full') === goal && ['queued', 'running', 'paused', 'failed'].includes(job.status));
+async function getOrCreateJob(datasetId: string, startSegmentIndex: number, total: number, goal: NovelAnalysisGoal, reuseExisting = true): Promise<NovelAnalysisJob> {
+  const existing = reuseExisting ? (await listNovelJobs(datasetId)).find(job => (job.goal ?? 'full') === goal && ['queued', 'running', 'paused', 'failed'].includes(job.status)) : undefined;
   const now = Date.now();
   return existing ? {
     ...existing,
@@ -272,6 +272,8 @@ export interface NovelAnalysisOptions {
   forceOverview?: boolean;
   /** Explicit user action: ignore reusable evidence and extract it again for every segment. */
   reExtractEvidence?: boolean;
+  /** Retry a failed unit without processing other pending or failed units. */
+  retrySegmentId?: string;
   /** 'background' stops after world material; plot compilation stays available later. */
   goal?: NovelAnalysisGoal;
   signal?: AbortSignal;
@@ -300,6 +302,8 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   const initial = await getNovelDataset(params.datasetId);
   if (!initial) throw new Error('未找到小说数据集');
   if (!initial.segments.length) throw new Error('小说没有可分析分段');
+  if (params.retrySegmentId && !initial.segments.some(segment => segment.id === params.retrySegmentId && (segment.status === 'failed' || segment.evidenceStatus === 'failed'))) throw new Error('未找到可重试的失败分段');
+  const selected = (segment: NovelSegment) => !params.retrySegmentId || segment.id === params.retrySegmentId;
   let generators = params.generators ?? defaultGenerators;
   const startSegmentIndex = Math.min(Math.max(0, Math.floor(params.startSegmentIndex ?? 0)), initial.segments.length - 1);
   let dataset: NovelDataset = { ...initial, segments: [...initial.segments], analysisStatus: 'processing' };
@@ -308,8 +312,9 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   }
   const sourceIdentity = novelAnalysisSourceIdentity(initial);
   const goal: NovelAnalysisGoal = params.goal ?? 'full';
-  const total = goal === 'full' ? dataset.segments.length * 2 + 1 : dataset.segments.length + 1;
-  let job = await getOrCreateJob(dataset.id, startSegmentIndex, total, goal);
+  const segmentTotal = params.retrySegmentId ? 1 : dataset.segments.length;
+  const total = goal === 'full' ? segmentTotal * 2 + 1 : segmentTotal + 1;
+  let job = await getOrCreateJob(dataset.id, startSegmentIndex, total, goal, !params.retrySegmentId);
   const forceOverview = Boolean(params.forceOverview || job.overviewRefreshPending);
   job.overviewRefreshPending = forceOverview;
   if (params.forceOverview || params.reExtractEvidence) job.refreshOperationId = uuid();
@@ -403,6 +408,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       if (params.reExtractEvidence || dataset.segments.some(segment => segment.evidenceNotes && !novelEvidenceReusable(dataset, segment, usedFingerprints, presetFingerprint))) {
         dataset.preparation = { version: 1, batches: [...batchArtifacts.values()] };
         for (let index = 0; index < dataset.segments.length; index++) {
+          if (!selected(dataset.segments[index])) continue;
           if (!params.reExtractEvidence && novelEvidenceReusable(dataset, dataset.segments[index], usedFingerprints, presetFingerprint)) continue;
           const segment = { ...dataset.segments[index], status: 'pending' as const, evidenceStatus: 'pending' as const,
             evidenceNotes: undefined, evidenceInputHash: undefined, analysisInputHash: undefined, error: undefined };
@@ -412,9 +418,11 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       }
       for (const batch of plan.batches) {
         assertNotAborted();
-        const missing = batch.parts.filter(part => !partNotes.has(part.id) && (params.reExtractEvidence || !novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints, presetFingerprint)));
-        if (!missing.length && batch.evidenceReusable) { job.completed += batch.parts.length; continue; }
-        progress({ callback: params.onProgress, job, segmentTitle: batch.parts[0]?.title, message: '正在准备原文证据与背景资料' });
+        const selectedParts = batch.parts.filter(part => !params.retrySegmentId || part.unitId === params.retrySegmentId);
+        if (!selectedParts.length) continue;
+        const missing = selectedParts.filter(part => !partNotes.has(part.id) && (params.reExtractEvidence || !novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints, presetFingerprint)));
+        if (!missing.length && selectedParts.every(part => novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints, presetFingerprint))) { job.completed += selectedParts.length; continue; }
+        progress({ callback: params.onProgress, job, segmentTitle: selectedParts[0]?.title, message: '正在准备原文证据与背景资料' });
         try {
           if (missing.length) {
             const inputHash = hashNovelText(JSON.stringify(missing.map(part => part.inputHash)));
@@ -435,6 +443,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
           await saveHeader();
           for (let index = 0; index < dataset.segments.length; index++) {
             const segment = dataset.segments[index];
+            if (!selected(segment)) continue;
             if (!params.reExtractEvidence && novelEvidenceReusable(dataset, segment, usedFingerprints, presetFingerprint)) continue;
             const parts = plan.batches.flatMap(batch => batch.parts).filter(part => part.unitId === segment.id);
             if (!parts.length || !parts.every(part => partNotes.has(part.id))) continue;
@@ -444,10 +453,10 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
             dataset.segments[index] = accepted;
             await saveSegment(accepted);
           }
-          await writeJob({ completed: dataset.segments.filter(segment => segment.evidenceNotes).length });
+          await writeJob({ completed: dataset.segments.filter(segment => selected(segment) && segment.evidenceNotes).length });
         } catch (error) {
           if (isFatalChannelError(error) || (error instanceof Error && error.name === 'AbortError')) throw error;
-          for (const part of batch.parts) {
+          for (const part of selectedParts) {
             const index = dataset.segments.findIndex(segment => segment.id === part.unitId);
             const segment = dataset.segments[index];
             if (segment.evidenceNotes) continue;
@@ -461,6 +470,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     for (let index = 0; index < dataset.segments.length; index += 1) {
       assertNotAborted();
       let segment = dataset.segments[index];
+      if (!selected(segment)) continue;
       const sourceText = novelSegmentSource(dataset, segment);
       const context = novelChapterContext(dataset, segment);
       // Evidence extraction is grounded in the original text, not in the channel, so switching
@@ -555,7 +565,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       const groups = partitionNovelEvidenceNotes(notes, params.overviewBatchTokens);
       let overviewNotes = notes;
       if (groups.length > 1) {
-        await writeJob({ total: goal === 'full' ? dataset.segments.length * 2 + groups.length + 1 : dataset.segments.length + groups.length + 1 });
+        await writeJob({ total: goal === 'full' ? segmentTotal * 2 + groups.length + 1 : segmentTotal + groups.length + 1 });
         const reduced: NovelEvidenceNote[] = [];
         for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
           assertNotAborted();
@@ -625,6 +635,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     for (let index = 0; index < dataset.segments.length; index += 1) {
       assertNotAborted();
       let segment = dataset.segments[index];
+      if (!selected(segment)) continue;
       if (!segment.evidenceNotes) continue;
       const previous = dataset.segments[index - 1];
       const analysisInputHash = novelStoryInputHash(
@@ -721,6 +732,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     const selectedChapters = new Set(dataset.segments.flatMap(s => s.chapterIds)).size;
     const totalChapters = dataset.chapters.filter(c => c.included !== false).length;
     const allCompleted = worldReady && dataset.segments.every(segment => segment.status === 'completed') && !dataset.overviewError
+      && (!params.retrySegmentId || dataset.segments.every((segment, index) => segment.analysisInputHash === novelStoryInputHash(dataset, index, job.configFingerprint, job.embeddingMode === 'enhanced' ? params.embedding?.identity ?? params.embedding?.model : 'basic')))
       && selectedChapters === totalChapters && !dataset.importIssues?.some(issue => issue.severity === 'error');
     dataset = { ...dataset, analysisStatus: allCompleted ? 'ready' : worldReady ? 'partial' : 'failed', coverage: {
       selectedChapters, totalChapters, evidenceCompleted: notes.length, segmentsCompleted: dataset.segments.filter(s => s.status === 'completed').length, totalSegments: dataset.segments.length,
