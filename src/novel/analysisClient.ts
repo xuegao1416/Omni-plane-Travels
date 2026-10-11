@@ -47,7 +47,7 @@ material 是这些原文支持的稳定背景；不是故事过程，不编造�
 export type NovelAnalysisRequest = (
   config: ApiConfig,
   messages: Message[],
-  options: StreamOptions,
+  options: StreamOptions & { canReuseResponse?: (result: CompletionResult) => boolean },
 ) => Promise<CompletionResult>;
 
 export const NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS = 16_384;
@@ -72,6 +72,7 @@ async function requestJson(
   signal: AbortSignal | undefined,
   onDelta: ((text: string) => void) | undefined,
   request: NovelAnalysisRequest,
+  parse: (text: string) => unknown,
 ): Promise<string> {
   const result = await request(config, [
     { role: 'system', content: '你只返回符合用户字段合同的 JSON 对象。' },
@@ -83,6 +84,14 @@ async function requestJson(
     temperature: 0.2,
     maxTokens: Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, config.maxTokens ?? NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS),
     onDelta: (_delta, accumulated) => onDelta?.(accumulated),
+    canReuseResponse: cached => {
+      try {
+        assertNovelContentAllowed(cached);
+        if (cached.finishReason === 'length') return false;
+        parse(cached.text);
+        return true;
+      } catch { return false; }
+    },
   });
   assertNovelContentAllowed(result);
   if (result.finishReason === 'length') throw new Error('小说拆解响应达到 token 上限（包含模型推理）；请在「拆解预设、专用 API 与检索配置」中调低推理强度、提高最大响应 Tokens 并保存，或缩小每次请求原文预算后重试');
@@ -91,10 +100,10 @@ async function requestJson(
 
 async function validated<T>(config: ApiConfig, prompt: string, parse: (text: string) => T, signal: AbortSignal | undefined,
   onDelta: ((text: string) => void) | undefined, request: NovelAnalysisRequest): Promise<T> {
-  const response = await requestJson(config, prompt, signal, onDelta, request);
+  const response = await requestJson(config, prompt, signal, onDelta, request, parse);
   try { return parse(response); } catch (error) {
     signal?.throwIfAborted();
-    const fixed = await requestJson(config, `${prompt}\n\n上次结果未通过格式或来源校验：${error instanceof Error ? error.message : String(error)}。修正结构或补齐原文中支持对应内容的摘录，不增加原文外信息，不用无关摘录凑证据。\n<invalid_response>\n${response}\n</invalid_response>`, signal, onDelta, request);
+    const fixed = await requestJson(config, `${prompt}\n\n上次结果未通过格式或来源校验：${error instanceof Error ? error.message : String(error)}。修正结构或补齐原文中支持对应内容的摘录，不增加原文外信息，不用无关摘录凑证据。\n<invalid_response>\n${response}\n</invalid_response>`, signal, onDelta, request, parse);
     return parse(fixed);
   }
 }

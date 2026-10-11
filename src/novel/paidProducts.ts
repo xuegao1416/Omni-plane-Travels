@@ -76,7 +76,7 @@ export function releaseNovelPaidProducts(products: NovelPaidProduct[]): void {
 }
 
 /** Generated products have their own durability, before acceptance into editable material. */
-export async function obtainNovelProduct<T>(key: NovelProductKey, generate: () => Promise<T>, options: { refresh?: boolean; signal?: AbortSignal } = {}): Promise<T> {
+export async function obtainNovelProduct<T>(key: NovelProductKey, generate: () => Promise<T>, options: { refresh?: boolean; signal?: AbortSignal; reuseIf?: (value: T) => boolean } = {}): Promise<T> {
   options.signal?.throwIfAborted();
   const generation = novelPaidProductEpoch(key.datasetId);
   await assertNovelPaidProductEpoch(key.datasetId, generation);
@@ -84,8 +84,10 @@ export async function obtainNovelProduct<T>(key: NovelProductKey, generate: () =
   const db = await getDB();
   const existing = retained.get(id) ?? (options.refresh ? undefined : await db.get(NOVEL_CHECKPOINTS_STORE, id)) as NovelPaidProduct<T> | undefined;
   await assertNovelPaidProductEpoch(key.datasetId, generation);
-  if (existing) {
-    validateNovelPaidProduct(existing, key.datasetId);
+  if (existing) validateNovelPaidProduct(existing, key.datasetId);
+  // Transport success does not guarantee a usable model response. Leave rejected
+  // data available until a replacement arrives, but never trap retries on it.
+  if (existing && (!options.reuseIf || options.reuseIf(existing.value as T))) {
     // A prior quota/write failure retries durability, never the model request.
     if (retained.has(id)) { await db.put(NOVEL_CHECKPOINTS_STORE, existing); retained.delete(id); }
     return structuredClone(existing.value) as T;

@@ -334,7 +334,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       config.reasoningEffort, config.temperature, config.topP, config.maxTokens, preparedMessages,
       options.temperature, options.maxTokens, options.topP, options.responseFormat,
       ...(presetFingerprint ? [{ preset: presetFingerprint }] : []), ...refreshIdentity]) },
-    () => transport(config, preparedMessages, options), { signal: options.signal, refresh: false });
+    () => transport(config, preparedMessages, options), { signal: options.signal, refresh: false, reuseIf: options.canReuseResponse });
   };
   if (!params.generators) generators = {
     prepareBatch: options => generateNovelPreparationBatch({ ...options, request }),

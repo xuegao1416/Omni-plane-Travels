@@ -81,6 +81,34 @@ describe('novel analysis runner', () => {
     } finally { globalThis.fetch = originalFetch; IDBObjectStore.prototype.put = originalPut; }
   });
 
+  test('resuming a malformed background response requests fresh JSON and then reuses the accepted result', async () => {
+    const source = dataset(crypto.randomUUID()); source.segments = source.segments.slice(0, 1);
+    await saveNovelDataset(source);
+    const previousFetch = globalThis.fetch;
+    let calls = 0, valid = false;
+    globalThis.fetch = (async (_url, options) => {
+      calls++;
+      const prompt = JSON.parse(String(options?.body)).messages[1].content;
+      const parts = JSON.parse(prompt.match(/<source_parts>\n([\s\S]*?)\n<\/source_parts>/)[1]);
+      const text = valid ? JSON.stringify({ parts: parts.map((part: { id: string }) => ({ partId: part.id, evidence: note('第一章') })), material: overview })
+        : '{"parts": [],}';
+      return Response.json({ choices: [{ message: { content: text }, finish_reason: 'stop' }] });
+    }) as typeof fetch;
+    try {
+      const cfg = { ...config, baseUrl: `https://${source.id}.invalid/v1`, rateLimitMs: 1 };
+      const failed = await runNovelAnalysis({ datasetId: source.id, config: cfg, goal: 'background' });
+      expect(failed.dataset.segments[0]?.evidenceStatus).toBe('failed');
+      expect(calls).toBe(2);
+      valid = true;
+      const resumed = await runNovelAnalysis({ datasetId: source.id, config: cfg, goal: 'background' });
+      expect(resumed.dataset.segments[0]?.evidenceStatus).toBe('completed');
+      expect(resumed.worldReady).toBe(true);
+      expect(calls).toBe(3);
+      await runNovelAnalysis({ datasetId: source.id, config: cfg, goal: 'background' });
+      expect(calls).toBe(3);
+    } finally { globalThis.fetch = previousFetch; }
+  });
+
   test('retains a complete paid response on cancellation and resumes without paying twice', async () => {
     const source = dataset(crypto.randomUUID());
     await saveNovelDataset(source);
