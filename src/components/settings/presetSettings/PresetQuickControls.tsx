@@ -1,22 +1,31 @@
 import { useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import type { PresetPack } from '@/data/builtinPresets';
-import { DRC_WORD_COUNT_PROMPT_ID } from '@/data/presetDrcV12';
 import { DRC_PERSPECTIVE_NOTICE, getChoiceValue, getPresetChoiceControls, getPresetToggleSections, selectPresetChoice } from '@/data/presetControls';
-import { getDrcWordRange, setDrcWordRange } from '@/data/presetParameters';
+import { getPresetWordRange, getPresetWordRangeEntry, resetPresetWordRange, setPresetWordRange } from '@/data/presetParameters';
 import './PresetQuickControls.css';
 
 function WordRange({ preset, onSave }: { preset: PresetPack; onSave: (preset: PresetPack) => void }) {
-  const range = getDrcWordRange(preset);
+  const range = getPresetWordRange(preset);
   const [min, setMin] = useState(String(range?.min ?? ''));
   const [max, setMax] = useState(String(range?.max ?? ''));
   const [error, setError] = useState('');
-  const enabled = preset.prompts.find(p => p.identifier === DRC_WORD_COUNT_PROMPT_ID)?.enabled;
-  if (!range) return <p className="preset-quick-note">字数条目已使用自定义文本，可在「高级条目」中编辑。</p>;
+  const entry = getPresetWordRangeEntry(preset);
+  const enabled = entry?.enabled;
+  if (!range) return (
+    <div className="preset-quick-range preset-quick-range--reset">
+      <p className="preset-quick-note">「字数设定」条目已被改成自定义文本，快捷区间输入暂不可用。</p>
+      <button type="button" onClick={() => {
+        try { onSave(resetPresetWordRange(preset)); setError(''); }
+        catch (cause) { setError(cause instanceof Error ? cause.message : '转换失败，请重试。'); }
+      }}>改用区间模式（覆盖自定义文本）</button>
+      {error && <p className="preset-quick-error" role="alert">{error}</p>}
+    </div>
+  );
   return (
     <form className="preset-quick-range" onSubmit={event => {
       event.preventDefault();
-      try { onSave(setDrcWordRange(preset, Number(min), Number(max))); setError(''); }
+      try { onSave(setPresetWordRange(preset, Number(min), Number(max))); setError(''); }
       catch (error) { setError(error instanceof Error ? error.message : '保存失败，请重试。'); }
     }}>
       <label>最少字数<input type="number" min={100} max={19999} step={1} required value={min} disabled={!enabled} onChange={event => setMin(event.target.value)} /></label>
@@ -36,7 +45,9 @@ export function PresetQuickControls({ preset, onSave }: { preset: PresetPack; on
   const visibleChoices = choices.filter(control => matches(`${control.label} ${control.section} ${control.options.map(option => option.label).join(' ')}`));
   const visibleSections = sections.map(section => ({ ...section, entries: preset.prompts.filter(p =>
     section.promptIds.includes(p.identifier) && matches(`${section.label} ${p.name}`)) })).filter(section => section.entries.length);
-  const wordEntry = preset.prompts.find(p => p.identifier === DRC_WORD_COUNT_PROMPT_ID);
+  const wordEntry = getPresetWordRangeEntry(preset);
+  const hasWordChoice = choices.some(control => control.id === 'word_count');
+  const showStandaloneWordRange = !!wordEntry && !hasWordChoice && matches('篇幅 字数 最少字数 最多字数');
   return (
     <div className="preset-quick">
       <div className="preset-quick-intro"><SlidersHorizontal size={18} /><span>快捷配置</span><small>修改后自动保存并启用此预设</small></div>
@@ -57,6 +68,10 @@ export function PresetQuickControls({ preset, onSave }: { preset: PresetPack; on
         })}</div>
         {wordEntry && visibleChoices.some(control => control.id === 'word_count') && <WordRange key={wordEntry.content} preset={preset} onSave={onSave} />}
       </section>}
+      {showStandaloneWordRange && <section className="preset-quick-section" aria-label="篇幅">
+        <h3>篇幅</h3>
+        <WordRange key={wordEntry.content} preset={preset} onSave={onSave} />
+      </section>}
       {visibleSections.map(section => <section key={section.id} className="preset-quick-section" aria-label={section.label}>
         <h3>{section.label}</h3>
         <div className="preset-quick-grid">{section.entries.map(entry => <label key={entry.identifier} className="preset-quick-toggle">
@@ -65,7 +80,7 @@ export function PresetQuickControls({ preset, onSave }: { preset: PresetPack; on
           <small>{entry.enabled ? '开' : '关'}</small>
         </label>)}</div>
       </section>)}
-      {!visibleChoices.length && !visibleSections.length && <p className="preset-quick-empty">{query.trim() ? '没有匹配的配置项。' : '此预设暂无快捷配置，可在「高级条目」中编辑。'}</p>}
+      {!visibleChoices.length && !visibleSections.length && !showStandaloneWordRange && <p className="preset-quick-empty">{query.trim() ? '没有匹配的配置项。' : '此预设暂无快捷配置，可在「高级条目」中编辑。'}</p>}
       {preset.prompts.some(p => p.identifier === 'drc_host_perspective_protocol') && <p className="preset-quick-note">{DRC_PERSPECTIVE_NOTICE}</p>}
       <p className="preset-quick-note">更多提示词内容可在「高级条目」中编辑。已有自定义内容会保留。</p>
     </div>

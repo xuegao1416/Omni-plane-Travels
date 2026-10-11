@@ -172,9 +172,10 @@ describe('实验性破甲·尾部深度注入（默认预设）', () => {
   const preset = getBuiltinPreset('default');
   const byId = (identifier: string) => preset.prompts.find(p => p.identifier === identifier);
 
+  const TAIL_IDS = ['exp_tail_reinforce', 'exp_tail_sensitive', 'start_cue'];
   const assemble = (enableIds: string[], userText: string) => {
     const prompts = preset.prompts.map(p =>
-      p.identifier === 'exp_tail_reinforce' || p.identifier === 'exp_tail_sensitive'
+      TAIL_IDS.includes(p.identifier)
         ? { ...p, enabled: enableIds.includes(p.identifier) }
         : p,
     );
@@ -226,9 +227,42 @@ describe('实验性破甲·尾部深度注入（默认预设）', () => {
     expect(history[history.length - 1].content).toContain('<TailReinforce>');
   });
 
-  test('敏感触发档只在玩家输入命中关键词时注入', () => {
-    expect(assemble(['exp_tail_sensitive'], '我们聊了聊天气').depthEntries).toHaveLength(0);
-    expect(assemble(['exp_tail_sensitive'], '她吻了我').depthEntries).toHaveLength(1);
+  test('场景续接档常驻尾部，让“继续”也能承接前文，同时禁止主动升级普通场景', () => {
+    const result = assemble(['exp_tail_sensitive'], '继续');
+    expect(result.depthEntries).toHaveLength(1);
+    expect(result.depthEntries[0]).toMatchObject({ depth: 0, label: '场景续接' });
+    expect(result.depthEntries[0].content).toContain('前文已经进入对应场景');
+    expect(result.depthEntries[0].content).toContain('不构成升级关系或主动引入敏感情节');
+  });
+
+  test('起笔语境默认开启，且挂到聊天历史末尾而不是系统提示头部', () => {
+    expect(byId('start_cue')).toMatchObject({ enabled: true, injectionPosition: 1, injectionDepth: 0 });
+
+    const result = assemble(['start_cue'], '继续');
+    expect(result.systemPrompt).not.toContain('<StartCue>');
+    expect(result.depthEntries).toHaveLength(1);
+    expect(result.depthEntries[0]).toMatchObject({ depth: 0, label: '起笔语境' });
+    expect(result.depthEntries[0].content).toContain('<StartCue>');
+  });
+
+  test('尾部顺序固定为创作重申、场景续接、起笔语境', () => {
+    const result = assemble(TAIL_IDS, '继续');
+    expect(result.depthEntries.map(entry => entry.label)).toEqual(['创作重申', '场景续接', '起笔语境']);
+
+    const history = injectAtDepthEntries(
+      [{ role: 'user' as const, content: '继续' }],
+      result.depthEntries,
+    );
+    expect(history.at(-1)?.content).toContain('<StartCue>');
+  });
+
+  test('默认关闭的破甲开关不再使用越狱特征措辞', () => {
+    for (const id of ['gemini37_jailbreak_light', 'gemini37_jailbreak_strong']) {
+      const content = byId(id)?.content ?? '';
+      expect(content).not.toContain('SystemOverride');
+      expect(content).not.toContain('不受现实法律法规');
+      expect(content).not.toContain('CSAM');
+    }
   });
 });
 

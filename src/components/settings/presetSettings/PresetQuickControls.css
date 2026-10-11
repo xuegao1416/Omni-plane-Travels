@@ -14,6 +14,8 @@
 .preset-quick-toggle small { width: 1em; flex-shrink: 0; color: var(--text-secondary); }
 .preset-quick-range { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .preset-quick-range label { display: flex; flex: 1 1 100px; flex-direction: column; gap: 6px; font-size: var(--font-size-sm); }
+.preset-quick-range--reset { flex-direction: column; align-items: stretch; }
+.preset-quick-range--reset button { align-self: flex-start; }
 .preset-quick-range button { min-height: 44px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text-primary); background: var(--bg-primary); cursor: pointer; }
 .preset-quick :disabled { cursor: default; opacity: .65; }
 .preset-quick-note { margin: 0; color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.6; }

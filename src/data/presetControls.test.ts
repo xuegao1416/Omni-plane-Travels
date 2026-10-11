@@ -62,6 +62,17 @@ describe('preset graphical controls', () => {
     expect(output).not.toContain('{{getvar::');
   });
 
+  test('默认预设提供独立的 Gemini 场景续接开关', () => {
+    const preset = getBuiltinPreset('default');
+    const section = getPresetToggleSections(preset).find(s => s.id === 'gemini_compatibility');
+    expect(section).toEqual({
+      id: 'gemini_compatibility',
+      label: 'Gemini 兼容',
+      promptIds: ['exp_tail_sensitive'],
+    });
+    expect(preset.prompts.find(p => p.identifier === 'exp_tail_sensitive')?.enabled).toBe(true);
+  });
+
   test('DRC groups only expose ordinary styles and keep baseline and host protocols unchanged', () => {
     const preset = getBuiltinPreset('drc_v12');
     const controls = getPresetChoiceControls(preset);

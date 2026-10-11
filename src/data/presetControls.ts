@@ -104,6 +104,7 @@ export function selectPresetChoice(preset: PresetPack, control: PresetChoiceCont
 
 export function getPresetToggleSections(preset: PresetPack): PresetToggleSection[] {
   const specs: { id: string; label: string; ids?: string[]; names?: string[] }[] = [
+    { id: 'gemini_compatibility', label: 'Gemini 兼容', ids: ['exp_tail_sensitive'] },
     { id: 'plot', label: '剧情推进', names: ['⚠️丨只复述', '⚠️丨防复述', '⚠️丨扩写后推进', '⚠️丨扩写+加强复述'] },
     { id: 'character', label: '角色表现', ids: ['anti_omniscience', 'anti_pandering_switch', 'emotional_balance', 'figure_crafting', 'calling_consistency', 'dialogue_balance'], names: ['😀丨活人对白', '😀丨叙事推进基准', '💗丨情感浓度', '🤔丨反抢话', '🤔丨NPC引入', '🤔丨生动化', '🤔丨反极端', '🤔丨Char主动', '🤔丨User去中心化', '📢丨增加对白', '📢丨增加NPC对白'] },
     { id: 'correction', label: '表达修正', ids: ['anti_formula', 'anti_metaphor', 'anti_reveal', 'anti_voice_desc', 'anti_synesthesia', 'anti_shaguanlian', 'anti_micro_macro'], names: ['❎丨抗过拟合', '❎丨杀比拟', '❎丨杀定语', '❎丨杀揭示', '❎丨反神化', '❎丨杀说明', '❎丨杀声述', '❎丨白描', '❎丨杀超雄', '❎丨杀骨骼描写', '❎丨杀转折词', '❎丨微观与宏观', '❎丨情绪化通感', '❎丨占有与支配', '❎丨杀过去对比', '🤔丨防重复', '🚫丨反绝望', '🚫丨反科幻', '🚫丨反固定', '❗️丨反贫穷化', '🚫丨反全知'] },
