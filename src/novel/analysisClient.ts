@@ -2,6 +2,7 @@ import { requestStreamWithRetry } from '../api/client';
 import type { ApiConfig, CompletionResult, Message, StreamOptions } from '../api/types';
 import {
   NovelAnalysisJsonError,
+  parseNovelJsonObject,
   parseNovelEvidenceNoteResponse,
   parseNovelOverviewResponse,
   parseNovelSegmentAnalysisResponse,
@@ -14,14 +15,18 @@ import type { NovelChapter, NovelEvidenceNote, NovelSegment, NovelStaticMaterial
 
 import { z } from 'zod';
 import { novelEvidenceNoteSchema, novelOverviewSchema } from './analysisSchema';
-import type { NovelRequestBatch, NovelBatchArtifact } from './preparationModel';
-import { hashNovelText } from './segmentation';
+import { mergeNovelEvidence, type NovelRequestBatch, type NovelBatchArtifact } from './preparationModel';
+import { estimateNovelTokens, hashNovelText } from './segmentation';
 
 /** One budgeted call prepares grounded evidence and immediately usable background material. */
 export async function generateNovelPreparationBatch(params: {
   config: ApiConfig; novelTitle: string; batch: NovelRequestBatch; sourceChapters: NovelChapter[];
   signal?: AbortSignal; onDelta?: (text: string) => void; request?: NovelAnalysisRequest;
 }): Promise<NovelBatchArtifact> {
+  return prepareNovelBatch(params, 0);
+}
+
+async function prepareNovelBatch(params: Parameters<typeof generateNovelPreparationBatch>[0], splitDepth: number): Promise<NovelBatchArtifact> {
   const schema = z.object({ parts: z.array(z.object({ partId: z.string(), evidence: novelEvidenceNoteSchema })), material: novelOverviewSchema });
   const prompt = `将小说原文整理成可玩背景与可追溯证据。一次完成全部必要成果，不生成剧情模板或向量索引。
 每个 source_parts 的 id 必须且只能返回一次，partId 原样沿用。证据只适用于对应原文窗口，evidenceRefs 使用 chapterId 与原文连续摘录 excerpt；不计算位置。
@@ -30,19 +35,62 @@ material 是这些原文支持的稳定背景；不是故事过程，不编造�
 作品：${params.novelTitle}
 <output_schema>\n${JSON.stringify(z.toJSONSchema(schema, { io: 'output' }))}\n</output_schema>
 <source_parts>\n${JSON.stringify(params.batch.parts.map(part => ({ id: part.id, unitId: part.unitId, chapterId: part.range.chapterId, title: part.title, sourceText: part.sourceText })))}\n</source_parts>`;
-  return validated(params.config, prompt, response => {
-    const parsed = schema.parse(JSON.parse(response.replace(/^```(?:json)?\s*|\s*```$/g, '').trim()));
-    const ids = new Set(params.batch.parts.map(part => part.id));
-    if (parsed.parts.length !== ids.size || new Set(parsed.parts.map(part => part.partId)).size !== ids.size
-      || parsed.parts.some(part => !ids.has(part.partId))) throw new Error('原文证据窗口不完整或重复，不能接纳批次');
-    return { batchId: params.batch.id, inputHash: hashNovelText(JSON.stringify(params.batch.parts.map(part => part.inputHash))),
-      parts: parsed.parts.map(part => {
-        const source = params.batch.parts.find(item => item.id === part.partId)!;
-        return { partId: part.partId, evidence: parseNovelEvidenceNoteResponse(JSON.stringify(part.evidence), params.sourceChapters, [source.range]) };
-      }), material: parseNovelOverviewResponse(JSON.stringify(parsed.material)) };
-  }, params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
+  try {
+    return await validated(params.config, prompt, response => {
+      const parsed = schema.parse(parseNovelJsonObject(response));
+      const ids = new Set(params.batch.parts.map(part => part.id));
+      if (parsed.parts.length !== ids.size || new Set(parsed.parts.map(part => part.partId)).size !== ids.size
+        || parsed.parts.some(part => !ids.has(part.partId))) throw new Error('原文证据窗口不完整或重复，不能接纳批次');
+      return { batchId: params.batch.id, inputHash: hashNovelText(JSON.stringify(params.batch.parts.map(part => part.inputHash))),
+        parts: parsed.parts.map(part => {
+          const source = params.batch.parts.find(item => item.id === part.partId)!;
+          return { partId: part.partId, evidence: parseNovelEvidenceNoteResponse(JSON.stringify(part.evidence), params.sourceChapters, [source.range]) };
+        }), material: parseNovelOverviewResponse(JSON.stringify(parsed.material)) };
+    }, params.signal, params.onDelta, params.request ?? requestStreamWithRetry);
+  } catch (error) {
+    params.signal?.throwIfAborted();
+    const parts = params.batch.parts;
+    if (splitDepth >= 3 || !(error instanceof NovelAnalysisJsonError || (error instanceof Error && error.message.includes('token 上限')))) throw error;
+    let groups: NovelRequestBatch['parts'][];
+    if (parts.length > 1) {
+      const mid = Math.ceil(parts.length / 2);
+      groups = [parts.slice(0, mid), parts.slice(mid)];
+    } else {
+      const part = parts[0];
+      if (!part || part.sourceText.length < 1200) throw error;
+      let mid = Math.floor(part.sourceText.length / 2);
+      // Keep UTF-16 surrogate pairs together, and retain exact chapter-relative offsets.
+      if (/[\uDC00-\uDFFF]/.test(part.sourceText[mid])) mid--;
+      groups = [[0, mid], [mid, part.sourceText.length]].map(([start, end]) => [{ ...part,
+        sourceText: part.sourceText.slice(start, end),
+        range: { ...part.range, startOffset: part.range.startOffset + start, endOffset: part.range.startOffset + end },
+        inputHash: hashNovelText(JSON.stringify([part.inputHash, start, end])),
+      }]);
+    }
+    const results: NovelBatchArtifact[] = [];
+    for (const group of groups) {
+      const inputHash = hashNovelText(JSON.stringify(group.map(part => part.inputHash)));
+      results.push(await prepareNovelBatch({ ...params, batch: { ...params.batch, id: `${params.batch.id}:split:${inputHash}`, parts: group,
+        chapterIds: [...new Set(group.map(part => part.range.chapterId))], estimatedTokens: estimateNovelTokens(group.map(part => part.sourceText).join('\n')) } }, splitDepth + 1));
+    }
+    return { batchId: params.batch.id, inputHash: hashNovelText(JSON.stringify(parts.map(part => part.inputHash))),
+      parts: parts.map(part => ({ partId: part.id, evidence: mergeNovelEvidence(results.flatMap(result => result.parts.filter(item => item.partId === part.id).map(item => item.evidence))) })),
+      material: mergePreparationMaterials(results.map(result => result.material)) };
+  }
 }
 
+function mergePreparationMaterials(materials: NovelStaticMaterial[]): NovelStaticMaterial {
+  const merged: NovelStaticMaterial = {};
+  for (const key of ['summary', 'powerSystem'] as const) merged[key] = [...new Set(materials.map(material => material[key]).filter(Boolean))].join('\n');
+  for (const key of ['settings', 'rules', 'relations', 'culture', 'highlights'] as const) merged[key] = [...new Set(materials.flatMap(material => material[key] ?? []))];
+  for (const key of ['characters', 'factions', 'locations', 'items'] as const) merged[key] = materials.flatMap(material => material[key] ?? []);
+  merged.economy = {};
+  for (const material of materials) for (const [key, value] of Object.entries(material.economy ?? {})) {
+    const field = key as keyof NonNullable<NovelStaticMaterial['economy']>;
+    merged.economy[field] = [...new Set([merged.economy[field], value].filter(Boolean))].join('\n');
+  }
+  return merged;
+}
 
 export type NovelAnalysisRequest = (
   config: ApiConfig,

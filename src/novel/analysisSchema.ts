@@ -228,7 +228,7 @@ export class NovelAnalysisJsonError extends Error {
   }
 }
 
-function parseJsonObject(response: string): unknown {
+export function parseNovelJsonObject(response: string): unknown {
   const withoutThinking = String(response ?? '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
@@ -359,7 +359,7 @@ function normalizeEvent(item: z.infer<typeof eventSchema>, sourceChapters?: Nove
 }
 
 function parsed<T>(schema: z.ZodType<T>, response: string): T {
-  const result = schema.safeParse(parseJsonObject(response));
+  const result = schema.safeParse(parseNovelJsonObject(response));
   if (!result.success) {
     const issue = result.error.issues[0];
     throw new Error(`AI 拆解结果不符合结构：${issue?.path.join('.') || 'root'} ${issue?.message || ''}`.trim());

@@ -1,7 +1,58 @@
 import { expect, test } from 'bun:test';
-import { generateNovelSegmentAnalysis } from './analysisClient';
+import { generateNovelPreparationBatch, generateNovelSegmentAnalysis } from './analysisClient';
+import type { NovelRequestBatch } from './preparationModel';
 import type { ApiConfig, CompletionResult } from '../api/types';
 import type { NovelEvidenceNote } from './types';
+
+const batchConfig: ApiConfig = { baseUrl: 'https://example.invalid', model: 'test', apiKey: '', provider: 'custom' };
+const preparationBatch = (sourceTexts: string[]): NovelRequestBatch => ({
+  id: 'batch', chapterIds: ['c1'], estimatedTokens: 6000, evidenceReusable: false,
+  parts: sourceTexts.map((sourceText, index) => ({ id: `s${index}:part:0`, unitId: `s${index}`, title: `第${index + 1}段`, sourceText,
+    range: { chapterId: 'c1', startOffset: sourceTexts.slice(0, index).join('').length, endOffset: sourceTexts.slice(0, index + 1).join('').length }, inputHash: `input-${index}` })),
+});
+
+test('malformed preparation batch splits after one repair and retains every original part', async () => {
+  const inputs: string[][] = [];
+  const batch = preparationBatch(['甲段', '乙段']);
+  const result = await generateNovelPreparationBatch({ config: batchConfig, novelTitle: '测试', batch, sourceChapters: [{ id: 'c1', index: 0, title: '第一章', content: '甲段乙段' }],
+    request: async (_config, messages) => {
+      const parts = JSON.parse(messages[1].content.match(/<source_parts>\n([\s\S]*?)\n<\/source_parts>/)![1]);
+      inputs.push(parts.map((part: { id: string }) => part.id));
+      return { text: inputs.length <= 2 ? '{"parts": [],}' : JSON.stringify({ parts: parts.map((part: { id: string; sourceText: string }) => ({ partId: part.id, evidence: { summary: part.sourceText } })), material: { summary: parts[0].sourceText, rules: [parts[0].sourceText] } }), elapsed: 1 };
+    },
+  });
+  expect(inputs).toEqual([['s0:part:0', 's1:part:0'], ['s0:part:0', 's1:part:0'], ['s0:part:0'], ['s1:part:0']]);
+  expect(result.batchId).toBe(batch.id);
+  expect(result.parts.map(part => part.partId)).toEqual(batch.parts.map(part => part.id));
+  expect(result.material.rules).toEqual(['甲段', '乙段']);
+});
+
+test('truncated single preparation window splits without changing its identity or citation offsets', async () => {
+  const sourceText = '甲'.repeat(650) + '乙'.repeat(650), batch = preparationBatch([sourceText]);
+  let calls = 0;
+  const result = await generateNovelPreparationBatch({ config: batchConfig, novelTitle: '测试', batch, sourceChapters: [{ id: 'c1', index: 0, title: '第一章', content: sourceText }],
+    request: async (_config, messages) => {
+      calls++;
+      const parts = JSON.parse(messages[1].content.match(/<source_parts>\n([\s\S]*?)\n<\/source_parts>/)![1]);
+      return { finishReason: calls === 1 ? 'length' : 'stop', text: JSON.stringify({ parts: parts.map((part: { id: string; sourceText: string }) => ({ partId: part.id, evidence: { summary: part.sourceText[0], evidenceRefs: [{ chapterId: 'c1', excerpt: part.sourceText.slice(0, 5), confidence: 'explicit' }] } })), material: { summary: parts[0].sourceText[0] } }), elapsed: 1 };
+    },
+  });
+  expect(calls).toBe(3);
+  expect(result.parts).toHaveLength(1);
+  expect(result.parts[0].partId).toBe(batch.parts[0].id);
+  expect(result.parts[0].evidence.summary).toBe('甲\n乙');
+  expect(result.parts[0].evidence.evidenceRefs.map(ref => ref.startOffset)).toEqual([0, 650]);
+});
+
+test('preparation retry stops at its split budget and never retries platform refusal', async () => {
+  let calls = 0;
+  const params = { config: batchConfig, novelTitle: '测试', batch: preparationBatch(['甲'.repeat(12000)]), sourceChapters: [] };
+  await expect(generateNovelPreparationBatch({ ...params, request: async () => { calls++; return { text: '', finishReason: 'length', elapsed: 1 }; } })).rejects.toThrow('token 上限');
+  expect(calls).toBe(4);
+  calls = 0;
+  await expect(generateNovelPreparationBatch({ ...params, request: async () => { calls++; return { text: '', finishReason: 'content_filter', elapsed: 1 }; } })).rejects.toThrow('模型平台已拦截');
+  expect(calls).toBe(1);
+});
 
 test.each(['content_filter', 'content-filter', 'SAFETY', 'RECITATION'])('platform refusal %s stops without JSON repair or split retries', async finishReason => {
   let calls = 0;
