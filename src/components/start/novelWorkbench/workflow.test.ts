@@ -7,6 +7,17 @@ const imported: WorkflowState = {
 };
 
 describe('小说拆解台连续操作', () => {
+  test('读取页有失败分段时，底部主操作直接批量重试而非继续读取或查看资料', () => {
+    for (const analysisPending of [true, false]) {
+      const failed = { ...imported, hasMaterial: true, analysisPending, failedSegmentCount: 300 };
+      const action = nextWorkflowAction(1, failed);
+      expect(action.action).toBe('retry');
+      expect(action.label).toContain('300');
+      expect(action.description).toContain('所有页');
+    }
+    expect(nextWorkflowAction(1, { ...imported, failedSegmentCount: 300, apiReady: false }).action).toBe('settings');
+  });
+
   test('千章小说试拆前十章时，主操作明确显示本次范围', () => {
     const trial = { ...imported, readingRange: { startChapterIndex: 0, endChapterIndex: 9, chapterCount: 3000, selectedCount: 10, isPartial: true } };
     const action = nextWorkflowAction(1, trial);

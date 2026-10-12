@@ -15,6 +15,7 @@ export interface WorkflowState {
   hasMaterial: boolean;
   apiReady: boolean;
   analysisPending: boolean;
+  failedSegmentCount?: number;
   worldReady: boolean;
   hasDirector: boolean;
   goal: NovelAnalysisGoal;
@@ -22,7 +23,7 @@ export interface WorkflowState {
   readingRangeError?: string;
 }
 
-export type WorkflowAction = 'import' | 'read' | 'range' | 'settings' | 'analyze' | 'review' | 'prepare' | 'director' | 'create';
+export type WorkflowAction = 'import' | 'read' | 'range' | 'settings' | 'analyze' | 'retry' | 'review' | 'prepare' | 'director' | 'create';
 export interface WorkflowNext { action: WorkflowAction; label: string; description: string }
 
 export function resumeWorkflow(state: WorkflowState): number {
@@ -40,6 +41,9 @@ export function nextWorkflowAction(tab: number, state: WorkflowState): WorkflowN
   if (tab === 1 || !state.hasMaterial) {
     if (state.readingRangeError && state.hasSource) return { action: 'range', label: '先修正章节范围', description: state.readingRangeError };
     if (!state.hasSource && !state.hasMaterial) return { action: 'import', label: '导入有正文的小说', description: '这份档案没有原文或可用资料，请选择 TXT、EPUB 或完整资料备份。' };
+    if (state.hasSource && state.hasSegments && (state.failedSegmentCount ?? 0) > 0) return state.apiReady
+      ? { action: 'retry', label: `批量重试全部失败（${state.failedSegmentCount}）`, description: '重试当前章节范围所有页的失败分段，保留已完成成果。' }
+      : { action: 'settings', label: '先配置并保存 AI 连接', description: '保存 AI 连接后即可批量重试失败分段。' };
     if (state.hasMaterial && !state.analysisPending) return { action: 'review', label: '下一步：查看人物和设定', description: '读取结果已保存，继续查看实际内容。' };
     if (!state.hasSegments) return { action: 'import', label: '检查正文与处理范围', description: '当前没有可读取的正文分段，请检查章节是否参与分析。' };
     if (!state.apiReady) return { action: 'settings', label: '先配置并保存 AI 连接', description: '填写接口和模型，或复制游戏 API 配置，然后保存。' };

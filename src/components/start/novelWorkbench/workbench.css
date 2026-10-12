@@ -132,6 +132,8 @@
 .novel-workbench-director .world-weave-artwork-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 .novel-workbench-after-create { margin: 18px 0; padding: 4px 16px; border-left: 3px solid var(--accent); }
 .novel-workbench-evidence { border-color: var(--accent); }
+.novel-workbench-retry-banner { border-color: var(--danger, #b25045); background: #fff4ed; }
+.novel-workbench-retry-banner h3 { color: var(--danger, #b25045); }
 .novel-workbench-evidence blockquote { margin: 14px 0; padding: 10px 16px; border-left: 3px solid var(--accent); white-space: pre-wrap; overflow-wrap: anywhere; }
 .novel-workbench-source-link { font-size: 12px !important; margin: 6px 4px 0 0; text-align: left; }
 .novel-import-workbench__footer { display: flex; flex-direction: column; gap: 12px; padding: 16px 26px 20px; border-top: 1px solid var(--border); background: #fffefa; flex-shrink: 0; }
