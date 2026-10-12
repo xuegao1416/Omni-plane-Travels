@@ -59,15 +59,15 @@ export function NovelConnectionSettings({ disabled, onMessage }: { disabled: boo
         <label className="novel-import-workbench__field">API 密钥<input type="password" value={draft.api.apiKey} onChange={e => patchApi({ apiKey: e.target.value })} autoComplete="new-password" /></label>
         <label className="novel-import-workbench__field">拆解模型<input list="novel-model-options" value={draft.api.model} onChange={e => patchApi({ model: e.target.value })} placeholder="获取模型列表后选择 Flash" /><datalist id="novel-model-options">{models.map(model => <option key={model} value={model} />)}</datalist></label>
       </div>
+      <label className="novel-import-workbench__field">拆解预设<select value={draft.analysisPreset.id} onChange={e => patch({ analysisPreset: { ...draft.analysisPreset, id: e.target.value as NovelAnalysisPreset['id'] } })}>{NOVEL_ANALYSIS_PRESETS.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
+      <p className="novel-import-workbench__hint">{NOVEL_ANALYSIS_PRESETS.find(preset => preset.id === draft.analysisPreset.id)?.description} 切换后请保存 AI 配置，再开始分析或重试。预设不能解除模型平台的内容限制。</p>
+      {draft.analysisPreset.id === 'custom' && <label className="novel-import-workbench__field">补充分析指令<textarea rows={5} maxLength={NOVEL_CUSTOM_INSTRUCTIONS_LIMIT} value={draft.analysisPreset.customInstructions} placeholder="例如：重点分析人物动机、关系变化与事件因果，使用简洁的中性表达。" onChange={e => patch({ analysisPreset: { ...draft.analysisPreset, customInstructions: e.target.value } })} /></label>}
       <div className="novel-import-workbench__structure-actions">
         <button type="button" onClick={() => void perform('models')}>获取模型列表</button>
         <button type="button" onClick={() => void perform('test')}>测试 AI 连接</button>
         <button type="button" className="novel-import-workbench__primary" onClick={() => void perform('save')}>{busy ? '正在处理…' : '保存 AI 配置'}</button>
       </div>
-      <details className="novel-workbench-advanced"><summary>分析风格与高级参数 · {NOVEL_ANALYSIS_PRESETS.find(preset => preset.id === draft.analysisPreset.id)?.name}</summary>
-      <label className="novel-import-workbench__field">拆解预设<select value={draft.analysisPreset.id} onChange={e => patch({ analysisPreset: { ...draft.analysisPreset, id: e.target.value as NovelAnalysisPreset['id'] } })}>{NOVEL_ANALYSIS_PRESETS.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
-      <p className="novel-import-workbench__hint">{NOVEL_ANALYSIS_PRESETS.find(preset => preset.id === draft.analysisPreset.id)?.description} 切换后再次分析会更新受影响的资料。预设不能解除模型平台的内容限制。</p>
-      {draft.analysisPreset.id === 'custom' && <label className="novel-import-workbench__field">补充分析指令<textarea rows={5} maxLength={NOVEL_CUSTOM_INSTRUCTIONS_LIMIT} value={draft.analysisPreset.customInstructions} placeholder="例如：重点分析人物动机、关系变化与事件因果，使用简洁的中性表达。" onChange={e => patch({ analysisPreset: { ...draft.analysisPreset, customInstructions: e.target.value } })} /></label>}
+      <details className="novel-workbench-advanced"><summary>高级参数</summary>
       <div className="novel-import-workbench__range-fields">
         <label className="novel-import-workbench__field">推理强度<select value={draft.api.reasoningEffort ?? '关闭'} onChange={e => patchApi({ reasoningEffort: e.target.value })}>{REASONING_OPTIONS.map(effort => <option key={effort} value={effort}>{effort}</option>)}</select></label>
         <label className="novel-import-workbench__field">最大响应 Tokens<input type="number" min={1024} max={NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS} step={1024} value={Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, draft.api.maxTokens ?? 8192)} onChange={e => patchApi({ maxTokens: Math.max(1024, Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, Number(e.target.value) || 8192)) })} /></label>

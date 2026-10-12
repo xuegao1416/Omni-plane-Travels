@@ -274,6 +274,8 @@ export interface NovelAnalysisOptions {
   reExtractEvidence?: boolean;
   /** Retry a failed unit without processing other pending or failed units. */
   retrySegmentId?: string;
+  /** Retry the selected failed units together, keeping pending/completed units untouched. */
+  retrySegmentIds?: string[];
   /** 'background' stops after world material; plot compilation stays available later. */
   goal?: NovelAnalysisGoal;
   signal?: AbortSignal;
@@ -302,8 +304,10 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   const initial = await getNovelDataset(params.datasetId);
   if (!initial) throw new Error('未找到小说数据集');
   if (!initial.segments.length) throw new Error('小说没有可分析分段');
-  if (params.retrySegmentId && !initial.segments.some(segment => segment.id === params.retrySegmentId && (segment.status === 'failed' || segment.evidenceStatus === 'failed'))) throw new Error('未找到可重试的失败分段');
-  const selected = (segment: NovelSegment) => !params.retrySegmentId || segment.id === params.retrySegmentId;
+  const requestedRetryIds = params.retrySegmentIds ? new Set(params.retrySegmentIds) : params.retrySegmentId ? new Set([params.retrySegmentId]) : undefined;
+  const retryIds = requestedRetryIds ? new Set(initial.segments.filter(segment => requestedRetryIds.has(segment.id) && (segment.status === 'failed' || segment.evidenceStatus === 'failed')).map(segment => segment.id)) : undefined;
+  if (retryIds && !retryIds.size) throw new Error('未找到可重试的失败分段');
+  const selected = (segment: NovelSegment) => !retryIds || retryIds.has(segment.id);
   let generators = params.generators ?? defaultGenerators;
   const startSegmentIndex = Math.min(Math.max(0, Math.floor(params.startSegmentIndex ?? 0)), initial.segments.length - 1);
   let dataset: NovelDataset = { ...initial, segments: [...initial.segments], analysisStatus: 'processing' };
@@ -312,9 +316,9 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
   }
   const sourceIdentity = novelAnalysisSourceIdentity(initial);
   const goal: NovelAnalysisGoal = params.goal ?? 'full';
-  const segmentTotal = params.retrySegmentId ? 1 : dataset.segments.length;
+  const segmentTotal = retryIds?.size ?? dataset.segments.length;
   const total = goal === 'full' ? segmentTotal * 2 + 1 : segmentTotal + 1;
-  let job = await getOrCreateJob(dataset.id, startSegmentIndex, total, goal, !params.retrySegmentId);
+  let job = await getOrCreateJob(dataset.id, startSegmentIndex, total, goal, !retryIds);
   const forceOverview = Boolean(params.forceOverview || job.overviewRefreshPending);
   job.overviewRefreshPending = forceOverview;
   if (params.forceOverview || params.reExtractEvidence) job.refreshOperationId = uuid();
@@ -418,7 +422,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
       }
       for (const batch of plan.batches) {
         assertNotAborted();
-        const selectedParts = batch.parts.filter(part => !params.retrySegmentId || part.unitId === params.retrySegmentId);
+        const selectedParts = batch.parts.filter(part => !retryIds || retryIds.has(part.unitId));
         if (!selectedParts.length) continue;
         const missing = selectedParts.filter(part => !partNotes.has(part.id) && (params.reExtractEvidence || !novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints, presetFingerprint)));
         if (!missing.length && selectedParts.every(part => novelEvidenceReusable(dataset, dataset.segments.find(segment => segment.id === part.unitId)!, usedFingerprints, presetFingerprint))) { job.completed += selectedParts.length; continue; }
@@ -732,7 +736,7 @@ async function executeNovelAnalysis(params: NovelAnalysisOptions): Promise<{ dat
     const selectedChapters = new Set(dataset.segments.flatMap(s => s.chapterIds)).size;
     const totalChapters = dataset.chapters.filter(c => c.included !== false).length;
     const allCompleted = worldReady && dataset.segments.every(segment => segment.status === 'completed') && !dataset.overviewError
-      && (!params.retrySegmentId || dataset.segments.every((segment, index) => segment.analysisInputHash === novelStoryInputHash(dataset, index, job.configFingerprint, job.embeddingMode === 'enhanced' ? params.embedding?.identity ?? params.embedding?.model : 'basic')))
+      && (!retryIds || dataset.segments.every((segment, index) => segment.analysisInputHash === novelStoryInputHash(dataset, index, job.configFingerprint, job.embeddingMode === 'enhanced' ? params.embedding?.identity ?? params.embedding?.model : 'basic')))
       && selectedChapters === totalChapters && !dataset.importIssues?.some(issue => issue.severity === 'error');
     dataset = { ...dataset, analysisStatus: allCompleted ? 'ready' : worldReady ? 'partial' : 'failed', coverage: {
       selectedChapters, totalChapters, evidenceCompleted: notes.length, segmentsCompleted: dataset.segments.filter(s => s.status === 'completed').length, totalSegments: dataset.segments.length,

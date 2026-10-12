@@ -34,6 +34,31 @@ const note = (name: string): NovelEvidenceNote => ({
 const overview: NovelStaticMaterial = { summary: '全书总览', rules: ['不得编造'] };
 
 describe('novel analysis runner', () => {
+  test('bulk retry processes selected failures in one run without reading a pending unit', async () => {
+    const source = dataset(crypto.randomUUID());
+    source.segments.forEach(segment => { segment.status = 'failed'; segment.evidenceStatus = 'failed'; });
+    source.segments.push({ ...structuredClone(source.segments[0]), id: `${source.id}-s3`, index: 2, title: '第三段' },
+      { ...structuredClone(source.segments[1]), id: `${source.id}-s4`, index: 3, title: '尚未读取', status: 'pending', evidenceStatus: 'pending' });
+    await saveNovelDataset(source);
+    const pending = structuredClone((await getNovelDataset(source.id))!.segments[3]);
+    const requests: string[][] = [];
+    const generators: NovelAnalysisGenerators = {
+      prepareBatch: async ({ batch }) => {
+        requests.push(batch.parts.map(part => part.unitId));
+        return { batchId: batch.id, inputHash: hashNovelText(JSON.stringify(batch.parts.map(part => part.inputHash))),
+          parts: batch.parts.map(part => ({ partId: part.id, evidence: note(part.title) })), material: overview };
+      },
+      evidence: async () => { throw new Error('batch only'); }, overview: async () => overview,
+      segment: async () => { throw new Error('background only'); },
+    };
+    const retryOptions = { datasetId: source.id, config, generators, goal: 'background' as const, retrySegmentIds: source.segments.slice(0, 3).map(segment => segment.id) };
+    const result = await runNovelAnalysis(retryOptions);
+    expect(requests).toEqual([retryOptions.retrySegmentIds]);
+    expect(result.dataset.segments.slice(0, 3).map(segment => segment.evidenceStatus)).toEqual(['completed', 'completed', 'completed']);
+    expect(result.dataset.segments[3]).toEqual(pending);
+    expect(result.job.status).toBe('completed');
+  });
+
   test('single-unit evidence retry limits a shared batch and preserves the other failed unit', async () => {
     const source = dataset(crypto.randomUUID()); await saveNovelDataset(source);
     let fail = true;
@@ -57,6 +82,35 @@ describe('novel analysis runner', () => {
     expect(requests.slice(1)).toEqual([[source.segments[0].id], [source.segments[0].id]]);
     expect(retried.dataset.segments[0].evidenceStatus).toBe('completed');
     expect(retried.dataset.segments[1]).toEqual(untouched);
+  });
+
+  test('bulk plot retry reuses evidence and skips completed or pending units', async () => {
+    const source = dataset(crypto.randomUUID()); await saveNovelDataset(source);
+    let fail = true, evidenceCalls = 0;
+    const plotCalls: string[] = [];
+    const generators: NovelAnalysisGenerators = {
+      evidence: async ({ segment }) => { evidenceCalls++; return note(segment.title); }, overview: async () => overview,
+      segment: async ({ segment }) => {
+        plotCalls.push(segment.id);
+        if (fail) throw new Error('剧情格式错误');
+        return { summary: segment.title, openingFacts: [], carryFacts: [], endingFacts: ['已抵达'], nextReference: [], hardConstraints: [], constraintDetails: [], foreshadowing: [], events: [], characterProgress: [], worldRules: [], relationships: [], timelineStart: '', timelineEnd: '', evidenceRefs: [] };
+      },
+    };
+    const initial = await runNovelAnalysis({ datasetId: source.id, config, generators });
+    initial.dataset.segments.push({ ...structuredClone(source.segments[0]), id: `${source.id}-pending`, index: 2 });
+    await saveNovelDataset(initial.dataset);
+    const pending = structuredClone((await getNovelDataset(source.id))!.segments[2]);
+    fail = false; plotCalls.length = 0;
+    const ids = source.segments.map(segment => segment.id);
+    const result = await runNovelAnalysis({ datasetId: source.id, config, generators, retrySegmentIds: ids });
+    expect(evidenceCalls).toBe(2);
+    expect(plotCalls).toEqual(ids);
+    expect(result.dataset.segments.slice(0, 2).map(segment => segment.status)).toEqual(['completed', 'completed']);
+    expect(result.dataset.segments[2]).toEqual(pending);
+    const emptyRetry = { datasetId: source.id, config, generators, retrySegmentIds: [] };
+    await expect(runNovelAnalysis(emptyRetry)).rejects.toThrow('未找到可重试的失败分段');
+    await expect(runNovelAnalysis({ ...emptyRetry, retrySegmentIds: ids })).rejects.toThrow('未找到可重试的失败分段');
+    expect(plotCalls).toEqual(ids);
   });
 
   test('single-unit plot retry reuses evidence and preserves a later completed plot', async () => {
