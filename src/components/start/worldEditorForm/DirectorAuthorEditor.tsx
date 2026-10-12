@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import type { WorldDef } from '../../../data/worlds-schema';
 import type { ApiConfig } from '../../../api/types';
 import { requestCompletion } from '../../../api/client';
@@ -9,15 +9,18 @@ import type { DirectorDefinition } from '../../../director/definitionTypes';
 import { validateDirectorDraft, type DirectorDraft } from '../../../director/definitionSchema';
 
 type Binding = NonNullable<WorldDef['directorSource']>;
+export interface DirectorWorkflowActions { compile: () => void; save: () => void }
+export interface DirectorWorkflowState { busy: boolean; hasDraft: boolean }
 const lines = (text: string) => text.split('\n').map(s => s.trim()).filter(Boolean);
 function editable(definition: DirectorDefinition): DirectorDraft {
   const { schemaVersion, id, version, source, createdAt, editedByAuthor, ...draft } = definition;
   return structuredClone(draft);
 }
 
-export default function DirectorAuthorEditor({ workspaceId, title, binding, novelDatasetId, apiConfig, onBind, required = false }: {
+export default function DirectorAuthorEditor({ workspaceId, title, binding, novelDatasetId, apiConfig, onBind, required = false, workflow }: {
   workspaceId: string; title: string; binding?: Binding; novelDatasetId?: string; apiConfig: ApiConfig;
   onBind: (binding: Binding | undefined) => void; required?: boolean;
+  workflow?: { actionRef: Ref<DirectorWorkflowActions>; onStateChange: (state: DirectorWorkflowState) => void };
 }) {
   const [raw, setRaw] = useState('');
   const [base, setBase] = useState<DirectorDefinition>();
@@ -108,6 +111,11 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
   const patchNode = (index: number, patch: Partial<DirectorDraft['nodes'][number]>) => setDraft(d => d && ({ ...d, nodes: d.nodes.map((n, i) => i === index ? { ...n, ...patch } : n) }));
   const toggle = (ids: string[], id: string, checked: boolean) => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id);
   const patchStage = (index: number, patch: Partial<DirectorDraft['stages'][number]>) => setDraft(d => d && ({ ...d, stages: d.stages.map((s, i) => i === index ? { ...s, ...patch } : s) }));
+  useImperativeHandle(workflow?.actionRef, () => ({ compile: () => { void compile(job && job.status !== 'completed' ? 'resume' : 'novel'); }, save: () => { void save(); } }));
+  const onWorkflowStateChange = workflow?.onStateChange;
+  const hasDraft = !!base && !!draft;
+  useEffect(() => { onWorkflowStateChange?.({ busy, hasDraft }); }, [busy, hasDraft, onWorkflowStateChange]);
+  useEffect(() => () => { onWorkflowStateChange?.({ busy: false, hasDraft: false }); }, [onWorkflowStateChange]);
   // 来源回显用索引：面板里每个事件都要回显来源，逐条 find 整份证据数组在小说来源下是平方级开销。
   const evidenceExcerpts = useMemo(() => {
     const index = new Map<string, string>();
@@ -121,7 +129,7 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
   return <Container className="world-weave-accordion">
     {required ? <h3>主线剧情 · {binding ? '已保存，可以创建世界' : '先完成下面这一步，才能按原作故事开局'}</h3> : <summary><span>主线剧情</span><em>{binding ? '已选择版本' : '可选'}</em></summary>}
     <div className="world-weave-accordion-body">
-      <p>{novelDatasetId ? binding ? '剧情已经保存。现在回到上方绿色按钮创建世界；只有想更新剧情时才需要重新整理。' : '小说已经上传，不用再写一份剧情。先点「整理本世界小说剧情」，等待整理完成，再点结果下方的「保存剧情版本并选用」。' : '写下核心冲突、人物动机和故事走向，整理后可逐项修改。剧情只引导未来发展，玩家行动仍会改变路径。'}</p>
+      <p>{novelDatasetId ? binding ? '剧情版本已经保存，可以创建世界；需要更新剧情时可重新整理。' : '先点「整理本世界小说剧情」，等待整理完成，再点「保存剧情版本并选用」。小说已经上传，不用再写一份剧情。' : '写下核心冲突、人物动机和故事走向，整理后可逐项修改。剧情只引导未来发展，玩家行动仍会改变路径。'}</p>
       {!novelDatasetId && <label className={field}><span>作者原稿</span><textarea rows={7} value={raw} disabled={busy} onChange={e => setRaw(e.target.value)} placeholder="例如：港城不断有人失踪，调查者发现商会与教团的联系……写到哪里，剧情就提供到哪里。" /></label>}
       <div className="world-weave-artwork-actions">
         {!novelDatasetId && <button type="button" className="btn-ghost" disabled={busy || !raw.trim()} onClick={() => void compile('author')}>AI 整理原稿</button>}
