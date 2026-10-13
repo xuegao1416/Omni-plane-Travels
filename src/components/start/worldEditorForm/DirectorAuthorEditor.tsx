@@ -1,12 +1,13 @@
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref, type Dispatch, type SetStateAction } from 'react';
 import type { WorldDef } from '../../../data/worlds-schema';
 import type { ApiConfig } from '../../../api/types';
 import { requestCompletion } from '../../../api/client';
 import { getNovelDataset } from '../../../novel/novelStore';
 import { compileDirectorDefinition, createDirectorCompileJob, type DirectorCompileJob } from '../../../director/definitionCompiler';
 import { getDirectorDefinition, listDirectorCompileJobs, listDirectorDefinitions, saveDirectorAuthorRevision, saveDirectorCompileJob, saveDirectorDefinition } from '../../../director/definitionStore';
-import type { DirectorDefinition } from '../../../director/definitionTypes';
+import type { DirectorDefinition, DirectorSource } from '../../../director/definitionTypes';
 import { validateDirectorDraft, type DirectorDraft } from '../../../director/definitionSchema';
+import { DirectorDetails } from './DirectorDetails';
 
 type Binding = NonNullable<WorldDef['directorSource']>;
 export interface DirectorWorkflowActions { compile: () => void; save: () => void }
@@ -108,24 +109,13 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
-  const patchNode = (index: number, patch: Partial<DirectorDraft['nodes'][number]>) => setDraft(d => d && ({ ...d, nodes: d.nodes.map((n, i) => i === index ? { ...n, ...patch } : n) }));
-  const toggle = (ids: string[], id: string, checked: boolean) => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id);
-  const patchStage = (index: number, patch: Partial<DirectorDraft['stages'][number]>) => setDraft(d => d && ({ ...d, stages: d.stages.map((s, i) => i === index ? { ...s, ...patch } : s) }));
   useImperativeHandle(workflow?.actionRef, () => ({ compile: () => { void compile(job && job.status !== 'completed' ? 'resume' : 'novel'); }, save: () => { void save(); } }));
   const onWorkflowStateChange = workflow?.onStateChange;
   const hasDraft = !!base && !!draft;
   useEffect(() => { onWorkflowStateChange?.({ busy, hasDraft }); }, [busy, hasDraft, onWorkflowStateChange]);
   useEffect(() => () => { onWorkflowStateChange?.({ busy: false, hasDraft: false }); }, [onWorkflowStateChange]);
-  // 来源回显用索引：面板里每个事件都要回显来源，逐条 find 整份证据数组在小说来源下是平方级开销。
-  const evidenceExcerpts = useMemo(() => {
-    const index = new Map<string, string>();
-    for (const ref of base?.source.evidenceRefs ?? []) index.set(`novel:${ref.chapterId}:${ref.startOffset}:${ref.endOffset}`, ref.excerpt);
-    return index;
-  }, [base]);
-
   const field = 'world-weave-field world-weave-field--wide';
   const Container = required ? 'section' : 'details';
-  const DraftDetails = novelDatasetId ? 'details' : 'div';
   return <Container className="world-weave-accordion">
     {required ? <h3>主线剧情 · {binding ? '已保存，可以创建世界' : '先完成下面这一步，才能按原作故事开局'}</h3> : <summary><span>主线剧情</span><em>{binding ? '已选择版本' : '可选'}</em></summary>}
     <div className="world-weave-accordion-body">
@@ -145,30 +135,50 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
       {draft && <fieldset disabled={busy} style={{ border: 0, padding: 0, marginTop: 16 }}>
         <legend>{novelDatasetId ? 'AI 已整理出可用剧情' : '检查与修改整理结果'}</legend>
         {novelDatasetId && <><p>{draft.title} · {draft.characters.length} 位人物 · {draft.stages.length} 个故事阶段 · {draft.nodes.length} 个事件。不需要逐项填写，直接保存就能继续。</p><label className={field}><span>默认起始阶段</span><select value={start} onChange={e => setStart(e.target.value)}>{draft.stages.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label><div className="world-weave-artwork-actions"><button type="button" className="btn-ghost" onClick={() => void save()}>保存剧情版本并选用</button>{binding && <button type="button" className="btn-ghost" onClick={() => { onBind(undefined); setNotice('已取消新开局的主线选择，保存世界后生效。'); }}>取消选用</button>}</div></>}
-        <DraftDetails>
-        {novelDatasetId && <summary>查看或修改剧情细节（可选，直接保存也能玩）</summary>}
+        <DirectorDraftFields draft={draft} setDraft={setDraft} source={base?.source} start={start} onStartChange={setStart} novel={!!novelDatasetId} />
+        {!novelDatasetId && <div className="world-weave-artwork-actions"><button type="button" className="btn-ghost" onClick={() => void save()}>保存剧情版本并选用</button>{binding && <button type="button" className="btn-ghost" onClick={() => { onBind(undefined); setNotice('已取消新开局的主线选择，保存世界后生效。'); }}>取消选用</button>}</div>}
+      </fieldset>}
+    </div>
+  </Container>;
+}
+
+export function DirectorDraftFields({ draft, setDraft, source, start, onStartChange, novel }: {
+  draft: DirectorDraft; setDraft: Dispatch<SetStateAction<DirectorDraft | undefined>>; source?: DirectorSource;
+  start: string; onStartChange: (value: string) => void; novel: boolean;
+}) {
+  const patchNode = (index: number, patch: Partial<DirectorDraft['nodes'][number]>) => setDraft(d => d && ({ ...d, nodes: d.nodes.map((n, i) => i === index ? { ...n, ...patch } : n) }));
+  const toggle = (ids: string[], id: string, checked: boolean) => checked ? [...new Set([...ids, id])] : ids.filter(value => value !== id);
+  const patchStage = (index: number, patch: Partial<DirectorDraft['stages'][number]>) => setDraft(d => d && ({ ...d, stages: d.stages.map((s, i) => i === index ? { ...s, ...patch } : s) }));
+  // 来源回显用索引：面板里每个事件都要回显来源，逐条 find 整份证据数组在小说来源下是平方级开销。
+  const evidenceExcerpts = useMemo(() => {
+    const index = new Map<string, string>();
+    for (const ref of source?.evidenceRefs ?? []) index.set(`novel:${ref.chapterId}:${ref.startOffset}:${ref.endOffset}`, ref.excerpt);
+    return index;
+  }, [source]);
+
+  const field = 'world-weave-field world-weave-field--wide';
+  const renderFields = () => <>
         <label className={field}><span>剧情名称</span><input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
         <label className={field}><span>核心冲突</span><textarea value={draft.coreConflict} onChange={e => setDraft({ ...draft, coreConflict: e.target.value })} /></label>
         <label className={field}><span>应保持的大方向（每行一项）</span><textarea value={draft.anchors.join('\n')} onChange={e => setDraft({ ...draft, anchors: lines(e.target.value) })} /></label>
         <label className={field}><span>内容边界</span><textarea value={draft.coverage.boundary} onChange={e => setDraft({ ...draft, coverage: { ...draft.coverage, boundary: e.target.value } })} /></label>
         <label className={field}><span>未知与缺口（每行一项）</span><textarea value={draft.coverage.gaps.join('\n')} onChange={e => setDraft({ ...draft, coverage: { ...draft.coverage, complete: false, gaps: lines(e.target.value) } })} /></label>
-        {!novelDatasetId && <label className={field}><span>默认起始阶段</span><select value={start} onChange={e => setStart(e.target.value)}>{draft.stages.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>}
-        <details className="world-weave-accordion"><summary>参与人物 · {draft.characters.length} 人</summary><div className="world-weave-accordion-body">
+        {!novel && <label className={field}><span>默认起始阶段</span><select value={start} onChange={e => onStartChange(e.target.value)}>{draft.stages.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>}
+        <DirectorDetails className="world-weave-accordion" summary={<>参与人物 · {draft.characters.length} 人</>}>{() => <div className="world-weave-accordion-body">
           {draft.characters.map((actor, index) => <div key={actor.id}>
             <label className={field}><span>人物姓名 {index + 1}</span><input value={actor.name} onChange={e => setDraft({ ...draft, characters: draft.characters.map((a, i) => i === index ? { ...a, name: e.target.value } : a) })} /></label>
             <label className={field}><span>{actor.name || '该人物'}的别名（每行一项）</span><textarea value={actor.aliases.join('\n')} onChange={e => setDraft({ ...draft, characters: draft.characters.map((a, i) => i === index ? { ...a, aliases: lines(e.target.value) } : a) })} /></label>
             <button type="button" className="btn-ghost" onClick={() => setDraft({ ...draft, characters: draft.characters.filter(a => a.id !== actor.id), nodes: draft.nodes.map(n => ({ ...n, actorIds: n.actorIds.filter(id => id !== actor.id) })) })}>移除人物 {actor.name}</button>
           </div>)}
           <button type="button" className="btn-ghost" onClick={() => setDraft({ ...draft, characters: [...draft.characters, { id: `actor-${crypto.randomUUID()}`, name: '', aliases: [] }] })}>添加人物</button>
-        </div></details>
-        {draft.stages.map((stage, index) => <details key={stage.id} className="world-weave-accordion">
-          <summary>{stage.title} · {stage.nodeIds.length} 个事件</summary>
-          <div className="world-weave-accordion-body">
+        </div>}</DirectorDetails>
+        {draft.stages.map((stage, index) => <DirectorDetails key={stage.id} className="world-weave-accordion" summary={<>{stage.title} · {stage.nodeIds.length} 个事件</>}>
+          {() => <div className="world-weave-accordion-body">
             <label className={field}><span>阶段名称</span><input value={stage.title} onChange={e => setDraft({ ...draft, stages: draft.stages.map((s, i) => i === index ? { ...s, title: e.target.value } : s) })} /></label>
             <label className={field}><span>阶段走向</span><textarea value={stage.description} onChange={e => setDraft({ ...draft, stages: draft.stages.map((s, i) => i === index ? { ...s, description: e.target.value } : s) })} /></label>
             <label className={field}><span>阶段完成方式</span><select value={stage.completion?.mode ?? 'all'} onChange={e => patchStage(index, { completion: { mode: e.target.value as 'all' | 'any', nodeIds: stage.completion?.nodeIds ?? [...stage.nodeIds] } })}><option value="all">选定事件全部落实</option><option value="any">选定事件任意一个落实</option></select></label>
             <fieldset><legend>决定阶段完成的事件</legend>{stage.nodeIds.map(id => <label key={id} style={{ display: 'block' }}><input type="checkbox" checked={(stage.completion?.nodeIds ?? stage.nodeIds).includes(id)} onChange={e => patchStage(index, { completion: { mode: stage.completion?.mode ?? 'all', nodeIds: toggle(stage.completion?.nodeIds ?? stage.nodeIds, id, e.target.checked) } })} />{draft.nodes.find(n => n.id === id)?.title}</label>)}</fieldset>
-            {draft.nodes.map((node, i) => node.stageId === stage.id && <details key={node.id} className="world-weave-accordion"><summary>{node.title}</summary><div className="world-weave-accordion-body">
+            {draft.nodes.map((node, i) => node.stageId === stage.id && <DirectorDetails key={node.id} className="world-weave-accordion" summary={node.title}>{() => <div className="world-weave-accordion-body">
               <label className={field}><span>事件名称</span><input value={node.title} onChange={e => patchNode(i, { title: e.target.value })} /></label>
               <label className={field}><span>推进意图</span><textarea value={node.intent} onChange={e => patchNode(i, { intent: e.target.value })} /></label>
               <label className={field}><span>发生方式</span><select value={node.execution} onChange={e => patchNode(i, { execution: e.target.value as typeof node.execution })}><option value="foreground">玩家在场</option><option value="offscreen">幕后发生</option><option value="either">视实际情况决定</option></select></label>
@@ -178,13 +188,12 @@ export default function DirectorAuthorEditor({ workspaceId, title, binding, nove
               <button type="button" className="btn-ghost" onClick={() => patchNode(i, { conditions: [...node.conditions, { id: `condition-${crypto.randomUUID()}`, description: '' }] })}>添加成立条件</button>
               <fieldset><legend>参与人物</legend>{draft.characters.map(actor => <label key={actor.id} style={{ display: 'block' }}><input type="checkbox" checked={node.actorIds.includes(actor.id)} onChange={e => patchNode(i, { actorIds: toggle(node.actorIds, actor.id, e.target.checked) })} />{actor.name || '未命名人物'}</label>)}</fieldset>
               <fieldset><legend>依赖已落实事件（全部满足才成立）</legend>{draft.nodes.filter(n => n.id !== node.id).map(dependency => <label key={dependency.id} style={{ display: 'block' }}><input type="checkbox" checked={node.dependsOn.includes(dependency.id)} onChange={e => patchNode(i, { dependsOn: toggle(node.dependsOn, dependency.id, e.target.checked) })} />{draft.stages.find(s => s.id === dependency.stageId)?.title} · {dependency.title}</label>)}</fieldset>
-              <details><summary>查看来源</summary>{node.sourceRefs.map(ref => { const match = /^author:(\d+):(\d+)$/.exec(ref); const excerpt = evidenceExcerpts.get(ref); return <blockquote key={ref}>{match ? base?.source.text.slice(Number(match[1]), Number(match[2])) : excerpt ?? ref}</blockquote>; })}</details>
-            </div></details>)}
-          </div>
-        </details>)}
-        </DraftDetails>
-        {!novelDatasetId && <div className="world-weave-artwork-actions"><button type="button" className="btn-ghost" onClick={() => void save()}>保存剧情版本并选用</button>{binding && <button type="button" className="btn-ghost" onClick={() => { onBind(undefined); setNotice('已取消新开局的主线选择，保存世界后生效。'); }}>取消选用</button>}</div>}
-      </fieldset>}
-    </div>
-  </Container>;
+              <DirectorDetails summary="查看来源">{() => node.sourceRefs.map(ref => { const match = /^author:(\d+):(\d+)$/.exec(ref); const excerpt = evidenceExcerpts.get(ref); return <blockquote key={ref}>{match ? source?.text.slice(Number(match[1]), Number(match[2])) : excerpt ?? ref}</blockquote>; })}</DirectorDetails>
+            </div>}</DirectorDetails>)}
+          </div>}
+        </DirectorDetails>)}
+  </>;
+  return novel
+    ? <DirectorDetails summary="查看或修改剧情细节（可选，直接保存也能玩）">{renderFields}</DirectorDetails>
+    : <div>{renderFields()}</div>;
 }

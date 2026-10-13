@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { compileDirectorDefinition, createDirectorCompileJob } from './definitionCompiler';
 import { deleteDirectorWorkspace, getDirectorCompileJob, getDirectorDefinition, saveDirectorAuthorRevision, saveDirectorCompileJob, saveDirectorDefinition } from './definitionStore';
 import type { DirectorDraft } from './definitionSchema';
+import type { NovelDataset } from '../novel/types';
 
 test('immutable versions and resumable jobs survive database round trips', async () => {
   const draft: DirectorDraft = { title: '调查', coreConflict: '调查', anchors: [], characters: [], stages: [{ id: 's', title: '调查', description: '调查', nodeIds: ['n'] }], nodes: [{ id: 'n', title: '发现', stageId: 's', intent: '发现', actorIds: [], execution: 'foreground', conditions: [], dependsOn: [], constraints: [], sourceRefs: ['author:0:2'] }], coverage: { complete: false, gaps: [], boundary: '到发现' } };
@@ -32,4 +33,24 @@ test('deleting a workspace removes only its own jobs and versions', async () => 
   expect(await getDirectorDefinition(target.definition!.id, target.definition!.version)).toBeUndefined();
   expect((await getDirectorCompileJob(keep.id))?.status).toBe('completed');
   expect((await getDirectorDefinition(keep.definition!.id, keep.definition!.version))?.title).toBe('发现');
+});
+
+test('shared novel material survives checkpoint storage and resume without truncating profiles', async () => {
+  const characters = [{ name: '证人', description: '完整人物资料'.repeat(300), aliases: ['报案人'] }];
+  const ref = { chapterId: 'c1', startOffset: 0, endOffset: 4, excerpt: '城门关闭', confidence: 'explicit' as const };
+  const dataset = { id: crypto.randomUUID(), title: '小说主线', rawText: '城门关闭', chapters: [{ id: 'c1', content: '城门关闭' }], segments: [{ id: 's1', events: [{ name: '关门', evidenceRefs: [ref] }] }], staticMaterial: { characters }, analysisStatus: 'ready' } as unknown as NovelDataset;
+  const initial = createDirectorCompileJob({ kind: 'novel', dataset });
+  const failed = await compileDirectorDefinition(initial, { request: async () => { throw new Error('offline'); }, onCheckpoint: saveDirectorCompileJob });
+  expect(failed.status).toBe('failed');
+  const restored = await getDirectorCompileJob(initial.id);
+  expect(restored?.context?.characters).toEqual(characters);
+  const result = await compileDirectorDefinition(restored!, { request: async input => {
+    const prompt = JSON.parse(input.prompt);
+    expect(prompt.context.characters).toEqual(characters);
+    expect(JSON.parse(prompt.data).event.name).toBe('关门');
+    const draft: DirectorDraft = { title: '调查', coreConflict: '调查', anchors: [], characters: [], stages: [{ id: 's', title: '调查', description: '调查', nodeIds: ['n'] }], nodes: [{ id: 'n', title: '关门', stageId: 's', intent: '关门', actorIds: [], execution: 'foreground', conditions: [], dependsOn: [], constraints: [], sourceRefs: ['novel:c1:0:4'] }], coverage: { complete: false, gaps: [], boundary: '到关门' } };
+    return JSON.stringify(draft);
+  }, onCheckpoint: saveDirectorCompileJob });
+  expect(result.status).toBe('completed');
+  expect((await getDirectorCompileJob(initial.id))?.definition?.source.text).toBe('城门关闭');
 });

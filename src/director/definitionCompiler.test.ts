@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { compileDirectorDefinition, createDirectorCompileJob } from './definitionCompiler';
+import { compileDirectorDefinition, contentHash, createDirectorCompileJob } from './definitionCompiler';
 import { validateDirectorDraft, type DirectorDraft } from './definitionSchema';
 import type { NovelDataset } from '../novel/types';
 
@@ -12,6 +12,45 @@ describe('director definition compilation', () => {
     expect(() => createDirectorCompileJob({ kind: 'novel', dataset })).toThrow('交信');
     dataset.segments[0]!.events[0] = { name: '关门', description: '城门关闭', evidenceRefs: [ref] };
     expect(createDirectorCompileJob({ kind: 'novel', dataset }).units[0]?.sourceRefs).toEqual(['novel:c1:0:4']);
+  });
+  test('large novel jobs retain all events without multiplying character archives by event count', () => {
+    const ref = { chapterId: 'c1', startOffset: 0, endOffset: 4, excerpt: '城门关闭', confidence: 'explicit' as const };
+    const characters = Array.from({ length: 100 }, (_, i) => ({ name: `人物${i}`, description: '人物资料'.repeat(256) }));
+    const events = Array.from({ length: 200 }, (_, i) => ({ name: `关门${i}`, description: '城门关闭', evidenceRefs: [ref] }));
+    const dataset = { id: 'large-novel', title: '大资料集', rawText: '城门关闭', chapters: [{ id: 'c1', index: 0, title: '章一', content: '城门关闭' }], segments: [{ id: 's1', status: 'completed', events }], staticMaterial: { characters }, analysisStatus: 'ready' } as unknown as NovelDataset;
+    const job = createDirectorCompileJob({ kind: 'novel', dataset });
+    expect(job.units).toHaveLength(200);
+    expect(job.source.text).toBe('城门关闭');
+    expect(job.units[199]!.sourceRefs).toEqual(['novel:c1:0:4']);
+    // Storage and cloning must grow with archives + events, not archives * events.
+    expect(JSON.stringify(job).length).toBeLessThan(300_000);
+    expect(job.context?.characters).toEqual(characters);
+    characters[0]!.name = '后来修改';
+    expect(job.context?.characters?.[0]?.name).toBe('人物0');
+  });
+  test('shared character material is verified by the source fingerprint', async () => {
+    const job = createDirectorCompileJob({ kind: 'author', text: '证人前来求助' });
+    job.context = { characters: [{ name: '证人', description: '保留完整资料' }] };
+    job.sourceFingerprint = contentHash({ source: job.source, units: job.units, context: job.context });
+    job.context.characters![0]!.description = '已经改变';
+    await expect(compileDirectorDefinition(job, { request: async () => { throw new Error('不应发起请求'); } })).rejects.toThrow('原始资料已改变');
+  });
+  test('legacy novel jobs still resume with their inline character material', async () => {
+    const ref = { chapterId: 'c1', startOffset: 0, endOffset: 4, excerpt: '城门关闭', confidence: 'explicit' as const };
+    const characters = [{ name: '证人', description: '原来的资料' }];
+    const dataset = { id: 'legacy-novel', title: '旧任务', chapters: [{ id: 'c1', content: '城门关闭' }], segments: [{ id: 's1', events: [{ name: '关门', evidenceRefs: [ref] }] }], staticMaterial: { characters }, analysisStatus: 'ready' } as unknown as NovelDataset;
+    const job = createDirectorCompileJob({ kind: 'novel', dataset });
+    // Reconstruct the persisted format before shared context existed.
+    delete job.context;
+    job.units[0]!.text = JSON.stringify({ ...JSON.parse(job.units[0]!.text), characters });
+    job.sourceFingerprint = contentHash({ source: job.source, units: job.units });
+    const result = await compileDirectorDefinition(job, { request: async input => {
+      const prompt = JSON.parse(input.prompt);
+      expect(JSON.parse(prompt.data).characters).toEqual(characters);
+      const draft = sampleDraft(); draft.nodes[0]!.sourceRefs = ['novel:c1:0:4'];
+      return JSON.stringify(draft);
+    } });
+    expect(result.status).toBe('completed');
   });
   test('rejects dangling references, fabricated sources and causal cycles', () => {
     const draft: DirectorDraft = sampleDraft() as DirectorDraft;

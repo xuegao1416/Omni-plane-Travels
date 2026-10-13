@@ -11,6 +11,8 @@ export interface DirectorCompileJob {
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   createdAt: number; updatedAt: number; error?: string; definition?: DirectorDefinition;
   coverageGaps: string[];
+  /** Shared extraction material, stored once rather than serialized into every event. */
+  context?: Pick<NovelDataset['staticMaterial'], 'characters'>;
 }
 export type DirectorCompileInput = { kind: 'author'; text: string; title?: string } | { kind: 'novel'; dataset: NovelDataset };
 export interface DirectorCompileRequest { system: string; prompt: string; stream: false; signal?: AbortSignal; phase: 'extract' | 'merge' }
@@ -25,6 +27,7 @@ export function createDirectorCompileJob(input: DirectorCompileInput, options: {
   const size = Math.max(1, options.unitChars ?? 12000);
   const units: DirectorCompileUnit[] = [];
   const coverageGaps: string[] = [];
+  let context: DirectorCompileJob['context'];
   let source: DirectorSource, title: string;
   if (input.kind === 'author') {
     if (!input.text.trim()) throw new Error('请提供剧情原稿');
@@ -39,6 +42,7 @@ export function createDirectorCompileJob(input: DirectorCompileInput, options: {
     if (d.segments.some(s => s.status === 'failed' || s.contextGap)) coverageGaps.push('部分分析缺失或上下文存在缺口，相关前提保持未知');
     if (d.analysisStatus !== 'ready') coverageGaps.push('小说资料尚非完整分析结果');
     title = d.title;
+    if (d.staticMaterial.characters) context = { characters: structuredClone(d.staticMaterial.characters) };
     const refs = d.segments.flatMap(s => [...(s.evidenceRefs ?? []), ...s.events.flatMap(e => e.evidenceRefs ?? [])]);
     const evidence = [...new Map(refs.map(r => [`novel:${r.chapterId}:${r.startOffset}:${r.endOffset}`, r])).values()];
     // 逐条校验证据与原文的对应关系。章节先建索引、匹配用 indexOf 定位：
@@ -60,14 +64,15 @@ export function createDirectorCompileJob(input: DirectorCompileInput, options: {
       for (const event of s.events) {
         const eventRefs = (event.evidenceRefs ?? []).map(r => `novel:${r.chapterId}:${r.startOffset}:${r.endOffset}`);
         if (!eventRefs.length) throw new Error(`剧情「${event.name}」缺少事件来源证据，请重新分析对应分段后再整理主线`);
-        const text = JSON.stringify({ event, hardConstraints: s.hardConstraints, openingFacts: s.openingFacts, contextGap: s.contextGap, characters: d.staticMaterial.characters });
+        const text = JSON.stringify({ event, hardConstraints: s.hardConstraints, openingFacts: s.openingFacts, contextGap: s.contextGap });
         units.push({ id: contentHash({ event, eventRefs }), text, sourceRefs: eventRefs });
       }
     }
     if (!units.length) throw new Error('没有可编译的小说剧情资料');
   }
-  const fingerprint = contentHash({ source, units });
-  return { id: crypto.randomUUID(), definitionId: options.definitionId ?? `plot-${contentHash(source.kind === 'novel' ? source.datasetId : source.text)}`, title, source, units, coverageGaps, sourceFingerprint: fingerprint, checkpoints: {}, status: 'queued', createdAt: Date.now(), updatedAt: Date.now() };
+  const shared = context ? { context } : {};
+  const fingerprint = contentHash({ source, units, ...shared });
+  return { id: crypto.randomUUID(), definitionId: options.definitionId ?? `plot-${contentHash(source.kind === 'novel' ? source.datasetId : source.text)}`, title, source, units, ...shared, coverageGaps, sourceFingerprint: fingerprint, checkpoints: {}, status: 'queued', createdAt: Date.now(), updatedAt: Date.now() };
 }
 
 function stableDraft(draft: DirectorDraft): DirectorDraft {
@@ -127,7 +132,7 @@ function normalizeCharacterIdentity(input: unknown): unknown {
 
 export async function compileDirectorDefinition(initial: DirectorCompileJob, options: { request: (input: DirectorCompileRequest) => Promise<string>; signal?: AbortSignal; onCheckpoint?: (job: DirectorCompileJob) => Promise<void>; mergeBatchSize?: number }): Promise<DirectorCompileJob> {
   const job = structuredClone(initial);
-  if (job.sourceFingerprint !== contentHash({ source: job.source, units: job.units })) throw new Error('原始资料已改变，请创建新的编译任务');
+  if (job.sourceFingerprint !== contentHash({ source: job.source, units: job.units, ...(job.context ? { context: job.context } : {}) })) throw new Error('原始资料已改变，请创建新的编译任务');
   if (job.status === 'completed') return job;
   job.status = 'running'; delete job.error;
   const persist = async () => { job.updatedAt = Date.now(); await options.onCheckpoint?.(structuredClone(job)); };
@@ -138,7 +143,7 @@ export async function compileDirectorDefinition(initial: DirectorCompileJob, opt
     let repair: { previousOutput: string; validationError: string } | undefined;
     let draft: DirectorDraft | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const raw = await options.request({ phase, system: DEFINITION_COMPILER_SYSTEM, prompt: JSON.stringify({ phase, sourceRefs: refs, data, ...repair }), stream: false, signal: options.signal });
+      const raw = await options.request({ phase, system: DEFINITION_COMPILER_SYSTEM, prompt: JSON.stringify({ phase, sourceRefs: refs, data, ...(phase === 'extract' && job.context ? { context: job.context } : {}), ...repair }), stream: false, signal: options.signal });
       checkAbort();
       try {
         const parsed = JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));
