@@ -98,7 +98,7 @@ export type NovelAnalysisRequest = (
   options: StreamOptions & { canReuseResponse?: (result: CompletionResult) => boolean },
 ) => Promise<CompletionResult>;
 
-export const NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS = 16_384;
+const NOVEL_ANALYSIS_DEFAULT_RESPONSE_TOKENS = 16_384;
 
 /** The segment's own chapter ranges, so a repeated quote resolves to the passage this segment quoted. */
 function evidenceWindows(segment: NovelSegment): NovelEvidenceWindow[] | undefined {
@@ -122,6 +122,7 @@ async function requestJson(
   request: NovelAnalysisRequest,
   parse: (text: string) => unknown,
 ): Promise<string> {
+  const maxTokens = config.maxTokens ?? NOVEL_ANALYSIS_DEFAULT_RESPONSE_TOKENS;
   const result = await request(config, [
     { role: 'system', content: '你只返回符合用户字段合同的 JSON 对象。' },
     { role: 'user', content: prompt },
@@ -130,7 +131,7 @@ async function requestJson(
     stream: config.stream,
     responseFormat: 'json',
     temperature: 0.2,
-    maxTokens: Math.min(NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS, config.maxTokens ?? NOVEL_ANALYSIS_MAX_RESPONSE_TOKENS),
+    maxTokens,
     onDelta: (_delta, accumulated) => onDelta?.(accumulated),
     canReuseResponse: cached => {
       try {
@@ -142,7 +143,7 @@ async function requestJson(
     },
   });
   assertNovelContentAllowed(result);
-  if (result.finishReason === 'length') throw new Error('小说拆解响应达到 token 上限（包含模型推理）；请在「拆解预设、专用 API 与检索配置」中调低推理强度、提高最大响应 Tokens 并保存，或缩小每次请求原文预算后重试');
+  if (result.finishReason === 'length') throw new Error(`小说拆解响应达到 token 上限（本次请求上限 ${maxTokens}，包含接口计入的模型推理）；请在「AI 连接 → 高级参数」中按模型支持范围调整最大响应 Tokens 或推理强度并保存。若已达到接口上限，请在「每次请求的大小」中降低原文 tokens 后重试`);
   return result.text;
 }
 

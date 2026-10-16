@@ -11,6 +11,20 @@ const preparationBatch = (sourceTexts: string[]): NovelRequestBatch => ({
     range: { chapterId: 'c1', startOffset: sourceTexts.slice(0, index).join('').length, endOffset: sourceTexts.slice(0, index + 1).join('').length }, inputHash: `input-${index}` })),
 });
 
+test.each([32768, 65536])('preparation and JSON repair honor a configured response budget of %i', async maxTokens => {
+  const limits: Array<number | undefined> = [];
+  const batch = preparationBatch(['甲段']);
+  const result = await generateNovelPreparationBatch({ config: { ...batchConfig, maxTokens }, novelTitle: '测试', batch,
+    sourceChapters: [{ id: 'c1', index: 0, title: '第一章', content: '甲段' }],
+    request: async (_config, _messages, options) => {
+      limits.push(options.maxTokens);
+      return { text: limits.length === 1 ? '{"parts": [],}' : JSON.stringify({ parts: [{ partId: batch.parts[0].id, evidence: { summary: '有效结果' } }], material: { summary: '背景资料' } }), elapsed: 1 };
+    },
+  });
+  expect(limits).toEqual([maxTokens, maxTokens]);
+  expect(result.parts[0].evidence.summary).toBe('有效结果');
+});
+
 test('malformed preparation batch splits after one repair and retains every original part', async () => {
   const inputs: string[][] = [];
   const batch = preparationBatch(['甲段', '乙段']);
