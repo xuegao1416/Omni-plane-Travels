@@ -14,13 +14,15 @@ export interface ApiConfig {
   reasoningEffort?: string;
   /** API 调用限流间隔（毫秒），默认 10000 */
   rateLimitMs?: number;
-  /** 单次模型请求的超时时间（毫秒）。未设置时按 provider 取默认值（deepseek 300000，其余 120000）。 */
+  /** 单次模型请求的超时时间（毫秒）。未设置时 DeepSeek（含兼容入口识别到的地址/模型）300000，其余 120000。 */
   requestTimeoutMs?: number;
 }
 
 export interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** DeepSeek 原生前缀续写：仅最后一条 assistant 发送此标记。 */
+  prefix?: boolean;
 }
 
 export interface JsonSchemaResponseFormat {

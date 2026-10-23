@@ -3,6 +3,7 @@
 
 import type { RegexScript } from '../utils/regexScripts';
 import { DRC_V12_PROMPTS, DRC_V12_REGEX_SCRIPTS } from './presetDrcV12';
+import { DEEPSEEK_STYLE_CONTENTS } from './presetDeepSeekStyles';
 
 // ============ 类型定义 ============
 
@@ -936,22 +937,43 @@ const PROMPT_DEEPSEEK_TASK = `<Task>
 {{#if::{{getvar::世界.规则.lethal}}}}当前世界允许角色在冲突中承担死亡风险。{{/if::}}
 </Task>`;
 
-/** DeepSeek 专用写作风格 — 默认风格 + DS 反细节堆砌 */
+/** DeepSeek 专用写作风格 — 具体行为、有限感知与自然段落 */
 const PROMPT_DEEPSEEK_WRITING_STYLE = `<WritingStyle>
 语言自然、直接、连贯，长短句交错，段落保持适中。对话使用「」包裹。
-- 每段围绕一个清晰的推进点，不堆砌动作、感官、形容词或背景说明。
-- 需要推动剧情时才写动作；不用装饰性的抬眼、低头和重复神态填充篇幅。
-- 情绪通过对白、选择和可感知的细节自然呈现，不说教、不拔高、不强行升华。
-- 直接陈述正在发生的事，少用否定式对比、抽象比喻和模糊量词。
+
+【写在场的人和事】
+- 叙述遵守已选视角，只使用该视角能感知、知道或合理推断的信息。状态快照用于决定人物反应，不把NPC的当前想法直接抄成旁白；允许的内心描写仍遵守视角边界。
+- 情绪落在人物具体做了什么、说了什么、作出什么选择上。写完可见行为便停笔，不再补一句动机分析、情绪定性或关系总结，让读者自行理解。
+- 动作有对象、方向和后果，符合身体、距离与手中物件的连续状态。可以整理东西、继续工作、挪动位置，不让人物只剩眼神、嘴角、手指和呼吸。
+- 人物有自己的需求、习惯和分寸，可以不耐烦、误会、拒绝、答非所问或暂时不回应；不把所有角色写成随时安抚玩家、包容一切的温柔照顾者。
+
+【让台词和段落自然流动】
+- 台词本身承担态度和情绪。伴随动作只在改变话意、人物距离或现场状态时出现，不在每句对白后补语气标签和小动作。
+- 每段围绕一件正在发生的事，让对白、动作与必要的环境细节相互衔接。以完整的中等句为主，关键停顿才用短句，不把每个动作都拆成独立一行。
+- 感官细节服务于场景：听到门锁响才转头，杯子太烫才换手。不为凑五感遍历光线、气味、温度，不连续堆砌身体微反应。
+- 单轮只写当前互动的一段，可以闲谈、等待或继续手头事务。不强求每轮情绪升级、关系突破或总结式收束，结尾落在可继续回应的动作或对白上。
+
+【写法示例：只学习方法，不复用情节和措辞】
+避免：他稳稳地接住了她所有的情绪，给了她恰到好处的安全感。
+改写：她说到一半停下。他把椅子往桌边挪近。「你接着说。」
+要点：用回应和距离呈现关系，不由旁白宣布安抚效果。
+避免：她的声音里带着一丝不易察觉的委屈，显然还在为刚才的事难过。
+改写：「那份也要算我的钱？」她把找零推回柜台，等着他重新算。
+要点：让台词与行动表达人物诉求，删掉声音里的情绪注解。
+
+- 直接陈述正在发生的事，少用否定式对比、抽象比喻和模糊量词，不用修辞替代观察。
 - 正文保持小说形态，禁止标题、编号、清单和创作说明。
-- 当前场景写完整后自然停住，为玩家下一步行动留下空间。
 </WritingStyle>`;
 
 /** DeepSeek 专用反八股 — 全部用自己的措辞 */
 const PROMPT_DEEPSEEK_ANTI_CLICHE = `<anti_cliche>
 避免重复前文的句式、动作、神态和结尾方式。
 - 不用“不是……而是……”“仿佛”“一丝”“一抹”等套路句堆砌气氛。
+- 不用“不争、不抢、不急”“不急不缓”“不疾不徐”“稳稳地接住了”“接住你的情绪”“恰到好处的分寸感”“给足安全感”“允许你做自己”等套话替人物表现和关系下结论。删掉修饰语后，必须留下角色实际说过的话、做过的事或作出的选择。
+- 同义改写也不能绕过：不反复用“不X、不Y、不Z”的排比给人物贴成熟克制标签，不把每次回应都写成承接、托住、兜住情绪，不在段末宣布对方终于被理解、被看见、被治愈。
+- 上述限制针对空泛的旁白评判和安抚模板；接住掉落物、争抢位置等真实动作按事实写，角色明确谈论自己的感受时保持自然，不机械删除有实际含义的词。
 - 不连续给每句对白附加抬眼、低头、轻笑、叹息等装饰动作。
+- 动作或台词已经交付信息后，不再补“这个动作仿佛在说”“语气中透着”“那是一种”等解释；只保留当前视角可感知的内容。
 - 不代替不在场角色获取信息，不把玩家操作写成角色已知事实。
 - 不用医学术语、精确数字或夸张生理反应替代具体叙事。
 - 删除不影响剧情、人物关系或现场感受的句子。
@@ -994,7 +1016,7 @@ const PROMPT_DEEPSEEK_OUTPUT_FORMAT = `<OutputFormat>
 - 输出 3-5 个不同方向的可执行选项。
 - 只有输出 [OPTION_END] 后才算完成；禁止在正文中途、</contenttext> 后或选项列表中途结束。
 - 空间不足时立即缩短正文，优先闭合 </contenttext> 并完整输出选项。
-- [OPTION_END] 必须是回复的最后一行，其后不输出任何文字。
+- [OPTION_END] 结束行动选项块。宿主要求 <TimeAdvance> 时间回执时，将唯一的时间回执放在其后、整条回复最后；除此之外不追加任何文字。
 </OutputFormat>`;
 
 /** 称呼一致性规则（共享条目，4 个 preset 都会启用） */
@@ -1657,6 +1679,8 @@ const DEEPSEEK_REDUNDANT_ANTI_PROMPTS = new Set([
 
 const DEEPSEEK_PROMPTS: PresetPromptEntry[] = [
   ...DEFAULT_PROMPTS.map(p => {
+    const styleContent = DEEPSEEK_STYLE_CONTENTS[p.identifier];
+    if (styleContent) return { ...p, content: wrapWritingStyle(styleContent) };
     if (p.identifier === 'task') return { ...p, content: PROMPT_DEEPSEEK_TASK };
     if (p.identifier === 'writing_style') return { ...p, content: wrapWritingStyle(PROMPT_DEEPSEEK_WRITING_STYLE) };
     if (p.identifier === 'anti_formula') return { ...p, content: PROMPT_DEEPSEEK_ANTI_CLICHE };
@@ -1731,11 +1755,11 @@ const BUILTIN_PRESETS: BuiltinPreset[] = [
   {
     id: 'deepseek',
     name: 'DeepSeek 专用预设',
-    description: '针对 DeepSeek 模型优化 — 精简推理与正文，优先保证完整回复和行动选项',
+    description: 'DeepSeek 文风适配（2026-10-17 更新后）— 默认与全部七种可选文风独立适配，减少安抚套话、解释腔和细节堆砌，保留完整正文与行动选项',
     prompts: DEEPSEEK_PROMPTS,
     regexScripts: [...CORE_DISPLAY_SCRIPTS, ...PROMPT_SCRIPTS],
     builtin: true,
-    version: '1.2.0',
+    version: '1.4.0',
   },
   {
     id: 'dialogue_avatar',

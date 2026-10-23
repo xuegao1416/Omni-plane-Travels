@@ -197,9 +197,12 @@ export async function callMemoryAI(
   timeoutMs?: number,
 ): Promise<string> {
   signal?.throwIfAborted();
-  // 记忆固定走 OpenAI 兼容线路，但超时档位仍按该阶段预设的真实 provider 取。
-  const budgetMs = timeoutMs ?? getRequestTimeoutMs({ ...apiConfig, provider: apiConfig.provider ?? 'openai' });
-  const requestConfig: ApiConfig = { ...apiConfig, provider: 'openai', requestTimeoutMs: budgetMs };
+  // 记忆阶段沿用该阶段预设的真实 provider：provider 既决定端点拼接
+  // （DeepSeek 留空地址时必须落到 /beta/chat/completions），也决定 body 适配。
+  // 无脑改写成 'openai' 会让 DeepSeek 官方留空配置打到 /v1/chat/completions 并返回 405。
+  const resolvedProvider = apiConfig.provider ?? 'openai';
+  const budgetMs = timeoutMs ?? getRequestTimeoutMs({ ...apiConfig, provider: resolvedProvider });
+  const requestConfig: ApiConfig = { ...apiConfig, provider: resolvedProvider, requestTimeoutMs: budgetMs };
   const controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
   signal?.addEventListener('abort', abort, { once: true });

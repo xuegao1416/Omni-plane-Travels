@@ -32,12 +32,16 @@ requestStreamWithRetry(config, messages, options)      // :400
 
 | 函数                            | 签名                             | 用途                                                                                                                                                                                                                                |
 | ----------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `getRequestTimeoutMs(config)` | `(ApiConfig) => number`        | DeepSeek 推理模型首 token 与完整生成较慢,返回 `300_000`ms;其它 provider 默认 `120_000`ms。`requestStreamWithRetry` 与 `callAuxiliaryApi` 都使用此值驱动 `AbortController` 超时。                                                                                |
+| `getRequestTimeoutMs(config)` | `(ApiConfig) => number`        | DeepSeek 推理模型首 token 与完整生成较慢，默认 `300_000`ms；其他配置默认 `120_000`ms。DeepSeek 识别覆盖显式 provider、官方端点与明确的模型名，因此从 OpenAI 兼容 / 自定义入口接入时也享有相同策略；用户显式超时优先。`requestStreamWithRetry` 与 `callAuxiliaryApi` 共用此策略。 |
 | `extractFinishReason(json)`   | `(any) => string \| undefined` | 归一化多 provider 的结束原因字段:`choices[0].finish_reason`(OpenAI) / `candidates[0].finishReason`(Gemini) / `stop_reason`(Anthropic),返回第一个非空字符串,否则 undefined。`CompletionResult.finishReason` 由 `requestCompletion` 与 `parseSSEStream` 各自填充。 |
 
 #### 8.1.2 多 Provider 特殊处理
 
 §8.5 差异化处理与 §8.6 多格式兼容散节整合详见下方。
+
+显式选择 `provider: deepseek` 时采用 DeepSeek 原生文本聊天协议：空地址与官方根地址使用 `/beta/chat/completions`，官方地址存在末尾 assistant 预填时确保使用 Beta；第三方明确版本路径和完整端点保持填写值。消息先合并相邻角色，中途 system 转 user 后再合并，仅末尾 assistant 加 `prefix: true`，输入消息不原地修改。复用 `reasoningEffort`：未设置或“关闭”明确发送 `thinking.disabled`，开启时发送 `thinking.enabled` 与对应强度（`medium → high`）；不发送 `top_k`，思考模式采样参数按当前官方支持范围处理。连接测试也使用该协议。OpenAI / custom 仅保留 DeepSeek 的识别超时和合并兼容，不自动启用这套专属参数。
+
+上述对齐酒馆原生 DeepSeek 的普通三角色文本请求，不导入酒馆的工具、多媒体、姓名转换、插件或世界书组装管线。外部预设导入仍遵守本项目的宿主规范，不能因具备 API 前缀续写就视为完整支持 SPreset 原版运行时。
 
 #### 8.1.3 SSE 流解析
 

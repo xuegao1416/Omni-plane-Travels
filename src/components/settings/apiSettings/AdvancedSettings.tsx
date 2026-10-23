@@ -1,4 +1,5 @@
 import type { ApiConfig } from '../../../api/types';
+import { getRequestTimeoutMs } from '../../../api/client';
 import { Toggle } from '../SettingsUIComponents';
 import { rowStyle,REASONING_OPTIONS,warningStyle } from './types';
 
@@ -8,8 +9,12 @@ interface Props {
 }
 
 export default function AdvancedSettings({ config, set }: Props) {
-  const defaultTimeoutSeconds = config.provider === 'deepseek' ? 300 : 120;
-  const timeoutSeconds = Math.max(1, Math.round((config.requestTimeoutMs ?? defaultTimeoutSeconds * 1000) / 1000));
+  const nativeDeepSeek = config.provider === 'deepseek';
+  const deepSeekThinking = nativeDeepSeek && !!config.reasoningEffort && config.reasoningEffort !== '关闭';
+  const deepSeekFlash = nativeDeepSeek && /(?:^|\/)deepseek-(?:v4(?:\.1)?-)?flash(?:$|[-_:])/i.test(config.model.trim());
+  const deepSeekTopPIgnored = nativeDeepSeek && (deepSeekThinking ? !deepSeekFlash : deepSeekFlash);
+  const defaultTimeoutSeconds = getRequestTimeoutMs({ ...config, requestTimeoutMs: undefined }) / 1000;
+  const timeoutSeconds = Math.max(1, Math.round(getRequestTimeoutMs(config) / 1000));
   return (
     <>
       <div className="settings-api-section-title">
@@ -59,10 +64,12 @@ export default function AdvancedSettings({ config, set }: Props) {
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>随机性 (Temperature)</div>
+          {deepSeekThinking && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>DeepSeek 思考模式下不生效</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
             type="range" min="0" max="2" step="0.05"
+            disabled={deepSeekThinking}
             value={config.temperature ?? 1.2}
             onChange={e => set('temperature', parseFloat(e.target.value))}
             style={{ width: '100px' }}
@@ -77,10 +84,13 @@ export default function AdvancedSettings({ config, set }: Props) {
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>核采样 (Top P)</div>
+          {deepSeekTopPIgnored && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>当前 DeepSeek 模式下不生效</div>}
+          {deepSeekFlash && deepSeekThinking && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>思考模式有效范围 0.95–1，低于 0.95 按 0.95 发送</div>}
         </div>
         <input
           type="number"
           step="0.01"
+          disabled={deepSeekTopPIgnored}
           value={config.topP ?? 0.65}
           onChange={e => set('topP', parseFloat(e.target.value) || 0)}
           style={{ width: '110px', fontSize: 'var(--font-size-base)', padding: '5px 10px', textAlign: 'right', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}
@@ -88,7 +98,7 @@ export default function AdvancedSettings({ config, set }: Props) {
       </div>
 
       {/* Top K */}
-      <div style={rowStyle}>
+      {!nativeDeepSeek && <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>Top K</div>
         </div>
@@ -98,12 +108,13 @@ export default function AdvancedSettings({ config, set }: Props) {
           onChange={e => set('topK', parseInt(e.target.value) || 0)}
           style={{ width: '110px', fontSize: 'var(--font-size-base)', padding: '5px 10px', textAlign: 'right', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}
         />
-      </div>
+      </div>}
 
       {/* 推理强度 */}
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>推理强度 (Reasoning Effort)</div>
+          {nativeDeepSeek && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>关闭会明确禁用思考；low / medium / high 开启思考，medium 按 high 处理。</div>}
         </div>
         <select
           value={config.reasoningEffort ?? '关闭'}
@@ -147,7 +158,7 @@ export default function AdvancedSettings({ config, set }: Props) {
               const { requestCompletion } = await import('../../../api/client');
               const testCall = async () => {
                 await requestCompletion(
-                  { ...config, provider: 'openai' },
+                  config,
                   [{ role: 'user', content: 'Hi' }],
                   { maxTokens: 5 }
                 );

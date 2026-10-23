@@ -75,8 +75,20 @@ function hasVersionSegment(base: string): boolean {
 }
 
 // URL拼接 - 支持多种provider
-export function buildEndpoint(config: ApiConfig): string {
-  const base = config.baseUrl.replace(/\/+$/, '');
+export function buildEndpoint(config: ApiConfig, messages: Message[] = []): string {
+  const base = config.baseUrl.trim().replace(/\/+$/, '');
+  if (config.provider === 'deepseek') {
+    if (!base) return 'https://api.deepseek.com/beta/chat/completions';
+    try {
+      const url = new URL(base);
+      const last = messages[messages.length - 1];
+      const needsPrefix = last?.role === 'assistant' && last.prefix === true;
+      if (url.hostname === 'api.deepseek.com' && (!url.pathname.replace(/\/+$/, '') || needsPrefix)) {
+        return `${url.origin}/beta/chat/completions`;
+      }
+    } catch { /* 非官方地址沿用下方通用拼接与请求错误处理。 */ }
+    if (base.endsWith('/beta')) return `${base}/chat/completions`;
+  }
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
@@ -87,11 +99,23 @@ export function buildEndpoint(config: ApiConfig): string {
   return `${base}/v1/chat/completions`;
 }
 
+/** OpenAI 兼容入口也可连接 DeepSeek，兼容策略由实际地址/模型共同判断。 */
+function isDeepSeekConfig(config: ApiConfig): boolean {
+  if (config.provider === 'deepseek') return true;
+  if (/(?:^|\/)deepseek(?:$|[-_:])/i.test(config.model.trim())) return true;
+  try {
+    const url = new URL(config.baseUrl);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname === 'api.deepseek.com';
+  } catch {
+    return false;
+  }
+}
+
 /** DeepSeek 推理模型首 token 和完整生成通常更慢，避免 2 分钟硬中止截断正文。 */
 export function getRequestTimeoutMs(config: ApiConfig): number {
   const custom = config.requestTimeoutMs;
   if (typeof custom === 'number' && Number.isFinite(custom) && custom > 0) return custom;
-  return config.provider === 'deepseek' ? 300_000 : 120_000;
+  return isDeepSeekConfig(config) ? 300_000 : 120_000;
 }
 
 function buildRequestBody(config: ApiConfig, messages: Message[], options: RequestOptions = {}) {
@@ -107,6 +131,22 @@ function buildRequestBody(config: ApiConfig, messages: Message[], options: Reque
   if (topP != null) body.top_p = topP;
   if (config.topK != null) body.top_k = config.topK;
   if (config.reasoningEffort && config.reasoningEffort !== '关闭') body.reasoning_effort = config.reasoningEffort;
+  if (config.provider === 'deepseek') {
+    const effort = getDeepSeekReasoningEffort(config.reasoningEffort);
+    body.thinking = { type: effort ? 'enabled' : 'disabled' };
+    // DeepSeek 没有 top_k；思考下 temperature 不生效，top_p 按型号处理。
+    delete body.top_k;
+    delete body.reasoning_effort;
+    if (effort) {
+      body.reasoning_effort = effort;
+      delete body.temperature;
+      if (/(?:^|\/)deepseek-(?:v4(?:\.1)?-)?flash(?:$|[-_:])/i.test(config.model.trim())) {
+        if (typeof body.top_p === 'number') body.top_p = Math.max(0.95, Math.min(1, body.top_p));
+      } else {
+        delete body.top_p;
+      }
+    }
+  }
   if (options.responseFormat === 'json') body.response_format = { type: 'json_object' };
   else if (typeof options.responseFormat === 'object' && options.responseFormat.type === 'json_schema') {
     body.response_format = {
@@ -124,6 +164,13 @@ function buildRequestBody(config: ApiConfig, messages: Message[], options: Reque
     delete body.presence_penalty;
   }
   return body;
+}
+
+function getDeepSeekReasoningEffort(effort: string | undefined): 'low' | 'high' | 'max' | undefined {
+  if (effort === 'low' || effort === 'minimal') return 'low';
+  if (effort === 'medium' || effort === 'high' || effort === 'xhigh') return 'high';
+  if (effort === 'max' || effort === 'ultra') return 'max';
+  return undefined;
 }
 
 // 多格式内容提取
@@ -178,8 +225,20 @@ function mergeConsecutiveSameRole(messages: Message[]): Message[] {
   return merged;
 }
 
-function normalizeMessages(provider: string | undefined, messages: Message[]): Message[] {
-  if (provider === 'deepseek') return mergeConsecutiveSameRole(messages);
+function normalizeMessages(config: ApiConfig, messages: Message[]): Message[] {
+  if (config.provider === 'deepseek') {
+    // 对齐 SEMI_TOOLS 的文本消息处理：先合并，再转换中途 system，再合并。
+    // 显式重建消息，避免历史 prefix 标记随相邻消息合并传播。
+    const merged = mergeConsecutiveSameRole(messages.map(({ role, content }) => ({ role, content })));
+    const normalized = mergeConsecutiveSameRole(merged.map((message, index) => ({
+      ...message,
+      role: index > 0 && message.role === 'system' ? 'user' : message.role,
+    })));
+    const last = normalized[normalized.length - 1];
+    if (last?.role === 'assistant') last.prefix = true;
+    return normalized;
+  }
+  if (isDeepSeekConfig(config)) return mergeConsecutiveSameRole(messages);
   return messages;
 }
 
@@ -273,8 +332,8 @@ export async function requestCompletion(
   options: RequestOptions = {},
 ): Promise<CompletionResult> {
   const start = Date.now();
-  const endpoint = buildEndpoint(config);
-  const normalized = normalizeMessages(config.provider, messages);
+  const normalized = normalizeMessages(config, messages);
+  const endpoint = buildEndpoint(config, normalized);
   const body = buildRequestBody(config, normalized, { ...options, stream: false });
   console.log(`🚀 [API] 发起请求 → ${endpoint} (${messages.length} 条消息)`);
 
@@ -336,8 +395,8 @@ export async function requestCompletionStream(
   options: StreamOptions,
 ): Promise<CompletionResult> {
   const start = Date.now();
-  const endpoint = buildEndpoint(config);
-  const normalized = normalizeMessages(config.provider, messages);
+  const normalized = normalizeMessages(config, messages);
+  const endpoint = buildEndpoint(config, normalized);
   const body = buildRequestBody(config, normalized, { ...options, stream: true });
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
@@ -437,7 +496,7 @@ export async function requestStreamWithRetry(
 }
 
 function getModelListUrls(config: ApiConfig): string[] {
-  const base = config.baseUrl.replace(/\/+$/, '');
+  const base = (config.baseUrl.trim() || (config.provider === 'deepseek' ? 'https://api.deepseek.com' : '')).replace(/\/+$/, '');
   if (config.provider === 'google') {
     // 基址已带版本段时沿用，避免拼出 /v1beta/v1beta/models。
     const root = /\/v\d/i.test(base) ? base : `${base}/v1beta`;
@@ -452,12 +511,11 @@ function getModelListUrls(config: ApiConfig): string[] {
         ? `${base}/models`
         : `${base}/v1/models`;
 
-  // DeepSeek 官方接口及部分公益站把模型目录放在 /models，
-  // 但聊天接口仍使用 /v1/chat/completions；两种路径都兼容。
+  // DeepSeek 模型目录优先使用根路径；beta 仅用于聊天补全。
   if (config.provider !== 'deepseek') return [standardUrl];
   const root = base
     .replace(/\/chat\/completions\/?$/, '')
-    .replace(/\/v\d+\/?$/, '');
+    .replace(/\/(?:v\d+|beta)\/?$/, '');
   return [...new Set([`${root}/models`, standardUrl])];
 }
 
@@ -528,7 +586,7 @@ export async function testConnection(config: ApiConfig, options?: ConnectionRequ
   let fetchUrl = '';
   try {
     endpoint = buildEndpoint(config);
-    const body = {
+    const body = config.provider === 'deepseek' ? buildRequestBody(config, [{ role: 'user', content: 'Hi' }], { maxTokens: 5, stream: false }) : {
       model: config.model,
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 5,

@@ -52,6 +52,17 @@ test('memory API selection preserves provider and response timeout without copyi
   expect(resolvePreset([{ id: 'vector', name: 'vector', createdAt: 0, config }], 'vector')).toEqual(expected);
 });
 
+test('memory calls keep the selected provider so official DeepSeek stays on the beta endpoint', async () => {
+  const requestedUrls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    requestedUrls.push(String(input));
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] }));
+  }) as unknown as typeof fetch;
+  // 留空 baseUrl 时 DeepSeek 官方只接受 /beta/chat/completions；改写 provider 会拼成 /v1 并拿到 405。
+  await expect(callMemoryAI({ baseUrl: '', apiKey: 'k', model: 'deepseek-v4-pro', provider: 'deepseek' }, 'system', 'user', 0.3, undefined, 100)).resolves.toBe('{}');
+  expect(requestedUrls).toEqual(['https://api.deepseek.com/beta/chat/completions']);
+});
+
 test('vector extraction honors the selected API response timeout', async () => {
   useMemoryStore.setState({ config: { ...createDefaultMemorySystemConfig(), vectorEnabled: true } });
   useMemoryStore.getState().initMemoryRuntime('vector-timeout-policy');

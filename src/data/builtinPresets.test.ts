@@ -166,6 +166,30 @@ describe('文风切换（setvar 单选机制）', () => {
     expect(resolved).toContain('文风：古风武侠');
     expect(resolved).not.toContain('语言自然、直接、连贯'); // DeepSeek 默认文风被覆盖
   });
+
+  test('DeepSeek 的七种可选文风各有专用正文，切换后仅选中文风生效且保留反八股', () => {
+    const markers = ['文风：日系轻小说', '文风：轻松吐槽', '文风：校园青春',
+      '文风：白描', '文风：古风武侠', '文风：散文小说', '文风：自由随性'];
+    for (const [index, styleId] of STYLE_IDS.entries()) {
+      const shared = getBuiltinPreset('default').prompts.find(p => p.identifier === styleId)!;
+      const adapted = getBuiltinPreset('deepseek').prompts.find(p => p.identifier === styleId)!;
+      expect(adapted.content).not.toBe(shared.content);
+      expect({ ...adapted, content: '' }).toEqual({ ...shared, content: '' });
+      for (const presetId of ['claude', 'dialogue_avatar']) {
+        expect(getBuiltinPreset(presetId).prompts.find(p => p.identifier === styleId)?.content).toBe(shared.content);
+      }
+      const resolved = resolveEnabled('deepseek', [styleId]);
+      expect(resolved).toContain(markers[index]!);
+      for (const otherMarker of markers.filter((_, markerIndex) => markerIndex !== index)) {
+        expect(resolved).not.toContain(otherMarker);
+      }
+      expect(resolved).not.toContain('【写在场的人和事】');
+      expect(resolved).not.toContain('{{setvar::');
+      expect(resolved).not.toContain('{{getvar::');
+      expect(resolved).toContain('不争、不抢、不急');
+      expect(resolved).toContain('稳稳地接住了');
+    }
+  });
 });
 
 describe('实验性破甲·尾部深度注入（默认预设）', () => {
