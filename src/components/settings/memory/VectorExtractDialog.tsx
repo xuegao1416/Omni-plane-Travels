@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo,useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { extractContentForPrompt } from '../../../engine/responseExtractor';
 import type { ChatMessage } from '../../../engine/types';
 import { useMemoryStore } from '../../../memory/memoryStore';
-import type { MemorySystemConfig, VectorMemoryItem } from '../../../memory/types';
-import { createEmbeddingClient, resolveEmbeddingEndpoint } from '../../../memory/embeddingRuntime';
+import type { MemorySystemConfig,VectorMemoryItem } from '../../../memory/types';
+import { createEmbeddingClient,resolveEmbeddingEndpoint } from '../../../memory/embeddingRuntime';
 import { Button } from '../SettingsUIComponents';
 
 interface Props {

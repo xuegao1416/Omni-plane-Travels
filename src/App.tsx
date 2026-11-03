@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { GameProvider, useGame } from './context/GameContext';
+import { GameProvider,useGame } from './context/GameContext';
 import { UISettingsProvider } from './context/UISettingsContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import StartScreen from './components/start/StartScreen';

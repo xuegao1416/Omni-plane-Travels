@@ -1,15 +1,15 @@
 // 生图设置 Tab — 精简编排层，具体配置由子组件负责
 import { useImageStore } from '@/stores/imageStore';
 import {
-  Section,
-  SettingRow,
-  Toggle,
-  Field,
-  TextArea,
-  Button,
+Section,
+SettingRow,
+Toggle,
+Field,
+TextArea,
+Button,
 } from './SettingsUIComponents';
 import { DEFAULT_IMAGE_CONFIG } from '@/api/imageGenTypes';
-import { ImageIcon, Users, Cpu, Wand2 } from 'lucide-react';
+import { ImageIcon,Users,Cpu,Wand2 } from 'lucide-react';
 
 import EngineSelector from './imageGenSettings/EngineSelector';
 import NAIConfig from './imageGenSettings/NAIConfig';

@@ -1,8 +1,8 @@
 /**
  * TemplatePickerDialog 类型定义
  */
-import type { CustomNpc, PlayerProfile } from '../../../storage/db';
-import type { NpcTemplate, PlayerPreset, HistoryPreset } from '../../../storage/templateStore';
+import type { CustomNpc,PlayerProfile } from '../../../storage/db';
+import type { NpcTemplate,PlayerPreset,HistoryPreset } from '../../../storage/templateStore';
 
 // ─── NPC 模板选择模式 ─────────────────────────────────
 

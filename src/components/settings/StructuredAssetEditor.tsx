@@ -1,4 +1,4 @@
-import { Plus, Save, Trash2, X } from 'lucide-react';
+import { Plus,Save,Trash2,X } from 'lucide-react';
 import OverlayPortal from '../shared/OverlayPortal';
 
 type EditableValue = null | boolean | number | string | EditableValue[] | { [key: string]: EditableValue };

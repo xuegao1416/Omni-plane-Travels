@@ -52,6 +52,7 @@ export const manifestSchema = z
       .object({ manifest: z.string(), assets: z.record(z.string(), z.string()) })
       .optional(),
     signature: z.string().nullable().optional(),
+    worldId: z.string().regex(ID_RE).optional(),
   })
   // 安全红线①：拒绝未知字段（含 code/script/eval）
   .strict();

@@ -108,11 +108,6 @@ const SOURCE_BOX_BY_ID = Object.fromEntries([
   ...DAWN_V4_OVERLAY_PIECES.map(piece => [piece.id, piece]),
 ]);
 
-function rectFromSourceBox(sourceBox: DawnV4SourceBox) {
-  const [left, top, right, bottom] = sourceBox;
-  return { left, top, width: right - left, height: bottom - top };
-}
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 
 const startScreenSource = readFileSync(new URL('./StartScreen.tsx', import.meta.url), 'utf8');
 const worldHallSource = readFileSync(new URL('./WorldHallView.tsx', import.meta.url), 'utf8');

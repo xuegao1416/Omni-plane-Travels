@@ -1,8 +1,8 @@
-import { FileText, Download, Trash2 } from 'lucide-react';
+import { FileText,Download,Trash2 } from 'lucide-react';
 import type { PresetCardProps } from './types';
 import { iconBtnStyle } from './constants';
 
-export function PresetCard({ name, desc, promptCount, regexCount, active, builtin, onSelect, onExport, onDelete, onEdit }: PresetCardProps) {
+export function PresetCard({ name, desc, promptCount, regexCount, active, onSelect, onExport, onDelete, onEdit }: PresetCardProps) {
   return (
     <div className="settings-preset-card" style={{
       display: 'flex', alignItems: 'center', gap: '10px',

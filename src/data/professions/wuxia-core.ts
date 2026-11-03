@@ -93,7 +93,7 @@ export const WUXIA_CORE_PROFESSION_PACK: ProfessionModuleSchema = {
       node('qimen_heaven', '天门借法', 'ultimate', '以天地方位之势重写一瞬战局。', ['qimen_foresight', 'qimen_hidden_needle'], { pointCost: 2, requiredProfessionLevel: 4, cooldownTicks: 7, prerequisiteMode: 'any' }),
     ]),
   ],
-  freeSkillCatalog: [
+  freeSkills: [
     lifeSkill('medicine', '医术', '诊治伤病、辨识毒物与药材。'),
     lifeSkill('qin_art', '琴艺', '演奏、鉴赏音律并安抚心神。'),
     lifeSkill('calligraphy', '书法', '书写、临摹与辨识古籍。'),

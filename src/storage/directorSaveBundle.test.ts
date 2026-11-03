@@ -1,0 +1,36 @@
+import 'fake-indexeddb/auto';
+import { expect, test } from 'bun:test';
+import { exportSave, importSaveFromData, loadGame } from './db';
+import { createEmptySimState } from '../simulation/types';
+import { createEmptyDirectorState } from '../director/types';
+import { trimSaveData } from '../stores/cloudSaveStore';
+const SAVE_EXPORT_TYPE = 'omni-plane-travels-save';
+const SAVE_EXPORT_VERSION = '2.0';
+
+test('imported save rebases director ownership in head and rollback snapshots without losing knowledge or memory', async () => {
+  const id = `save_${Date.now()}_bundle`;
+  const director = { ...createEmptyDirectorState(), pendingReview: { saveId: id, worldId: 'default', turnId: 'm', round: 1, writesCommitted: true }, directives: { d: { id: 'd', saveId: id, primary: { planId: 'p' } } }, offscreenProposals: { p: { proposalId: 'p', saveId: id } } };
+  const simulationState = { ...createEmptySimState(), director, snapshots: [{ id: 'sim:1', snapshot: { ...createEmptySimState(), director } }] };
+  const knowledge = { version: 1, characters: { npc: { observed: { name: 'known' } } } };
+  const memoryRuntime = { sourceEvents: [{ id: 'external:1', visibility: 'offscreen', playerKnown: false, assistantText: 'SECRET' }], checkpoints: [{ id: 'mem:1', snapshot: { sourceEvents: [{ id: 'external:1', visibility: 'offscreen', playerKnown: false }] } }] };
+  const payload = { type: SAVE_EXPORT_TYPE, version: SAVE_EXPORT_VERSION, save: { id, name: id, worldId: 'default', gameState: { playerKnowledge: knowledge }, memoryRuntime, simulationState, messages: [{ id: 'm', role: 'assistant', rawText: '正文', round: 1, timestamp: 1, snapshot: { playerKnowledge: knowledge }, memoryCheckpointId: 'mem:1', simulationSnapshotId: 'sim:1' }] } };
+  await importSaveFromData(payload);
+  const imported = await importSaveFromData(payload);
+  expect(imported.id).not.toBe(id);
+  const loaded = (await loadGame(imported.id))!;
+  expect(loaded.simulationState?.director?.directives.d?.saveId).toBe(imported.id);
+  expect(loaded.simulationState?.director?.offscreenProposals.p?.saveId).toBe(imported.id);
+  expect(loaded.simulationState?.snapshots[0]?.snapshot.director?.directives.d?.saveId).toBe(imported.id);
+  expect(loaded.simulationState?.director?.pendingReview).toEqual({ ...director.pendingReview, saveId: imported.id });
+  expect(loaded.simulationState?.snapshots[0]?.snapshot.director?.pendingReview?.saveId).toBe(imported.id);
+  expect((loaded.gameState as any).playerKnowledge).toEqual(knowledge);
+  expect((loaded.messages[0]?.snapshot as any).playerKnowledge).toEqual(knowledge);
+  expect(loaded.messages[0]?.memoryCheckpointId).toBe('mem:1');
+  expect(loaded.messages[0]?.simulationSnapshotId).toBe('sim:1');
+  expect((loaded.memoryRuntime as any).sourceEvents[0].playerKnown).toBe(false);
+  const exported = JSON.parse(await (await exportSave(imported.id)).text());
+  expect(trimSaveData(exported).save.simulationState.director.directives.d.saveId).toBe(imported.id);
+  expect(trimSaveData(exported).save.simulationState.director.pendingReview.saveId).toBe(imported.id);
+  expect(payload.save.simulationState.director.pendingReview.saveId).toBe(id);
+  expect(payload.save.simulationState.director.directives.d.saveId).toBe(id);
+});

@@ -1,4 +1,4 @@
-import { ExternalLink, Copy, Check, Lightbulb, CheckCircle, XCircle } from 'lucide-react';
+import { ExternalLink,Copy,Check,Lightbulb,CheckCircle,XCircle } from 'lucide-react';
 import type { TutorialStep } from './data';
 import { PROXY_CODE } from './constants';
 

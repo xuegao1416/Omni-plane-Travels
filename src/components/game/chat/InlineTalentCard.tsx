@@ -4,8 +4,6 @@ import { Sparkles } from 'lucide-react';
 import JourneyCardShell from '../shared/JourneyCardShell';
 
 interface InlineTalentCardProps {
-  /** 天赋 ID */
-  id: string;
   /** 天赋名称 */
   name: string;
   /** 天赋品质 */
@@ -34,7 +32,7 @@ const RARITY_BG_COLORS: Record<string, string> = {
   '传说': 'var(--warning-bg-soft)',
 };
 
-export default function InlineTalentCard({ id, name, rarity, description, effects }: InlineTalentCardProps) {
+export default function InlineTalentCard({ name, rarity, description, effects }: InlineTalentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const rarityColor = RARITY_COLORS[rarity] || '#9ca3af';
   const rarityBg = RARITY_BG_COLORS[rarity] || 'rgba(156, 163, 175, 0.1)';

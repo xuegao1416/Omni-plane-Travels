@@ -22,8 +22,15 @@ export interface WebEventRecord {
   files: Record<string, string | Blob>;
   /** 内置标记：来自世界树关联的事件包，不可删除，事件中心显示为「内置」 */
   builtin?: boolean;
-  /** 来源世界 ID（仅 builtin=true 时有值，用于展示归属） */
-  worldId?: string;
+}
+
+function normalizeWebEventRecord(raw: WebEventRecord & { worldId?: string }): WebEventRecord {
+  const legacyWorldId = raw.worldId;
+  const record = { ...raw } as WebEventRecord & { worldId?: string };
+  delete record.worldId;
+  return legacyWorldId && !record.manifest.worldId
+    ? { ...record, manifest: { ...record.manifest, worldId: legacyWorldId } }
+    : record;
 }
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -55,7 +62,8 @@ export async function putWebEvent(rec: WebEventRecord): Promise<void> {
 
 export async function getWebEvent(id: string): Promise<WebEventRecord | undefined> {
   const db = await getDb();
-  return db.get(STORE, id);
+  const raw = await db.get(STORE, id) as (WebEventRecord & { worldId?: string }) | undefined;
+  return raw ? normalizeWebEventRecord(raw) : undefined;
 }
 
 export async function deleteWebEvent(id: string): Promise<void> {
@@ -65,7 +73,8 @@ export async function deleteWebEvent(id: string): Promise<void> {
 
 export async function allWebEvents(): Promise<WebEventRecord[]> {
   const db = await getDb();
-  return db.getAll(STORE);
+  const records = await db.getAll(STORE) as Array<WebEventRecord & { worldId?: string }>;
+  return records.map(normalizeWebEventRecord);
 }
 
 /** Manifest → EventMeta（列表/发现态所需字段） */

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 
 const workspaceSource = readFileSync(new URL('./CustomModuleAgentWorkspace.tsx', import.meta.url), 'utf8');
 const stylesSource = readFileSync(new URL('../../styles/custom-modules.css', import.meta.url), 'utf8');

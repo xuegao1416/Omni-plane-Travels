@@ -1,17 +1,17 @@
 // ComfyUI 自定义工作流编辑器 — 导入、验证、映射、管理
-import { useState, useCallback } from 'react';
+import { useState,useCallback } from 'react';
 import { useImageStore } from '@/stores/imageStore';
 import { useImageGen } from '@/hooks/useImageGen';
-import { validateWorkflow, detectWorkflowNodes } from '@/api/imageGen';
-import type { ComfyWorkflowPreset, WorkflowParamMapping, WorkflowValidation, DetectedNode } from '@/api/imageGenTypes';
+import { validateWorkflow,detectWorkflowNodes } from '@/api/imageGen';
+import type { ComfyWorkflowPreset,WorkflowParamMapping,WorkflowValidation,DetectedNode } from '@/api/imageGenTypes';
 import {
-  createImportedComfyWorkflowRecord,
-  validateAndRepairComfyApiPromptResources,
+createImportedComfyWorkflowRecord,
+validateAndRepairComfyApiPromptResources,
 } from '@/api/comfy/comfyWorkflow';
 import type { ApiPromptWorkflow } from '@/api/comfy/comfyWorkflow';
-import { Section, Toggle } from './SettingsUIComponents';
+import { Section,Toggle } from './SettingsUIComponents';
 import { Wand2 } from 'lucide-react';
-import { PresetCard, ImportPanel, parseWorkflowJson, buildAutoMapping, setMappingParam } from './comfyWorkflow';
+import { PresetCard,ImportPanel,buildAutoMapping,setMappingParam } from './comfyWorkflow';
 
 export default function ComfyWorkflowEditor() {
   const config = useImageStore((s) => s.config);

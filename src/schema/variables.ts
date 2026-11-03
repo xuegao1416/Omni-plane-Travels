@@ -1,17 +1,9 @@
-// 游戏变量类型定义 - 从世界漫游指南.json的Zod schema提取
+// 游戏变量类型定义 - 运行时变量状态的 Zod schema
 
 import type { DiceRoll, SurvivalRecipe } from '../modules/schema';
 import type { WorldClockState } from '../time/worldClock';
-import type { CombatRuntimeState } from '../gameplay/combat';
 import type { NarrativeDecisionRecord } from '../gameplay/narrativeDecision';
 import type { V3GameStateRuntime } from '../gameplay/protocols';
-
-export interface WorldModuleRuntime {
-  moduleId: string;
-  名称: string;
-  描述: string;
-  数据: Record<string, unknown>;
-}
 
 export interface WorldState {
   时间系统: { 当前时间: string; 当前天气: string; 时钟?: WorldClockState };
@@ -81,12 +73,6 @@ export interface ChronicleSystem {
   纪事: Record<string, ChronicleEntry>;
 }
 
-/** @deprecated 旧笔记结构，保留用于旧存档兼容迁移 */
-export interface Notebook {
-  潜在危机?: Record<string, { 严重程度: string; 预计影响时间: string; 应对措施: string; $time: number }>;
-  当前机遇?: Record<string, { 时效性: string; 所需资源: string; 行动计划: string; $time: number }>;
-  待办事项?: Record<string, { 优先级: string; 截止时间: string; 状态: string; $time: number }>;
-}
 
 // ═══════════════════════════════════════════
 //  动态任务系统
@@ -256,7 +242,7 @@ export interface PlayerState {
     已觉醒?: Record<string, { 轮次: number; 名称?: string }>;
     /** 装备槽 -> 能力 ID；槽容量由世界模块定义。 */
     装备槽?: Record<string, string[]>;
-    /** 新职业体系；旧天赋字段继续保留，仅用于兼容旧世界。 */
+    /** 当前职业体系运行态。 */
     职业状态?: {
       职业ID: string | null;
       职业名称: string;
@@ -280,8 +266,6 @@ export interface PlayerState {
     主货币: { 名称: string; 数量: number };
   };
   物品栏: Record<string, InventoryItem>;
-  /** @deprecated 旧笔记，保留用于存档兼容 */
-  记事本?: Notebook;
   /** 纪事系统 — 统一情报板（危机/机遇/线索/情报/承诺等） */
   纪事系统?: ChronicleSystem;
   /** 动态任务系统 — 与物品/属性/资源/技能/NPC深度联动 */
@@ -393,9 +377,12 @@ export interface NPCData {
 }
 
 export interface GameState {
+  playerIdentity?: { actorId: string; name: string; aliases: string[] };
+  playerKnowledge?: import('../engine/playerKnowledge').PlayerKnowledgeState;
   世界: WorldState;
   玩家: PlayerState;
   人物档案: Record<string, NPCData>;
+  /** 玩家实际已知的人物资料投影；不与后台权威真相自动同步。 */
   /** 记忆系统运行态（可选，由记忆系统模块管理） */
   memoryRuntime?: Record<string, unknown>;
   /** 记忆系统配置（可选） */
@@ -411,8 +398,6 @@ export interface GameState {
   customModules?: Record<string, import('../custom-modules/stateStore').CustomModuleRuntimeState>;
   /** 六大内置模块共用的事务、事件、日志与迁移运行态。 */
   gameplay?: import('../gameplay/types').GameplayRuntimeState;
-  /** Independent combat-domain runtime; absent in worlds without combat. */
-  combat?: CombatRuntimeState;
   /** Save-scoped event decisions; pending records survive failed narrative retries. */
   narrativeDecisions?: NarrativeDecisionRecord[];
   /** Additive v3 protocol state; absent means all optional v3 modules are off. */
@@ -444,6 +429,3 @@ export function createDefaultGameState(): GameState {
     人物档案: {},
   };
 }
-
-
-

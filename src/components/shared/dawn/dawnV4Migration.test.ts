@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe,expect,test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
@@ -126,8 +126,8 @@ test('hall navigation remains a content-sized transparent group', () => {
     expect(wizardShell).not.toContain('<button type="button" className="btn-secondary"');
     expect(wizardShell).not.toContain('<button type="button" className="btn-primary"');
     expect(wizardShell).toContain('creation-ritual-shell__footer${currentStep === historyStep');
-    expect(wizardShell).toContain("${modalOpen ? ' is-modal-blocked' : ''}");
-    expect(wizardShell).toContain('disabled={modalOpen}');
+    expect(wizardShell).toContain("${navigationBlocked ? ' is-modal-blocked' : ''}");
+    expect(wizardShell).toContain('disabled={navigationBlocked}');
   });
 
   test('defines portrait-specific 2x2 navigation and frameless current-journey treatment', () => {
@@ -158,7 +158,7 @@ test('hall navigation remains a content-sized transparent group', () => {
     expect(ritualStyles).toMatch(/\.dawn-frame-v4 > \.dawn-frame-v4__border[\s\S]*z-index: 20 !important/);
     const worldEditor = read('../../start/WorldEditorForm.tsx');
     expect(worldEditor).not.toContain('if (disabledByConflict.size > 0)');
-    expect(worldEditor).toContain('未配置 AI，可继续手动编织。');
+    expect(worldEditor).toContain('请先在设置中配置API');
     expect(worldEditor).not.toContain('onClick={() => setWeaveStep(2)}');
     expect(worldEditor).not.toContain('onClick={() => setWeaveStep(3)}');
   });

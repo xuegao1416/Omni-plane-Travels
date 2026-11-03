@@ -1,40 +1,40 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo,useRef,useState } from 'react';
 import {
-  Bot,
-  Copy,
-  Download,
-  FilePlus2,
-  Plus,
-  Save,
-  Sparkles,
-  Trash2,
-  Upload,
-  X,
+Bot,
+Copy,
+Download,
+FilePlus2,
+Plus,
+Save,
+Sparkles,
+Trash2,
+Upload,
+X,
 } from 'lucide-react';
 import type {
-  InnateTalentDef,
-  CombatScalingDefinition,
-  CombatTargetMode,
-  ProfessionAbilityDef,
-  ProfessionAccentKey,
-  ProfessionPack,
-  ProfessionWorldBinding,
+InnateTalentDef,
+CombatScalingDefinition,
+CombatTargetMode,
+ProfessionAbilityDef,
+ProfessionAccentKey,
+ProfessionPack,
+ProfessionWorldBinding,
 } from '../../modules/schema';
 import { getCanonicalStatOptions } from '../../modules/canonicalStats';
 import {
-  createEmptyProfessionPack,
-  deleteProfessionPack,
-  exportProfessionPack,
-  importProfessionPack,
-  listProfessionPacks,
-  normalizeProfessionPack,
-  saveProfessionPack,
-  validateProfessionPack,
+createEmptyProfessionPack,
+deleteProfessionPack,
+exportProfessionPack,
+importProfessionPack,
+listProfessionPacks,
+normalizeProfessionPack,
+saveProfessionPack,
+validateProfessionPack,
 } from '../../data/professions';
 import ProfessionTreeCanvas from './ProfessionTreeCanvas';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { describeProfessionMechanics } from '../../gameplay/profession';
-import { PROFESSION_ACCENT_KEYS, PROFESSION_EMBLEM_KEYS } from '../../data/professions/professionVisuals';
+import { PROFESSION_ACCENT_KEYS,PROFESSION_EMBLEM_KEYS } from '../../data/professions/professionVisuals';
 
 function downloadText(name: string, content: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: 'application/json;charset=utf-8' }));
@@ -368,7 +368,7 @@ export default function ProfessionLibraryWorkspace({
             {pendingGeneratedPack && pendingValidation && <div className="profession-library__binding">
               <strong>待确认的 AI 本地配平预览</strong>
               <span>{pendingGeneratedPack.manifest.name}</span>
-              <small>{pendingGeneratedPack.professions.length} 个职业 · {pendingGeneratedPack.innateTalents.length} 个先天天赋 · {(pendingGeneratedPack.freeSkillCatalog ?? pendingGeneratedPack.freeSkills ?? []).length} 个自由技能</small>
+              <small>{pendingGeneratedPack.professions.length} 个职业 · {pendingGeneratedPack.innateTalents.length} 个先天天赋 · {(pendingGeneratedPack.freeSkills ?? []).length} 个自由技能</small>
               {pendingValidation.errors.length > 0 && <div style={{ color: 'var(--danger, #d66)', fontSize: 11 }}>{pendingValidation.errors.map(error => <div key={`${error.path}-${error.code}`}>{error.message}</div>)}</div>}
               <div style={{ display: 'grid', gap: 4, fontSize: 11 }}>
                 {pendingGeneratedPack.professions.flatMap(profession => profession.abilities.map(ability => ({ profession, ability }))).slice(0, 4).map(({ profession, ability }) => <span key={`${profession.id}-${ability.id}`} className="profession-library__mechanic-summary">{profession.name} / {ability.name}：{describeProfessionMechanics(ability.mechanics) || '无机械'}</span>)}
@@ -429,7 +429,6 @@ export default function ProfessionLibraryWorkspace({
             {activePack && <>
               <h3>{selectedAbility ? '能力节点' : '职业包信息'}</h3>
               {activePackIsDraft && <p style={{ color: 'var(--text-muted)', fontSize: 11 }}>当前为未保存草稿；中间态允许暂时不满足完整包校验。</p>}
-              {activePack.baselineStatus === 'legacy-v1-incomplete' && <p style={{ color: 'var(--text-muted)', fontSize: 11 }}>旧版 v1：内容低于 3.0 基准，但仍可继续使用或补全，不会自动填充假技能。</p>}
               {selectedAbility ? <>
                 <label className="profession-library__field">名称<input value={selectedAbility.name} disabled={!editable} onChange={event => updateAbility({ name: event.target.value })} /></label>
                 <label className="profession-library__field">描述<textarea rows={5} value={selectedAbility.description} disabled={!editable} onChange={event => updateAbility({ description: event.target.value })} /></label>

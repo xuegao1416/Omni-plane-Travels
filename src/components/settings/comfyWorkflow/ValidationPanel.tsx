@@ -1,5 +1,5 @@
 // ComfyUI 工作流编辑器 — 验证面板
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle,XCircle,AlertTriangle } from 'lucide-react';
 import type { WorkflowValidation } from '@/api/imageGenTypes';
 
 export function ValidationPanel({ validation }: { validation: WorkflowValidation }) {

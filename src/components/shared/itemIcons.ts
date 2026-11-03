@@ -3,9 +3,9 @@
  * 供 profilePanel、wizard 身份页等多处复用
  */
 import {
-  Swords, Shield, Wrench, Beaker, Wheat, Gem, BookOpen, ScrollText,
-  Crosshair, Crown, Shirt, Package, FlaskConical, Fish, Compass, Key,
-  CircleDot, type LucideIcon,
+Swords,Shield,Wrench,Beaker,Wheat,Gem,BookOpen,ScrollText,
+Crosshair,Crown,Shirt,Package,FlaskConical,Fish,Compass,Key,
+CircleDot,type LucideIcon,
 } from 'lucide-react';
 
 // ─── 物品类型 → Lucide 图标映射 ───

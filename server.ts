@@ -79,16 +79,6 @@ Bun.serve({
 
     if (pathname === '/') pathname = '/index.html';
 
-    // 角色卡JSON（世界书数据源）
-    if (pathname === '/card.json') {
-      const cardFile = Bun.file('./世界漫游指南.json');
-      if (await cardFile.exists()) {
-        return new Response(cardFile, {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
     // JS 入口 — 返回打包后的 JS（禁止缓存）
     if (pathname === '/app.js' || pathname === '/src/main.tsx') {
       try {

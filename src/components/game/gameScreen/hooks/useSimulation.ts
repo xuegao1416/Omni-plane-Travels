@@ -1,28 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getSimulationEngine, setWorldContext } from '../../../../simulation/SimulationApi';
+import { useState,useEffect,useCallback } from 'react';
+import { getSimulationEngine,requestDirectorReview,setWorldContext } from '../../../../simulation/SimulationApi';
 import { extractWorldContext } from '../../../../simulation/worldContext';
 import { useSimulationStore } from '../../../../stores/simulationStore';
-import { useSaveStore } from '../../../../stores/saveStore';
-import { eventBus, EVENTS } from '../../../../engine/eventBus';
 import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
-import type { WorldDynamics } from '../../../../modules/schema';
-import { createDefaultWorldDynamics } from '../../../../modules/defaults';
 import { isCombatInteractionPaused } from '../../../../gameplay/combatRuntime';
-
-/**
- * 从世界定义中获取仿真规则。
- * 世界演化不再作为可选模块暴露给用户（建世界时不勾选「世界演化」），
- * 但 5 层后台（周期事件 / 世界状态规则 / 叙事护栏 / 资源自然漂移 / 成长体系）
- * 必须始终运行，故缺少 simulation 模块时回退到默认规则兜底。
- * 旧世界文件若仍含 simulation 模块，则照常读取其 moduleConfig。
- */
-function getSimRules(worldDef: WorldDef | undefined): WorldDynamics {
-  if (!worldDef?.modules) return createDefaultWorldDynamics();
-  const simMod = worldDef.modules.find(m => m.moduleId === 'simulation' && m.enabled);
-  return (simMod?.moduleConfig as unknown as WorldDynamics) ?? createDefaultWorldDynamics();
-}
 
 export function useSimulation(
   engine: GameEngine,
@@ -60,20 +43,9 @@ export function useSimulation(
       // 同步 store 配置到引擎
       simEngine.state.config = { ...useSimulationStore.getState().simState.config };
 
-      const gs = engine.variableManager.getState();
-      const gameTime = {
-        current: gs.世界?.时间系统?.当前时间 ?? '',
-      };
-      const round = engine.messages.length;
-      const worldDesc = worldDef?.description ?? worldDef?.name ?? '未知世界';
-      const simRules = getSimRules(worldDef);
-
-      // 强制 tick（跳过 shouldTick 检查）
-      simEngine.state.config.lastSimulatedTime = '';
-      simEngine.state.config.lastAutoTickRound = 0;
-      await simEngine.tick(gs, gameTime, round, worldDesc, undefined, simRules);
-      useSimulationStore.getState().setSimState(simEngine.state);
-      useSaveStore.getState().scheduleAutoSave();
+      // 手动按钮复用已提交正文的审查通道，强制后台分支执行一次。
+      // 这样不会绕过回合身份/快照校验，也不会重新引入已废弃的 engine.tick。
+      await requestDirectorReview('background');
     } catch (err) {
       console.warn('[WorldSim] 手动推演失败:', err);
     } finally {

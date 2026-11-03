@@ -4,7 +4,7 @@ import { useImageGen } from './useImageGen';
 import { getGenerationConfigError } from '@/api/imageGen';
 import { useConfigStore } from '@/stores/configStore';
 import { requestCompletionStream } from '@/api/client';
-import type { NPCData } from '@/schema/variables';
+import type { KnownNPC } from '@/engine/playerKnowledge';
 
 // ─── LLM 翻译 Prompt ───
 
@@ -35,7 +35,7 @@ function addLine(lines: string[], label: string, val: unknown) {
   if (!isPlaceholder(val)) lines.push(`${label}：${val}`);
 }
 
-function buildCharacterDescription(npc: NPCData): string {
+function buildCharacterDescription(npc: KnownNPC): string {
   const lines: string[] = [];
   const pi = npc.个人信息 || {};
 
@@ -69,7 +69,7 @@ function buildCharacterDescription(npc: NPCData): string {
 // ─── 导出函数 ───
 
 /** 本地降级：从 NPC 数据直接拼基础英文标签（LLM 失败时用） */
-export function buildPortraitPrompt(npc: NPCData): string {
+export function buildPortraitPrompt(npc: KnownNPC): string {
   const parts: string[] = ['masterpiece, best quality, portrait'];
   const gender = npc.性别 || '';
   if (gender.includes('女')) parts.push('1girl');
@@ -85,7 +85,7 @@ export function buildPortraitPrompt(npc: NPCData): string {
 }
 
 /** 调用 LLM 将中文角色描述翻译为英文 booru 标签 */
-export async function translatePromptWithLLM(npc: NPCData): Promise<string> {
+export async function translatePromptWithLLM(npc: KnownNPC): Promise<string> {
   const apiConfig = useConfigStore.getState().apiConfig;
   if (!apiConfig) throw new Error('未配置 API');
 
@@ -123,7 +123,7 @@ export function useCharacterPortrait() {
   const { config, generateAndSave, getImageUrl } = useImageGen();
 
   const generatePortrait = useCallback(async (
-    npc: NPCData,
+    npc: KnownNPC,
     onProgress?: (status: string) => void,
     promptOverride?: string,
   ): Promise<{ url: string; blobKey: string } | null> => {

@@ -93,7 +93,7 @@ export const FANTASY_CORE_PROFESSION_PACK: ProfessionModuleSchema = {
       ability('judgment', '最终审判', 'ultimate', '以全部誓约之力完成一次裁决。', ['oath_vengeance'], { pointCost: 2, requiredProfessionLevel: 4, cooldownTicks: 6 }),
     ]),
   ],
-  freeSkillCatalog: [
+  freeSkills: [
     freeSkill('arcana', '奥术学识', '识读魔法符文、仪式与超自然线索。', 2),
     freeSkill('herbalism', '草药学', '辨识药草并处理基础药材。', 1),
     freeSkill('tracking', '追踪术', '从足迹、气味与环境变化还原行踪。', 2),

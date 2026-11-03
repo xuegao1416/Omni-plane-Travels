@@ -1,5 +1,5 @@
 // ComfyUI 工作流编辑器 — 工具函数
-import type { WorkflowParamMapping, DetectedNode, ParamInjectPoint } from '@/api/imageGenTypes';
+import type { WorkflowParamMapping,DetectedNode,ParamInjectPoint } from '@/api/imageGenTypes';
 
 /** 解析 workflow JSON（兼容 ComfyUI 导出的两种格式），失败返回 null */
 export function parseWorkflowJson(raw: string): Record<string, Record<string, unknown>> | null {

@@ -8,7 +8,7 @@ import { executeBuildPipeline } from '../../modules/buildPipeline';
 import { createBuildContext } from '../../modules/buildContext';
 import { createFallbackModule } from '../../modules/defaults';
 import type { CallAI } from '../types';
-import type { DimensionGeneration, DimensionSelection } from './types';
+import type { DimensionSelection } from './types';
 import { inferWorldClockConfig } from '../../time/worldClock';
 
 // ── JSON 提取工具 ──

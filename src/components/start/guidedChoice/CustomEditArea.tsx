@@ -1,4 +1,4 @@
-import { Loader, Sparkles } from 'lucide-react';
+import { Loader,Sparkles } from 'lucide-react';
 
 interface CustomEditAreaProps {
   dimLabel: string;

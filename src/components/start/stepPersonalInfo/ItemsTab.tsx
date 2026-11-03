@@ -1,6 +1,5 @@
-import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import type { PlayerProfile, InventoryItem } from './types';
+import { Plus,Trash2 } from 'lucide-react';
+import type { PlayerProfile,InventoryItem } from './types';
 import { QUALITY_OPTIONS } from './types';
 
 interface ItemsTabProps {

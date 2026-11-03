@@ -3,18 +3,18 @@
 //  受控组件：workflow.id 变化 → 重置画布；用户编辑 → onChange 回调
 //  用 isUserEditRef 标记区分「用户编辑」和「外部重置」，避免无限循环
 // ============================================================
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback,useEffect,useMemo,useRef } from 'react';
 import {
-  ReactFlow, Background, Controls, MiniMap, ReactFlowProvider,
-  useNodesState, useEdgesState, addEdge,
-  type Node, type Edge, type Connection, type NodeTypes,
-  type OnNodesChange, type OnEdgesChange,
+ReactFlow,Background,Controls,MiniMap,ReactFlowProvider,
+useNodesState,useEdgesState,addEdge,
+type Node,type Edge,type Connection,type NodeTypes,
+type OnNodesChange,type OnEdgesChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type {
-  CardWorkflowDefinition, CardNodeInstance, CardWorkflowConnection,
+CardWorkflowDefinition,CardNodeInstance,CardWorkflowConnection,
 } from '../../modules/schema';
-import { getCardNodeDefinition, validateCardConnection } from '../../modules/cardNodeRegistry';
+import { getCardNodeDefinition,validateCardConnection } from '../../modules/cardNodeRegistry';
 import { computeAutoLayout } from '../../modules/autoLayout';
 import CardNodeComponent from './CardNodeComponent';
 

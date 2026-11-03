@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { extractFinishReason, getRequestTimeoutMs } from './client';
+import { describe,expect,test } from 'bun:test';
+import { extractFinishReason,getRequestTimeoutMs } from './client';
 import type { ApiConfig } from './types';
 
 const config = (provider: ApiConfig['provider']): ApiConfig => ({

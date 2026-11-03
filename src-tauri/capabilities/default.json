@@ -1,13 +1,20 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "default permissions with an explicit http scope so desktop requests bypass WebView CORS",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    "http:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://**" },
+        { "url": "http://127.0.0.1:*" },
+        { "url": "http://localhost:*" }
+      ]
+    },
     "dialog:default",
     "fs:default"
   ]

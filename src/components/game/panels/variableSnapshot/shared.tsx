@@ -1,2 +1,2 @@
-// 共享组件已迁移至 src/components/game/shared/
+// Compatibility re-export for snapshot subcomponents; canonical implementation lives in game/shared.
 export { default as ToolBtn } from '../../shared/ToolBtn';

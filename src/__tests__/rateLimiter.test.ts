@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'bun:test';
+import { describe,it,expect } from 'bun:test';
 import {
-  parseRetryAfter,
-  notifyRateLimited,
-  waitForRateLimit,
-  getRateLimitInterval,
-  setRateLimitInterval,
-  bucketKeyForConfig,
+parseRetryAfter,
+notifyRateLimited,
+waitForRateLimit,
+getRateLimitInterval,
+setRateLimitInterval,
+bucketKeyForConfig,
 } from '../api/rateLimiter';
 
 describe('rateLimiter.parseRetryAfter', () => {

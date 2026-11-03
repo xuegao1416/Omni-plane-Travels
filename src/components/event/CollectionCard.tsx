@@ -2,30 +2,30 @@
 // 合集卡片 — 在 EventLibrary（合集库）中显示
 //   - 封面色块 + 图标 + 名称 + 成员数量 + 作者
 //   - 操作：编辑、删除按钮
-//   - 点击展开显示成员列表（复用 EventListRow 样式）
+//   - 点击展开显示成员列表
 // ============================================================
 import { useState } from 'react';
 import {
-  ChevronRight,
-  Pencil,
-  Trash2,
-  Package,
-  FolderPlus,
-  Layers,
-  Star,
-  Zap,
-  Shield,
-  Crown,
-  Heart,
-  Gem,
-  Compass,
-  Feather,
-  Globe,
-  Map,
-  Swords,
-  Wand2,
-  Boxes,
-  type LucideIcon,
+ChevronRight,
+Pencil,
+Trash2,
+Package,
+FolderPlus,
+Layers,
+Star,
+Zap,
+Shield,
+Crown,
+Heart,
+Gem,
+Compass,
+Feather,
+Globe,
+Map,
+Swords,
+Wand2,
+Boxes,
+type LucideIcon,
 } from 'lucide-react';
 import type { EventRegistryEntry } from '../../modules/schema';
 import type { Collection } from '../../modules/schema';
@@ -211,7 +211,7 @@ export default function CollectionCard({
   );
 }
 
-// ─── 成员行（简化版 EventListRow） ───
+// ─── 成员行 ───
 
 function MemberRow({
   entry,

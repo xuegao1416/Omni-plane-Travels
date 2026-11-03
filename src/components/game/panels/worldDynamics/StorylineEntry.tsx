@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, PersonStanding, X } from 'lucide-react';
+import { ChevronDown,ChevronRight,PersonStanding,X } from 'lucide-react';
 import { useSimulationStore } from '../../../../stores/simulationStore';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 

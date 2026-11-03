@@ -1,123 +1,38 @@
-/**
- * 世界动态面板 — 展示后台推演的世界事件和玩家切入点
- *
- * 薄编排层：子组件已拆分至 ./worldDynamics/ 子目录
- */
-
-import { useState } from 'react';
-import { Globe } from 'lucide-react';
+/** 剧情导演控制台：计划、指导、回执、幕后事件、来源版本与机械日志。 */
+import { useMemo, useState } from 'react';
+import { Clapperboard, RefreshCw } from 'lucide-react';
 import { useSimulationStore } from '../../../stores/simulationStore';
-
 import type { WorldDynamicsPanelProps } from './worldDynamics/types';
-import { EventsTab } from './worldDynamics/EventsTab';
-import { StorylinesTab } from './worldDynamics/StorylinesTab';
-import { InteractionsTab } from './worldDynamics/InteractionsTab';
-import { SimSettings } from './worldDynamics/SimSettings';
+import { DirectorOverviewTab } from './worldDynamics/DirectorOverviewTab';
+import { DirectorPlansTab } from './worldDynamics/DirectorPlansTab';
+import { DirectorDirectivesTab } from './worldDynamics/DirectorDirectivesTab';
+import { DirectorReceiptsTab } from './worldDynamics/DirectorReceiptsTab';
+import { DirectorOffscreenTab } from './worldDynamics/DirectorOffscreenTab';
+import { DirectorSourceTab } from './worldDynamics/DirectorSourceTab';
+import { DirectorDiagnosticsTab } from './worldDynamics/DirectorDiagnosticsTab';
 import { EffectLogTab } from './worldDynamics/EffectLogTab';
+import { SimSettings } from './worldDynamics/SimSettings';
 
-type TabId = 'events' | 'storylines' | 'interactions' | 'effectlog' | 'settings';
-
-export default function WorldDynamicsPanel({ gameState, onManualTick, isSimulating, worldDef, onRulesChange, onUseAction }: WorldDynamicsPanelProps) {
-  const { simState } = useSimulationStore();
-  const [activeTab, setActiveTab] = useState<TabId>('events');
-
-  const eventsMap = simState.events ?? {};
-  const activeEvents = Object.values(eventsMap).filter(
-    e => e.status === 'active' || e.status === 'brewing',
-  );
-  activeEvents.sort((a, b) => b.severity - a.severity);
-
-  const offscreenNpcs = gameState
-    ? Object.entries(gameState.人物档案 ?? {})
-        .filter(([, npc]) => (npc.人物分类 === '离场' || npc.人物分类 === '重点') && npc.重要NPC)
-        .slice(0, 10)
-    : [];
-
-  // 获取 effectLog
-  const effectLog = gameState?.simulationRuntime?.effectLog ?? [];
-  const variableLabels: Record<string, string> = Object.fromEntries(
-    Object.entries(gameState?.玩家?.生存资源 ?? {}).map(([id, resource]) => [id, String((resource as any).name || (resource as any).名称 || id)]),
-  );
-  const statModule = worldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled)?.moduleConfig as Record<string, any> | undefined;
-  for (const key of ['attrA', 'attrB', 'dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6']) {
-    if (statModule?.[key]?.name) variableLabels[key] = String(statModule[key].name);
-  }
-  for (const special of Array.isArray(statModule?.special) ? statModule.special : []) {
-    if (special?.id && special?.name) variableLabels[String(special.id)] = String(special.name);
-  }
-
-  const tabs: { id: TabId; label: string; badge?: number }[] = [
-    { id: 'events', label: '事件' },
-    { id: 'storylines', label: '暗线' },
-    { id: 'interactions', label: '交互', badge: (simState.pendingInteractions ?? []).length },
-    { id: 'effectlog', label: '日志', badge: effectLog.length },
-    { id: 'settings', label: '设置' },
-  ];
-
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      overflow: 'hidden',
-    }}>
-      {/* 标题栏 */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', borderBottom: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <Globe size={16} color="var(--accent)" />
-          <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>
-            世界动态
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={activeTab === tab.id ? 'btn-primary btn-xs' : 'btn-ghost btn-xs'}
-              style={tab.badge ? { position: 'relative' } : undefined}
-            >
-              {tab.label}
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="notification-dot">
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 内容区 */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
-        {activeTab === 'events' && (
-          <EventsTab
-            activeEvents={activeEvents}
-            tickCount={simState.tickCount}
-            worldNewsSummary={simState.worldNewsSummary}
-            onManualTick={onManualTick}
-            isSimulating={isSimulating}
-            onUseAction={onUseAction}
-          />
-        )}
-
-        {activeTab === 'storylines' && (
-          <StorylinesTab offscreenNpcs={offscreenNpcs} storylines={simState.storylines ?? {}} />
-        )}
-
-        {activeTab === 'interactions' && (
-          <InteractionsTab interactions={simState.pendingInteractions ?? []} onUseAction={onUseAction} />
-        )}
-
-        {activeTab === 'effectlog' && (
-          <EffectLogTab effectLog={effectLog} variableLabels={variableLabels} />
-        )}
-
-        {activeTab === 'settings' && (
-          <SimSettings worldDef={worldDef} onRulesChange={onRulesChange} />
-        )}
-      </div>
+type TabId='overview'|'plans'|'directives'|'receipts'|'offscreen'|'source'|'diagnostics'|'mechanics'|'settings';
+export default function WorldDynamicsPanel({ gameState,onManualTick,isSimulating }:WorldDynamicsPanelProps){
+  const {simState,lastError,isMainlineReviewing,isBackgroundReviewing}=useSimulationStore(); const [active,setActive]=useState<TabId>('overview');
+  const reviewing = isSimulating || isMainlineReviewing || isBackgroundReviewing;
+  const director=simState.director; const effectLog=gameState?.simulationRuntime?.effectLog??[];
+  const variableLabels=useMemo(()=>Object.fromEntries(Object.entries(gameState?.玩家?.生存资源??{}).map(([id,r])=>[id,String((r as any).name||(r as any).名称||id)])),[gameState]);
+  const tabs:Array<{id:TabId;label:string;badge?:number}>=[
+    {id:'overview',label:'总览'},{id:'plans',label:'计划图谱',badge:Object.keys(director?.plans??{}).length},{id:'directives',label:'当前指令',badge:Object.keys(director?.directives??{}).length},{id:'receipts',label:'落实回执',badge:director?.receipts?.length??0},{id:'offscreen',label:'幕后事件',badge:Object.keys(director?.offscreenReceipts??{}).length},{id:'source',label:'主线版本'},{id:'diagnostics',label:'依据诊断'},{id:'mechanics',label:'机械日志',badge:effectLog.length},{id:'settings',label:'设置'}];
+  return <div className="game-director-panel">
+    <div className="game-director-header">
+      <Clapperboard size={17} color="var(--accent)"/><strong style={{fontSize:'var(--font-size-lg)'}}>剧情导演控制台</strong>
+      <span style={{fontSize:11,color:'var(--text-muted)'}}>{simState.config.enabled?'已启用':'已暂停 · 游戏规则照常结算'}</span>
+      <span className="game-director-header__spacer"/>
+      <button className="btn-ghost btn-xs" disabled={reviewing} onClick={onManualTick}><RefreshCw size={12}/>{reviewing?'审查中':'手动审查'}</button>
     </div>
-  );
+    {lastError && <div role="alert" className="game-director-error">{lastError}</div>}
+    <div className="game-director-tabs">{tabs.map(t=><button key={t.id} className={active===t.id?'btn-primary btn-xs':'btn-ghost btn-xs'} onClick={()=>setActive(t.id)} style={{whiteSpace:'nowrap'}}>{t.label}{t.badge?` ${t.badge}`:''}</button>)}</div>
+    <div className="game-director-body">
+      {active==='overview'&&<DirectorOverviewTab simState={simState}/>} {active==='plans'&&<DirectorPlansTab director={director}/>} {active==='directives'&&<DirectorDirectivesTab director={director}/>} {active==='receipts'&&<DirectorReceiptsTab director={director}/>} {active==='offscreen'&&<DirectorOffscreenTab director={director}/>} {active==='source'&&<DirectorSourceTab simState={simState}/>} {active==='diagnostics'&&<DirectorDiagnosticsTab simState={simState}/>} {active==='mechanics'&&<EffectLogTab effectLog={effectLog} variableLabels={variableLabels}/>} {active==='settings'&&<SimSettings/>} 
+    </div>
+  </div>;
 }
+

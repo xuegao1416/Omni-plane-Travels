@@ -1,11 +1,11 @@
 /** 模板选择弹窗 — 子组件拆分至 ./templatePicker/ */
-import { useState, useRef, useCallback } from 'react';
-import { Plus, FileJson, Users, User, BookOpen } from 'lucide-react';
+import { useState,useRef,useCallback } from 'react';
+import { Plus,FileJson,Users,User,BookOpen } from 'lucide-react';
 import { useDialog } from './Dialog';
 import OverlayPortal from './OverlayPortal';
 import type { TemplatePickerProps } from './templatePicker/types';
-import type { NpcTemplate, PlayerPreset, HistoryPreset } from '../../storage/templateStore';
-import { getNpcTemplates, importNpcFromTemplate, parseNpcTemplateJSON, getPlayerPresets, parsePlayerPresetJSON, applyPresetToProfile, deleteNpcTemplate, deletePlayerPreset, getHistoryPresets, parseHistoryPresetJSON, deleteHistoryPreset } from '../../storage/templateStore';
+import type { NpcTemplate,PlayerPreset,HistoryPreset } from '../../storage/templateStore';
+import { getNpcTemplates,importNpcFromTemplate,parseNpcTemplateJSON,getPlayerPresets,parsePlayerPresetJSON,applyPresetToProfile,deleteNpcTemplate,deletePlayerPreset,getHistoryPresets,parseHistoryPresetJSON,deleteHistoryPreset } from '../../storage/templateStore';
 import { OptionCard } from './templatePicker/OptionCard';
 import { TemplateCard } from './templatePicker/TemplateCard';
 import s from './templatePicker/styles.module.css';

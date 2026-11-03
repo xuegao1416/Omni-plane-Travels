@@ -2,9 +2,9 @@
 // 提示词模板区块 — 使用共享组件重写
 // ============================================================
 
-import { ChevronRight, RotateCcw, FileText } from 'lucide-react';
+import { ChevronRight,RotateCcw,FileText } from 'lucide-react';
 import type { NarrativePromptTemplates } from '../../../memory/types';
-import { TextArea, Button } from '../SettingsUIComponents';
+import { TextArea,Button } from '../SettingsUIComponents';
 
 interface Props {
   templates: NarrativePromptTemplates;

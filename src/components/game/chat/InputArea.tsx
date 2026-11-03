@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState,useRef,useCallback,useEffect } from 'react';
 import { useUISettings } from '../../../context/UISettingsContext';
 import { useMediaQuery } from '../../../hooks/useIsMobile';
-import { Activity, Send, StopCircle } from 'lucide-react';
+import { Activity,Send,StopCircle } from 'lucide-react';
 import type { PipelineStatus as PipelineStatusType } from '../../../engine/pipelineTypes';
 
 interface Props {

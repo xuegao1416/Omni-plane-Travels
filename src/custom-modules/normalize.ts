@@ -1,8 +1,7 @@
-import { customGameplayModuleV1Schema, customGameplayModuleV2Schema } from './manifestSchema';
+import { customGameplayModuleV1Schema,customGameplayModuleV2Schema } from './manifestSchema';
 import type {
-  CustomGameplayModule,
-  CustomGameplayModuleDefinition,
-  ModuleValidationIssue,
+CustomGameplayModuleDefinition,
+ModuleValidationIssue
 } from './schema';
 
 export type NormalizedModuleResult = {

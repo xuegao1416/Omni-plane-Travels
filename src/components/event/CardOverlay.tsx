@@ -2,18 +2,19 @@
 //  卡片浮层 v2 — 执行 CardWorkflowDefinition 工作流
 //  订阅 EVENT_CARD 事件，加载工作流定义，执行 DAG，渲染结果
 // ============================================================
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { X, FileText, ScrollText, MessageCircle, Image, ListChecks, Sparkles, Filter, Dice5 } from 'lucide-react';
-import { eventBus, EVENTS } from '../../engine/eventBus';
-import { getWebEvent } from '../../modules/eventDb';
+import { useEffect,useState,useCallback,useRef } from 'react';
+import { X,FileText,ScrollText,MessageCircle,Image } from 'lucide-react';
+import { eventBus,EVENTS } from '../../engine/eventBus';
 import { getRuntimePack } from '../../modules/eventApi';
-import type { CardWorkflowDefinition, CardNodeExecutionResult, CardExecutionContext } from '../../modules/schema';
+import type { CardNodeExecutionResult,CardExecutionContext } from '../../modules/schema';
+import type { ApiConfig } from '../../api/types';
+import { generateDynamicChoices } from '../../modules/dynamicChoiceGenerator';
 import { readCanonicalEventPack } from '../../modules/eventPackFormat';
-import { executeCardWorkflow, type CardWorkflowExecutionResult } from '../../modules/cardWorkflowEngine';
+import { executeCardWorkflow,type CardWorkflowExecutionResult } from '../../modules/cardWorkflowEngine';
 import { useSaveStore } from '../../stores/saveStore';
 import type { GameState } from '../../schema/variables';
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
-import { applyNarrativeDecision, createNarrativeDecisionRecord, normalizeNarrativeDecisionAction, type NarrativeDecisionEffect, type NarrativeDecisionRecord } from '../../gameplay/narrativeDecision';
+import { applyNarrativeDecision,createNarrativeDecisionRecord,normalizeNarrativeDecisionAction,type NarrativeDecisionEffect,type NarrativeDecisionRecord } from '../../gameplay/narrativeDecision';
 import JourneyCardShell from '../game/shared/JourneyCardShell';
 
 interface CardEvent {
@@ -23,23 +24,17 @@ interface CardEvent {
 
 interface Props {
   gameState?: GameState;
+  apiConfig?: ApiConfig | null;
   onChoice?: (event: CustomModuleChoiceEvent) => Promise<void> | void;
   onDecisionApplied?: (state: GameState, record: NarrativeDecisionRecord) => Promise<void> | void;
 }
 
-export default function CardOverlay({ gameState, onChoice, onDecisionApplied }: Props) {
+export default function CardOverlay({ gameState, apiConfig, onChoice, onDecisionApplied }: Props) {
   const [result, setResult] = useState<CardWorkflowExecutionResult | null>(null);
   const [title, setTitle] = useState('');
   const [current, setCurrent] = useState<CardEvent | null>(null);
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const decisionIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const offCard = eventBus.on(EVENTS.EVENT_CARD, (evt: CardEvent) => {
-      void openCard(evt);
-    });
-    return () => { offCard(); };
-  }, []);
 
   const openCard = useCallback(async (evt: CardEvent) => {
     try {
@@ -60,7 +55,33 @@ export default function CardOverlay({ gameState, onChoice, onDecisionApplied }: 
         gameState: (gameState ?? {}) as Record<string, unknown>,
       };
 
-      const execResult = executeCardWorkflow(workflow, ctx);
+      let execResult = executeCardWorkflow(workflow, ctx);
+      if (execResult.dynamicConfig) {
+        const narrativeText = execResult.renderData
+          .map((item) => item?.text || item?.title || '')
+          .filter(Boolean)
+          .join('\n');
+        const fallbackChoices = execResult.dynamicConfig.fallbackChoices ?? [];
+        const dynamicChoices = gameState && apiConfig
+          ? await generateDynamicChoices(
+              execResult.dynamicConfig,
+              gameState,
+              narrativeText,
+              apiConfig,
+              {
+                worldName,
+                gameTime: gameState.世界?.时间系统?.当前时间,
+              },
+            )
+          : fallbackChoices;
+        execResult = {
+          ...execResult,
+          choices: dynamicChoices,
+          warnings: gameState && apiConfig
+            ? execResult.warnings
+            : [...execResult.warnings, '动态选项缺少游戏状态或 API 配置，已使用兜底选项'],
+        };
+      }
 
       setTitle(workflow.name || worldName);
       setCurrent(evt);
@@ -69,7 +90,14 @@ export default function CardOverlay({ gameState, onChoice, onDecisionApplied }: 
     } catch (err) {
       console.error('[CardOverlay] 卡片加载失败:', evt, err);
     }
-  }, [gameState]);
+  }, [apiConfig, gameState]);
+
+  useEffect(() => {
+    const offCard = eventBus.on(EVENTS.EVENT_CARD, (evt: CardEvent) => {
+      void openCard(evt);
+    });
+    return () => { offCard(); };
+  }, [openCard]);
 
   const close = useCallback(() => {
     setResult(null);

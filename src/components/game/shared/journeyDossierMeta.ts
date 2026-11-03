@@ -20,7 +20,7 @@ export const DOSSIER_META: Record<DossierPanelId, DossierPanelMeta> = {
   chronicle: { title: '旅途纪事', subtitle: '按时间整理的世界日志', emblemSrc: themeEmblem(32) },
   variables: { title: '变量档案', subtitle: '玩家、世界与资源状态', emblemSrc: '/art/theme/emblems/emblem-08-v2.png' },
   worldbook: { title: '世界书', subtitle: '条目、目录与启用状态', emblemSrc: themeEmblem(34) },
-  dynamics: { title: '世界动态', subtitle: '时间流、状态轴与最近变化', emblemSrc: '/art/theme/emblems/emblem-20-v2.png' },
+  dynamics: { title: '剧情导演', subtitle: '剧情计划、落实回执与幕后发展', emblemSrc: '/art/theme/emblems/emblem-20-v2.png' },
   memory: { title: '记忆回廊', subtitle: '长期、短期与关键记忆', emblemSrc: '/art/theme/emblems/emblem-24-v2.png' },
   modules: { title: '本局模块', subtitle: '只影响当前旅程的启用开关', emblemSrc: '/art/theme/emblems/emblem-13-v2.png' },
   settings: { title: '旅途设置', subtitle: '主题、文字、显示与生成偏好', emblemSrc: '/art/theme/emblems/emblem-26-v2.png' },

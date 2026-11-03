@@ -1,24 +1,23 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Palette, Cpu, ImageIcon, FileText } from 'lucide-react';
+import { useState,useRef,useCallback,useEffect } from 'react';
+import { Palette,Cpu,ImageIcon,FileText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useUISettings } from '../context/UISettingsContext';
 import { useConfigStore } from '../stores/configStore';
 import { useIsPhone } from '../hooks/useIsMobile';
-import type { ApiConfig } from '../api/types';
 import GeneralSettingsTab from './settings/GeneralSettingsTab';
-import ApiSettingsTab, { type ApiSettingsRef } from './settings/ApiSettingsTab';
+import ApiSettingsTab,{ type ApiSettingsRef } from './settings/ApiSettingsTab';
 import ImageGenSettingsTab from './settings/ImageGenSettingsTab';
 import PresetSettingsTab from './settings/PresetSettingsTab';
 import DawnFrameV4 from './shared/dawn/DawnFrameV4';
 
 type SettingsTab = 'general' | 'api' | 'image' | 'preset';
 
-const SETTINGS_TABS: { id: SettingsTab; icon: LucideIcon; label: string }[] = [
-  { id: 'general', icon: Palette, label: '通用设置' },
-  { id: 'api', icon: Cpu, label: 'API 设置' },
-  { id: 'image', icon: ImageIcon, label: '生图设置' },
-  { id: 'preset', icon: FileText, label: '预设管理' },
+const SETTINGS_TABS: { id: SettingsTab; icon: LucideIcon; label: string; mobileLabel: string }[] = [
+  { id: 'general', icon: Palette, label: '通用设置', mobileLabel: '通用' },
+  { id: 'api', icon: Cpu, label: 'API 设置', mobileLabel: 'API' },
+  { id: 'image', icon: ImageIcon, label: '生图设置', mobileLabel: '生图' },
+  { id: 'preset', icon: FileText, label: '预设管理', mobileLabel: '预设' },
 ];
 
 export default function SettingsScreen() {
@@ -74,7 +73,7 @@ export default function SettingsScreen() {
                   className={`settings-mobile-tab${tab === t.id ? ' active' : ''}`}
                 >
                   <TabIcon size={15} strokeWidth={1.5} />
-                  <span>{t.label}</span>
+                  <span>{t.mobileLabel}</span>
                 </button>
               );
             })}

@@ -1,9 +1,9 @@
 import {
-  ScrollText, MapPin, Clock, Cloud, Sparkles, Star, Compass, Globe, Map,
-  Flag, BookMarked, User, AlertTriangle, Zap, Users, Swords, Layers,
-  BarChart3, Target, Briefcase, DollarSign, Heart, Calendar,
+ScrollText,MapPin,Clock,Cloud,Sparkles,Star,Compass,Map,
+Flag,BookMarked,User,AlertTriangle,Zap,Users,Swords,Layers,
+BarChart3,Target,Briefcase,DollarSign,Heart,Calendar
 } from 'lucide-react';
-import type { WorldDef, WorldBookEntryDef } from '../../../data/worlds-schema';
+import type { WorldDef } from '../../../data/worlds-schema';
 import type { WorldBookEntry } from '../../../worldbook/index';
 import { findEntryByType } from './constants';
 
@@ -57,6 +57,13 @@ export function LoreTab({ world }: { world: WorldDef }) {
       ) : <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>暂无地理数据</div>}
     </div>
   );
+}
+
+export function ItemsTab({ world }: { world: WorldDef }) {
+  const entries = world.worldBookEntries?.filter(entry => entry.entryType === 'items') ?? [];
+  return <div className="tab-section">{entries.length ? entries.map(entry =>
+    <div key={entry.uid} className="detail-block"><div className="detail-block-title"><BookMarked size={15} />{entry.comment}</div><div className="detail-block-body">{entry.content}</div></div>
+  ) : <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>暂无物品资料</div>}</div>;
 }
 
 export function FactionsTab({ world }: { world: WorldDef }) {
@@ -117,7 +124,6 @@ export function EconomyTab({ world }: { world: WorldDef }) {
   const survMod = world.modules?.find(m => m.moduleId === 'survival' && m.enabled);
   const survData = survMod?.moduleConfig as any;
   const resources = survData?.resources || [];
-  const recipes = survData?.recipes || [];
   const resDesc = survData?.description;
   const economyEntry = findEntryByType(world.worldBookEntries, 'economy');
   const currency = economyEntry?.meta?.currency;

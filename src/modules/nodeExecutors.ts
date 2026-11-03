@@ -2,7 +2,6 @@
 //  节点执行器 — 38 个节点的具体执行逻辑
 // ============================================================
 import { registerNodeExecutor } from './nodeRegistry';
-import type { NodeExecutor, NodeExecutorContext, PendingAction } from './workflowSchema';
 
 // ─── 辅助 ───
 
@@ -45,7 +44,7 @@ function mathOp(op: string, a: number, b: number): number {
 
 // ─── TRIGGERS ───
 
-registerNodeExecutor('triggers.world_event', (inputs, ctx, wv) => {
+registerNodeExecutor('triggers.world_event', (_inputs, ctx, wv) => {
   const matchType = (wv?.match_type as string) ?? '';
   const matched = ctx.events.find((e) => !matchType || e.type === matchType);
   return {
@@ -125,7 +124,7 @@ registerNodeExecutor('conditions.compare', (inputs, _ctx, wv) => {
   return { outputs: { result: compare(op, inputs.value_a, inputs.value_b) } };
 });
 
-registerNodeExecutor('conditions.check_resource', (inputs, ctx, wv) => {
+registerNodeExecutor('conditions.check_resource', (_inputs, ctx, wv) => {
   const key = (wv?.resource_key as string) ?? '';
   const op = (wv?.op as string) ?? '>=';
   const threshold = (wv?.threshold as number) ?? 0;
@@ -136,7 +135,7 @@ registerNodeExecutor('conditions.check_resource', (inputs, ctx, wv) => {
   };
 });
 
-registerNodeExecutor('conditions.check_stat', (inputs, ctx, wv) => {
+registerNodeExecutor('conditions.check_stat', (_inputs, ctx, wv) => {
   const key = (wv?.stat_key as string) ?? '';
   const op = (wv?.op as string) ?? '>=';
   const threshold = (wv?.threshold as number) ?? 0;
@@ -186,7 +185,7 @@ registerNodeExecutor('conditions.not', (inputs) => ({
   outputs: { result: !inputs.in_0 },
 }));
 
-registerNodeExecutor('conditions.event_match', (inputs, ctx, wv) => {
+registerNodeExecutor('conditions.event_match', (_inputs, ctx, wv) => {
   const matchType = (wv?.match_type as string) ?? '';
   const matched = ctx.events.find((e) => !matchType || e.type === matchType);
   return { outputs: { matched: !!matched, event_out: matched ?? null } };
@@ -290,7 +289,7 @@ registerNodeExecutor('actions.emit_signal', (inputs, ctx, wv) => {
   return { outputs: { flow_out: true } };
 });
 
-registerNodeExecutor('actions.modify_npc', (inputs, ctx, wv) => {
+registerNodeExecutor('actions.modify_npc', (inputs, _ctx, wv) => {
   const npcId = (wv?.npc_id as string) ?? '';
   const field = (wv?.field as string) ?? '';
   if (!npcId || !field) return { outputs: { flow_out: true } };
@@ -457,8 +456,7 @@ registerNodeExecutor('flow.delay', (_inputs, _ctx, wv) => ({
   actions: [{ kind: 'scheduleTick', payload: { after: (wv?.after as number) ?? 1 } }],
 }));
 
-registerNodeExecutor('flow.loop', (inputs, _ctx, wv) => {
-  const count = Math.min((wv?.count as number) ?? 1, 64);
+registerNodeExecutor('flow.loop', (inputs) => {
   // 简化实现：只输出第一次的 flow_out，后续迭代由外部处理
   return {
     outputs: { flow_out: !!inputs.flow_in, index: 0, done: true },

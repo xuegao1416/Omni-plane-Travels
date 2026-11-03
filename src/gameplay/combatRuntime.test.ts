@@ -60,6 +60,12 @@ describe('v3 combat runtime bridge', () => {
     expect(roster.ok).toBe(true);
     expect(roster.plan?.enemyPool[0].id).toBe('enemy');
     expect(roster.plan?.enemyPool[0].stateBinding?.id).toBe('enemy');
+    const contextRoster = buildValidatedCombatRoster(initial, {
+      ...proposal(),
+      context: '同伴就在旅者身边，档案敌人发动了袭击',
+      allies: [],
+    });
+    expect(contextRoster.plan?.playerPool.map(unit => unit.id)).toContain('ally');
 
     const started = requestV3CombatEncounter(initial, request(), { seed: 17, now: 1 });
     expect(started.ok).toBe(true);
@@ -100,6 +106,19 @@ describe('v3 combat runtime bridge', () => {
     expect(hasResolvedCombatOutcome('袭击者拔刀冲来，刀锋已经逼近你的肩侧。')).toBe(false);
   });
 
+  test('includes friendly NPCs explicitly present in a locally inferred encounter', () => {
+    const encounter = inferImmediateCombatEncounterRequest(
+      '我和同伴一起停下脚步',
+      '同伴守在你身侧，追杀者堵住出口并朝你挥刀。',
+      makeState(),
+      8,
+    );
+
+    expect(encounter?.proposal.allies).toEqual([
+      { id: 'ally', identity: '同伴', temporary: false, source: 'npc' },
+    ]);
+  });
+
   test('uses the v3 core for roster selection, command persistence, pause gate, and refresh-ready state', () => {
     const initial = makeState();
     const prepared = requestV3CombatEncounter(initial, request(), { seed: 3, now: 1 });
@@ -115,6 +134,8 @@ describe('v3 combat runtime bridge', () => {
     expect(command.ok).toBe(true);
     expect(command.state.v3?.combatSession?.actionSequence).toHaveLength(1);
     expect(command.state.v3?.combatSession?.actionSequence[0].transactionId).toContain('runtime-command-1');
+    expect(command.state.人物档案).toBe(selected.state.人物档案);
+    expect(selected.state.v3?.combatSession?.actionSequence).toHaveLength(0);
   });
 
   test('retry returns the complete checkpoint restore bundle and preserves inferno guard', () => {
@@ -250,5 +271,6 @@ describe('v3 combat runtime bridge', () => {
     expect(view.allyUnits).toHaveLength(2);
     expect(view.controls).toEqual(['attack', 'skill', 'item', 'defend', 'flee']);
     expect(view.enemyUnits.every(unit => unit.portrait.kind === 'neutral')).toBe(true);
+    expect(view.allyUnits.find(unit => unit.id === 'ally')).toMatchObject({ hp: 50, maxHp: 50 });
   });
 });

@@ -1,6 +1,6 @@
-import { BookOpen, ExternalLink } from 'lucide-react';
+import { BookOpen,ExternalLink } from 'lucide-react';
 import type { ProfessionWorldBinding } from '../../../modules/schema';
-import { getProfessionPack, isProfessionBinding, resolveProfessionBinding } from '../../../data/professions';
+import { getProfessionPack,isProfessionBinding,resolveProfessionBinding } from '../../../data/professions';
 
 export function ProfessionModuleEditor({
   data,

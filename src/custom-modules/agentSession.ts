@@ -1,4 +1,4 @@
-import type { CustomGameplayModuleDefinition, ModuleValidationIssue } from './schema';
+import type { CustomGameplayModuleDefinition,ModuleValidationIssue } from './schema';
 import { validateCustomGameplayModule } from './validator';
 
 export type CustomModuleAgentPhase = 'discovery' | 'designing' | 'draft_ready' | 'revising';

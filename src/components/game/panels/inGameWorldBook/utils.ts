@@ -1,4 +1,4 @@
-import type { WorldBookEntryDef, WorldDef } from '../../../../data/worlds-schema';
+import type { WorldBookEntryDef,WorldDef } from '../../../../data/worlds-schema';
 import { findWorldDef } from '../../../../data/worldLoader';
 import { STORAGE_KEYS } from '../../../../config/storageKeys';
 

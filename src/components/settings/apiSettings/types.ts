@@ -1,4 +1,4 @@
-import type { ApiConfig, ApiProvider } from '../../../api/types';
+import type { ApiConfig,ApiProvider } from '../../../api/types';
 import type { ApiPreset } from '../apiPresetUtils';
 
 export interface ApiSettingsRef {

@@ -5,15 +5,15 @@
 //   - 导入 .opt-event / 导出已启用事件包
 //   - 事件包提供「预览」按钮（折叠列表看事件和卡片）
 // ============================================================
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect,useMemo,useRef,useState } from 'react';
 import {
-  Package, FileText, Zap, BookOpen, Boxes, Upload, Download, Eye,
+Package,FileText,Zap,BookOpen,Boxes,Upload,Download,Eye,
 } from 'lucide-react';
 import * as eventApi from '../../modules/eventApi';
 import { useSaveStore } from '../../stores/saveStore';
-import { getWebEvent, allWebEvents } from '../../modules/eventDb';
+import { getWebEvent,allWebEvents } from '../../modules/eventDb';
 import { eventWorldEvolution } from '../../modules/eventIntegration';
-import type { EventPackType, EventRegistryEntry, Collection } from '../../modules/schema';
+import type { EventPackType,EventRegistryEntry,Collection } from '../../modules/schema';
 import EventPackPreview from './EventPackPreview';
 import type { WorldDef } from '../../data/worlds-schema';
 import EventSwitch from './EventSwitch';
@@ -30,10 +30,8 @@ const TYPE_META: Record<string, { label: string; icon: typeof Package }> = {
 const TYPE_ORDER: EventPackType[] = ['card', 'rule', 'worldbook', 'bundle'];
 
 export default function EventConfigPanel({
-  onClose,
   worldDef,
 }: {
-  onClose: () => void;
   worldDef?: WorldDef | null;
 }) {
   const [packs, setPacks] = useState<EventRegistryEntry[]>([]);
@@ -61,9 +59,9 @@ export default function EventConfigPanel({
       // 只显示全局已启用的包（总开关）
       const enabled = list.filter(e => e.enabled);
       // 预加载 worldId：批量读取 WebEventRecord，构建 id→worldId 映射
-      // 优先取 WebEventRecord.worldId，回退到 manifest.worldId
+      // worldId 已归一到 manifest.worldId
       const allRecs = await allWebEvents();
-      const worldIdMap = new Map(allRecs.map(r => [r.id, r.worldId ?? r.manifest.worldId]));
+      const worldIdMap = new Map(allRecs.map(r => [r.id, r.manifest.worldId]));
       // 所有包必须 worldId === worldDef.id 才显示（防止跨世界污染）
       const filtered = enabled.filter(e => {
         if (!worldDef) return true; // 无世界上下文时不过滤

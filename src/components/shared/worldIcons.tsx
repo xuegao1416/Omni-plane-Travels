@@ -3,16 +3,16 @@
  * icon 字段直接存 Lucide 图标名称（如 "Cpu"、"Swords"），一步解析到位
  */
 import {
-  Globe, Compass, BookOpen, Flame, Mountain, Ship, Castle, Skull, Crown,
-  Rocket, Star, Shield, Zap, Brain, Gem, Ghost, Snowflake, Sun, Moon,
-  Wind, Waves, Anchor, Eye, Heart, Target, Wand2, Fish, Bug,
-  Flower, TreePine, Cloud, Sunrise, Eclipse, Hexagon, Diamond, Atom,
-  Cpu, Swords, GraduationCap, Flower2, Plane, Sailboat, Tent, TentTree, Trees,
-  TreePalm,
-  ScrollText, MapPin, Clock, AlertTriangle, DollarSign, Flag, User,
-  Sparkles, Check, Landmark, Scroll, Backpack, Dna, Lightbulb, Bookmark,
-  Building2, Truck, Package, Store,
-  type LucideIcon,
+Globe,Compass,BookOpen,Flame,Mountain,Ship,Castle,Skull,Crown,
+Rocket,Star,Shield,Zap,Brain,Gem,Ghost,Snowflake,Sun,Moon,
+Wind,Waves,Anchor,Eye,Heart,Target,Wand2,Fish,Bug,
+Flower,TreePine,Cloud,Sunrise,Eclipse,Hexagon,Diamond,Atom,
+Cpu,Swords,GraduationCap,Flower2,Plane,Sailboat,Tent,TentTree,Trees,
+TreePalm,
+ScrollText,MapPin,Clock,AlertTriangle,DollarSign,Flag,User,
+Sparkles,Check,Landmark,Scroll,Backpack,Dna,Lightbulb,Bookmark,
+Building2,Truck,Package,Store,
+type LucideIcon,
 } from 'lucide-react';
 
 /** Lucide 图标名称 → 组件映射 */

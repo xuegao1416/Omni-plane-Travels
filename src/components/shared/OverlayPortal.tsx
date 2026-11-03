@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect,useRef,useState,type MouseEvent,type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
-import { getOverlayPortalTarget, shouldDismissOverlay } from './overlayPortalContract';
+import { getOverlayPortalTarget,shouldDismissOverlay } from './overlayPortalContract';
 
 export { getOverlayPortalTarget, shouldDismissOverlay } from './overlayPortalContract';
 

@@ -2,20 +2,19 @@
 // 导出记忆弹窗 — 使用共享组件重写
 // ============================================================
 
-import { useState, useCallback } from 'react';
-import { FileText, Image } from 'lucide-react';
+import { useState,useCallback } from 'react';
+import { FileText,Image } from 'lucide-react';
 import { useDialog } from '../../shared/Dialog';
-import type { NarrativeMemoryRuntime, VectorMemoryItem } from '../../../memory/types';
-import { createMemoryDataPngBlob, getMemoryExportFileName } from '../../../memory/narrativePng';
+import type { NarrativeMemoryRuntime,VectorMemoryItem } from '../../../memory/types';
+import { createMemoryDataPngBlob,getMemoryExportFileName } from '../../../memory/narrativePng';
 
 interface Props {
   onClose: () => void;
-  store: { toJSON: () => unknown };
   vectorMemory: VectorMemoryItem[];
   memoryRuntime: NarrativeMemoryRuntime | null;
 }
 
-export function ExportPickerDialog({ onClose, store, vectorMemory, memoryRuntime }: Props) {
+export function ExportPickerDialog({ onClose, vectorMemory, memoryRuntime }: Props) {
   const { DialogUI, alert: dlgAlert } = useDialog();
   const [exporting, setExporting] = useState(false);
 

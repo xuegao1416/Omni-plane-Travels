@@ -4,11 +4,11 @@ import type { MemorySystemConfig } from './types';
 export const DEFAULT_LOCAL_EMBEDDING_MODEL = 'onnx-community/bge-small-zh-v1.5-ONNX';
 
 export interface EmbeddingClient {
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], options?: { signal?: AbortSignal }): Promise<number[][]>;
 }
 
 export interface EmbeddingRuntimeDependencies {
-  remoteBatch?: (config: EmbeddingConfig, texts: string[]) => Promise<number[][]>;
+  remoteBatch?: (config: EmbeddingConfig, texts: string[], options?: { signal?: AbortSignal }) => Promise<number[][]>;
   localBatch?: (model: string, texts: string[]) => Promise<number[][]>;
 }
 
@@ -172,9 +172,9 @@ async function runLocalEmbedding(model: string, texts: string[]): Promise<number
   return assertEmbeddingMatrix(output.tolist(), texts.length);
 }
 
-async function runRemoteEmbedding(config: EmbeddingConfig, texts: string[]): Promise<number[][]> {
+async function runRemoteEmbedding(config: EmbeddingConfig, texts: string[], options?: { signal?: AbortSignal }): Promise<number[][]> {
   const { fetchEmbeddingBatch } = await import('../api/client');
-  return fetchEmbeddingBatch(config, texts);
+  return fetchEmbeddingBatch(config, texts, options);
 }
 
 export function resolveEmbeddingEndpoint(
@@ -195,9 +195,10 @@ export function createEmbeddingClient(
   if (config.vectorRuntime === 'local') {
     const localBatch = dependencies.localBatch ?? runLocalEmbedding;
     return {
-      embed: async texts => {
+      embed: async (texts, options) => {
         const embeddings: number[][] = [];
         for (let start = 0; start < texts.length; start += LOCAL_BATCH_SIZE) {
+          options?.signal?.throwIfAborted();
           embeddings.push(...await localBatch(model, texts.slice(start, start + LOCAL_BATCH_SIZE)));
         }
         return embeddings;
@@ -210,11 +211,11 @@ export function createEmbeddingClient(
     ? config.localEmbeddingEndpoint.trim()
     : config.vectorApiUrl.trim();
   return {
-    embed: texts => remoteBatch({
+    embed: (texts, options) => remoteBatch({
       baseUrl: endpoint,
       apiKey: config.vectorRuntime === 'local_endpoint' ? '' : config.vectorApiKey.trim(),
       model: config.vectorRuntime === 'local_endpoint' ? model : config.vectorApiModel.trim(),
-    }, texts),
+    }, texts, options),
   };
 }
 

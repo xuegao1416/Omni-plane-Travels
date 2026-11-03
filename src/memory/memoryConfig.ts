@@ -10,7 +10,6 @@ import type {
   MemoryCompilerConfig,
   MemoryRetentionConfig,
   MemoryDebugConfig,
-  NarrativePromptTemplates,
 } from './types';
 import { createDefaultNarrativePromptTemplates, normalizeNarrativePromptTemplates } from './memoryPrompts';
 
@@ -113,7 +112,6 @@ function createDefaultRetentionConfig(): MemoryRetentionConfig {
     maxHotEventCards: 50,
     checkpointInterval: 12,
     maxVectorMemories: 500,
-    maxSourceEvents: 200,
   };
 }
 
@@ -181,25 +179,15 @@ export function normalizeMemorySystemConfig(rawConfig: unknown): MemorySystemCon
   const defaults = createDefaultMemorySystemConfig();
   const safe = isPlainObject(rawConfig) ? rawConfig : {};
   const safeRetrieval = isPlainObject(safe.retrieval) ? safe.retrieval as Record<string, unknown> : {};
-  const safeMigrations = isPlainObject(safe._migrations) ? safe._migrations as Record<string, boolean> : {};
 
   const normalizedMemoryMode = String(safe.memoryMode ?? defaults.memoryMode).trim().toLowerCase() === 'simple'
     ? 'simple' as const
     : 'full' as const;
 
-  const hasPlannerCandidateLimit = 'plannerCandidateLimit' in safeRetrieval;
   const rawPlannerLimit = Number(safeRetrieval.plannerCandidateLimit);
-  const shouldMigrate = safeMigrations.plannerCandidateLimitDefault200 !== true && (
-    !hasPlannerCandidateLimit ||
-    (Number.isFinite(rawPlannerLimit) && Math.floor(rawPlannerLimit) === 100)
-  );
-  const migratedPlannerLimit = shouldMigrate
-    ? defaults.retrieval.plannerCandidateLimit
-    : (Number.isFinite(rawPlannerLimit) && rawPlannerLimit > 0)
-      ? Math.floor(rawPlannerLimit)
-      : defaults.retrieval.plannerCandidateLimit;
-
-  const shouldResetTemplates = safeMigrations.forceDefaultNarrativePromptTemplates !== true;
+  const plannerCandidateLimit = Number.isFinite(rawPlannerLimit) && rawPlannerLimit > 0
+    ? Math.floor(rawPlannerLimit)
+    : defaults.retrieval.plannerCandidateLimit;
 
   const normalized: MemorySystemConfig = {
     ...defaults,
@@ -211,19 +199,12 @@ export function normalizeMemorySystemConfig(rawConfig: unknown): MemorySystemCon
       ...defaults.retrieval,
       ...safeRetrieval,
       vectorFallbackEnabled: (safeRetrieval.vectorFallbackEnabled ?? safe.vectorEnabled ?? defaults.retrieval.vectorFallbackEnabled) as boolean,
-      plannerCandidateLimit: migratedPlannerLimit,
+      plannerCandidateLimit,
     },
     compiler: { ...defaults.compiler, ...(isPlainObject(safe.compiler) ? safe.compiler : {}) },
     retention: { ...defaults.retention, ...(isPlainObject(safe.retention) ? safe.retention : {}) },
     debug: { ...defaults.debug, ...(isPlainObject(safe.debug) ? safe.debug : {}) },
-    _migrations: {
-      ...safeMigrations,
-      plannerCandidateLimitDefault200: true,
-      forceDefaultNarrativePromptTemplates: true,
-    },
-    narrativePromptTemplates: shouldResetTemplates
-      ? createDefaultNarrativePromptTemplates()
-      : normalizeNarrativePromptTemplates(safe.narrativePromptTemplates),
+    narrativePromptTemplates: normalizeNarrativePromptTemplates(safe.narrativePromptTemplates),
   };
 
   // 顶层 apiPresetId 兜底

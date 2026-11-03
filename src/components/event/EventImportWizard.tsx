@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback,useEffect,useRef,useState } from 'react';
 import JSZip from 'jszip';
 import {
-  ArrowLeft, Upload, FileCheck, ShieldCheck, AlertTriangle, Check, X, FileWarning, Package,
+ArrowLeft,Upload,FileCheck,AlertTriangle,Check,X,FileWarning,Package
 } from 'lucide-react';
-import type { Manifest, ValidationResult, ValidationIssue, EventPackType } from '../../modules/schema';
+import type { Manifest,ValidationResult,ValidationIssue,EventPackType } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
-import { StatusBadge, EventTypeBadge } from './StatusBadge';
+import { StatusBadge,EventTypeBadge } from './StatusBadge';
 import { EmptyState } from './EmptyState';
 import { resolveEventIcon } from './eventIcons';
 import { textOn } from './colorUtils';
+import { APP_VERSION } from '../../config/version';
 
 /* 导入导出向导：选文件 → 校验 → 冲突 → 预览确认。
    校验优先调用 eventApi.validate（Rust validate_event）；非 Tauri 环境下回退到本地结构化校验，
    二者合并展示。错误码沿用 API 文档的 EventErrorCode（MANIFEST_* 等）。 */
 
-const APP_VERSION = '2.8.1';
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
 const VER_RE = /^\d+\.\d+\.\d+$/;
 

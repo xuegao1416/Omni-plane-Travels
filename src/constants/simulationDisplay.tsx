@@ -3,8 +3,8 @@
  * 事件层级图标/颜色、紧急度图标/标签
  */
 import {
-  Sparkles, Building2, Users, Coins, PersonStanding,
-  AlertTriangle, Clock,
+Sparkles,Building2,Users,Coins,PersonStanding,
+AlertTriangle,Clock,
 } from 'lucide-react';
 import type { EventLevel } from '../simulation/types';
 

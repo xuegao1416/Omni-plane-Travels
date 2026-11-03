@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach,describe,expect,test } from 'bun:test';
 import { fetchEmbeddingBatch } from './client';
 
 const originalFetch = globalThis.fetch;

@@ -1,9 +1,9 @@
 // OpenAI 兼容引擎配置 — 服务商选择、API 地址、API Key、模型
-import { useState, useCallback } from 'react';
+import { useState,useCallback } from 'react';
 import {
-  Field,
-  Select,
-  Button,
+Field,
+Select,
+Button,
 } from '../SettingsUIComponents';
 import { OPENAI_COMPATIBLE_IMAGE_PROVIDERS } from '@/api/imageGenTypes';
 import { fetchOpenAICompatibleModels } from '@/api/imageGen';

@@ -2,7 +2,7 @@
  * 世界动态面板 — 事件列表标签页
  */
 
-import { Zap, Trash2 } from 'lucide-react';
+import { Zap,Trash2 } from 'lucide-react';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 import type { SimEvent } from '../../../../simulation/types';
 import { EventCard } from './EventCard';

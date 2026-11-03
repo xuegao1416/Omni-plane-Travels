@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
-import { Compass, Sparkles } from 'lucide-react';
+import { Compass,Sparkles } from 'lucide-react';
 import type { ProfessionDef } from '../../../modules/schema';
-import { professionEmblemSrc, resolveProfessionVisual } from '../../../data/professions/professionVisuals';
+import { professionEmblemSrc,resolveProfessionVisual } from '../../../data/professions/professionVisuals';
 
 interface TarotCardProps {
   profession: ProfessionDef | null;

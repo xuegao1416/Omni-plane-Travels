@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { PipelineTaskId } from '../../../engine/pipelineTypes';
-import { PenLine, BookOpen, Search, Puzzle, Database, Variable, RefreshCw, ListChecks, BarChart3 } from 'lucide-react';
+import { PenLine,BookOpen,Search,Puzzle,Database,Variable,RefreshCw,ListChecks,BarChart3 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** 阶段视觉配置（图标 + 颜色 + 描述） */

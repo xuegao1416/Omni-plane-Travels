@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect,useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import { fetchTrialStatus, type TrialStatus } from '../../../api/trial';
+import { fetchTrialStatus,type TrialStatus } from '../../../api/trial';
 
 interface Props { onSelect?: () => void }
 

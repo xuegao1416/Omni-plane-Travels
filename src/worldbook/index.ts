@@ -4,7 +4,6 @@
 
 import {
   scanWorldInfo,
-  compareWorldInfoEntriesBySendOrder,
   world_info_position,
   type WorldInfoEntry,
   type WorldInfoScanOptions,
@@ -17,6 +16,23 @@ import {
 
 import type { WorldBookEntryDef } from '../data/worlds-schema';
 
+/**
+ * 归一化条目注入位置。
+ * 接受字符串（'before_char' | 'after_char' | 'at_depth'）或 SillyTavern 数值
+ * （0=before, 1=after, 4=atDepth；2/3/5/6 为 AN/EM 槽位，本应用无对应槽，落到 after_char）。
+ */
+export function normalizeEntryPosition(value: unknown): 'before_char' | 'after_char' | 'at_depth' {
+  if (typeof value === 'number') {
+    if (value === 0) return 'before_char';
+    if (value === 4) return 'at_depth';
+    return 'after_char';
+  }
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'before_char' || normalized === 'beforechar' || normalized === 'before') return 'before_char';
+  if (normalized === 'at_depth' || normalized === 'atdepth' || normalized === 'atdepth') return 'at_depth';
+  return 'after_char';
+}
+
 // ─── 条目类型 ─────────────────────────
 
 export interface WorldBookEntry {
@@ -28,7 +44,8 @@ export interface WorldBookEntry {
   selective: boolean;
   keys: string[];
   secondaryKeys: string[];
-  position: 'before_char' | 'after_char';
+  /** 注入位置：before_char / after_char / at_depth（注入聊天历史指定深度） */
+  position: 'before_char' | 'after_char' | 'at_depth';
   insertionOrder: number;
 
   // ── v2 新增字段 ──
@@ -97,7 +114,7 @@ export function convertWorldBookDefsToEntries(defs: WorldBookEntryDef[]): WorldB
     keys: e.key ?? [],
     secondaryKeys: e.keysecondary ?? [],
     excludeKeys: e.exclude_key ?? [],
-    position: (e.position ?? 'after_char') as 'before_char' | 'after_char',
+    position: normalizeEntryPosition(e.position ?? 'after_char'),
     insertionOrder: e.order ?? 0,
     order: e.order,
     depth: e.depth,
@@ -136,7 +153,7 @@ export interface WorldBookManager {
   getAllEntries(): WorldBookEntry[];
   /** 替换所有 non‑constant 条目，保留 constant 条目不变（游戏内编辑用） */
   replaceNonConstantEntries(newEntries: WorldBookEntry[]): void;
-  /** 清除所有世界专属条目（负 ID），保留 card.json 通用条目（正 ID） */
+  /** 清除所有运行时注入的世界专属条目（负 ID），保留其他已注册条目。 */
   clearWorldEntries(): void;
 
   /**
@@ -165,7 +182,7 @@ export function parseWorldBook(cardData: any): WorldBookEntry[] {
     selective: entry.selective ?? false,
     keys: entry.keys || [],
     secondaryKeys: entry.secondary_keys || [],
-    position: (entry.position || 'after_char') as 'before_char' | 'after_char',
+    position: normalizeEntryPosition(entry.position ?? 'after_char'),
     insertionOrder: entry.insertion_order ?? 0,
     // v2 新增
     uid: entry.uid,
@@ -215,8 +232,12 @@ function toWorldInfoEntry(entry: WorldBookEntry): WorldInfoEntry {
     groupWeight: entry.groupWeight,
     order: entry.order ?? entry.insertionOrder,
     depth: entry.depth,
-    // position 映射: 'before_char' → 0, 'after_char' → 1
-    position: entry.position === 'before_char' ? 0 : 1,
+    // position 映射: 'before_char' → 0, 'after_char' → 1, 'at_depth' → 4（注入聊天历史指定深度）
+    position: entry.position === 'before_char'
+      ? world_info_position.before
+      : entry.position === 'at_depth'
+        ? world_info_position.atDepth
+        : world_info_position.after,
   };
 }
 
@@ -314,7 +335,7 @@ export function createWorldBookManager(initialEntries: WorldBookEntry[]): WorldB
     },
 
     clearWorldEntries(): void {
-      // 保留 card.json 通用条目（正 ID），清除世界专属条目（负 ID）
+      // 保留其他已注册条目，清除运行时注入的世界专属条目（负 ID）
       entries = entries.filter(e => e.id >= 0);
     },
 

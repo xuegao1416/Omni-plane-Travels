@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState,useCallback } from 'react';
 import {
-  ChevronDown, ChevronRight, RotateCcw,
-  ChevronLeft, ChevronRight as ChevronRightNav,
+ChevronDown,ChevronRight,RotateCcw,
+ChevronLeft,ChevronRight as ChevronRightNav,
 } from 'lucide-react';
 import type { SnapshotLayer } from './types';
-import { formatTime, getSnapshotPreview } from './types';
+import { formatTime,getSnapshotPreview } from './types';
 import { ToolBtn } from './shared';
 import { SNAPSHOT_PAGE_SIZE } from './constants';
 import { SnapshotDetail } from './SnapshotDetail';
@@ -41,7 +41,7 @@ export function SnapshotList({
   }, []);
 
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px' }}>
+    <div className="game-variable-snapshot-list">
       {/* 分页控制 */}
       {totalPages > 1 && (
         <div style={{
@@ -143,7 +143,6 @@ export function SnapshotList({
                 {/* 展开内容 */}
                 {isExpanded && (
                   <SnapshotDetail
-                    layer={layer}
                     editText={getLayerEditText(layer)}
                     isLatest={isLatest}
                     onEditTextChange={(text) => onLayerEdit(layer.id, text)}

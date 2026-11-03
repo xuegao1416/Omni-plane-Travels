@@ -6,10 +6,10 @@
  */
 import { useState } from 'react';
 import {
-  AlertTriangle, Sparkles, Search, Shield, MapPin, Package,
-  BookOpen, CheckCircle2, Clock,
+AlertTriangle,Sparkles,Search,Shield,MapPin,Package,
+BookOpen,CheckCircle2,Clock,
 } from 'lucide-react';
-import type { GameState, ChronicleType, ChronicleEntry } from '../../../schema/variables';
+import type { GameState,ChronicleType,ChronicleEntry } from '../../../schema/variables';
 import EmptyState from '../../shared/EmptyState';
 
 interface Props { gameState: GameState; }
@@ -101,16 +101,13 @@ export default function NotebookPanel({ gameState }: Props) {
   }
 
   return (
-    <div>
-      {/* 过滤标签 */}
-      <div style={{
-        display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '10px',
-      }}>
+    <div className="game-notebook-panel">
+      {/* 过滤标签：窄屏保持单行滚动，避免筛选器把正文挤出可视区。 */}
+      <div className="game-notebook-filters">
         {ALL_TYPES.map(type => {
           const isActive = filter === type;
           const count = type === '全部' ? allEntries.length : (typeCounts[type] || 0);
           if (type !== '全部' && count === 0) return null; // 不显示空类型
-          const config = type === '全部' ? null : CHRONICLE_TYPE_CONFIG[type];
           return (
             <button
               key={type}

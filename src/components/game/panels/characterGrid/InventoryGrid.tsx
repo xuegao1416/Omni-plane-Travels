@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Backpack } from 'lucide-react';
 import { getQualityColor } from '../../../shared/qualityUtils';
-import { extractFields, FieldDetailModal } from './SharedUI';
+import { extractFields,FieldDetailModal } from './SharedUI';
 
 export function InventoryGrid({ data }: { data: Record<string, unknown> | undefined }) {
   const [selected, setSelected] = useState<{ name: string; fields: [string, string][] } | null>(null);

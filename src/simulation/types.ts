@@ -50,6 +50,10 @@ export interface SimEvent {
   severity: number;
   /** 事件状态 */
   status: 'brewing' | 'active' | 'resolved' | 'abandoned';
+  /** 候选不产生机械效果，也不能被当作已发生事实。旧数据按候选处理。 */
+  factStatus?: 'candidate' | 'confirmed';
+  /** 镜头外事实默认只供叙事引擎读取，不代表玩家知情。 */
+  readerOnly?: boolean;
   /** 子事件 ID 列表（级联传导） */
   childEventIds: string[];
   /** 父事件 ID */
@@ -101,6 +105,8 @@ export interface StoryBeat {
   title: string;
   /** 节拍叙事文本 */
   narrative: string;
+  factStatus?: 'candidate' | 'confirmed';
+  readerOnly?: boolean;
   /** 角色位置变化 */
   locationChange?: string;
   /** 关系变化（对玩家的好感度增减） */
@@ -217,6 +223,11 @@ export const DEFAULT_SIM_CONFIG: SimConfig = {
 
 /** 完整的模拟状态（可持久化到存档） */
 export interface SimulationState {
+  director?: import('../director/types').DirectorState;
+  mainline?: import('./mainline').MainlineState;
+  lastMechanicalSummary?: string;
+  /** 与后台 AI 开关、成功次数解耦的本地周期时钟。 */
+  mechanics?: { lastTurnId: string; lastRound: number; lastTime: string; tickCount: number };
   /** 模拟配置 */
   config: SimConfig;
   /** 当前活跃的世界事件（以事件 ID 为键） */
@@ -255,6 +266,7 @@ export function createEmptySimState(): SimulationState {
 
 /** 推演请求的输入上下文 */
 export interface SimContext {
+  mainlineProtection?: string;
   /** 世界设定摘要 */
   worldSetting: string;
   /** 当前游戏时间 */
@@ -269,6 +281,51 @@ export interface SimContext {
   coreConflict?: string;
   /** 最近对话上下文（玩家消息 + 最近几轮摘要） */
   recentConversation?: string;
+}
+
+export interface EvolutionTurnIdentity {
+  saveId: string;
+  worldId: string;
+  factVersion: string;
+  turnId: string;
+}
+
+export interface MainlineProtection {
+  summary: string;
+  entityIds: string[];
+  eventIds: string[];
+}
+
+export interface BackgroundProposal {
+  identity: EvolutionTurnIdentity;
+  generation: SimGenerationResult;
+  gameTime: GameTime;
+  round: number;
+  mainlineProtection?: MainlineProtection;
+  simRules?: import('../modules/schema').WorldDynamics | null;
+}
+
+export interface BackgroundProposalOptions {
+  identity: EvolutionTurnIdentity;
+  preset?: SimPreset;
+  simRules?: import('../modules/schema').WorldDynamics | null;
+  recentConversation?: string;
+  mainlineProtection?: MainlineProtection;
+  signal?: AbortSignal;
+}
+
+export interface MechanicsSettlement {
+  nextMechanics?: NonNullable<SimulationState['mechanics']>;
+  gameState: import('../schema/variables').GameState;
+  mechanicalEffects: import('../modules/schema').ModuleEffects;
+  effectLog: import('../modules/schema').EffectLogEntry[];
+  settled: boolean;
+  notifications: MechanicalNotifications;
+}
+
+export interface MechanicalNotifications {
+  eventCards: Array<{ eventId: string; eventPackId: string }>;
+  combatRequests: import('../gameplay/protocols').CombatEncounterRequest[];
 }
 
 /** NPC 摘要（全量角色名录，供演化 AI 参考） */

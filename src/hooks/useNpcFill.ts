@@ -6,6 +6,7 @@ import type { ApiConfig } from '../api/types';
 import { requestStreamWithRetry } from '../api/client';
 import { buildNpcFillPrompt } from '../utils/prompts';
 import { buildSpecialConfig } from '../modules/normalizeModule';
+import { mergeNpcFillResult } from './npcFillMapping';
 
 interface UseNpcFillOptions {
   apiConfig: ApiConfig | null;
@@ -97,29 +98,7 @@ export function useNpcFill({
 
       const data = JSON.parse(jsonMatch[0]);
 
-      // 更新NPC信息
-      setNpc(prev => ({
-        ...prev,
-        gender: data.gender || prev.gender,
-        age: data.age || prev.age,
-        race: data.race || prev.race,
-        relationshipType: data.relationship || prev.relationshipType,
-        occupation: data.occupation || prev.occupation,
-        socialStatus: data.socialStatus || prev.socialStatus,
-        personality: data.personality || prev.personality,
-        hiddenPersonality: data.hiddenPersonality || prev.hiddenPersonality,
-        currentThought: data.currentThought || prev.currentThought,
-        appearance: data.appearance || prev.appearance,
-        currentOutfit: data.currentOutfit || prev.currentOutfit,
-        currentAction: data.currentAction || prev.currentAction,
-        currentLocation: data.currentLocation || prev.currentLocation,
-        currentState: data.currentState || prev.currentState,
-        shortTermGoal: data.shortTermGoal || prev.shortTermGoal,
-        longTermGoal: data.longTermGoal || prev.longTermGoal,
-        background: data.background || prev.background,
-        skillsList: data.skillsList && typeof data.skillsList === 'object' ? data.skillsList : prev.skillsList,
-        itemsList: data.itemsList && typeof data.itemsList === 'object' ? data.itemsList : prev.itemsList,
-      }));
+      setNpc(prev => mergeNpcFillResult(prev, data, statRaw, hasProgression));
 
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {

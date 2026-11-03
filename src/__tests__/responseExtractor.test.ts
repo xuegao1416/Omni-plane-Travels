@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe,it,expect } from 'bun:test';
 import { extractContentForPrompt } from '../engine/responseExtractor';
 
 describe('responseExtractor.extractContentForPrompt — 剥标签', () => {

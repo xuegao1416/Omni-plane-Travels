@@ -187,7 +187,7 @@ export function createDefaultWorldSystem(): WorldSystemData {
 
 /**
  * 创建兜底模块（模块生成失败时使用，确保 UI 卡片能正常显示）
- * 返回完整的 WorldModule，包含 moduleConfig/data/initialState
+ * 返回完整的 WorldModule，包含 moduleConfig/initialState
  */
 export function createFallbackModule(moduleId: string, name: string): import('../data/worlds-schema').WorldModule {
   const base: import('../data/worlds-schema').WorldModule = { moduleId, name, description: '', enabled: true };

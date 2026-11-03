@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { useEffect,useRef,useState } from 'react';
+import { Check,X } from 'lucide-react';
 import type { ProfessionDef } from '../../../modules/schema';
 import OverlayPortal from '../../shared/OverlayPortal';
 import { EntrySlicedButton } from '../EntrySurface';

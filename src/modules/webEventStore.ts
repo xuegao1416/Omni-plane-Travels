@@ -5,6 +5,7 @@
 //   Web 端无 Rust 文件系统，故「安装」即「导入并落 IndexedDB」，不调用原生对话框。
 // ============================================================
 import JSZip from 'jszip';
+import { manifestSchema } from './manifestSchema';
 import type {
   Manifest,
   EventMeta,
@@ -30,7 +31,7 @@ import type {
 import { EventPackFormatError, normalizeCardPackFiles, parseCanonicalEventIndex } from './eventPackFormat';
 import { ensureEventApiError, EventApiError } from './eventErrors';
 import type { EventApiErrorCode } from './eventErrors';
-import { normalizeBuiltinCardWorkflow, WORLD_WORKFLOWS } from './worldWorkflows';
+import { WORLD_WORKFLOWS } from './worldWorkflows';
 import {
   putWebEvent,
   getWebEvent,
@@ -45,9 +46,6 @@ import {
   allCollections,
 } from './eventDb';
 
-const APP_VERSION = '2.8.1';
-const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;
-const VER_RE = /^\d+\.\d+\.\d+$/;
 const TEXT_RE = /\.(json|txt|md|csv|yml|yaml)$/i;
 const EVENTS_FILE_PATH = 'schema/events.json';
 const RULES_FILE_PATH = 'schema/rules.json';
@@ -70,28 +68,26 @@ function ensureWebImportApiError(error: unknown): EventApiError {
   if (error instanceof EventApiError) return error;
   if (error instanceof EventPackFormatError) {
     return createWebEventError(error.code, error.message, {
-      context: error.context,
+      context: {
+        ...error.context,
+        ...(error.filePath ? { filePath: error.filePath } : {}),
+      },
       filePath: error.filePath,
     });
   }
   return ensureEventApiError(error);
 }
 
-/** 本地结构化校验（与 EventImportWizard.localValidate 同源，输出 ValidationResult） */
+/** 本地结构化校验：与 manifestSchema 共用唯一运行时契约。 */
 export function localValidate(m: Manifest): ValidationResult {
-  const errors: ValidationIssue[] = [];
-  const warnings: ValidationIssue[] = [];
-  if (!m.id) errors.push({ code: 'MANIFEST_MISSING_FIELD', field: 'id', message: '缺少必需字段 id' });
-  else if (!ID_RE.test(m.id)) errors.push({ code: 'MANIFEST_INVALID', field: 'id', message: `id 不符合 ^[a-z0-9][a-z0-9_:-]{2,63}$（${m.id}）` });
-  if (!m.version) errors.push({ code: 'MANIFEST_MISSING_FIELD', field: 'version', message: '缺少必需字段 version' });
-  else if (!VER_RE.test(m.version)) errors.push({ code: 'MANIFEST_INVALID', field: 'version', message: `version 需为主.次.修（${m.version}）` });
-  if (!m.name) errors.push({ code: 'MANIFEST_MISSING_FIELD', field: 'name', message: '缺少必需字段 name' });
-  if (!m.type) errors.push({ code: 'MANIFEST_MISSING_FIELD', field: 'type', message: '缺少必需字段 type' });
-  if (!m.coverColor) warnings.push({ code: 'WARNING', field: 'coverColor', message: '未设置封面色（建议补充）' });
-  else if (/gradient|linear|radial/i.test(m.coverColor)) errors.push({ code: 'MANIFEST_INVALID', field: 'coverColor', message: '封面色禁止为渐变，必须为实色块' });
-  if (!m.icon) warnings.push({ code: 'WARNING', field: 'icon', message: '未设置图标' });
-  if (m.engine && m.engine !== 'opt-event') errors.push({ code: 'MANIFEST_INVALID', field: 'engine', message: `engine 必须为 opt-event（${m.engine}）` });
-  return { ok: errors.length === 0, errors, warnings };
+  const parsed = manifestSchema.safeParse(m);
+  if (parsed.success) return { ok: true, errors: [], warnings: [] };
+  const errors: ValidationIssue[] = parsed.error.issues.map((issue) => ({
+    code: 'MANIFEST_INVALID',
+    field: issue.path.length > 0 ? issue.path.join('.') : undefined,
+    message: issue.message,
+  }));
+  return { ok: false, errors, warnings: [] };
 }
 
 /** 解析一个 .opt-event 包，返回 manifest + 内联文件内容（zip-slip 防护）。
@@ -344,22 +340,28 @@ async function webImportFromFileImpl(file: File | Blob | ArrayBuffer | Uint8Arra
   }
 
   let storedFiles = files;
+  let storedManifest = manifest;
   if (manifest.type === 'card') {
     storedFiles = toWebEventFiles(normalizeCardPackFiles(manifest, files).files);
+    // v1 的 manifest.cards 只用于导入识别；v2 运行时以 schema/events.json 为唯一卡片索引。
+    const canonicalManifest: Manifest = { ...manifest };
+    delete canonicalManifest.cards;
+    storedManifest = canonicalManifest;
+    storedFiles['manifest.json'] = JSON.stringify(storedManifest, null, 2);
   }
 
   const existing = await getWebEvent(manifest.id);
   const enabled = existing?.enabled ?? (manifest.enabledByDefault ?? false);
   const rec: WebEventRecord = {
     id: manifest.id,
-    manifest,
+    manifest: storedManifest,
     enabled,
     status: enabled ? 'enabled' : 'installed',
     installedAt: existing?.installedAt ?? new Date().toISOString(),
     files: storedFiles,
   };
   await putWebEvent(rec);
-  return manifestToMeta(manifest);
+  return manifestToMeta(storedManifest);
 }
 
 export async function webImportFromFile(file: File | Blob | ArrayBuffer | Uint8Array): Promise<EventMeta> {
@@ -446,12 +448,20 @@ export async function webGetEventDetail(id: string): Promise<EventDetail> {
       actionCount: 0,
     }));
   }
-  const cardsSummary: CardSummary[] = (rec.manifest.cards ?? []).map((f, i) => ({
-    id: `${id}-card-${i}`,
-    title: '',
-    file: f,
-    kind: 'add',
-  }));
+  let cardsSummary: CardSummary[] = [];
+  if (rec.manifest.type === 'card') {
+    try {
+      const index = readCanonicalIndex(rec);
+      cardsSummary = index.events.map((event) => ({
+        id: event.id,
+        title: event.name,
+        file: `schema/event-${event.id}.json`,
+        kind: 'add',
+      }));
+    } catch {
+      /* canonical 索引损坏时保持空摘要，详情页不再回读 manifest.cards。 */
+    }
+  }
   const dependencyStatus: DepIssue[] = (rec.manifest.dependencies ?? []).map((d) => ({
     id: d,
     satisfied: false,
@@ -479,7 +489,6 @@ export async function webGetRuntimePack(id: string): Promise<{
   id: string;
   manifest: Manifest;
   files: Record<string, string>;
-  worldId?: string;
 }> {
   const rec = await getWebEvent(id);
   if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${id}`);
@@ -489,7 +498,7 @@ export async function webGetRuntimePack(id: string): Promise<{
     if (typeof value === 'string') files[path] = value;
   }
 
-  return { id: rec.id, manifest: rec.manifest, files, worldId: rec.worldId };
+  return { id: rec.id, manifest: rec.manifest, files };
 }
 
 export async function saveEventToPack(
@@ -587,59 +596,8 @@ export async function savePackMeta(
 }
 
 /**
- * 向指定事件包写入规则图产出的 EventRule[]（落 schema/rules.json）。
- * 与 saveEventToPack（写 events.json / 卡片画布）互不干扰；
- * 此处仅替换 rules 字段，保留同一文件中的 periodicRules（周期事件包由 EventConfigPanel 维护）。
- * 不存在该 pack 时抛 EventApiError（调用方应保证 eventPackId 来自已安装包）。
- */
-export async function saveRulesToPack(packId: string, rules: EventRule[], periodicRules?: PeriodicRule[]): Promise<void> {
-  const rec = await getWebEvent(packId);
-  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
-  // 若未显式传入 periodicRules，从已有文件读回（向后兼容旧调用方）
-  let effectivePeriodic = periodicRules;
-  if (effectivePeriodic === undefined) {
-    effectivePeriodic = [];
-    const existing = rec.files['schema/rules.json'];
-    if (typeof existing === 'string') {
-      try {
-        const rf = JSON.parse(existing) as RuleFile;
-        effectivePeriodic = rf.periodicRules ?? [];
-      } catch {
-        /* 旧文件损坏：丢弃，以新 rules 重建 */
-      }
-    }
-  }
-  const file: RuleFile = { version: 1, rules, periodicRules: effectivePeriodic };
-  rec.files['schema/rules.json'] = JSON.stringify(file, null, 2);
-  await putWebEvent(rec);
-}
-
-/**
- * 向指定事件包写入周期规则 PeriodicRule[]（落 schema/rules.json）。
- * 与 saveRulesToPack 对称：此处仅替换 periodicRules 字段，保留同一文件中的 rules（规则图由 RuleEditor 维护）。
- */
-export async function savePeriodicRulesToPack(packId: string, periodicRules: PeriodicRule[]): Promise<void> {
-  const rec = await getWebEvent(packId);
-  if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
-  // 读取已有文件以保留 rules（规则图由另一入口维护，避免互相覆盖）
-  let rules: EventRule[] = [];
-  const existing = rec.files['schema/rules.json'];
-  if (typeof existing === 'string') {
-    try {
-      const rf = JSON.parse(existing) as RuleFile;
-      rules = rf.rules ?? [];
-    } catch {
-      /* 旧文件损坏：丢弃，以新 periodicRules 重建 */
-    }
-  }
-  const file: RuleFile = { version: 1, rules, periodicRules };
-  rec.files['schema/rules.json'] = JSON.stringify(file, null, 2);
-  await putWebEvent(rec);
-}
-
-/**
  * 保存工作流定义到事件包（落 schema/workflow.json）。
- * 同时自动生成 rules.json 供旧引擎兼容。
+ * 同时生成 rules.json，供当前规则执行器消费。
  */
 export async function saveWorkflowToPack(packId: string, workflow: import('./workflowSchema').WorkflowDefinition): Promise<void> {
   const { workflowToRuleFile } = await import('./workflowConverters');
@@ -647,7 +605,7 @@ export async function saveWorkflowToPack(packId: string, workflow: import('./wor
   if (!rec) throw createWebEventError('PACK_NOT_FOUND', `未找到事件包：${packId}`);
   // 保存工作流原始格式
   rec.files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
-  // 同时生成 rules.json 兼容旧引擎
+  // 同步生成当前规则执行器所需的 rules.json
   const rf = workflowToRuleFile(workflow);
   rec.files['schema/rules.json'] = JSON.stringify(rf, null, 2);
   await putWebEvent(rec);
@@ -655,7 +613,7 @@ export async function saveWorkflowToPack(packId: string, workflow: import('./wor
 
 /**
  * 从事件包加载工作流定义。
- * 优先读 schema/workflow.json，不存在则从 schema/rules.json 转换。
+ * 优先读编辑器源格式 schema/workflow.json；缺失时可从当前运行时表示 schema/rules.json 重建。
  */
 export async function loadWorkflowFromPack(packId: string): Promise<import('./workflowSchema').WorkflowDefinition | null> {
   const { ruleFileToWorkflow } = await import('./workflowConverters');
@@ -887,7 +845,7 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
         const entry: EventIndexEntry = { id: event.id, name: event.name };
         return {
           entry,
-          workflow: normalizeBuiltinCardWorkflow({ ...event.workflow, id: entry.id, name: entry.name }),
+          workflow: { ...event.workflow, id: entry.id, name: entry.name },
         };
       });
       Object.assign(files, buildCanonicalCardPackFiles(manifest.name, events));
@@ -900,7 +858,6 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
       status: existing?.enabled === false ? 'disabled' : 'enabled',
       installedAt: existing?.installedAt ?? new Date().toISOString(),
       builtin: true,
-      worldId: world.id,
       files,
     };
 
@@ -947,7 +904,6 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
       status: existing?.enabled === false ? 'disabled' : 'enabled',
       installedAt: existing?.installedAt ?? new Date().toISOString(),
       builtin: true,
-      worldId: world.id,
       files,
     });
   }
@@ -977,7 +933,7 @@ export async function collectPacksForExport(ids: string[]): Promise<EventPackSna
   for (const id of ids) {
     const rec = await getWebEvent(id).catch(() => undefined);
     if (rec) {
-      out.push({ id: rec.id, manifest: rec.manifest, files: rec.files, worldId: rec.worldId, builtin: rec.builtin });
+      out.push({ id: rec.id, manifest: rec.manifest, files: rec.files, builtin: rec.builtin });
     }
   }
   return out;
@@ -992,10 +948,14 @@ export async function importPacksFromSave(snapshots: EventPackSnapshot[]): Promi
   const imported: string[] = [];
   for (const snap of snapshots) {
     const existing = await getWebEvent(snap.id).catch(() => undefined);
+    const snapshotManifest: Manifest = snap.worldId && !snap.manifest.worldId
+      ? { ...snap.manifest, worldId: snap.worldId }
+      : snap.manifest;
     if (existing) {
-      // 已存在：补写缺失的 worldId / builtin（修复旧存档缺少世界绑定的问题）
-      if (snap.worldId && !existing.worldId) {
-        existing.worldId = snap.worldId;
+      // 直接上一代存档快照可能把世界绑定放在 record.worldId；一次性收敛进 manifest.worldId。
+      if (snapshotManifest.worldId && !existing.manifest.worldId) {
+        existing.manifest = { ...existing.manifest, worldId: snapshotManifest.worldId };
+        existing.files['manifest.json'] = JSON.stringify(existing.manifest, null, 2);
         existing.builtin = snap.builtin ?? existing.builtin;
         await putWebEvent(existing);
       }
@@ -1003,12 +963,11 @@ export async function importPacksFromSave(snapshots: EventPackSnapshot[]): Promi
     }
     const rec: WebEventRecord = {
       id: snap.id,
-      manifest: snap.manifest,
+      manifest: snapshotManifest,
       enabled: true,
       status: 'enabled',
       installedAt: new Date().toISOString(),
-      files: snap.files,
-      worldId: snap.worldId,
+      files: { ...snap.files, 'manifest.json': JSON.stringify(snapshotManifest, null, 2) },
       builtin: snap.builtin,
     };
     await putWebEvent(rec);

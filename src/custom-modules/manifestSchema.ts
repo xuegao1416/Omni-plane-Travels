@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import type {
-  Condition,
-  CustomGameplayModule,
-  CustomGameplayModuleDefinition,
-  JsonValue,
-  StateFieldDefinition,
+Condition,CustomGameplayModuleDefinition,
+JsonValue,
+StateFieldDefinition
 } from './schema';
 
 const ID_RE = /^[a-z0-9][a-z0-9_:-]{2,63}$/;

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect,test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 const hall = readFileSync(new URL('./WorldHallView.tsx', import.meta.url), 'utf8');

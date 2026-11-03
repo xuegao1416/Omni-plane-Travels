@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getPlayTrackingConsent, setPlayTrackingConsent } from '../modules/playTracker';
+import { getPlayTrackingConsent,setPlayTrackingConsent } from '../modules/playTracker';
 import styles from './TelemetryConsentBanner.module.css';
 
 export default function TelemetryConsentBanner() {

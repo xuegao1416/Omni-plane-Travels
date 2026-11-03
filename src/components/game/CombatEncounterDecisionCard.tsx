@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { BookOpenText, Footprints, ShieldAlert, Swords } from 'lucide-react';
+import { useEffect,useRef } from 'react';
+import { BookOpenText,Footprints,ShieldAlert,Swords } from 'lucide-react';
 import type { CombatEncounterRequest } from '../../gameplay/protocols';
 
 export type CombatEncounterDecision = 'fight' | 'escape' | 'narrative';

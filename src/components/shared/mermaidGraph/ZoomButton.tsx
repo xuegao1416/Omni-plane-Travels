@@ -1,4 +1,4 @@
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { ZoomIn,ZoomOut,Maximize2 } from 'lucide-react';
 import s from './ZoomButton.module.css';
 
 export function ZoomButton({ onClick, title, children }: {

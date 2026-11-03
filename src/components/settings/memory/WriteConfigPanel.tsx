@@ -2,11 +2,10 @@
 // 写入记忆层面板 — 使用共享组件重写
 // ============================================================
 
-import { useState } from 'react';
 import { Pen } from 'lucide-react';
 import type { MemorySystemConfig } from '../../../memory/types';
 import type { ApiPreset } from '../apiPresetUtils';
-import { Section, FieldGrid, Field, Select, Collapsible } from '../SettingsUIComponents';
+import { Section,FieldGrid,Field,Select,Collapsible } from '../SettingsUIComponents';
 
 interface Props {
   config: MemorySystemConfig;

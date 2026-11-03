@@ -1,7 +1,7 @@
 // 生存资源卡片
-import { useState, useEffect, useRef, memo } from 'react';
-import { Leaf, AlertTriangle, Hammer, Plus, Trash2, ChevronRight, Loader, Sparkles, Sparkle } from 'lucide-react';
-import type { SurvivalModuleSchema, SurvivalRecipe } from '../../../../modules/schema';
+import { useState,useEffect,useRef,memo } from 'react';
+import { Leaf,AlertTriangle,Hammer,Plus,Trash2,ChevronRight,Loader,Sparkles,Sparkle } from 'lucide-react';
+import type { SurvivalModuleSchema,SurvivalRecipe } from '../../../../modules/schema';
 import type { ResourceChangeLog } from '../../gameScreen/hooks/useSurvivalSettlement';
 import { Collapsible } from '../../../shared/Collapsible';
 
@@ -41,7 +41,7 @@ interface SurvivalCardProps {
 }
 
 export default memo(function SurvivalCard({
-  data, title, runtimeResources, onGenerateRecipe, onCraft, onUnlock, unlockedRecipeIds = [], onGather, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
+  data, title, runtimeResources, onGenerateRecipe, onCraft, unlockedRecipeIds = [], onGather, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
 }: SurvivalCardProps) {
   const displayTitle = title || '生存资源';
   const threshold = data.rules?.criticalThreshold ?? 2;

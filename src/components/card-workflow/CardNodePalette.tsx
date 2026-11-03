@@ -1,9 +1,9 @@
 // ============================================================
 //  卡片节点面板 — 按分类展示、拖拽添加、搜索过滤
 // ============================================================
-import { useState, useMemo } from 'react';
+import { useState,useMemo } from 'react';
 import { Search } from 'lucide-react';
-import { getAllCardNodeDefinitions, getCardNodeCategories, searchCardNodes } from '../../modules/cardNodeRegistry';
+import { getAllCardNodeDefinitions,searchCardNodes } from '../../modules/cardNodeRegistry';
 import type { CardNodeDefinition } from '../../modules/schema';
 
 interface Props {

@@ -101,8 +101,8 @@ function detectRelevantModules(
         ?? worldDef?.modules?.find(module => MODULE_ALIASES[module.moduleId] === moduleId && module.enabled)
       : worldDef?.modules?.find(module => MODULE_ALIASES[module.moduleId] === moduleId && module.enabled);
     const definitionData = moduleId === 'profession' && definition
-      ? resolveProfessionBinding(definition.moduleConfig ?? definition.data)
-      : definition?.moduleConfig ?? definition?.data;
+      ? resolveProfessionBinding(definition.moduleConfig)
+      : definition?.moduleConfig;
     const tokens = collectDefinitionTokens(definitionData);
     if (tokens.some(token => normalized.includes(token))) relevant.add(moduleId);
   }
@@ -168,7 +168,7 @@ export function projectProfessionModuleConfig(
 ): ProfessionModuleSchema | undefined {
   const module = worldDef?.modules?.find(item => item.moduleId === 'profession' && item.enabled);
   if (!module) return undefined;
-  const config: ProfessionModuleSchema = resolveProfessionBinding(module.moduleConfig ?? module.data);
+  const config: ProfessionModuleSchema = resolveProfessionBinding(module.moduleConfig);
   if (!config.professions.length) return undefined;
   const runtime = state.玩家.能力系统?.职业状态;
   const current = config.professions.find(item => item.id === runtime?.职业ID);
@@ -187,7 +187,7 @@ export function projectProfessionModuleConfig(
       )).map(clone),
     }] : [],
     innateTalents: (config.innateTalents ?? []).filter(item => selectedTalentIds.has(item.id)).map(clone),
-    freeSkillCatalog: (config.freeSkillCatalog ?? []).filter(item => ownedFreeSkillNames.has(item.name) || ownedFreeSkillNames.has(item.id)).map(clone),
+    freeSkills: (config.freeSkills ?? []).filter(item => ownedFreeSkillNames.has(item.name) || ownedFreeSkillNames.has(item.id)).map(clone),
   };
 }
 
@@ -197,7 +197,7 @@ function professionDetailFor(state: GameState, worldDef: WorldDef | undefined, r
   if (!projected || !runtime) return undefined;
   const profession = projected.professions[0];
   const statModule = worldDef?.modules?.find(item => item.moduleId === 'stat' && item.enabled);
-  const statConfig = (statModule?.moduleConfig ?? statModule?.data) as StatModuleSchema | undefined;
+  const statConfig = (statModule?.moduleConfig) as StatModuleSchema | undefined;
   const typeLabel: Record<ProfessionAbilityDef['type'], string> = {
     active: '主动', passive: '被动', specialization: '专精', ultimate: '终极',
   };
@@ -257,7 +257,6 @@ function stripAllModuleState(state: GameState): GameState {
     delete projected.gameplay.logs;
     delete projected.gameplay.eventHistory;
     delete projected.gameplay.scheduledEvents;
-    delete projected.gameplay.appliedMigrations;
     delete projected.gameplay.settlementKeys;
   }
   return projected;

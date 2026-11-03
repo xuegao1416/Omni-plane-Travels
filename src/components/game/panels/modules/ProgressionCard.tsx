@@ -1,8 +1,8 @@
 // 成长体系卡片 — 段位制/等级制统一渲染
 import { memo } from 'react';
 import { TrendingUp } from 'lucide-react';
-import type { ProgressionConfig, ProgressionState, ProgressionModuleSchema, StatBonuses } from '../../../../modules/schema';
-import { getXpForNextTier, getTierProgress, getLevelStatBonuses } from '../../../../modules/xpAlgorithm';
+import type { ProgressionConfig,ProgressionState,ProgressionModuleSchema } from '../../../../modules/schema';
+import { getXpForNextTier,getTierProgress,getLevelStatBonuses } from '../../../../modules/xpAlgorithm';
 import { Collapsible } from '../../../shared/Collapsible';
 
 /** 属性名称映射（从数值属性配置读取） */
@@ -23,21 +23,18 @@ interface ProgressionCardProps {
   /** 成长体系状态（动态，从变量系统读取） */
   state?: ProgressionState;
   title?: string;
-  /** @deprecated 兼容旧格式，新代码请使用 config + state */
-  data?: ProgressionModuleSchema;
   /** 属性名称映射（用于显示中文名称） */
   statNames?: StatNames;
   breakthroughFailureReason?: string;
   onBreakthrough?: (targetTier: number) => void;
 }
 
-export default memo(function ProgressionCard({ config, state, title, data, statNames, breakthroughFailureReason, onBreakthrough }: ProgressionCardProps) {
+export default memo(function ProgressionCard({ config, state, title, statNames, breakthroughFailureReason, onBreakthrough }: ProgressionCardProps) {
   const defaultTitle = config.mode === 'tiered' ? '段位体系' : '等级体系';
   const displayTitle = title || defaultTitle;
 
-  // 合并配置和状态，兼容旧格式
-  const currentTierIndex = state?.currentTierIndex ?? data?.currentTierIndex ?? 0;
-  const currentXP = state?.currentXP ?? data?.currentXP ?? 0;
+  const currentTierIndex = state?.currentTierIndex ?? 0;
+  const currentXP = state?.currentXP ?? 0;
 
   // 构建完整的 progression 对象供算法使用
   // 防御：确保 xpFormula 存在且属性完整

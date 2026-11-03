@@ -24,15 +24,15 @@ function clone<T>(value: T): T {
 
 type AbilityMechanics = NonNullable<AbilityDefinition['mechanics']>;
 
-interface LegacyActivation {
+interface ModuleActivation {
   costs?: GameplayCost[];
   effects?: GameplayEffect[];
   rewards?: GameplayReward[];
   combatAction?: CombatActionDefinition;
 }
 
-function mechanicsFromLegacy(source: {
-  activation?: LegacyActivation;
+function mechanicsFromModuleDefinition(source: {
+  activation?: ModuleActivation;
   passiveEffects?: GameplayEffect[];
   mechanics?: ProfessionAbilityDef['mechanics'];
   cooldownTicks?: number;
@@ -62,11 +62,8 @@ function mechanicsFromLegacy(source: {
 }
 
 /**
- * Every active combat ability must have a real runtime cost. Older profession
- * packs often declared a combat action and cooldown but omitted its cost,
- * which made the battle UI show a zero energy cost and effectively created free
- * skills. Explicit costs are preserved; only missing/zero-only costs receive
- * the controlled single-resource default.
+ * Every active combat ability must have a real runtime cost. Explicit costs are
+ * preserved; missing or zero-only costs receive a controlled single-resource default.
  */
 export function ensureCombatAbilityDefaults(source: AbilityDefinition): AbilityDefinition {
   const definition = clone(source);
@@ -93,7 +90,7 @@ export function ensureCombatAbilityDefaults(source: AbilityDefinition): AbilityD
 }
 
 export function abilityDefinitionFromProfessionAbility(source: ProfessionAbilityDef, professionId?: string): AbilityDefinition {
-  const mechanics = mechanicsFromLegacy(source);
+  const mechanics = mechanicsFromModuleDefinition(source);
   return ensureCombatAbilityDefaults({
     schemaVersion: 2,
     id: source.id,
@@ -114,7 +111,6 @@ export function abilityDefinitionFromProfessionAbility(source: ProfessionAbility
     tags: [...(source.tags ?? [])],
     ...(source.iconKey ? { iconKey: source.iconKey } : {}),
     ...(mechanics ? { mechanics } : {}),
-    legacy: clone(source) as unknown as Record<string, unknown>,
   });
 }
 
@@ -140,11 +136,10 @@ export function abilityDefinitionFromInnateTalent(source: InnateTalentDef): Abil
     tags: [...(source.tags ?? [])],
     ...(source.iconKey ? { iconKey: source.iconKey } : {}),
     ...(Object.keys(mechanics).length ? { mechanics } : {}),
-    legacy: clone(source) as unknown as Record<string, unknown>,
   };
 }
 
-/** Adapter for the older generic talent module; the module remains a compatibility shell. */
+/** Adapter from the generic talent-module definition into the shared ability runtime. */
 export function abilityDefinitionFromTalent(source: TalentDef): AbilityDefinition {
   const mechanics: AbilityMechanics = {
     ...(source.mechanics?.passive?.length ? { passiveEffects: clone(source.mechanics.passive) } : {}),
@@ -167,12 +162,11 @@ export function abilityDefinitionFromTalent(source: TalentDef): AbilityDefinitio
     ...(source.exclusiveGroup ? { exclusiveGroup: source.exclusiveGroup } : {}),
     tags: source.branch ? [source.branch] : [],
     ...(Object.keys(mechanics).length ? { mechanics } : {}),
-    legacy: clone(source) as unknown as Record<string, unknown>,
   };
 }
 
 export function abilityDefinitionFromSkill(source: SkillDef): AbilityDefinition {
-  const mechanics = mechanicsFromLegacy(source);
+  const mechanics = mechanicsFromModuleDefinition(source);
   return ensureCombatAbilityDefaults({
     schemaVersion: 2,
     id: source.id,
@@ -189,7 +183,6 @@ export function abilityDefinitionFromSkill(source: SkillDef): AbilityDefinition 
     ...(source.exclusiveGroup ? { exclusiveGroup: source.exclusiveGroup } : {}),
     tags: [...(source.tags ?? [])],
     ...(mechanics ? { mechanics } : {}),
-    legacy: clone(source) as unknown as Record<string, unknown>,
   });
 }
 
@@ -276,7 +269,6 @@ export function balanceAbilityProposal(proposal: AbilityProposal): AbilityDefini
     prerequisiteMode: 'all',
     tags: [...proposal.tags],
     mechanics,
-    legacy: { source: 'AbilityProposal', semanticOnly: true },
   };
 }
 

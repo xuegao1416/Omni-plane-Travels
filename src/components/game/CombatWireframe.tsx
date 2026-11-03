@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect,useMemo,useRef,useState } from 'react';
 import {
-  Footprints,
-  Package,
-  Shield,
-  Sparkles,
-  Target,
+Footprints,
+Package,
+Shield,
+Sparkles,
+Target,
 } from 'lucide-react';
 import type {
-  AbilityDefinition,
-  AbilityProposalTarget,
-  CombatActionKind,
-  CombatCommandInputV2,
-  CombatSessionV2,
+AbilityDefinition,
+AbilityProposalTarget,
+CombatActionKind,
+CombatCommandInputV2,
+CombatSessionV2,
 } from '../../gameplay/protocols';
-import { getCombatAbilityCostsV2, previewCombatAbilityV2, type CombatAutoStrategy } from '../../gameplay/combatV2';
-import { buildCombatViewModel, type CombatUnitCardModel } from '../../gameplay/combatViewModel';
+import { getCombatAbilityCostsV2,previewCombatAbilityV2,type CombatAutoStrategy } from '../../gameplay/combatV2';
+import { buildCombatViewModel,type CombatUnitCardModel } from '../../gameplay/combatViewModel';
 import CombatBattlefield from './combat/CombatBattlefield';
 import CombatCommandDeck from './combat/CombatCommandDeck';
 import CombatFormation from './combat/CombatFormation';

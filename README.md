@@ -4,7 +4,7 @@
 
 **把任何脑洞编织成一个可以真正活进去的世界**
 
-一个面向自定义世界、长期叙事与规则化模拟的 AI 互动叙事引擎。项目以 React + TypeScript 构建前端，以结构化游戏状态、叙事记忆、世界演化、事件工作流和可插拔模块共同驱动游戏。
+一个面向自定义世界、长期叙事与规则化模拟的 AI 互动叙事引擎。项目以 React + TypeScript 构建前端，以小说拆解、剧情导演、结构化游戏状态、叙事记忆、事件工作流和可插拔模块共同驱动游戏。
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript)](https://www.typescriptlang.org/)
@@ -12,13 +12,22 @@
 [![Zustand](https://img.shields.io/badge/Zustand-5-3B3B3B)](https://zustand-demo.pmnd.rs/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-`v2.8.1` · Web / PWA · Tauri 桌面端 · BYOK
+`v2.8.3` · Web / PWA · BYOK
 
 </div>
 
 <img src="public/art/theme/entry/hall-background-16x9-nocturne-v2.png" alt="世界晶体大厅" width="100%" />
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/sparkles.svg" width="20" height="20" /> 项目能力
+
+### 小说拆解与剧情导演
+
+- 导入 TXT、EPUB 或拆解资料，识别章节、提取原文证据，归并人物、势力、地点、物品与世界规则，生成世界书和主线资料。
+- 支持暂停、检查点恢复及可选 Embedding；小说分析分段与游戏主线阶段分别组织。
+- 原创原稿与小说共用可人工编辑的固定剧情版本，支持自创/原作角色及阶段起点，小说创建前需保存主线版本。
+- 导演在正文前提供指导、正文后核对落实；主线和人物幕后行动共用事实依据，玩家拒绝或前提变化可以影响后续计划。
+- 普通面板只展示玩家上次获知的人物资料；幕后事实经实际见闻或披露后才更新角色认知。
+- 主线耗尽后可继续游玩；固定剧情版本、阶段与导演状态随存档导出，支持跨设备导入续玩。
 
 ### <img src="https://unpkg.com/lucide-static@latest/icons/theater.svg" width="16" height="16" /> 世界与角色
 
@@ -30,10 +39,10 @@
 
 ### <img src="https://unpkg.com/lucide-static@latest/icons/brain.svg" width="16" height="16" /> 叙事运行时
 
-- 流式 AI 叙事与可交互选择卡片。
+- 非流式 AI 正文与可交互选择卡片。
 - 结构化 `GameState` 同步维护世界、玩家、NPC、资源和任务状态。
 - 编译式叙事记忆保存场景锚点、故事线、关系、事件与长期事实。
-- 世界演化引擎在对话之外推进资源、世界状态与后台事件。
+- 剧情导演统一主线与幕后人物计划；资源、时间周期和机械效果由玩法系统结算。
 - 动态任务、纪事系统、变量快照与历史回滚。
 
 ### <img src="https://unpkg.com/lucide-static@latest/icons/puzzle.svg" width="16" height="16" /> 模块、事件与规则
@@ -55,7 +64,7 @@
 - 可选云存档、创意工坊与邮箱验证码账号体系。
 - 记忆检索可选择远程 Embedding、应用内 WASM 端侧模型或外部本地服务；不可用时自动降级到关键词召回。
 - 服务端可配置不可由客户端重置的三轮匿名体验额度，上游失败不会消耗次数。
-- 桌面端通过 Tauri 提供原生能力，移动端使用响应式面板与抽屉布局。
+- 移动端使用响应式面板与抽屉布局；当前交付为 Web/PWA，Tauri 原生适配入口保留，但本版源码不包含 `src-tauri` 工程。
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/image.svg" width="20" height="20" /> 设计与流程图
 
@@ -80,16 +89,16 @@ Zustand + React Context
         │
         ▼
 Game Engine
-├─ Prompt 组装与流式响应
+├─ Prompt 组装与非流式正文
 ├─ 变量更新与机械效果结算
 ├─ 叙事记忆与世界书注入
-├─ 世界演化与事件规则求值
+├─ 剧情导演、幕后受理与事件规则求值
 └─ 任务、纪事、卡片与快照
         │
         ▼
 Storage / Services
 ├─ IndexedDB
-├─ Tauri backend
+├─ 固定剧情定义与小说资料
 └─ Cloudflare Workers + D1（可选云服务）
 ```
 
@@ -99,7 +108,7 @@ Storage / Services
 |---|---|
 | 前端 | React 19、TypeScript 6、Zustand |
 | 服务 | Bun、Hono |
-| 桌面端 | Tauri 2 |
+| 原生适配 | Tauri 2 前端适配保留；原生工程不在本版源码内 |
 | 存储 | IndexedDB、可选 Cloudflare D1 |
 | 编辑器 | React Flow、Mermaid、Marked |
 | 数据校验 | Zod |
@@ -121,13 +130,15 @@ src/
 ├─ constants/           运行时常量
 ├─ context/             游戏与 UI Context
 ├─ data/                内置世界、世界 Schema 与加载器
-├─ engine/              Prompt、流式响应、变量与事件总线
+├─ director/            固定剧情定义、因果计划、指导与落实回执
+├─ engine/              Prompt、正文管线、变量与事件总线
 ├─ gameplay/            统一玩法内核、能力协议、职业与确定性战斗
 ├─ hooks/               游戏、向导、NPC、生图与响应式 Hooks
 ├─ memory/              编译式叙事记忆、向量检索与检查点
 ├─ modules/             属性、成长、生存、经营、骰子与天赋模块
 ├─ schema/              GameState / PlayerState / NPCData 类型
-├─ simulation/          世界演化与机械层结算
+├─ novel/               小说导入、证据提取、档案归并与世界书生成
+├─ simulation/          导演运行状态、上下文与快照接入
 ├─ storage/             IndexedDB 存档与模板持久化
 ├─ stores/              Zustand 配置、存档、预设与生图 Store
 ├─ styles/ + theme/     Dawn V4 UI 与主题样式
@@ -135,7 +146,6 @@ src/
 ├─ worldbook/           SillyTavern 兼容世界书引擎
 └─ worldgen/            选择式与自定义世界生成管线
 
-src-tauri/              Tauri 桌面端 Rust 后端
 functions/              Cloudflare Workers API 与边缘函数
 migrations/             D1 数据库迁移
 docs/                   架构、教程、规范、截图与变更记录
@@ -174,7 +184,7 @@ bun run dev
 | `bun run tauri:android:dev` | 启动 Android 开发环境 |
 | `bun run tauri:android:build:debug` | 构建 ARM64 调试 APK |
 
-Windows 与 Android 的完整依赖、构建命令和产物位置见 [原生构建指南](docs/native-build.md)。
+上表中的 Tauri 命令仅供已有完整原生工程的工作副本使用；本版不含 `src-tauri`，不能直接生成安装包。历史构建依赖和产物位置见 [原生构建指南](docs/native-build.md)。标签发布默认产出 Web 压缩包，仅在原生工程存在时执行原生构建。
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/key-round.svg" width="20" height="20" /> API 配置
 
@@ -208,7 +218,7 @@ API Key 使用 Web Crypto 加密后保存在本机。浏览器端遇到 Provider
 
 ### 存档
 
-- 游戏存档包含世界、角色、对话、变量、记忆、任务、纪事、模块运行时、职业能力与可恢复战斗会话
+- 游戏存档包含世界、角色、对话、变量、记忆、任务、纪事、模块运行时、职业能力、可恢复战斗会话，以及导演状态、玩家已知资料和固定剧情依赖
 - 支持自动保存、手动导入导出与历史快照回滚
 
 ## <img src="https://unpkg.com/lucide-static@latest/icons/shield-check.svg" width="20" height="20" /> 安全与隐私

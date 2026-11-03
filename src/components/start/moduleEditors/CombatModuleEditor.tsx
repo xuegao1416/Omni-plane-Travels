@@ -1,4 +1,4 @@
-import { Shield, Swords } from 'lucide-react';
+import { Shield,Swords } from 'lucide-react';
 import type { CombatRulesetBinding } from '../../../modules/schema';
 import { BUILTIN_COMBAT_RULESETS } from '../../../gameplay/combatRulesets';
 

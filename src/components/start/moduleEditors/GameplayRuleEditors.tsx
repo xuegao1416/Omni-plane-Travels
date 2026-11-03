@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import type { GameplayComparator, GameplayCondition, GameplayCost, GameplayEffect, GameplayLiteral, GameplayValue } from '../../../gameplay/types';
+import { useEffect,useState } from 'react';
+import type { GameplayComparator,GameplayCondition,GameplayCost,GameplayEffect,GameplayLiteral,GameplayValue } from '../../../gameplay/types';
 import { inputStyle } from './shared';
 
 const comparators: GameplayComparator[] = ['==', '!=', '>', '>=', '<', '<=', 'in', 'contains'];

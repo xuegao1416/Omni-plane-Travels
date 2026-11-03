@@ -1,5 +1,5 @@
 import type { DiceModuleSchema } from '../../../modules/schema';
-import { inputStyle, labelStyle, setPathInClone } from './shared';
+import { inputStyle,labelStyle,setPathInClone } from './shared';
 
 export function DiceModuleEditor({ data, onChange }: { data: DiceModuleSchema; onChange: (d: DiceModuleSchema) => void }) {
   const set = (path: string, value: unknown) => onChange(setPathInClone(data as unknown as Record<string, unknown>, path, value) as unknown as DiceModuleSchema);

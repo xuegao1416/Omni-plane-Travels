@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { ScrollText, X, Edit3, Trash2, Plus } from 'lucide-react';
+import { useState,useEffect } from 'react';
+import { ScrollText,X,Edit3,Trash2,Plus } from 'lucide-react';
 import EmptyState from '../../../shared/EmptyState';
 
-export function DeedsModal({ npcId, npcName, chronicles: initialChronicles, onClose, onUpdate, onMerge }: {
-  npcId: string; npcName: string; chronicles: string[];
+export function DeedsModal({ npcId, chronicles: initialChronicles, onClose, onUpdate, onMerge }: {
+  npcId: string; chronicles: string[];
   onClose: () => void; onUpdate: (npcId: string, chronicles: string[]) => void;
   onMerge?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
 }) {

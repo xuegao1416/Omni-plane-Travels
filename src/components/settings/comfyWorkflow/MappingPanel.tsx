@@ -1,8 +1,8 @@
 // ComfyUI 工作流编辑器 — 映射配置面板
 import { CheckCircle } from 'lucide-react';
-import { ROLE_LABELS, ROLE_ORDER } from './constants';
+import { ROLE_LABELS,ROLE_ORDER } from './constants';
 import { getMappingParam } from './utils';
-import type { DetectedNode, WorkflowParamMapping } from '@/api/imageGenTypes';
+import type { DetectedNode,WorkflowParamMapping } from '@/api/imageGenTypes';
 
 export function MappingPanel({
   detectedNodes,

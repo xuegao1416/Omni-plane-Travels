@@ -1,7 +1,7 @@
 import { Star } from 'lucide-react';
 import Avatar from '../../../shared/Avatar';
-import type { NPCData } from '../../../../schema/variables';
-import { favorClass, categoryStyle } from './types';
+import type { KnownNPC } from '../../../../engine/playerKnowledge';
+import { favorClass,categoryStyle } from './types';
 
 export function GaugeBar({ value, color, min = 0, max = 100 }: { value: number; color: string; min?: number; max?: number }) {
   // 计算百分比：根据 min/max 范围
@@ -17,9 +17,9 @@ export function GaugeBar({ value, color, min = 0, max = 100 }: { value: number; 
 }
 
 export function NPCCard({ id, npc, onClick, portraitSrc }: {
-  id: string; npc: NPCData; onClick: () => void; portraitSrc?: string | null;
+  id: string; npc: KnownNPC; onClick: () => void; portraitSrc?: string | null;
 }) {
-  const rd = npc.关系数据 ?? { 好感度: 0, 关系类型: '未知' };
+  const rd = npc.关系数据 ?? {};
   const sj = npc.社会身份 ?? { 职业: '', 社会地位: '' };
   const fav = favorClass(rd.好感度);
   const cat = categoryStyle(npc.人物分类);
@@ -48,9 +48,9 @@ export function NPCCard({ id, npc, onClick, portraitSrc }: {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: '2px' }}>
           <span style={{ color: 'var(--text-muted)' }}>好感度</span>
-          <span style={{ color: fav.color, fontWeight: '500' }}>{rd.好感度}</span>
+          <span style={{ color: fav.color, fontWeight: '500' }}>{rd.好感度 ?? '未知'}</span>
         </div>
-        <GaugeBar value={rd.好感度} color={fav.color} min={-100} max={100} />
+        {rd.好感度 !== undefined && <GaugeBar value={rd.好感度} color={fav.color} min={-100} max={100} />}
       </div>
     </div>
   );

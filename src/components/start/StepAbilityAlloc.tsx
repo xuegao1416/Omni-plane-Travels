@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { BarChart3, Minus, Plus } from 'lucide-react';
+import { BarChart3,Minus,Plus } from 'lucide-react';
 import { statPointGain } from '../../gameplay/creation/creationPoints';
 
 interface StepAbilityAllocProps {

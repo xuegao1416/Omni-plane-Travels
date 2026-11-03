@@ -160,3 +160,9 @@
   .structured-asset-editor > footer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px 14px 14px; }
   .structured-asset-editor > footer button { width: 100%; min-width: 0; }
 }
+
+/* Stage 2: registry title is optically centered between mirrored edge actions. */
+@media (max-width: 640px) {
+  .traveler-registry-header { align-items: center; }
+  .traveler-registry-heading { text-align: center; }
+}

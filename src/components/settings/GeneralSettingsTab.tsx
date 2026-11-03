@@ -1,6 +1,6 @@
-import { Globe, Palette, Type } from 'lucide-react';
-import { useUISettings, type Theme, type FontFamily, type FontSize, type LineHeight } from '../../context/UISettingsContext';
-import { Section, SettingRow, SegmentedControl, Select, Toggle } from './SettingsUIComponents';
+import { Globe,Palette,Type } from 'lucide-react';
+import { useUISettings,type Theme,type FontFamily,type FontSize,type LineHeight } from '../../context/UISettingsContext';
+import { Section,SettingRow,SegmentedControl,Select,Toggle } from './SettingsUIComponents';
 
 export default function GeneralSettingsTab() {
   const { settings: ui, update, t } = useUISettings();

@@ -1,6 +1,5 @@
-import React from 'react';
-import { Plus, Trash2, Pencil } from 'lucide-react';
-import type { PlayerProfile, CustomNpc } from './types';
+import { Plus,Trash2,Pencil } from 'lucide-react';
+import type { PlayerProfile,CustomNpc } from './types';
 
 interface NpcsTabProps {
   personalInfo: PlayerProfile;

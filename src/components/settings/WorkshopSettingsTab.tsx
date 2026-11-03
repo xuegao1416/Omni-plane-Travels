@@ -1,17 +1,17 @@
 /**
  * 创意工坊设置标签页
  */
-import { useEffect, useState } from 'react';
-import { useWorkshopStore, type WorkshopItem, type WorkshopItemDetail, type WorkshopInstallPlan } from '../../stores/workshopStore';
+import { useEffect,useState } from 'react';
+import { useWorkshopStore,type WorkshopItem,type WorkshopItemDetail,type WorkshopInstallPlan } from '../../stores/workshopStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
 import { STORAGE_KEYS } from '../../config/storageKeys';
 import type { WorldDef } from '../../data/worlds-schema';
-import { installWorkshopItem, type WorkshopInstallOperation, restoreCustomWorldStorage } from '../../workshopRuntime';
-import { PUBLIC_WORKSHOP_TYPES, isPublicWorkshopType, type PublicWorkshopType } from '../../workshopCatalog';
+import { installWorkshopItem,type WorkshopInstallOperation,restoreCustomWorldStorage } from '../../workshopRuntime';
+import { PUBLIC_WORKSHOP_TYPES,isPublicWorkshopType,type PublicWorkshopType } from '../../workshopCatalog';
 import {
-  Store, Download, Trash2, Loader, RefreshCw,
-  Globe, BookOpen, Plus, Upload, X, Puzzle, CalendarDays, TrendingUp, Star, ChevronRight, ArrowLeft
+Store,Download,Trash2,Loader,RefreshCw,
+Globe,BookOpen,Plus,Upload,X,Puzzle,CalendarDays,TrendingUp,Star,ChevronRight,ArrowLeft
 } from 'lucide-react';
 
 const TYPE_LABELS: Record<PublicWorkshopType, { label: string; icon: typeof Globe }> = {

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Crown, LockKeyhole, Sparkles, WandSparkles } from 'lucide-react';
-import type { ProfessionAbilityDef, ProfessionDef } from '../../modules/schema';
-import { professionEmblemSrc, resolveAbilityIconKey, resolveProfessionVisual } from '../../data/professions/professionVisuals';
+import { useEffect,useMemo,useRef,useState } from 'react';
+import { Check,Crown,LockKeyhole,Sparkles,WandSparkles } from 'lucide-react';
+import type { ProfessionAbilityDef,ProfessionDef } from '../../modules/schema';
+import { professionEmblemSrc,resolveAbilityIconKey,resolveProfessionVisual } from '../../data/professions/professionVisuals';
 import '../../styles/profession-book.css';
 
 type AbilityState = 'locked' | 'available' | 'owned';

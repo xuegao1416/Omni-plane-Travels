@@ -6,16 +6,16 @@
  */
 import { useState } from 'react';
 import {
-  Target, Crosshair, Star, Eye, Repeat, CheckCircle2, XCircle, Clock,
-  Package, Dumbbell, Leaf, Swords, Heart, Coins, ChevronDown, ChevronRight,
-  Zap, Trophy, Shield,
+Target,Crosshair,Star,Eye,Repeat,CheckCircle2,XCircle,Clock,
+Package,Dumbbell,Leaf,Swords,Heart,Coins,ChevronDown,ChevronRight,Trophy
 } from 'lucide-react';
-import type { GameState, Task, TaskType, TaskStage, TaskReward } from '../../../schema/variables';
+import type { GameState,Task,TaskType,TaskStage,TaskReward } from '../../../schema/variables';
 import type { ProfessionModuleSchema } from '../../../modules/schema';
 import { resolveOwnedAbility } from '../../../gameplay/profession';
 import { Collapsible } from '../../shared/Collapsible';
 import EmptyState from '../../shared/EmptyState';
 import { toDisplayText } from '../../../utils/displayText';
+import { selectPlayerKnownNPCs } from '../../../engine/playerKnowledge';
 
 interface Props { gameState: GameState; professionConfig?: ProfessionModuleSchema; }
 
@@ -89,7 +89,7 @@ function StageIndicator({ stages }: { stages: TaskStage[] }) {
 }
 
 // ── 需求条件列表 ──
-function RequirementList({ task, gameState, professionConfig }: { task: Task; gameState: GameState; professionConfig?: ProfessionModuleSchema }) {
+export function RequirementList({ task, gameState, professionConfig }: { task: Task; gameState: GameState; professionConfig?: ProfessionModuleSchema }) {
   const items: Array<{ icon: typeof Package; label: string; met: boolean }> = [];
 
   // 物品需求
@@ -149,13 +149,15 @@ function RequirementList({ task, gameState, professionConfig }: { task: Task; ga
 
   // NPC需求
   if (task.NPC需求) {
+    const knownNpcs = Object.values(selectPlayerKnownNPCs(gameState));
     for (const req of safeArray<NonNullable<Task['NPC需求']>[number]>(task.NPC需求)) {
-      const npc = Object.values(gameState.人物档案).find(n => n.姓名 === req.NPC名);
-      const favor = npc?.关系数据?.好感度 ?? 0;
-      const met = !req.最低好感度 || favor >= req.最低好感度;
+      const npc = knownNpcs.find(n => n.姓名 === req.NPC名);
+      const favor = npc?.关系数据?.好感度;
+      const known = typeof favor === 'number' && Number.isFinite(favor);
+      const met = known && favor >= (req.最低好感度 ?? 0);
       items.push({
         icon: Heart,
-        label: `${req.NPC名} 好感度 ≥ ${req.最低好感度 ?? 0} (当前: ${favor})`,
+        label: `${req.NPC名} 好感度 ≥ ${req.最低好感度 ?? 0} (${known ? `上次获知: ${favor}` : '未知'})`,
         met,
       });
     }

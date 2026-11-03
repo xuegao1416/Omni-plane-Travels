@@ -1,21 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
-import { BookOpen, Dices, Library, Shield, Sparkles, X } from 'lucide-react';
+import { useEffect,useRef,useState } from 'react';
+import { BookOpen,Dices,Library,Shield,Sparkles,X } from 'lucide-react';
 import type { ProfessionModuleSchema } from '../../modules/schema';
 import type { PlayerProfile } from '../../storage/db';
 import { validateProfessionSelection } from '../../gameplay/profession';
 import {
-  CREATION_MAX_DRAWS,
-  computeCreationSpending,
-  creationDrawCost,
-  drawRandomTalent,
-  isDivineTalent,
-  talentDirectCost,
+CREATION_MAX_DRAWS,
+computeCreationSpending,
+creationDrawCost,
+drawRandomTalent,
+isDivineTalent,
+talentDirectCost,
 } from '../../gameplay/creation/creationPoints';
-import { professionEmblemSrc, resolveProfessionVisual } from '../../data/professions/professionVisuals';
+import { professionEmblemSrc,resolveProfessionVisual } from '../../data/professions/professionVisuals';
 import { EntrySlicedButton } from './EntrySurface';
 import ProfessionTarotOverlay from './professionTarot/ProfessionTarotOverlay';
 import StepAbilityAlloc from './StepAbilityAlloc';
-import TalentCodexOverlay, { TalentGlyph } from './TalentCodexOverlay';
+import TalentCodexOverlay,{ TalentGlyph } from './TalentCodexOverlay';
 import useCreationAllocations from './useCreationAllocations';
 
 interface StepProfessionTalentsProps {

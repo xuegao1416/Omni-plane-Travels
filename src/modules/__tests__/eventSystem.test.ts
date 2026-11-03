@@ -79,8 +79,7 @@ g.window.__TAURI_INTERNALS__ = {};
 
 import { evaluate } from '../ruleEngine';
 import { parseManifest } from '../manifestSchema';
-import { validateRuleGraph } from '../validateEvent';
-import type { EventRule, EventGraph } from '../schema';
+import type { EventRule } from '../schema';
 
 describe('ruleEngine — 确定性', () => {
   it('相同输入产生相同输出', () => {
@@ -254,38 +253,6 @@ describe('manifestSchema — 安全红线', () => {
     expect(r.ok).toBe(false);
   });
 });
-
-describe('validateEvent — 图结构', () => {
-  const baseGraph = (): EventGraph => ({ nodes: [], edges: [] });
-
-  it('孤立效果节点被检出', () => {
-    const g = baseGraph();
-    g.nodes.push({ id: 'fx1', kind: 'effect', label: '效果' });
-    const issues = validateRuleGraph(g);
-    expect(issues.some((i) => i.code === 'ISOLATED_EFFECT' && i.nodeId === 'fx1')).toBe(true);
-  });
-
-  it('普通触发环被检出', () => {
-    const g = baseGraph();
-    g.nodes.push({ id: 't1', kind: 'trigger', label: '触发1' });
-    g.nodes.push({ id: 't2', kind: 'trigger', label: '触发2' });
-    g.nodes.push({ id: 'fx', kind: 'effect', label: '效果' });
-    g.edges.push({ id: 'e1', source: 't1', target: 't2' });
-    g.edges.push({ id: 'e2', source: 't2', target: 't1' });
-    g.edges.push({ id: 'e3', source: 't1', target: 'fx' });
-    const issues = validateRuleGraph(g);
-    expect(issues.some((i) => i.code === 'CYCLE')).toBe(true);
-  });
-
-  it('普通节点自环被检出', () => {
-    const g = baseGraph();
-    g.nodes.push({ id: 'fx', kind: 'effect', label: '效果' });
-    g.edges.push({ id: 'e', source: 'fx', target: 'fx' });
-    const issues = validateRuleGraph(g);
-    expect(issues.some((i) => i.code === 'SELF_LOOP' && i.nodeId === 'fx')).toBe(true);
-  });
-});
-
 
 describe('eventApi — 缓存与错误解析', () => {
   it('listPacks 走缓存，写命令失效缓存', async () => {

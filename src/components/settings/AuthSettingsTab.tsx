@@ -1,16 +1,16 @@
 /**
  * 用户认证设置标签页（邮箱 + 密码登录 / 验证码注册 / 忘记密码）
  */
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState,useRef,useEffect,useCallback } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useDialog } from '../shared/Dialog';
-import { LogIn, LogOut, User, Loader, Mail, ArrowRight, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { LogIn,LogOut,User,Loader,Mail,ArrowRight,Eye,EyeOff } from 'lucide-react';
 
 type AuthView = 'login' | 'register' | 'forgot';
 
 export default function AuthSettingsTab() {
   const { user, isLoading, isAuthenticated, logout, sendCode, login, register, resetPassword } = useAuthStore();
-  const { DialogUI, alert: showAlert } = useDialog();
+  const { DialogUI } = useDialog();
 
   const effectiveLoading = isLoading;
   const effectiveAuthenticated = isAuthenticated;

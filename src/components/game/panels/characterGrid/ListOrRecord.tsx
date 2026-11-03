@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getQualityColor } from '../../../shared/qualityUtils';
-import { extractFields, FieldDetailModal } from './SharedUI';
+import { extractFields,FieldDetailModal } from './SharedUI';
 
 export function ListOrRecord({ data, emptyText }: {
   data: string[] | Record<string, unknown> | undefined;

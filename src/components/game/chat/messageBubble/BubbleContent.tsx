@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import type { ChatMessage } from '../../../../engine/types';
 import { useUISettings } from '../../../../context/UISettingsContext';
 import { createIframeSrcDoc } from '../../../../utils/markdown';

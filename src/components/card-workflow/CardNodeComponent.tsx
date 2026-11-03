@@ -1,8 +1,8 @@
 // ============================================================
 //  通用卡片节点渲染组件 — 标题 + 端口 + widget 区域
 // ============================================================
-import { memo, useCallback } from 'react';
-import { Position, type NodeProps } from '@xyflow/react';
+import { memo,useCallback } from 'react';
+import { Position,type NodeProps } from '@xyflow/react';
 import { getCardNodeDefinition } from '../../modules/cardNodeRegistry';
 import type { CardNodeInstance } from '../../modules/schema';
 import CardSocketHandle from './CardSocketHandle';

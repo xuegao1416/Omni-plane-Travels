@@ -89,3 +89,150 @@
 .addBtn {
   margin-top: 12px;
 }
+
+/* Responsive audit: keep the editor inside the visual frame on narrow/short viewports. */
+.panel {
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100dvh - 40px);
+  box-sizing: border-box;
+}
+.header { min-width: 0; }
+.header > h2 { flex: 0 0 auto; }
+.header > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar { min-width: 0; }
+.entryList { min-width: 0; min-height: 0; }
+
+@media (max-width: 520px) {
+  .panel {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: 8px auto;
+    border-radius: var(--radius-md);
+  }
+  .header {
+    padding: 10px 12px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .header > h2 { font-size: var(--font-size-lg) !important; }
+  .header > span { order: 3; width: 100%; font-size: 10px !important; }
+  .infoBar { padding: 8px 12px; gap: 6px; }
+  .infoHint { flex: 1 0 100%; text-align: left; }
+  .toolbar {
+    padding: 8px 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .toolbar > button { flex: 0 0 auto; white-space: nowrap; }
+  .importMsg { margin-inline: 10px; }
+  .entryList { padding: 8px 10px 12px; }
+
+  :global(.wbe-entry-header) { min-width: 0; gap: 6px; }
+  :global(.wbe-entry-left) { min-width: 0; flex: 1 1 auto; }
+  :global(.wbe-entry-title) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  :global(.wbe-entry-right) { flex: 0 0 auto; }
+  :global(.wbe-entry-body) { padding-inline: 10px; }
+  :global(.wbe-options-row) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  :global(.wbe-field-sm) { min-width: 0; width: auto; }
+  :global(.wbe-input), :global(.wbe-textarea) { min-width: 0; width: 100%; box-sizing: border-box; }
+}
+
+@media (max-width: 340px) {
+  :global(.wbe-options-row) { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The in-game editor lost its old global WBE layout rules during the journey
+   shell migration. Re-establish them locally so nested content has a real
+   collision box instead of browser-default stacked controls. */
+:global(.wbe-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+:global(.wbe-btn:hover) { border-color: var(--accent); }
+:global(.wbe-btn-primary) { background: var(--accent); border-color: var(--accent); color: var(--color-on-accent, #fff); }
+:global(.wbe-btn-ghost) { background: transparent; }
+
+:global(.wbe-entry) {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+:global(.wbe-entry + .wbe-entry) { margin-top: 6px; }
+:global(.wbe-entry-global) { background: color-mix(in srgb, var(--bg-secondary) 82%, var(--warning) 4%); }
+:global(.wbe-entry-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 9px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+:global(.wbe-entry-left), :global(.wbe-entry-right) { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:global(.wbe-entry-left) { flex: 1 1 auto; }
+:global(.wbe-entry-right) { flex: 0 0 auto; }
+:global(.wbe-entry-order) { flex: 0 0 auto; min-width: 20px; color: var(--text-muted); font-size: var(--font-size-xs); text-align: right; }
+:global(.wbe-entry-type-dot) { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--success); }
+:global(.wbe-entry-lock) { display: inline-grid; place-items: center; flex: 0 0 auto; color: var(--warning); }
+:global(.wbe-entry-title) { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+:global(.wbe-tag-locked) { padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); font-size: 10px; white-space: nowrap; }
+:global(.wbe-entry-delete) { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--danger); cursor: pointer; }
+:global(.wbe-entry-body) { display: grid; gap: 10px; padding: 10px 12px 12px; border-top: 1px solid var(--border); }
+:global(.wbe-field) { display: grid; gap: 5px; min-width: 0; }
+:global(.wbe-label) { color: var(--text-muted); font-size: var(--font-size-xs); }
+:global(.wbe-input), :global(.wbe-textarea) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+:global(.wbe-textarea) { resize: vertical; line-height: 1.55; }
+:global(.wbe-options-row) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+:global(.wbe-global-hint) { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: var(--font-size-xs); line-height: 1.45; }
+
+@media (max-width: 520px) {
+  .overlay {
+    box-sizing: border-box;
+    padding: 38px 30px 28px;
+  }
+  .panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0;
+  }
+  :global(.wbe-options-row) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .toolbar > button { width: 100%; min-width: 0; }
+}

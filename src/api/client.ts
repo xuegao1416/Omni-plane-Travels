@@ -1,8 +1,8 @@
-import type { ApiConfig, Message, RequestOptions, StreamOptions, CompletionResult } from './types';
+import type { ApiConfig,Message,RequestOptions,StreamOptions,CompletionResult } from './types';
 import { nativeFetch } from '../utils/nativeFetch';
 import { STORAGE_KEYS } from '../config/storageKeys';
-import { notifyRateLimited, bucketKeyForConfig } from './rateLimiter';
-import { fetchTrialStatus, getTrialClientId, isTrialApiConfig } from './trial';
+import { notifyRateLimited,bucketKeyForConfig,parseRetryAfter } from './rateLimiter';
+import { getTrialClientId,isTrialApiConfig } from './trial';
 
 // 获取代理 URL（校验协议安全性）
 export function getProxyUrl(): string | null {
@@ -282,7 +282,7 @@ export async function requestCompletion(
     if (res.status === 429) {
       notifyRateLimited(res.headers.get('Retry-After'), bucketKeyForConfig(config));
     }
-    throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
+    throw Object.assign(new Error(`API ${res.status}: ${errText.slice(0, 200)}`), { status: res.status, retryAfterMs: parseRetryAfter(res.headers.get('Retry-After')) ?? undefined });
   }
 
   const json = await res.json();
@@ -338,7 +338,7 @@ export async function requestCompletionStream(
     if (res.status === 429) {
       notifyRateLimited(res.headers.get('Retry-After'), bucketKeyForConfig(config));
     }
-    throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
+    throw Object.assign(new Error(`API ${res.status}: ${errText.slice(0, 200)}`), { status: res.status, retryAfterMs: parseRetryAfter(res.headers.get('Retry-After')) ?? undefined });
   }
 
   const { text, reasoning, finishReason } = await parseSSEStream(res, options.onDelta, options.onReasoning);
@@ -607,6 +607,7 @@ export async function fetchEmbedding(
 export async function fetchEmbeddingBatch(
   config: EmbeddingConfig,
   texts: string[],
+  options?: { signal?: AbortSignal },
 ): Promise<number[][]> {
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
@@ -623,6 +624,7 @@ export async function fetchEmbeddingBatch(
       model: config.model,
       input: texts,
     }),
+    signal: options?.signal,
   });
 
   if (!res.ok) {

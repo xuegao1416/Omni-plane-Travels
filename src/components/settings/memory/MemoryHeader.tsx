@@ -1,4 +1,4 @@
-import { Brain, Repeat } from 'lucide-react';
+import { Brain,Repeat } from 'lucide-react';
 
 interface Props {
   modeLabel: string;

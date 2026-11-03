@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import { GitBranch, Sparkles, Star } from 'lucide-react';
-import type { ProfessionAbilityDef, ProfessionAbilityMechanics, ProfessionModuleSchema, StatModuleSchema } from '../../../../modules/schema';
+import { useMemo,useState } from 'react';
+import { GitBranch,Sparkles,Star } from 'lucide-react';
+import type { ProfessionAbilityDef,ProfessionAbilityMechanics,ProfessionModuleSchema,StatModuleSchema } from '../../../../modules/schema';
 import type { GameState } from '../../../../schema/variables';
-import { describeProfessionAbilityMechanics, describeProfessionMechanics } from '../../../../gameplay/profession';
+import { describeProfessionAbilityMechanics,describeProfessionMechanics } from '../../../../gameplay/profession';
 import { Collapsible } from '../../../shared/Collapsible';
-import { DetailModal, DetailRow } from './shared';
+import { DetailModal,DetailRow } from './shared';
 
 const TYPE_LABEL: Record<ProfessionAbilityDef['type'], string> = {
   active: '主动能力',
@@ -65,7 +65,7 @@ export function ProfessionSection({
             const ability: ProfessionAbilityDef = definition ?? {
               id,
               name: owned.名称 || id,
-              description: '此能力来自旧存档；当前职业包中没有对应定义。',
+              description: '当前职业包中没有该能力的定义。',
               type: owned.类型 ?? 'passive',
             };
             return (

@@ -14,6 +14,20 @@ import { buildModuleContextProjection, projectProfessionModuleConfig } from '../
 import { normalizeAbilityProposal, normalizeCombatEncounterRequest, type AbilityProposal, type CombatEncounterRequest } from '../gameplay/protocols';
 import { stageAbilityProposalOnGameState } from '../gameplay/abilitySystem';
 import { detectCombatOnset } from '../gameplay/combatNarrativeBoundary';
+import { isCombatAllyNpc } from '../gameplay/combatV2';
+import type { StatModuleSchema } from '../modules/schema';
+import { ensureNpcModuleDefaults } from '../utils/npcStats';
+import { getNpcCategoryValue } from '../utils/npcHelpers';
+import { applyPlayerObservations, type PlayerObservation } from './playerKnowledge';
+
+export function extractPlayerObservations(input: unknown): PlayerObservation[] {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return [];
+  const candidates = (input as Record<string, unknown>).playerObservations;
+  if (!Array.isArray(candidates)) return [];
+  return candidates.slice(0, 100).filter((item): item is PlayerObservation => !!item && typeof item === 'object'
+    && typeof item.npcId === 'string' && typeof item.path === 'string' && typeof item.quote === 'string'
+    && (item.mode === 'observed' || item.mode === 'disclosed'));
+}
 
 const COMBAT_ENCOUNTER_CONTRACT_PROMPT = `
 
@@ -60,6 +74,7 @@ function stripCombatEncounterMetadata(input: unknown): unknown {
   delete sanitized.combatEncounterRequest;
   delete sanitized.abilityProposal;
   delete sanitized.abilityProposals;
+  delete sanitized.playerObservations;
   const combat = sanitized.combat;
   if (combat && typeof combat === 'object' && !Array.isArray(combat)) {
     const sanitizedCombat = { ...(combat as Record<string, unknown>) };
@@ -85,7 +100,7 @@ function sleep(ms: number): Promise<void> {
  * 精简 GameState 用于变量提取 API 调用
  * 移除非必要字段（memoryRuntime、portraitUrl 等），减少序列化体积
  */
-function sanitizeForExtraction(state: GameState): GameState {
+export function createVariableExtractionSnapshot(state: GameState, narrativeText = ''): GameState {
   const snapshot = { ...state };
 
   // 移除记忆系统运行态和配置（体积大，变量提取不需要）
@@ -96,14 +111,41 @@ function sanitizeForExtraction(state: GameState): GameState {
   if (snapshot.人物档案) {
     const cleanedNpcs: Record<string, unknown> = {};
     for (const [id, npc] of Object.entries(snapshot.人物档案)) {
-      const cleaned = { ...npc };
-      // 移除缓存字段
-      delete (cleaned as any).portraitUrl;
-      delete (cleaned as any).portraitBlobKey;
-      // 事迹只保留最近 10 条（完整事迹在主状态里，提取只需参考近期）
-      if (Array.isArray(cleaned.人物事迹) && cleaned.人物事迹.length > 10) {
-        cleaned.人物事迹 = cleaned.人物事迹.slice(-10);
-      }
+      const name = String(npc.姓名 ?? '').trim();
+      const mentioned = narrativeText.includes(id) || (name.length > 0 && narrativeText.includes(name));
+      if (getNpcCategoryValue(npc) === '离场' && !mentioned) continue;
+      const personal = npc.个人信息 ?? {} as GameState['人物档案'][string]['个人信息'];
+      // NPC 物品栏：非空时带上，供 AI 在 NPC 使用/消耗/交付道具时更新（含删除）
+      const npcInventory = (npc as unknown as Record<string, unknown>).物品栏;
+      const hasInventory = !!npcInventory && typeof npcInventory === 'object' && !Array.isArray(npcInventory)
+        && Object.keys(npcInventory as Record<string, unknown>).length > 0;
+      const cleaned = Object.fromEntries(Object.entries({
+        姓名: npc.姓名,
+        种族: npc.种族,
+        性别: npc.性别,
+        年龄: npc.年龄,
+        人物分类: npc.人物分类,
+        生存状态: npc.生存状态,
+        战斗状态: npc.战斗状态,
+        社会身份: npc.社会身份,
+        关系数据: npc.关系数据,
+        ...(hasInventory ? { 物品栏: npcInventory } : {}),
+        个人信息: Object.fromEntries(Object.entries({
+          外貌: personal.外貌,
+          表性格: personal.表性格,
+          里性格: personal.里性格,
+          当前想法: personal.当前想法,
+          当前穿着: personal.当前穿着,
+          当前位置: personal.当前位置,
+          当前状态: personal.当前状态,
+        }).filter(([, value]) => value !== undefined)),
+        重要NPC: npc.重要NPC,
+        当前行动: npc.当前行动,
+        短期目标: npc.短期目标,
+        长期目标: npc.长期目标,
+        人物事迹: Array.isArray(npc.人物事迹) ? npc.人物事迹.slice(-5) : [],
+        成长状态: npc.成长状态,
+      }).filter(([, value]) => value !== undefined));
       cleanedNpcs[id] = cleaned;
     }
     snapshot.人物档案 = cleanedNpcs as any;
@@ -129,7 +171,10 @@ async function callAuxiliaryApiForEngine(
     aiText: aiContentText,
     target: 'extraction',
   });
-  const variableSnapshot = JSON.stringify(sanitizeForExtraction(moduleProjection.state));
+  const variableSnapshot = JSON.stringify(createVariableExtractionSnapshot(
+    moduleProjection.state,
+    `${userMessage}\n${aiContentText}`,
+  ));
 
   let worldBookRules = '';
   if (worldBook) {
@@ -173,17 +218,23 @@ async function callAuxiliaryApiForEngine(
     };
     for (const mod of worldDef.modules) {
       const mapped = keyMap[mod.moduleId];
-      if (mod.enabled && mapped && relevant.has(mapped[1] as any) && (mod.moduleConfig || mod.data)) {
+      if (mod.enabled && mapped && (mod.moduleId === 'stat' || relevant.has(mapped[1] as any)) && (mod.moduleConfig)) {
         worldSystemFromDef[mapped[0]] = mod.moduleId === 'profession'
           ? projectProfessionModuleConfig(gameState, worldDef, `${userMessage}\n${aiContentText}`)
-          : (mod.moduleConfig || mod.data);
+          : (mod.moduleConfig);
       }
     }
   }
 
   const variableUpdatePrompt = `${buildVariableExtractionPrompt(worldSystemFromDef, progressionConfig as Record<string, unknown>)}${
     hasEnabledCombatModule(worldDef, gameState) ? COMBAT_ENCOUNTER_CONTRACT_PROMPT : ''
-  }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}`;
+  }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}
+【玩家观察记录】
+在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"observed|disclosed",introduces:false}]。
+只记录本轮已提交正文中玩家亲眼观察或明确获告知的具体字段，quote 必须逐字引用正文并能够支持该字段。不能从变量快照、读者视角或幕后叙述补充玩家不知道的内容。见面不等于获知全部资料，未获知的字段省略。内心想法、真实目标、里性格等秘密仅当正文明确向玩家披露时用 disclosed。新认识人物先提供姓名字段和 introduces:true。人物必须使用人物档案中的规范 ID，path 为字段路径，例如 个人信息.当前状态；不得直接修改 playerKnowledge。没有实际观察则省略。
+【机械结算只读边界】
+simulationRuntime 及其 effectLog 属于本地规则运行记录，不是允许修改的变量路径。下面是最近已结算记录，快照数值已包含这些变化，不得因为正文再次提及而重复加减。不要输出主线进度、候选事件或未来剧情为实际状态；只提取这轮正文已经发生且尚未结算的事实。
+${JSON.stringify(gameState.simulationRuntime?.effectLog?.slice(-12) ?? []).slice(0, 5000)}`;
 
   return callAuxiliaryApi(config, messages, variableUpdatePrompt, signal);
 }
@@ -198,8 +249,16 @@ export async function runVariableExtraction(params: {
   worldId: string;
   delayMs: number;
   maxRetries: number;
+  signal?: AbortSignal;
+  /** A retry must still belong to the same save, world, turn and manager. */
+  isCurrent?: () => boolean;
 }): Promise<void> {
-  const { varMgr, parsed, round, userText, mainApiConfig, worldBook, worldId, delayMs, maxRetries } = params;
+  const { varMgr, parsed, round, userText, mainApiConfig, worldBook, worldId, delayMs, maxRetries, signal } = params;
+  const assertCurrent = () => {
+    signal?.throwIfAborted();
+    if (params.isCurrent && !params.isCurrent()) throw new DOMException('变量提取对应的回合已失效', 'AbortError');
+  };
+  assertCurrent();
 
   if (!parsed.content.trim()) {
     const error = new Error('正文内容为空，无法执行变量提取');
@@ -229,6 +288,8 @@ export async function runVariableExtraction(params: {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
+      assertCurrent();
+
       // 始终通过独立 API 调用提取变量（正文和变量完全分离）
       const updateText = await callAuxiliaryApiForEngine(
         effectiveConfig,
@@ -237,7 +298,16 @@ export async function runVariableExtraction(params: {
         userText,
         parsed.content,
         worldId,
+        signal,
       );
+      assertCurrent();
+
+      // AI 返回 null/空字符串/仅空白：视为无需更新，不是错误
+      if (!updateText || !updateText.trim()) {
+        console.log('[变量提取] AI 未返回有效更新内容，跳过变量更新');
+        eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+        return;
+      }
 
       if (updateText) {
         // callAuxiliaryApi 已负责从 <UpdateVariable> 标签或裸 JSON 中提取内容
@@ -258,10 +328,28 @@ export async function runVariableExtraction(params: {
         );
         const encounter = structuredEncounter ?? localEncounter;
         const abilityProposals = extractStructuredAbilityProposals(parsedUpdate);
+        const observations = extractPlayerObservations(parsedUpdate);
         const gameplayUpdate = stripCombatEncounterMetadata(parsedUpdate);
         const gameplayJson = gameplayUpdate === undefined ? jsonContent : JSON.stringify(gameplayUpdate);
-        const applied = varMgr.applyUpdateVariable(gameplayJson);
-        if (!applied && !encounter && abilityProposals.length === 0) {
+        assertCurrent();
+        const applied = varMgr.applyAiUpdateVariable(gameplayJson);
+        if (applied) {
+          const activeWorld = findWorldDef(worldId);
+          const statModule = activeWorld?.modules?.find(module => module.moduleId === 'stat' && module.enabled);
+          const progressionModule = activeWorld?.modules?.find(module => module.moduleId === 'progression' && module.enabled);
+          const statConfig = (statModule?.moduleConfig) as StatModuleSchema | undefined;
+          const progressionConfig = (progressionModule?.moduleConfig) as Record<string, unknown> | undefined;
+          if (statConfig || progressionModule) {
+            const stateWithDefaults = structuredClone(varMgr.getState());
+            const tierFallback = progressionModule
+              ? Number(progressionConfig?.currentTierIndex ?? 0)
+              : undefined;
+            if (ensureNpcModuleDefaults(stateWithDefaults, statConfig, tierFallback)) {
+              varMgr.setState(stateWithDefaults);
+            }
+          }
+        }
+        if (!applied && !encounter && abilityProposals.length === 0 && observations.length === 0) {
           throw new Error(`变量更新内容无法应用：${jsonContent.slice(0, 120)}`);
         }
         if (abilityProposals.length > 0) {
@@ -270,21 +358,31 @@ export async function runVariableExtraction(params: {
           varMgr.setState(proposalState);
         }
         if (encounter) eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, encounter);
-      } else {
-        throw new Error('辅助 API 未返回有效的变量更新内容');
+        if (observations.length) {
+          let hash = 2166136261;
+          for (let i = 0; i < parsed.content.length; i++) hash = Math.imul(hash ^ parsed.content.charCodeAt(i), 16777619);
+          const eventId = `narrative:${worldId}:${round}:${(hash >>> 0).toString(36)}`;
+          const result = applyPlayerObservations(varMgr.getState(), { id: `observation:${eventId}`, turnId: eventId, eventId, turnNumber: round, committed: true, text: parsed.content, observations });
+          assertCurrent();
+          varMgr.setState(result.state);
+        }
       }
 
       eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
       return;
     } catch (err: unknown) {
+      assertCurrent();
       lastError = err;
       console.warn(`[变量提取] 第 ${attempt + 1}/${maxRetries + 1} 次失败:`, (err as Error).message || err);
       if (attempt < maxRetries) {
-        await sleep(delayMs);
+        // 指数退避，避免瞬时网络抖动时连续重试都打在同一次故障上
+        const waitMs = delayMs > 0 ? delayMs * Math.pow(2, attempt) : 0;
+        await sleep(waitMs);
       }
     }
   }
 
+  assertCurrent();
   const finalError = lastError instanceof Error
     ? lastError
     : new Error('变量提取全部重试失败');
@@ -367,6 +465,19 @@ export function inferImmediateCombatEncounterRequest(
     temporary: !knownEnemy,
     source: knownEnemy ? 'npc' as const : 'temporary' as const,
   };
+  const allies = Object.entries(state.人物档案 ?? {})
+    .filter(([id, npc]) => id !== knownEnemy?.[0]
+      && Boolean(String(npc.姓名 || '').trim())
+      && combined.includes(String(npc.姓名).trim())
+      && isCombatAllyNpc(npc)
+      && Number(npc.生存状态?.血量 ?? 0) > 0)
+    .slice(0, 3)
+    .map(([id, npc]) => ({
+      id,
+      identity: npc.姓名 || id,
+      temporary: false,
+      source: 'npc' as const,
+    }));
   return {
     schemaVersion: 2,
     source: 'variable-hostile-action',
@@ -375,7 +486,7 @@ export function inferImmediateCombatEncounterRequest(
       id: `narrative-hostile-${Math.max(0, Math.trunc(round))}-${enemyId}`,
       context,
       threatBand: 'matched',
-      allies: [],
+      allies,
       enemies: [enemy],
       neutrals: [],
     },

@@ -8,14 +8,14 @@
 //   canonical workflow 与 rules.json 内容派生（含节点 / 含周期 / 含规则）。
 //   数据来源：懒加载 getWebEvent(packId).files → parseCanonicalPackView → derivePackFlags。
 //
-// EventListRow（已装）/ EventLibrary（发现）共用本组件，消除重复。
+// 事件中心与事件库共用本组件，消除重复。
 // 仅 Lucide 图标、零 emoji、全项目 Token。
 // ============================================================
-import { useEffect, useState, type CSSProperties } from 'react';
-import { Package, FileText, Repeat, BookOpen, Spline, type LucideIcon } from 'lucide-react';
+import { useEffect,useState,type CSSProperties } from 'react';
+import { Package,FileText,Repeat,BookOpen,Spline,type LucideIcon } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
 import type { RuleFile } from '../../modules/schema';
-import { readCanonicalEventPack, type CanonicalEventPackView } from '../../modules/eventPackFormat';
+import { readCanonicalEventPack,type CanonicalEventPackView } from '../../modules/eventPackFormat';
 
 /** 事件包内容构成标记（库顶层徽章与筛选共用同一派生口径） */
 export interface EventPackFlags {

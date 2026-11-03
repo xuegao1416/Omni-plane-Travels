@@ -13,7 +13,7 @@ import type { CombatRiskMode } from '../gameplay/protocols';
 // ─── 类型定义 ─────────────────────────────────────────
 
 /** 自建NPC（向导阶段玩家创建，注入到初始人物档案） */
-interface CustomNpc {
+export interface CustomNpc {
   id: string;
   // 基础信息
   name: string;
@@ -60,7 +60,9 @@ export interface PortraitSettings {
   fileName?: string;
 }
 
-interface PlayerProfile {
+export interface PlayerProfile {
+  /** Creation-only role selection, fixed to the immutable plot version. */
+  directorRole?: import('../director/initialIdentity').DirectorPlayerSelection;
   // 基础信息
   name: string;
   gender: string;
@@ -117,7 +119,9 @@ interface PlayerProfile {
 export type SaveLifecycle = 'active' | 'ended';
 
 /** 完整存档记录（写入 IndexedDB saves store） */
-interface GameSave {
+export interface GameSave {
+  /** v3/v4 internal save schema marker; imports are normalized before persistence. */
+  schemaVersion?: number;
   id: string;
   name: string;
   timestamp: number;
@@ -138,8 +142,6 @@ interface GameSave {
   customWorld?: Record<string, unknown>;
   /** 世界推演模拟状态（每个存档独立，解决串存档问题） */
   simulationState?: SimulationState;
-  /** 按存档绑定的启用事件包列表（内置世界无 customWorld，绑定落在此处） */
-  enabledMods?: string[]; // TODO: 下次存档格式升级时改名为 enabledEventPacks
   /** 六模块当前运行态；仅作为加载/导出传输载体，实际存于独立 object store。 */
   moduleStates?: ModuleStateRecord[];
   /** 消息快照引用的模块历史修订；实际存于独立 object store。 */
@@ -178,12 +180,28 @@ export interface SaveMeta {
 // ─── DB 常量 ──────────────────────────────────────────
 
 const DB_NAME = 'omni-plane-travels';
-const DB_VERSION = 5;  // v5: 独立模块状态与回滚检查点
+const DB_VERSION = 10; // v10: immutable director definitions and resumable compile jobs
+// v2.8.2 shipped DB v5; v6–v9 were intermediate additions before v2.8.3.
+// Database deployment versions are independent of the save payload schema below.
+const MIN_UPGRADABLE_DB_VERSION = 5;
 const SAVES_STORE = 'saves';
 const GLOBAL_STORE = 'global';
 const MESSAGES_STORE = 'messages';  // 新增：消息分片 store
 export const MODULE_STATES_STORE = 'module_states';
 export const MODULE_CHECKPOINTS_STORE = 'module_checkpoints';
+
+// Novel analysis stores
+export const NOVEL_CHAPTERS_STORE = 'novel_chapters';
+export const NOVEL_CHUNKS_STORE = 'novel_chunks';
+export const NOVEL_DATASETS_STORE = 'novel_datasets';
+export const NOVEL_JOBS_STORE = 'novel_jobs';
+export const NOVEL_SEGMENTS_STORE = 'novel_segments';
+export const NOVEL_ARCHIVES_STORE = 'novel_archives';
+export const NOVEL_CHECKPOINTS_STORE = 'novel_checkpoints';
+export const NOVEL_SOURCES_STORE = 'novel_sources';
+export const NOVEL_MATERIALS_STORE = 'novel_materials';
+export const DIRECTOR_DEFINITIONS_STORE = 'director_definitions';
+export const DIRECTOR_JOBS_STORE = 'director_jobs';
 
 /** localStorage key：当前活跃存档 ID（F5 恢复用） */
 export const ACTIVE_SAVE_KEY = STORAGE_KEYS.ACTIVE_SAVE;
@@ -192,38 +210,53 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 
 export function getDB() {
   if (!dbPromise) {
+    let unsupportedVersion: number | undefined;
     dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) {
-        // v1-v3: 原有 store
-        if (!db.objectStoreNames.contains(SAVES_STORE)) {
-          const store = db.createObjectStore(SAVES_STORE, { keyPath: 'id' });
-          store.createIndex('timestamp', 'timestamp');
+      upgrade(db, oldVersion, _newVersion, transaction) {
+        // Report upgrade failures through openDB, including asynchronous index failures.
+        void transaction.done.catch(() => {});
+        if (oldVersion !== 0 && oldVersion < MIN_UPGRADABLE_DB_VERSION) {
+          unsupportedVersion = oldVersion;
+          transaction.abort();
+          return;
         }
-        if (!db.objectStoreNames.contains(GLOBAL_STORE)) {
-          db.createObjectStore(GLOBAL_STORE, { keyPath: 'key' });
-        }
-
-        // v4: 新增 messages 分片 store
-        if (oldVersion < 4) {
-          const msgStore = db.createObjectStore(MESSAGES_STORE, { keyPath: 'key' });
-          msgStore.createIndex('saveId', 'saveId');
-          msgStore.createIndex('saveId_seq', ['saveId', 'seq']);
-        }
-
-        // v5: module runtime partitions are persisted separately from GameState.
-        if (oldVersion < 5) {
-          if (!db.objectStoreNames.contains(MODULE_STATES_STORE)) {
-            const moduleStore = db.createObjectStore(MODULE_STATES_STORE, { keyPath: 'key' });
-            moduleStore.createIndex('saveId', 'saveId');
-            moduleStore.createIndex('saveId_moduleId', ['saveId', 'moduleId'], { unique: true });
+        // Reconcile directly to one canonical layout in the atomic upgrade transaction.
+        // Never recreate stores or rewrite records: saves and rollback snapshots stay intact.
+        const ensureStore = (name: string, keyPath = 'id') => db.objectStoreNames.contains(name)
+          ? transaction.objectStore(name)
+          : db.createObjectStore(name, { keyPath });
+        const ensureIndex = (store: ReturnType<typeof ensureStore>, name: string, keyPath: string | string[], unique = false) => {
+          if (store.indexNames.contains(name)) {
+            const index = store.index(name);
+            if (JSON.stringify(index.keyPath) === JSON.stringify(keyPath) && index.unique === unique) return;
+            // Early novel databases used a single-field datasetId_index.
+            store.deleteIndex(name);
           }
-          if (!db.objectStoreNames.contains(MODULE_CHECKPOINTS_STORE)) {
-            const checkpointStore = db.createObjectStore(MODULE_CHECKPOINTS_STORE, { keyPath: 'key' });
-            checkpointStore.createIndex('saveId', 'saveId');
-            checkpointStore.createIndex('saveId_module_revision', ['saveId', 'moduleId', 'revision'], { unique: true });
-          }
+          store.createIndex(name, keyPath, { unique });
+        };
+        ensureIndex(ensureStore(SAVES_STORE), 'timestamp', 'timestamp');
+        ensureStore(GLOBAL_STORE, 'key');
+        const messages = ensureStore(MESSAGES_STORE, 'key');
+        ensureIndex(messages, 'saveId', 'saveId');
+        ensureIndex(messages, 'saveId_seq', ['saveId', 'seq']);
+        const modules = ensureStore(MODULE_STATES_STORE, 'key');
+        ensureIndex(modules, 'saveId', 'saveId');
+        ensureIndex(modules, 'saveId_moduleId', ['saveId', 'moduleId'], true);
+        const checkpoints = ensureStore(MODULE_CHECKPOINTS_STORE, 'key');
+        ensureIndex(checkpoints, 'saveId', 'saveId');
+        ensureIndex(checkpoints, 'saveId_module_revision', ['saveId', 'moduleId', 'revision'], true);
+        ensureIndex(ensureStore(NOVEL_DATASETS_STORE), 'timestamp', 'timestamp');
+        for (const name of [NOVEL_CHAPTERS_STORE, NOVEL_SEGMENTS_STORE, NOVEL_CHUNKS_STORE, NOVEL_JOBS_STORE, NOVEL_ARCHIVES_STORE, NOVEL_CHECKPOINTS_STORE]) {
+          const store = ensureStore(name);
+          ensureIndex(store, 'datasetId', 'datasetId');
+          if (name === NOVEL_SEGMENTS_STORE) ensureIndex(store, 'datasetId_index', ['datasetId', 'index']);
         }
+        for (const name of [NOVEL_SOURCES_STORE, NOVEL_MATERIALS_STORE, DIRECTOR_DEFINITIONS_STORE, DIRECTOR_JOBS_STORE]) ensureStore(name);
       },
+    }).catch(error => {
+      dbPromise = null;
+      if (unsupportedVersion !== undefined) throw new Error(`本地数据库 v${unsupportedVersion} 无法直接升级到 v${DB_VERSION}；支持从 v${MIN_UPGRADABLE_DB_VERSION} 及之后版本升级。原数据未修改，请保留网站数据并联系维护者协助迁移。`);
+      throw error;
     });
   }
 
@@ -346,15 +379,6 @@ export async function updateSaveHead(saveId: string, patch: { name?: string; tim
   if (patch.name !== undefined) record.name = patch.name;
   if (patch.timestamp !== undefined) record.timestamp = patch.timestamp;
 
-  await db.put(SAVES_STORE, record);
-}
-
-/** 更新单个存档的「按存档绑定启用 mod 列表」（游戏内模块面板开关后持久化） */
-export async function updateSaveEnabledMods(saveId: string, ids: string[]): Promise<void> {
-  const db = await getDB();
-  const record = await db.get(SAVES_STORE, saveId);
-  if (!record) return;
-  record.enabledMods = ids;
   await db.put(SAVES_STORE, record);
 }
 
@@ -497,84 +521,6 @@ export async function autoPruneIfNeeded(saveId: string): Promise<void> {
   }
 }
 
-/**
- * 重新迁移存档（修复 seq 缺失问题）
- * 删除旧的 messages 分片，重新从 saves 记录迁移
- */
-export async function remigrateSave(saveId: string): Promise<boolean> {
-  try {
-    const db = await getDB();
-
-    // 1) 删除旧的 messages 分片
-    await deleteMessages(saveId);
-
-    // 2) 读取 saves 记录
-    const record = await db.get(SAVES_STORE, saveId);
-    if (!record) return false;
-
-    // 3) 检查是否有内联的 messages（老格式）
-    const oldSave = record as any;
-    if (!oldSave.messages || !Array.isArray(oldSave.messages)) {
-      console.warn(`[重新迁移] 存档 ${saveId} 没有内联 messages，跳过`);
-      return false;
-    }
-
-    // 4) 重新迁移（这次会正确分配 seq）
-    const messages = oldSave.messages as ChatMessage[];
-
-    // 给消息对象分配 seq 字段
-    for (let i = 0; i < messages.length; i++) {
-      messages[i].seq = i;
-    }
-
-    // 写入 messages 分片
-    const tx = db.transaction(MESSAGES_STORE, 'readwrite');
-    for (let i = 0; i < messages.length; i++) {
-      const record: MessageRecord = {
-        key: `${saveId}#${i}`,
-        saveId,
-        seq: i,
-        message: messages[i],
-      };
-      await tx.store.put(record);
-    }
-    await tx.done;
-
-    // 5) 更新 saves 记录为新格式（删除内联 messages）
-    const compactHead: CompactSaveRecord = {
-      id: oldSave.id,
-      name: oldSave.name,
-      timestamp: oldSave.timestamp,
-      schemaVersion: SAVE_SCHEMA_VERSION,
-      round: messages.reduce((max, m) => Math.max(max, m.round), 0),
-      gameState: oldSave.gameState,
-      worldId: oldSave.worldId,
-      personalInfo: oldSave.personalInfo,
-      characterHistory: oldSave.characterHistory,
-      memoryRuntime: oldSave.memoryRuntime,
-      memoryConfig: oldSave.memoryConfig,
-      vectorMemory: oldSave.vectorMemory,
-      variableConfig: oldSave.variableConfig,
-      customWorld: oldSave.customWorld,
-      simulationState: oldSave.simulationState,
-      enabledMods: oldSave.enabledMods,
-      lifecycle: oldSave.lifecycle === 'ended' ? 'ended' : 'active',
-      endedAt: oldSave.endedAt,
-      endReason: oldSave.endReason,
-      messageCount: messages.length,
-      lastMessageSeq: messages.length - 1,
-    };
-
-    await db.put(SAVES_STORE, compactHead as any);
-
-    console.log(`[重新迁移] 成功重新迁移存档 ${saveId}，共 ${messages.length} 条消息`);
-    return true;
-  } catch (err) {
-    console.error(`[重新迁移] 存档 ${saveId} 重新迁移失败:`, err);
-    return false;
-  }
-}
-
 /** 获取指定存档的全量消息（用于导出） */
 export async function getAllMessages(saveId: string): Promise<ChatMessage[]> {
   const db = await getDB();
@@ -707,8 +653,6 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
-  /** 按存档绑定的启用事件包列表 */
-  enabledMods?: string[];
   messageCount: number;
   lastMessageSeq: number;
   estBytes?: number;
@@ -718,19 +662,21 @@ export interface CompactSaveRecord {
 }
 
 /**
- * 纯函数：规划 v3（内联 messages）→ v4（分片）迁移。
+ * 纯函数：规划直接上一代 v3（内联 messages）→ 当前 v4（分片）迁移。
  * 不接触 IndexedDB，便于单测（L-16）。
- * - 已为新格式（schemaVersion >= SAVE_SCHEMA_VERSION）→ 返回 null（跳过）
+ * - 仅接受 schemaVersion === 3；当前 v4 返回 null，更早版本不再进入自动迁移链
  * - 否则返回紧凑头部 compactHead + 消息分片记录 messageRecords
  *   - 无消息 → messageRecords 为空，compactHead.messageCount=0 / lastMessageSeq=-1
  *   - 有消息 → 每条消息生成一条分片，seq 从 0 递增
  */
-export function planV2ToV3Migration(oldSave: GameSave): {
+export function planV3ToV4Migration(oldSave: GameSave): {
   head: CompactSaveRecord;
   messageRecords: MessageRecord[];
 } | null {
-  if ((oldSave as any).schemaVersion >= SAVE_SCHEMA_VERSION) {
-    return null; // 已迁移，跳过
+  const schemaVersion = Number((oldSave as any).schemaVersion ?? 0);
+  if (schemaVersion >= SAVE_SCHEMA_VERSION) return null;
+  if (schemaVersion !== SAVE_SCHEMA_VERSION - 1) {
+    throw new Error(`不支持从存档 schema v${schemaVersion} 直接迁移到 v${SAVE_SCHEMA_VERSION}；仅保留 v${SAVE_SCHEMA_VERSION - 1} → v${SAVE_SCHEMA_VERSION}`);
   }
 
   const messages = oldSave.messages || [];
@@ -751,7 +697,6 @@ export function planV2ToV3Migration(oldSave: GameSave): {
     variableConfig: oldSave.variableConfig,
     customWorld: oldSave.customWorld,
     simulationState: oldSave.simulationState,
-    enabledMods: oldSave.enabledMods,
     lifecycle: oldSave.lifecycle === 'ended' ? 'ended' : 'active',
     endedAt: oldSave.endedAt,
     endReason: oldSave.endReason,
@@ -770,15 +715,15 @@ export function planV2ToV3Migration(oldSave: GameSave): {
 }
 
 /**
- * 迁移老存档（v3 内联 messages）到新格式（v4 分片存储）
+ * 迁移直接上一代存档（v3 内联 messages）到当前格式（v4 分片存储）
  * - 将内联的 messages 拆到 messages store
  * - 生成紧凑头部（不含 messages）
  * - 一次性事务完成，失败不动老记录
- * 实现基于纯函数 planV2ToV3Migration，保证迁移逻辑可单测。
+ * 实现基于纯函数 planV3ToV4Migration，保证迁移逻辑可单测。
  */
-export async function migrateV2ToV3(oldSave: GameSave): Promise<boolean> {
+export async function migrateV3ToV4(oldSave: GameSave): Promise<boolean> {
   try {
-    const plan = planV2ToV3Migration(oldSave);
+    const plan = planV3ToV4Migration(oldSave);
     if (!plan) return true; // 已迁移，跳过
 
     const db = await getDB();
@@ -817,21 +762,25 @@ export async function loadSaveWithMigration(saveId: string): Promise<GameSave | 
 
   // 检查是否需要迁移
   const schemaVersion = (record as any).schemaVersion ?? 0;
-  if (schemaVersion < SAVE_SCHEMA_VERSION && (record as any).messages) {
-    // 老格式，需要迁移
+  if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
+    // 直接上一代 v3，需要迁移
     const oldSave = record as GameSave;
-    const migrated = await migrateV2ToV3(oldSave);
+    const migrated = await migrateV3ToV4(oldSave);
     if (migrated) {
       // 迁移成功，重新读取（现在是紧凑头部）
       const migratedRecord = await db.get(SAVES_STORE, saveId) as GameSave | undefined;
       return migratedRecord ? normalizeSaveLifecycle(migratedRecord) : null;
     }
-    // 迁移失败，返回原记录（兼容回退）
-    return normalizeSaveLifecycle(oldSave);
+    // 迁移失败时不把旧结构继续送入当前运行时。
+    return null;
   }
 
-  // 新格式，直接返回
-  return normalizeSaveLifecycle(record as GameSave);
+  if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
+    return normalizeSaveLifecycle(record as GameSave);
+  }
+
+  console.warn(`[存档迁移] 存档 ${saveId} 使用不受支持的 schema v${schemaVersion}`);
+  return null;
 }
 
 // ─── 存档 CRUD ────────────────────────────────────────
@@ -907,7 +856,7 @@ export async function saveGameIncremental(
 }
 
 /**
- * 加载完整存档（兼容新旧格式，自动迁移）
+ * 加载完整存档（当前 v4；仅自动迁移直接上一代 v3）
  * @param id 存档 ID
  * @param messageLimit 消息加载限制（0 = 全量，> 0 = 只加载最近 N 条）
  */
@@ -919,7 +868,7 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
 
     // 检查是否是新格式（有 schemaVersion，无 messages）
     const schemaVersion = (record as any).schemaVersion ?? 0;
-    if (schemaVersion >= SAVE_SCHEMA_VERSION && !(record as any).messages) {
+    if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
       // 新格式：从 messages store 加载消息
       const compactHead = record as CompactSaveRecord;
       let messages = messageLimit > 0
@@ -948,7 +897,6 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
         variableConfig: compactHead.variableConfig,
         customWorld: compactHead.customWorld,
         simulationState: compactHead.simulationState,
-        enabledMods: compactHead.enabledMods,
         lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
         endedAt: compactHead.endedAt,
         endReason: compactHead.endReason,
@@ -957,11 +905,11 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
       };
     }
 
-    // 老格式（schemaVersion < 4 且有 messages）：自动迁移
-    if (schemaVersion < SAVE_SCHEMA_VERSION && (record as any).messages) {
-      console.log(`[DB] 检测到老格式存档 ${id}，开始自动迁移...`);
+    // 直接上一代 v3（内联 messages）：自动迁移到 v4。更早版本不再串联迁移。
+    if (schemaVersion === SAVE_SCHEMA_VERSION - 1 && (record as any).messages) {
+      console.log(`[DB] 检测到 v3 存档 ${id}，开始迁移到 v4...`);
       const oldSave = record as GameSave;
-      const migrated = await migrateV2ToV3(oldSave);
+      const migrated = await migrateV3ToV4(oldSave);
       if (migrated) {
         // 迁移成功，重新读取（现在是新格式）
         const newRecord = await db.get(SAVES_STORE, id);
@@ -985,8 +933,7 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
             variableConfig: compactHead.variableConfig,
             customWorld: compactHead.customWorld,
             simulationState: compactHead.simulationState,
-            enabledMods: compactHead.enabledMods,
-            lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
+                lifecycle: compactHead.lifecycle === 'ended' ? 'ended' : 'active',
             endedAt: compactHead.endedAt,
             endReason: compactHead.endReason,
             moduleStates: await (await import('./moduleStateDb')).getModuleStates(id),
@@ -994,28 +941,10 @@ export async function loadGame(id: string, messageLimit: number = 0): Promise<Ga
           };
         }
       }
-      // 迁移失败，返回原记录（兼容回退）
-      console.warn(`[DB] 存档 ${id} 迁移失败，使用原格式加载`);
-      return normalizeSaveLifecycle(oldSave);
+      throw new Error(`存档 ${id} 从 v3 迁移到 v4 失败`);
     }
 
-    // 其他情况直接返回
-    const result = record as GameSave;
-
-    // 检查消息是否有 seq 字段，如果没有则自动重新迁移
-    if (result.messages && result.messages.length > 0) {
-      const hasSeq = result.messages.some((m: any) => m.seq !== undefined);
-      if (!hasSeq) {
-        console.log(`[DB] 检测到消息缺少 seq 字段，自动重新迁移存档 ${id}...`);
-        const remigrated = await remigrateSave(id);
-        if (remigrated) {
-          // 重新加载
-          return loadGame(id, messageLimit);
-        }
-      }
-    }
-
-    return normalizeSaveLifecycle(result);
+    throw new Error(`存档 ${id} 使用不受支持的 schema v${schemaVersion}；当前仅支持 v4 与直接上一代 v3`);
   } catch (err) {
     console.error('[DB] 加载失败:', err);
     throw new Error('存档加载失败');
@@ -1064,7 +993,7 @@ export async function deleteSave(id: string): Promise<void> {
 /** 强制删除存档（不读取数据，直接按 key 删除，用于处理损坏/膨胀存档） */
 export async function forceDeleteSave(id: string): Promise<void> {
   try {
-    const db = await getDB();
+    await getDB();
     await deleteSave(id);
     // 同时清理元数据中的对应条目
     const metas = await getAllSaveMeta();
@@ -1124,9 +1053,14 @@ export function optimizeSnapshots(messages: ChatMessage[]): ChatMessage[] {
 
 // ─── 导出/导入 ────────────────────────────────────────
 
+const SAVE_EXPORT_TYPE = 'omni-plane-travels-save';
+const SAVE_EXPORT_VERSION = '2.0';
+const PREVIOUS_SAVE_EXPORT_VERSION = '1.0';
+
+
 /** 导出存档为 JSON Blob（不包含 API 配置，API 是应用级设置）
  *  注意：导出全量消息，不走 loadGame 的 200 条限制
- *  事件包：导出全局已启用的事件包完整内容（排重用），同时保留 enabledMods 兼容旧版
+ *  事件包：导出全局已启用的事件包完整内容（排重用）。
  */
 export async function exportSave(saveId: string): Promise<Blob> {
   const db = await getDB();
@@ -1136,7 +1070,7 @@ export async function exportSave(saveId: string): Promise<Blob> {
   let messages: ChatMessage[];
   const schemaVersion = (record as any).schemaVersion ?? 0;
 
-  if (schemaVersion >= SAVE_SCHEMA_VERSION && !(record as any).messages) {
+  if (schemaVersion === SAVE_SCHEMA_VERSION && !(record as any).messages) {
     // 新格式：从 messages store 拉全量
     messages = await getAllMessages(saveId);
   } else {
@@ -1155,8 +1089,8 @@ export async function exportSave(saveId: string): Promise<Blob> {
   }
 
   const exportData = {
-    type: 'omni-plane-travels-save',
-    version: '2.0',
+    type: SAVE_EXPORT_TYPE,
+    version: SAVE_EXPORT_VERSION,
     exportedAt: Date.now(),
     save: {
       id: record.id,
@@ -1172,7 +1106,7 @@ export async function exportSave(saveId: string): Promise<Blob> {
       vectorMemory: record.vectorMemory,
       customWorld: record.customWorld,
       simulationState: record.simulationState,
-      enabledMods: record.enabledMods, // 兼容旧版
+      directorDefinitions: await (await import('../director/dependencies')).collectDirectorDependencies(record),
       lifecycle: record.lifecycle === 'ended' ? 'ended' : 'active',
       endedAt: record.endedAt,
       endReason: record.endReason,
@@ -1200,14 +1134,19 @@ export async function importSaveFromFile(file: File): Promise<SaveMeta> {
 
 /** 从原始数据导入存档（normalize + 新 ID + 唯一名称） */
 export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
-  if (!rawData || typeof rawData !== 'object' || !rawData.save) {
+  if (!rawData || typeof rawData !== 'object' || rawData.type !== SAVE_EXPORT_TYPE || !rawData.save) {
     throw new Error('存档数据格式无效');
+  }
+  const exportVersion = String(rawData.version ?? '');
+  if (exportVersion !== SAVE_EXPORT_VERSION && exportVersion !== PREVIOUS_SAVE_EXPORT_VERSION) {
+    throw new Error(`不支持的导出存档版本 ${exportVersion || '(missing)'}；当前仅支持 ${SAVE_EXPORT_VERSION} 与直接上一代 ${PREVIOUS_SAVE_EXPORT_VERSION}`);
   }
 
   const save = rawData.save;
   if (!save.messages && !save.gameState) {
     throw new Error('文件中未找到有效存档数据');
   }
+  await (await import('../director/dependencies')).restoreDirectorDependencies(save, save.directorDefinitions);
 
   // 导入事件包到 IndexedDB（排重：同 ID 跳过）
   if (Array.isArray(save.eventPacks) && save.eventPacks.length > 0) {
@@ -1238,17 +1177,18 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
   const importedModuleCheckpoints = Array.isArray(save.moduleCheckpoints)
     ? (save.moduleCheckpoints as ModuleStateRecord[]).map(record => ({ ...record, saveId: finalId }))
     : undefined;
-  const canPartitionLegacyState = save.gameState?.玩家 && save.gameState?.世界;
-  const migratedPartitions = importedModuleStates || !canPartitionLegacyState
-    ? undefined
-    : extractModulePartitions(save.gameState, finalId);
+  // Export v1 stored gameplay module state inside gameState. The current v2 export
+  // carries independent moduleStates/moduleCheckpoints and never needs this fallback.
+  const previousVersionPartitions = exportVersion === PREVIOUS_SAVE_EXPORT_VERSION && !importedModuleStates
+    ? extractModulePartitions(save.gameState, finalId)
+    : undefined;
 
   const saveData: GameSave = {
     id: finalId,
     name: finalName,
     timestamp: finalTimestamp,
     messages: Array.isArray(save.messages) ? save.messages : [],
-    gameState: migratedPartitions?.coreState ?? (save.gameState || {}),
+    gameState: previousVersionPartitions?.coreState ?? (save.gameState || {}),
     worldId: save.worldId || 'default',
     personalInfo: save.personalInfo || undefined,
     characterHistory: save.characterHistory || undefined,
@@ -1257,13 +1197,12 @@ export async function importSaveFromData(rawData: any): Promise<SaveMeta> {
     vectorMemory: Array.isArray(save.vectorMemory) ? save.vectorMemory : undefined,
     variableConfig: save.variableConfig || undefined,
     customWorld: save.customWorld || undefined,
-    simulationState: save.simulationState || undefined,
-    enabledMods: save.enabledMods || undefined, // 兼容旧版
+    simulationState: (await import('./importOwnership')).rebindImportedSimulation(save.simulationState || undefined, finalId),
     lifecycle: save.lifecycle === 'ended' ? 'ended' : 'active',
     endedAt: save.endedAt,
     endReason: save.endReason,
-    moduleStates: importedModuleStates ?? migratedPartitions?.records,
-    moduleCheckpoints: importedModuleCheckpoints ?? migratedPartitions?.records,
+    moduleStates: importedModuleStates ?? previousVersionPartitions?.records,
+    moduleCheckpoints: importedModuleCheckpoints ?? previousVersionPartitions?.records,
   };
 
   // 如果导入的存档包含自建世界，注册到 localStorage 以便 findWorldDef 能找到
@@ -1361,5 +1300,3 @@ export function buildPreview(save: GameSave): string {
 function getWorldNameById(worldId: string): string {
   return findWorldDef(worldId)?.name || worldId;
 }
-
-export type { GameSave, PlayerProfile, CustomNpc };

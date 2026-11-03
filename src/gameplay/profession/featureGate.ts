@@ -12,7 +12,7 @@ export function isProfessionModuleEnabled(worldDef?: Pick<WorldDef, 'modules'>, 
   const module = worldDef?.modules?.find(item => item.moduleId === 'profession');
   if (!module?.enabled) return false;
   if (typeof flags?.professionsEnabled === 'boolean') return flags.professionsEnabled;
-  const config = record(module.moduleConfig ?? module.data);
+  const config = record(module.moduleConfig);
   const nestedFlags = record(config?.featureFlags);
   if (config?.professionsEnabled === true || nestedFlags?.professionsEnabled === true) return true;
   // v3 worlds keep profession content in the library and store references only.

@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
-import { User, FileText, Swords, Backpack } from 'lucide-react';
+import { User,FileText,Swords,Backpack } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
-import type { NPCData, GameState } from '../../../../schema/variables';
+import type { GameState } from '../../../../schema/variables';
+import type { KnownNPC } from '../../../../engine/playerKnowledge';
 import type { CustomNpc } from '../../../../storage/db';
 
 export interface CharacterGridProps {
@@ -9,6 +10,11 @@ export interface CharacterGridProps {
   worldId?: string;
   onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  /**
+   * 删除指定 NPC：调用方负责清理外部资源并保存存档。
+   * 返回 false 表示删除未生效（如 NPC 不存在或处于只读模式）。
+   */
+  onDeleteNpc?: (npcId: string) => boolean | Promise<boolean>;
 }
 
 export type DetailTab = 'overview' | 'dossier' | 'skills' | 'items';
@@ -20,7 +26,8 @@ export const DETAIL_TABS: { id: DetailTab; icon: LucideIcon; label: string }[] =
   { id: 'items', icon: Backpack, label: '物品列表' },
 ];
 
-export function favorClass(v: number) {
+export function favorClass(v?: number) {
+  if (v === undefined) return { color: 'var(--text-muted)', label: '未知' };
   if (v >= 60) return { color: 'var(--success)', label: '高' };
   if (v >= 20) return { color: '#3b82f6', label: '中' };
   if (v >= -20) return { color: '#9ca3af', label: '平' };
@@ -32,11 +39,11 @@ export function categoryStyle(cat?: string) {
     case '在场': return { bg: '#dcfce7', color: '#166534', label: '在场' };
     case '离场': return { bg: '#f3f4f6', color: '#6b7280', label: '离场' };
     case '重点': return { bg: '#fef3c7', color: '#92400e', label: '重点' };
-    default: return { bg: '#dcfce7', color: '#166534', label: '在场' };
+    default: return { bg: '#f3f4f6', color: '#6b7280', label: '状态未知' };
   }
 }
 
-export function npcDataToCustomNpc(npc: NPCData): CustomNpc {
+export function npcDataToCustomNpc(npc: KnownNPC): CustomNpc {
   const ext = npc as any;
   const pi = npc.个人信息 ?? {} as any;
   const sj = npc.社会身份 ?? {} as any;

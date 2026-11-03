@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Swords } from 'lucide-react';
 import { Collapsible } from '../../../shared/Collapsible';
 import { getQualityColor } from '../../../shared/qualityUtils';
-import { DetailModal, DetailRow } from './shared';
-import type { SkillData, SkillSelection } from './types';
+import { DetailModal,DetailRow } from './shared';
+import type { SkillData,SkillSelection } from './types';
 
 interface Props {
   skills: Record<string, SkillData>;

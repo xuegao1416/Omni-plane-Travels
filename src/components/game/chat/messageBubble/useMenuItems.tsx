@@ -1,4 +1,4 @@
-import { Pencil, Copy, RefreshCw, ArrowLeftToLine, Trash2 } from 'lucide-react';
+import { Pencil,Copy,RefreshCw,ArrowLeftToLine,Trash2 } from 'lucide-react';
 import type { ContextMenuItem } from '../ContextMenu';
 import type { ChatMessage } from '../../../../engine/types';
 import { processRegexScripts } from '../../../../utils/regexScripts';

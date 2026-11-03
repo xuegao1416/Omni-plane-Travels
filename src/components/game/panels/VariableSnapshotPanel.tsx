@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, ChevronRight, History, RotateCcw } from 'lucide-react';
+import { useState,useMemo,useCallback } from 'react';
+import { ChevronDown,ChevronRight,History,RotateCcw } from 'lucide-react';
 import { useDialog } from '../../shared/Dialog';
 import type { GameState } from '../../../schema/variables';
-import type { SnapshotLayer, VariableSnapshotPanelProps } from './variableSnapshot/types';
+import type { SnapshotLayer,VariableSnapshotPanelProps } from './variableSnapshot/types';
 import { SnapshotToolbar } from './variableSnapshot/SnapshotToolbar';
 import { ApiSettingsSection } from './variableSnapshot/ApiSettingsSection';
 import { SnapshotList } from './variableSnapshot/SnapshotList';
@@ -317,10 +317,7 @@ export default function VariableSnapshotPanel({
   }, [varMgr, onSave, dlgAlert]);
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      background: 'var(--bg-primary)', position: 'relative',
-    }}>
+    <div className="game-variable-panel">
       {DialogUI}
       <SnapshotToolbar
         snapshotLayers={snapshotLayers}

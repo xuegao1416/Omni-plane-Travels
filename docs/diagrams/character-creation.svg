@@ -219,7 +219,7 @@
     <use href="#icon-file-json" x="15" y="137" width="11" height="11" color="#94a3b8"/>
     <text x="32" y="146" fill="#94a3b8" font-size="10">JSON 导入/导出</text>
     <use href="#icon-database" x="15" y="170" width="11" height="11" color="#64748b"/>
-    <text x="32" y="179" fill="#64748b" font-size="9">7 个内置世界</text>
+    <text x="32" y="179" fill="#64748b" font-size="9">6 个内置世界</text>
     <text x="15" y="198" fill="#64748b" font-size="9">科幻/末日/武侠/校园/宫廷...</text>
   </g>
 

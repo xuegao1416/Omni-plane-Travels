@@ -1,48 +1,52 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy,Suspense,useEffect,useMemo,useRef,useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Archive,
-  ArrowLeft,
-  ArrowRight,
-  Boxes,
-  Compass,
-  ExternalLink,
-  Layers,
-  MousePointer2,
-  Pencil,
-  Plus,
-  Settings,
-  Sparkles,
-  Trash2,
-  Upload,
-  X,
+Archive,
+ArrowLeft,
+ArrowRight,
+Boxes,
+Compass,
+Copy,
+ExternalLink,MousePointer2,
+Pencil,
+Plus,
+Settings,
+Sparkles,
+Trash2,
+Upload,
+X
 } from 'lucide-react';
 import type { WorldDef } from '../../data/worldLoader';
+import { saveWorldDraft,deleteWorldDraft,type WorldDraft } from '../../data/worldLoader';
 import { resolveWorldArtwork } from '../../data/worldArtwork';
-import type { GameSave, SaveMeta } from '../../storage/db';
-import { TABS, type TabKey } from './stepWorldBrowser/constants';
+import WorldForkSelectModal from './WorldForkSelectModal';
+import type { GameSave,SaveMeta } from '../../storage/db';
+import { TABS,type TabKey } from './stepWorldBrowser/constants';
 import { normalizeExternal } from './stepWorldBrowser/constants';
+import { restoreDirectorDependencies } from '../../director/dependencies';
 import {
-  CultureTab,
-  EconomyTab,
-  FactionsTab,
-  LoreTab,
-  NpcsTab,
-  OverviewTab,
-  RulesTab,
-  SystemsTab,
+CultureTab,
+EconomyTab,
+FactionsTab,
+LoreTab,
+ItemsTab,
+NpcsTab,
+OverviewTab,
+RulesTab,
+SystemsTab,
 } from './stepWorldBrowser/WorldDetailTabs';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { EntrySlicedButton } from './EntrySurface';
 import SaveArchiveView from './SaveArchiveView';
 import { playHallSound } from '../../utils/hallAudio';
-import { canAdvanceHallPage, getHallPageCount } from './worldHallPagination';
+import { canAdvanceHallPage,getHallPageCount } from './worldHallPagination';
+import { NovelImportWorkbench } from './NovelImportWorkbench';
 
 const DEV_LAYOUT_SIGNAL = Boolean(
   (import.meta.env?.DEV as unknown) === true
   || import.meta.hot
   || (typeof window !== 'undefined'
-    && ['localhost', '127.0.0.1', '[::1]', '::1'].includes(window.location.hostname)),
+    && ['localhost', '127.0.0.1', '[::1]', '::1'].includes(window.location?.hostname ?? '')),
 );
 const DevLayoutCalibrationStudio = DEV_LAYOUT_SIGNAL
   ? lazy(() => import('../../dev/layout-calibration/LayoutCalibrationStudio'))
@@ -339,7 +343,6 @@ interface WorldHallViewProps {
   onOpenCustomModules: () => void;
   onOpenSettings: () => void;
   onOpenUserCenter: () => void;
-  onOpenWorkshop: () => void;
   onOpenEditor: (world: WorldDef | null, step?: number) => void;
   onDeleteWorld: (worldId: string) => void | Promise<{ ok: boolean }>;
   onImportWorld: (world: WorldDef) => void;
@@ -361,7 +364,6 @@ export default function WorldHallView({
   onOpenCustomModules,
   onOpenSettings,
   onOpenUserCenter,
-  onOpenWorkshop,
   onOpenEditor,
   onDeleteWorld,
   onImportWorld,
@@ -378,6 +380,9 @@ export default function WorldHallView({
   const pageCount = getHallPageCount(customWorlds.length);
   const [hallPage, setHallPage] = useState(0);
   const [emptySlotOpen, setEmptySlotOpen] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [novelOpen, setNovelOpen] = useState(false);
+  const [forkSelectOpen, setForkSelectOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [activeWorldId, setActiveWorldId] = useState(() => (
     allWorlds.some(world => world.id === selectedWorld) ? selectedWorld : worlds[0]?.id ?? ''
@@ -422,7 +427,6 @@ export default function WorldHallView({
     name: hallPage === 0 ? '请选择一枚世界晶体' : '空晶体等待编织',
     description: '',
   } as WorldDef);
-  const activeWorldName = activeWorld.name;
   const hallLayout = HALL_LAYOUTS[hallLayoutKey];
   const hallStyle = {
     '--entry-hall-background': `url("${hallLayout.background}")`,
@@ -475,6 +479,21 @@ export default function WorldHallView({
       setActiveWorldId('');
     }
   };
+
+  const handleFork = (draft: WorldDraft) => {
+    saveWorldDraft(draft);
+    setForkSelectOpen(false);
+    onOpenEditor(draft, 1);
+  };
+
+  const handleEditDraft = (draft: WorldDraft) => {
+    setForkSelectOpen(false);
+    onOpenEditor(draft, 1);
+  };
+
+  const handleDeleteDraft = (draftId: string) => {
+    deleteWorldDraft(draftId);
+  };
   useEffect(() => {
     if (!emptySlotOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); closeEmptySlot(); } };
@@ -482,26 +501,24 @@ export default function WorldHallView({
     window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.entry-hall-empty-choice__close')?.focus());
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [emptySlotOpen]);
-  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
+    event.target.value = '';
+    setImportError('');
       try {
-        const data = JSON.parse(String(reader.result));
+        const { directorDefinitions, ...data } = JSON.parse(await file.text());
         const isOurFormat = (Array.isArray(data.worldBookEntries) && data.worldBookEntries.some((entry: any) => typeof entry.entryType === 'string'))
           || Array.isArray(data.modules)
           || (typeof data.id === 'string' && data.id.startsWith('world_'));
         const imported = isOurFormat
-          ? { ...data, id: data.id || `custom_${Date.now()}`, entryId: null, source: undefined } as WorldDef
+          ? { ...data, id: data.id || `custom_${Date.now()}`, source: undefined } as WorldDef
           : normalizeExternal(data, file.name);
         if (!imported.name) throw new Error('导入世界缺少名称');
+        await restoreDirectorDependencies({ customWorld: imported as unknown as Record<string, unknown> }, directorDefinitions);
         onImportWorld(imported);
         setEmptySlotOpen(false);
-      } catch { /* The existing editor/import flow reports malformed files; keep this slot chooser open. */ }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
+      } catch (error) { setImportError(`导入失败：${error instanceof Error ? error.message : String(error)}`); }
   };
 
   return (
@@ -514,6 +531,7 @@ export default function WorldHallView({
           <span><b>世界漫游指南</b><small>OMNI PLANE TRAVELS</small></span>
         </div>
         <div className="entry-hall-header__actions" data-layout-id="hall.nav" data-layout-label="顶部导航整体" data-layout-editable="true" data-layout-container="hall.screen">
+          <EntrySlicedButton frame="dawn-v4-compact" icon={Sparkles} onClick={() => setNovelOpen(true)}>小说拆解台</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-26-v2.png" icon={Settings} onClick={onOpenSettings} data-layout-id="hall.nav.save" data-layout-label="导航 · 设置" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">设置</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-07-v2.png" icon={Boxes} onClick={() => { playHallSound('confirm'); onOpenEvents(); }} data-layout-id="hall.nav.events" data-layout-label="导航 · 事件中心" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">事件中心</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-13-v2.png" icon={Sparkles} onClick={() => { playHallSound('confirm'); onOpenCustomModules(); }} data-layout-id="hall.nav.modules" data-layout-label="导航 · 自定义模块" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">自定义模块</EntrySlicedButton>
@@ -590,6 +608,7 @@ export default function WorldHallView({
         />
       )}
 
+      {novelOpen && <NovelImportWorkbench worlds={allWorlds} onClose={() => setNovelOpen(false)} onUpdateWorld={onImportWorld} onCreateWorld={world => { onImportWorld(world); setSelectedWorld(world.id); setNovelOpen(false); }} />}
       {emptySlotOpen && (
         <div className="entry-hall-empty-choice" role="dialog" aria-modal="true" aria-labelledby="entry-hall-empty-choice-title" onClick={event => { if (event.target === event.currentTarget) closeEmptySlot(); }}>
           <div className="entry-hall-empty-choice__backdrop" aria-hidden="true" onClick={closeEmptySlot} />
@@ -600,14 +619,27 @@ export default function WorldHallView({
               <span className="entry-hall-empty-choice__kicker">NEW WORLD SLOT</span>
               <h2 id="entry-hall-empty-choice-title">编织一枚新世界</h2>
               <p>从世界编织仪式开始，或导入已有世界档案。</p>
+              {importError && <p role="alert" style={{ color: 'var(--danger)' }}>{importError}</p>}
               <div className="entry-hall-empty-choice__actions">
                 <button type="button" onClick={() => { closeEmptySlot(); onOpenEditor(null); }}><Plus size={16} />创建世界</button>
+                <button type="button" onClick={() => { closeEmptySlot(); setForkSelectOpen(true); }}><Copy size={16} />基于已有世界创作</button>
                 <button type="button" onClick={() => importInputRef.current?.click()}><Upload size={16} />导入世界</button>
+                <button type="button" onClick={() => { closeEmptySlot(); setNovelOpen(true); }}><Sparkles size={16} />小说拆解台</button>
               </div>
               <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImportFile} hidden />
             </div>
           </DawnFrameV4>
         </div>
+      )}
+
+      {forkSelectOpen && (
+        <WorldForkSelectModal
+          isOpen={forkSelectOpen}
+          onClose={() => setForkSelectOpen(false)}
+          onFork={handleFork}
+          onEditDraft={handleEditDraft}
+          onDeleteDraft={handleDeleteDraft}
+        />
       )}
 
       {archiveOpen && (
@@ -822,6 +854,7 @@ function WorldDetailOverlay({
   const tabContent = (() => {
     switch (activeTab) {
       case 'lore': return <LoreTab world={world} />;
+      case 'items': return <ItemsTab world={world} />;
       case 'factions': return <FactionsTab world={world} />;
       case 'culture': return <CultureTab world={world} />;
       case 'economy': return <EconomyTab world={world} />;
@@ -909,6 +942,6 @@ function WorldDetailOverlay({
   );
 }
 
-function hasEnabledSystemModule(world: WorldDef) {
+export function hasEnabledSystemModule(world: WorldDef) {
   return world.modules?.some(module => module.enabled) ?? false;
 }

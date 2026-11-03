@@ -1,4 +1,4 @@
-import { Heart, Swords, Zap } from 'lucide-react';
+import { Heart,Swords,Zap } from 'lucide-react';
 import type { CombatUnitCardModel } from '../../../gameplay/combatViewModel';
 
 const battleFallbackPortraits: Record<CombatUnitCardModel['portrait']['kind'], string> = {

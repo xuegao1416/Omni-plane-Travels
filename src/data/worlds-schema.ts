@@ -97,6 +97,7 @@ export interface NarrativeStyleDef {
 
 /** 条目分类，用于 UI 渲染分组 */
 export type WorldBookEntryType =
+  | 'items'           // 物品档案
   | 'setting'         // 世界观设定
   | 'factions'        // 势力
   | 'npcs'            // 预设NPC
@@ -175,17 +176,28 @@ export interface WorldBookEntryMeta {
 
 /** 世界书条目（直接嵌入 WorldDef，可注入到 system prompt） */
 export interface WorldBookEntryDef {
+  novelProvenance?: {
+    datasetId: string;
+    analysisVersion: number;
+    sourceKey: string;
+    generatedHash: string;
+    entityId?: string;
+    evidenceRefs?: import('../novel/types').NovelEvidenceRef[];
+    reviewStatus?: 'updated' | 'manual_conflict' | 'missing_from_regeneration';
+  };
   uid: number;
-  key: string[];                 // 触发关键词（空数组 = 始终注入）
+  key: string[];                 // 触发关键词（空数组时：constant=true 常驻注入；constant=false 不注入）
   keysecondary?: string[];
   exclude_key?: string[];        // 排除关键词（命中即否决）
   comment: string;               // 条目标题
   content: string;               // 详细内容（注入到 prompt）
-  constant: boolean;             // true = 始终注入，false = 关键词触发
+  constant: boolean;             // true = 始终注入（对齐 SillyTavern：无视关键词），false = 关键词触发
   selectiveLogic?: number;       // 0=AND_ANY, 1=NOT_ALL, 2=NOT_ANY, 3=AND_ALL
   order: number;                 // 注入顺序
-  position?: 'before_char' | 'after_char';
-  depth?: number;                // 最大注入轮次
+  /** 注入位置：before_char = 角色定义前；after_char = 角色定义后；at_depth = 注入聊天历史指定深度（需配合 depth） */
+  position?: 'before_char' | 'after_char' | 'at_depth';
+  /** at_depth 专用：插入到"倒数第 depth 条消息之前"（0 = 消息末尾，1~N = 越大越早） */
+  depth?: number;
   probability?: number;          // 触发概率 (0-100)
   disable?: boolean;
   // ── v2 新增 ──
@@ -219,16 +231,7 @@ export interface WorldModule {
   description?: string;
   /** 是否启用 */
   enabled: boolean;
-  /** 模块特定配置（如自定义提示词内容等） */
-  config?: Record<string, unknown>;
-  /**
-   * @deprecated 已废弃，请使用 moduleConfig + initialState
-   * 模块运行时初始数据（旧格式，兼容用）
-   * normalizeModule() 会自动将 data 拆分到 moduleConfig 和 initialState
-   */
-  data?: Record<string, unknown>;
-
-  // ── 新格式：分离配置和状态 ──
+  // ── 当前格式：分离配置和状态 ──
   /** 模块配置（静态，注入世界书给AI参考） */
   moduleConfig?: Record<string, unknown>;
   /** 模块初始状态（动态，初始化变量系统） */
@@ -241,11 +244,20 @@ export interface WorldModule {
 
 /** 完整的世界定义 —— worldBookEntries 为唯一叙事真相源 */
 export interface WorldDef {
+  /** Immutable plot version selected for future new games only. */
+  directorSource?: { definitionId: string; version: string; startStageId: string };
+  novelSource?: {
+    datasetId: string;
+    startSegmentIndex: number;
+    schemaVersion?: number;
+    analysisVersion?: number;
+  };
+  novelAdaptationMode?: 'source_faithful' | 'adapted';
+  novelMaterialStatus?: 'unavailable' | 'static_only' | 'partial' | 'complete';
   // ─── 必填 ───
   id: string;
   name: string;
   description: string;          // 一句话简介（Step 1 卡片用）
-  entryId: number | null;       // 世界书条目ID，null = 默认自由模式
 
   // ─── 视觉/展示 ───
   tags?: string[];              // ['科幻', '封闭空间', '生存']

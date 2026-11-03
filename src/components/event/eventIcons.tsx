@@ -1,11 +1,11 @@
 import {
-  FileText, Spline, BookOpen, Boxes, Repeat,
-  Image, ScrollText, Gamepad2, Swords, Map, Sparkles, Star, Zap,
-  Globe, Users, Package, Layers, Component, BookMarked, Library,
-  Scroll, Wand2, Dices, Compass, Feather, Shield, Crown, Castle,
-  TreePine, Flame, Droplet, Moon, Sun, Heart, Skull, Anchor, Flag,
-  Tags, Gem, Coins, Landmark, Building2, BookOpenCheck, Newspaper,
-  type LucideIcon,
+FileText,Spline,BookOpen,Boxes,Repeat,
+Image,ScrollText,Gamepad2,Swords,Map,Sparkles,Star,Zap,
+Globe,Users,Package,Layers,Component,BookMarked,Library,
+Scroll,Wand2,Dices,Compass,Feather,Shield,Crown,Castle,
+TreePine,Flame,Droplet,Moon,Sun,Heart,Skull,Anchor,Flag,
+Tags,Gem,Coins,Landmark,Building2,BookOpenCheck,Newspaper,
+type LucideIcon,
 } from 'lucide-react';
 import type { EventPackType } from '../../modules/schema';
 

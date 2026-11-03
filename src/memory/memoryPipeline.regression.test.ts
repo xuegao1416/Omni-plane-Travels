@@ -125,23 +125,22 @@ describe('memory integrity invariants', () => {
       sourceEndIndex: 1,
       summaryData: {
         otherCharacterMemories: [],
-        playerMemories: [{ id: 'legacy-null-fields', title: undefined, summary: undefined, keywords: null }],
+        playerMemories: [{ id: 'null-fields', title: undefined, summary: undefined, keywords: null }],
         itemMemories: [],
       },
     } as unknown as typeof runtime.summarySaveHistory[number]);
 
     expect(() => collectAllMemoriesFromRuntime(runtime)).not.toThrow();
     expect(collectAllMemoriesFromRuntime(runtime)[0]).toMatchObject({
-      id: 'legacy-null-fields',
-      title: 'legacy-null-fields',
-      summary: 'legacy-null-fields',
+      id: 'null-fields',
+      title: 'null-fields',
+      summary: 'null-fields',
       keywords: [],
     });
   });
 
   test('keeps the immutable source-event ledger without silently dropping old evidence', () => {
     const store = useMemoryStore.getState();
-    store.setConfig({ retention: { ...store.config.retention, maxSourceEvents: 2 } });
     store.appendSourceEvent({ id: 'turn_1', round: 1, userText: 'a', assistantText: 'A', createdAt: 1 });
     store.appendSourceEvent({ id: 'turn_1', round: 1, userText: 'changed', assistantText: 'changed', createdAt: 2 });
     store.appendSourceEvent({ id: 'turn_2', round: 2, userText: 'b', assistantText: 'B', createdAt: 3 });

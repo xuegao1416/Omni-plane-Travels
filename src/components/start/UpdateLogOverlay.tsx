@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Megaphone, X } from 'lucide-react';
+import { useEffect,useState } from 'react';
+import { Megaphone,X } from 'lucide-react';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { EntrySlicedButton } from './EntrySurface';
+import { APP_VERSION } from '../../config/version';
 
-const UPDATE_LOG_STORAGE_KEY = 'omni.update-notice.2.8.1.seen';
+const UPDATE_LOG_STORAGE_KEY = `omni.update-notice.${APP_VERSION}.seen`;
 
 export default function UpdateLogOverlay() {
   const [open, setOpen] = useState(false);
@@ -32,33 +33,26 @@ export default function UpdateLogOverlay() {
       {trigger}
       <div className="entry-update-log-overlay" role="dialog" aria-modal="true" aria-labelledby="entry-update-log-title" onClick={event => event.stopPropagation()}>
       <button type="button" className="entry-update-log-backdrop" aria-label="关闭更新日志" onClick={dismiss} />
-      <DawnFrameV4 mode="panel" withFill className="entry-update-log-frame" ariaLabel="2.8.1 更新日志">
+      <DawnFrameV4 mode="panel" withFill className="entry-update-log-frame" ariaLabel={`${APP_VERSION} 更新日志`}>
         <div className="entry-update-log-content">
           <button type="button" className="entry-update-log-close" onClick={dismiss} aria-label="关闭更新日志"><X size={20} /></button>
           <span className="entry-update-log-kicker">版本更新</span>
-          <h2 id="entry-update-log-title">2.8.1 更新日志</h2>
-          <p className="entry-update-log-lead">职业、技能与图形化战斗正式进入同一套可选玩法内核：需要时才出现，不会强塞进不适合战斗的世界。</p>
+          <h2 id="entry-update-log-title">{APP_VERSION} 更新日志</h2>
+          <p className="entry-update-log-lead">小说拆解台与剧情导演正式接通：把原文整理成世界与主线，让人物行动、玩家选择和幕后变化共同推动旅程。</p>
           <div className="entry-update-log-list">
-            <div><strong>可扩展职业典藏</strong><span>内置职业包可复制、编辑、导入导出；每个世界可按自己的设定配置任意数量的职业道路。</span></div>
-            <div><strong>独立卡片战场</strong><span>最多 4v4，攻击、技能、道具、防御与逃跑全部本地确定性结算，整场结束后才由 AI 承接剧情。</span></div>
-            <div><strong>本地策略 AI</strong><span>敌方与自动友方可选择进攻、均衡、防守或支援倾向，不会在每个回合消耗 API。</span></div>
-            <div><strong>战斗风险</strong><span>简单、普通、困难、炼狱四档独立于世界展示难度；炼狱死亡封存存档，但仍可浏览与导出。</span></div>
-            <div><strong>可靠恢复</strong><span>战前完整检查点、刷新续战、幂等结算与待叙述结果，避免断网、空回或重复点击造成重复奖励和数据污染。</span></div>
-            <div><strong>降临难度与点数</strong><span>四档难度在第一步一次选定，同时决定战斗风险与可分配的降临点数池。</span></div>
-            <div><strong>命运牌阵</strong><span>当前职业典藏中的道路会以塔罗牌阵展开，数量随配置变化；翻开牌面即可查看定位、徽记与成长阶位。</span></div>
-            <div><strong>点数加点与抽卡</strong><span>属性每点约提升上限的 5%；天赋可直选或命运抽卡，神技仅可通过命运抽取。</span></div>
-            <div><strong>行囊纯化</strong><span>第三步专注行囊、初始段位与同行者，职业世界不再重复选择自由技能和属性。</span></div>
+            <div><strong>小说拆解与世界创建</strong><span>导入 TXT、EPUB 或拆解资料，提取人物、地点、势力、物品和剧情证据；支持暂停续作、可选向量检索与世界资料包导入导出。</span></div>
+            <div><strong>可编辑的固定主线</strong><span>原创原稿和小说剧情都可整理、人工修订并保存版本；开局支持自创角色、扮演原角色和选择起始阶段。</span></div>
+            <div><strong>剧情导演</strong><span>根据主线方向、人物行动和玩家选择安排剧情，核对正文落实结果；前提被破坏时调整计划，主线耗尽后仍可自由续玩。</span></div>
+            <div><strong>幕后变化与玩家认知</strong><span>人物可以在幕后行动，普通面板保留玩家上次获知的资料；只有实际见闻或披露才更新，查看幕后不会让角色自动知道秘密。</span></div>
+            <div><strong>存档与跨设备续玩</strong><span>保存并携带固定剧情版本、导演阶段与相关状态；导入其他设备后可以继续小说主线，刷新和回滚同步恢复变量与记忆。</span></div>
+            <div><strong>世界、NPC 与物品管理</strong><span>支持从内置世界派生编辑草稿，完善人物资料、头像及生图操作，支持删除 NPC、丢弃玩家物品和查看 NPC 物品栏。</span></div>
+            <div><strong>世界书与运行稳定性</strong><span>统一世界书导入，修复空关键词条目意外全量注入；完善变量请求超时、幕后重试和手动审查保存，保留玩法与战斗结算边界。</span></div>
+            <div><strong>移动端与阅读体验</strong><span>整理文风预设，优化设置导航、人物档案、状态条、世界书详情、变量快照及导演控制台的窄屏布局。</span></div>
           </div>
           <div className="entry-update-log-next">
-            <span className="entry-update-log-kicker">可选，而不是强制</span>
-            <p>只有挂载职业或战斗模块的世界才会显示相应创建步骤与界面。旧世界、旧存档和纯叙事玩法会保持原样。</p>
-            <p>当前图形化战斗仍处于开发阶段，内容仅供参考，不代表最终成品。</p>
-          </div>
-          <div className="entry-update-log-next">
-            <span className="entry-update-log-kicker">后续计划</span>
-            <p>职业与先天天赋将拆分为独立系统，减少创建阶段的耦合，并保留各自的世界配置能力。</p>
-            <p>数值平衡与世界系数算法会继续校准，让不同世界的创建体验更稳定。</p>
-            <p>地图与其他仍在推进的内容会逐步完善；本次更新是阶段成果，不代表全部计划完成。</p>
+            <span className="entry-update-log-kicker">开始新的旅程</span>
+            <p>小说世界需先整理并保存主线版本，再创建世界。主线在开局时绑定，后续修改世界模板不会替换已开始旅程的剧情版本。</p>
+            <p>原世界演化的独立剧情推进已由导演接管，时间与机械规则继续由玩法系统结算。本次包含 2.8.2 之后的累计更新。</p>
           </div>
           <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-44-v2.png" icon={Megaphone} onClick={dismiss}>知道了，继续使用</EntrySlicedButton>
         </div>

@@ -2,20 +2,20 @@
 // 向量化设置面板 — 使用共享组件重写
 // ============================================================
 
-import { useState, useCallback, useEffect } from 'react';
-import { RefreshCw, AlertTriangle, Database, Download, CheckCircle2, Trash2 } from 'lucide-react';
+import { useState,useCallback,useEffect } from 'react';
+import { RefreshCw,AlertTriangle,Database,Download,CheckCircle2,Trash2 } from 'lucide-react';
 import type { MemorySystemConfig } from '../../../memory/types';
 import type { ApiPreset } from '../apiPresetUtils';
 import { fetchModels } from '../../../api/client';
-import { Section, FieldGrid, Field, Select, Toggle } from '../SettingsUIComponents';
+import { Section,FieldGrid,Field,Select,Toggle } from '../SettingsUIComponents';
 import {
-  DEFAULT_LOCAL_EMBEDDING_MODEL,
-  clearAllLocalEmbeddingModels,
-  deleteLocalEmbeddingModel,
-  getInstalledLocalEmbeddingModels,
-  isLocalEmbeddingModelLoaded,
-  warmLocalEmbeddingModel,
-  type LocalEmbeddingModelMetadata,
+DEFAULT_LOCAL_EMBEDDING_MODEL,
+clearAllLocalEmbeddingModels,
+deleteLocalEmbeddingModel,
+getInstalledLocalEmbeddingModels,
+isLocalEmbeddingModelLoaded,
+warmLocalEmbeddingModel,
+type LocalEmbeddingModelMetadata,
 } from '../../../memory/embeddingRuntime';
 
 interface Props {

@@ -3,8 +3,8 @@
 // 数据来源：
 //   1. 当前事件包的 schema/events.json
 //   2. 关联世界的所有事件包的 schema/events.json（按包分组）
-import { useEffect, useState } from 'react';
-import { getWebEvent, allWebEvents } from '../../modules/eventDb';
+import { useEffect,useState } from 'react';
+import { getWebEvent,allWebEvents } from '../../modules/eventDb';
 import type { WebEventRecord } from '../../modules/eventDb';
 import type { WorldDef } from '../../data/worlds-schema';
 import { readCanonicalEventPack } from '../../modules/eventPackFormat';
@@ -40,8 +40,8 @@ interface EventOption {
   packId: string;
 }
 
-export function getEventPackWorldId(pack: Pick<WebEventRecord, 'worldId' | 'manifest'>): string | undefined {
-  return pack.worldId ?? pack.manifest.worldId;
+export function getEventPackWorldId(pack: Pick<WebEventRecord, 'manifest'>): string | undefined {
+  return pack.manifest.worldId;
 }
 
 export function isCardEventPack(pack: Pick<WebEventRecord, 'manifest'>): boolean {

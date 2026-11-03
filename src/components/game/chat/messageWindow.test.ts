@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
-import { getInitialMessageStart, getPreviousMessageStart, MESSAGE_BATCH_SIZE } from './messageWindow';
+import { describe,expect,test } from 'bun:test';
+import { getInitialMessageStart,getPreviousMessageStart,MESSAGE_BATCH_SIZE } from './messageWindow';
 
 describe('large chat message window', () => {
   test('mounts only the latest batch from a large save', () => {

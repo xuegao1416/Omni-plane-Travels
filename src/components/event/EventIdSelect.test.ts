@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
+import { expect,test } from 'bun:test';
 import type { WebEventRecord } from '../../modules/eventDb';
-import { getEventPackWorldId, isCardEventPack } from './EventIdSelect';
+import { getEventPackWorldId,isCardEventPack } from './EventIdSelect';
 
 test('event selector uses manifest world binding and ignores rule packs', () => {
   const cardPack = {

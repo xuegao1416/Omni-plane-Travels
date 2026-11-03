@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { ExternalLink, FileText, Plus, Upload, X } from 'lucide-react';
+import { useState,useRef,useCallback } from 'react';
+import { ExternalLink,FileText,Plus,Upload,X } from 'lucide-react';
 import type { PresetPromptEntry } from '@/data/builtinPresets';
 import { getBuiltinPreset } from '@/data/builtinPresets';
 import type { RegexScript } from '@/utils/regexScripts';

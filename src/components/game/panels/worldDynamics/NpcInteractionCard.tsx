@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, MessageSquare, X } from 'lucide-react';
+import { ChevronDown,ChevronRight,MessageSquare,X } from 'lucide-react';
 import type { NpcProactiveInteraction } from '../../../../simulation/types';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 

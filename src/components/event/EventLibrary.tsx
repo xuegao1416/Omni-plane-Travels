@@ -1,24 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect,useMemo,useState } from 'react';
 import {
-  Upload,
-  Download,
-  Trash2,
-  SquareArrowOutUpRight,
-  Search,
-  Loader2,
-  PackageOpen,
-  AlertTriangle,
-  ChevronRight,
-  FolderPlus,
+Upload,
+Download,
+Trash2,
+SquareArrowOutUpRight,
+Search,
+Loader2,
+PackageOpen,
+AlertTriangle,
+ChevronRight,
+FolderPlus,
 } from 'lucide-react';
-import type { EventRegistryEntry, EventMeta, EventPackType } from '../../modules/schema';
+import type { EventRegistryEntry,EventMeta,EventPackType } from '../../modules/schema';
 import type { UseEventsResult } from './useEvents';
 import { resolveEventIcon } from './eventIcons';
 import EventSwitch from './EventSwitch';
-import EventPackBadge, {
-  derivePackFlags,
-  parseCanonicalPackView,
-  type EventPackFlags,
+import EventPackBadge,{
+derivePackFlags,
+parseCanonicalPackView,
+type EventPackFlags,
 } from './EventPackBadge';
 import { getWebEvent } from '../../modules/eventDb';
 import PackEventList from './PackEventList';

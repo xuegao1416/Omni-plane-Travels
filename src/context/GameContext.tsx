@@ -1,16 +1,15 @@
-import { createContext, useContext, useReducer, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react';
+import { createContext,useContext,useReducer,useCallback,useEffect,useRef,useMemo,type ReactNode } from 'react';
 import { useGameEngine } from '../engine/useGameEngine';
 import type { GameEngine } from '../engine/types';
-import type { GameSave, PlayerProfile } from '../storage/db';
-import { loadGame as loadGameFromDb, optimizeSnapshots, ACTIVE_SAVE_KEY } from '../storage/db';
-import { useSaveStore, setAutoSaveBuilder } from '../stores/saveStore';
+import type { GameSave,PlayerProfile } from '../storage/db';
+import { loadGame as loadGameFromDb,optimizeSnapshots,ACTIVE_SAVE_KEY } from '../storage/db';
+import { useSaveStore,setAutoSaveBuilder } from '../stores/saveStore';
 import { useConfigStore } from '../stores/configStore';
 import { useMemoryStore } from '../memory/memoryStore';
 import { getEngineState } from '../simulation/SimulationApi';
 import { STORAGE_KEYS } from '../config/storageKeys';
-import { findWorldDef } from '../data/worldLoader';
 
-/** 创建带默认值的 PlayerProfile（旧存档缺失字段时兜底） */
+/** 规范化 PlayerProfile 的可选字段与默认值。 */
 function withProfileDefaults(raw: Partial<PlayerProfile> | null | undefined): PlayerProfile | null {
   if (!raw) return null;
   return {
@@ -199,18 +198,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       loadGameFromDb(savedId).then(save => {
         // 如果新游戏已开始，不应用旧存档数据
         if (newGameStartedRef.current) return;
-        // ── 临时迁移：旧存档 content → rawText（可于 2026-07 后删除） ──
-        if (save?.messages?.length) {
-          for (const msg of save.messages) {
-            if ((msg as any).content && !msg.rawText) {
-              msg.rawText = (msg as any).content;
-              delete (msg as any).content;
-              delete (msg as any).thinking;
-              delete (msg as any).actionOptions;
-            }
-          }
-        }
-        // ── 迁移结束 ──
         if (!cancelled && save && save.messages && save.messages.length > 0) {
           useSaveStore.setState({ currentSaveId: savedId, currentSaveName: save.name });
           dispatch({ type: 'LOAD_SAVE', save });

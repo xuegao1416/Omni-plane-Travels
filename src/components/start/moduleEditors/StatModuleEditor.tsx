@@ -1,6 +1,6 @@
 import type { StatModuleSchema } from '../../../modules/schema';
 import { getSixDimSemantic } from '../../../modules/xpAlgorithm';
-import { inputStyle, labelStyle, setPathInClone } from './shared';
+import { inputStyle,labelStyle,setPathInClone } from './shared';
 
 /** 数值属性编辑器 */
 export function StatModuleEditor({ data, onChange }: { data: StatModuleSchema; onChange: (d: StatModuleSchema) => void }) {

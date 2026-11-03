@@ -1,5 +1,5 @@
 // 共享生成参数 — Steps / CFG Scale（NAI 与 ComfyUI 共用）
-import { FieldGrid, Slider } from '../SettingsUIComponents';
+import { FieldGrid,Slider } from '../SettingsUIComponents';
 import type { ConfigSectionProps } from './types';
 
 export default function SharedFields({ config, updateConfig }: ConfigSectionProps) {

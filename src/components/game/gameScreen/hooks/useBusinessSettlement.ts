@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import { eventBus, EVENTS } from '../../../../engine/eventBus';
+import { eventBus,EVENTS } from '../../../../engine/eventBus';
 import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { BusinessModuleSchema } from '../../../../modules/schema';
 import { getBusinessSettlementPeriodKey } from '../../../../time/businessPeriod';
 import { getTimeSystemFromWorld } from '../../../../time/worldClock';
 import { settleBusinessCycle } from '../../../../gameplay/modules/business';
-import { prepareGameplayState } from '../../../../gameplay/migrations';
+import { prepareGameplayState } from '../../../../gameplay/statePreparation';
 import { isCombatInteractionPaused } from '../../../../gameplay/combatRuntime';
 
 export { getBusinessSettlementPeriodKey as settlementPeriodKey };

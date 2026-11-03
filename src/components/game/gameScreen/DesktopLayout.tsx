@@ -1,6 +1,6 @@
-import { ChevronLeft, ChevronRight, Minimize2, Maximize2 } from 'lucide-react';
+import { ChevronLeft,ChevronRight,Minimize2,Maximize2 } from 'lucide-react';
 import DrawerPanel from './DrawerPanel';
-import type { NavButton, OverlayPanel, Screen } from './types';
+import type { NavButton,OverlayPanel,Screen } from './types';
 import { getNavLabel } from './navConfig';
 
 interface DesktopLayoutProps {
@@ -9,7 +9,6 @@ interface DesktopLayoutProps {
   overlay: OverlayPanel;
   onOverlayChange: (panel: OverlayPanel) => void;
   onNavigate: (screen: Screen) => void;
-  t: (key: string) => string;
 
   // Fullscreen
   isFullscreen: boolean;
@@ -35,7 +34,6 @@ export default function DesktopLayout({
   overlay,
   onOverlayChange,
   onNavigate,
-  t,
   isFullscreen,
   onToggleFullscreen,
   drawerTitle,

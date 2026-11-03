@@ -1,3 +1,5 @@
+import { sameMemoryVisibility, memoryVisibilityMetadata } from './memoryVisibility';
+import { applyAcceptedExternalEvent, type AcceptedExternalMemoryEvent } from './externalFacts';
 // ============================================================
 // 记忆系统 Zustand Store
 // 核心状态管理 + 配置 + 运行态 + 公开 API
@@ -23,11 +25,8 @@ import type {
   CompiledContextSnapshot,
   RuntimeFlowSnapshot,
   RetrievePlanSnapshot,
-  CompiledNarrativeContext,
-  NarrativeQueryPackage,
-  NarrativeRetrieveCandidate,
-  VectorFact,
   NarrativeSourceEvent,
+  NarrativeOffscreenFact,
 } from './types';
 import {
   createDefaultMemorySystemConfig,
@@ -121,6 +120,7 @@ interface MemoryStoreActions {
 
   // 原始事件账本（只追加）
   appendSourceEvent: (event: NarrativeSourceEvent) => void;
+  appendAcceptedExternalEvent: (receipt: AcceptedExternalMemoryEvent) => void;
 
   // 线程管理
   upsertThread: (thread: NarrativeThread) => void;
@@ -213,6 +213,7 @@ function createDefaultMemoryRuntime(bankId = ''): NarrativeMemoryRuntime {
     compileDebugLogs: [],
     vectorMemory: [],
     sourceEvents: [],
+    offscreenFacts: [],
   };
 }
 
@@ -282,9 +283,12 @@ function normalizeMemoryRuntime(raw: unknown): NarrativeMemoryRuntime {
     vectorMemory: normalizeArray(safe.vectorMemory)
       .map((v: unknown) => v && typeof v === 'object' ? normalizeProvenance(v as Record<string, unknown>) : v)
       .filter(Boolean) as VectorMemoryItem[],
+    offscreenFacts: normalizeArray(safe.offscreenFacts)
+      .filter((fact): fact is NarrativeOffscreenFact => Boolean(fact && typeof fact === 'object' && (fact as any).logicalEventKey)),
     sourceEvents: normalizeArray(safe.sourceEvents)
       .filter((event): event is Record<string, unknown> => Boolean(event && typeof event === 'object'))
       .map(event => ({
+        ...normalizeProvenance(event),
         id: String(event.id ?? ''),
         round: Math.max(0, Math.floor(Number(event.round) || 0)),
         userText: String(event.userText ?? ''),
@@ -495,6 +499,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       if (!state.memoryRuntime || !event.id) return state;
       if (state.memoryRuntime.sourceEvents.some(existing => existing.id === event.id)) return state;
       const sourceEvents = [...state.memoryRuntime.sourceEvents, {
+        ...event,
         id: event.id,
         round: Math.max(0, Math.floor(event.round || 0)),
         userText: String(event.userText ?? ''),
@@ -502,6 +507,18 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
         createdAt: event.createdAt || Date.now(),
       }];
       return { memoryRuntime: { ...state.memoryRuntime, sourceEvents }, runtimeVersion: state.runtimeVersion + 1 };
+    });
+  },
+
+  appendAcceptedExternalEvent: (receipt) => {
+    set((state) => {
+      const runtime = state.memoryRuntime ?? createDefaultMemoryRuntime();
+      const result = applyAcceptedExternalEvent(runtime, receipt);
+      if (result.status === 'duplicate') return state;
+      return {
+        memoryRuntime: result.runtime,
+        runtimeVersion: state.runtimeVersion + 1,
+      };
     });
   },
 
@@ -653,9 +670,12 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       const combined = [...state.vectorMemory];
       for (const item of memories) {
         const factKey = String(item.fact ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-        const idx = combined.findIndex(existing => existing.id === item.id || (String(existing.fact ?? '').trim().replace(/\s+/g, ' ').toLowerCase() === factKey && existing.conflictStatus !== 'superseded'));
+        const idx = combined.findIndex(existing => sameMemoryVisibility(existing, item) && (existing.id === item.id || (String(existing.fact ?? '').trim().replace(/\s+/g, ' ').toLowerCase() === factKey && existing.conflictStatus !== 'superseded')));
         if (idx < 0) {
-          combined.push(item);
+          let id = item.id;
+          let suffix = 1;
+          while (combined.some(existing => existing.id === id)) id = `${item.id}@knowledge${suffix++}`;
+          combined.push({ ...item, id });
           continue;
         }
         const existing = combined[idx];
@@ -690,6 +710,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const expiredThreads = state.memoryRuntime.activeThreads.filter(t => t.status === 'resolved' && currentRound - (t.sourceEndIndex || 0) > retention.archiveResolvedThreadsAfter);
     const activeThreads = state.memoryRuntime.activeThreads.filter(t => !expiredThreads.includes(t));
     const archivedThreads = expiredThreads.map(thread => ({
+      ...memoryVisibilityMetadata(thread),
       id: `thread_archive_${thread.id}`,
       title: thread.title,
       arcTitle: thread.title,

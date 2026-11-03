@@ -1,14 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState,useRef,useEffect } from 'react';
 import {
-  RefreshCw, Play, Loader, Sparkles,
-  Sunrise, Baby, BookOpen, Flame, Zap,
-  BookMarked, ChevronDown, Save, Download, Upload,
+RefreshCw,Play,Loader,Sparkles,
+Sunrise,Baby,BookOpen,Flame,Zap,
+BookMarked,ChevronDown,Save,Download,Upload,
 } from 'lucide-react';
 import TemplatePickerDialog from '../shared/TemplatePickerDialog';
 import { useDialog } from '../shared/Dialog';
 import {
-  saveHistoryPreset, exportHistoryPresetJSON, downloadJSON,
-  type HistoryPreset,
+saveHistoryPreset,exportHistoryPresetJSON,downloadJSON,
+type HistoryPreset,
 } from '../../storage/templateStore';
 
 /** 拆块定义 */
@@ -236,7 +236,7 @@ export default function StepCharacterHistory({
       <div className="history-progress-rail history-ritual-surface__rail" aria-label="前尘编年进度">
         <div className="history-progress-rail__art" aria-hidden="true" />
         <div className="history-progress-rail__nodes">
-          {segmentDefs.map((def, index) => {
+          {segmentDefs.map((def) => {
             const complete = Boolean(segments[def.id]?.trim());
             const current = activeId === def.id;
             return (

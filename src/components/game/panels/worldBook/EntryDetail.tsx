@@ -1,10 +1,10 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown,ChevronRight } from 'lucide-react';
 import type { EntryCardProps } from './types';
 
 /** A single world-book entry card; shows title row and expands to detail */
 export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
   return (
-    <div style={{
+    <div className="game-worldbook-entry" style={{
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-sm)',
       overflow: 'hidden',
@@ -13,7 +13,7 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
       {/* Title row */}
       <button
         onClick={onToggle}
-        className="wb-entry-toggle"
+        className="wb-entry-toggle game-worldbook-entry__toggle"
         style={{
           background: expanded ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
         }}
@@ -49,7 +49,7 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
 
       {/* Expanded detail */}
       {expanded && (
-        <div style={{
+        <div className="game-worldbook-entry__detail" style={{
           padding: '10px',
           borderTop: '1px solid var(--border)',
           background: 'var(--bg-primary)',
@@ -74,7 +74,7 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
           )}
 
           {/* Meta info */}
-          <div style={{
+          <div className="game-worldbook-entry__meta" style={{
             display: 'flex', gap: '12px', marginBottom: '8px',
             fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
           }}>
@@ -84,7 +84,7 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
           </div>
 
           {/* Content */}
-          <div style={{
+          <div className="game-worldbook-entry__content" style={{
             fontSize: 'var(--font-size-sm)',
             lineHeight: '1.6',
             color: 'var(--text-secondary)',

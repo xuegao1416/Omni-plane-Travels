@@ -26,7 +26,7 @@ export interface CardWorkflowExecutionResult {
   /** 是否因超限中止 */
   aborted: boolean;
   /** 动态选项配置（如果有 choice.dynamic 节点） */
-  dynamicConfig?: Record<string, unknown>;
+  dynamicConfig?: import('./schema').DynamicChoiceConfig;
 }
 
 // ─── 默认限制 ───
@@ -101,7 +101,7 @@ export function executeCardWorkflow(
   const executedNodeIds: string[] = [];
   const warnings: string[] = [];
   let aborted = false;
-  let dynamicConfig: Record<string, unknown> | undefined;
+  let dynamicConfig: import('./schema').DynamicChoiceConfig | undefined;
 
   // 输出缓存：nodeId → outputs
   const outputCache = new Map<string, Record<string, unknown>>();

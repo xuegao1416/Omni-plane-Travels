@@ -41,12 +41,28 @@ export async function nativeFetch(url: string, init?: RequestInit): Promise<Resp
     return fetch(url, init);
   }
 
+  let tauriFetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
   try {
-    const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+    ({ fetch: tauriFetch } = await import('@tauri-apps/plugin-http'));
+  } catch (err) {
+    // 只有模块本身取不到才算插件不可用；此时降级后的请求仍受 WebView CORS 限制。
+    console.warn('[nativeFetch] Tauri HTTP 插件不可用，降级为普通 fetch:', err);
+    return fetch(url, init);
+  }
+
+  try {
     return await tauriFetch(url, init);
   } catch (err) {
-    // 插件加载失败时降级为普通 fetch
-    console.warn('[nativeFetch] Tauri HTTP 插件加载失败，降级为普通 fetch:', err);
+    // 请求被拒与网络故障要分开报：scope 未放行时提示去查 capabilities，
+    // 否则容易被误读成插件没装而掩盖真实原因。
+    const text = err instanceof Error ? err.message : String(err);
+    const denied = /url not allowed|not allowed on the configured scope|scope|permission/i.test(text);
+    console.warn(
+      denied
+        ? '[nativeFetch] 请求被 http 插件的 scope 拒绝，降级为普通 fetch：请检查 capabilities 中 http:default 的 allow 列表'
+        : '[nativeFetch] 原生请求失败，降级为普通 fetch',
+      err,
+    );
     return fetch(url, init);
   }
 }

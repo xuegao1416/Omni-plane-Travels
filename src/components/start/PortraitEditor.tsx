@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Check, RotateCcw, Trash2, X } from 'lucide-react';
-import type { PlayerProfile, PortraitSettings } from '../../storage/db';
+import { useEffect,useRef,useState,type PointerEvent } from 'react';
+import { Check,RotateCcw,Trash2,X } from 'lucide-react';
+import type { PlayerProfile,PortraitSettings } from '../../storage/db';
 
 const PORTRAIT_DEFAULTS = {
   male: '/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-male-v1.png',

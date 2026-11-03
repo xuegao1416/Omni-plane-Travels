@@ -2,23 +2,28 @@ import { useEffect } from 'react';
 import { useGame } from '../../context/GameContext';
 import { useUISettings } from '../../context/UISettingsContext';
 import { useDialog } from '../shared/Dialog';
-import { useSaveStore, resetForNewGame } from '../../stores/saveStore';
+import { useSaveStore,resetForNewGame } from '../../stores/saveStore';
 import { useConfigStore } from '../../stores/configStore';
 import { useWizard } from '../../hooks/useWizard';
 import { useAiFill } from '../../hooks/useAiFill';
-import { useCharacterHistory, clearSegmentsCache } from '../../hooks/useCharacterHistory';
-import { loadSaveWithMigration, type GameSave, type PlayerProfile } from '../../storage/db';
+import { useCharacterHistory,clearSegmentsCache } from '../../hooks/useCharacterHistory';
+import { loadSaveWithMigration,type GameSave } from '../../storage/db';
 import type { ChatMessage } from '../../engine/types';
 import type { GameState } from '../../schema/variables';
 import { createDefaultGameState } from '../../schema/variables';
-import type { ProfessionModuleSchema } from '../../modules/schema';
+import type { ProfessionModuleSchema,StatModuleSchema } from '../../modules/schema';
 import { resetSimulationEngine } from '../../simulation/SimulationApi';
+import { getDirectorDefinition } from '../../director/definitionStore';
+import { bindDirectorDefinition } from '../../director/sourceAdapter';
+import { ensureDirectorState } from '../../director/runtime';
+import { enforcePlayerIdentity, resolveDirectorInitialIdentity } from '../../director/initialIdentity';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
 import { initializeProfessionSelection } from '../../gameplay/profession';
 import { resolveProfessionBinding } from '../../data/professions';
 import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
-import { migrateGameStateToV3 } from '../../gameplay/protocols';
+import { normalizeGameStateV3 } from '../../gameplay/protocols';
 import { isDivineTalent } from '../../gameplay/creation/creationPoints';
+import { materializeNpcSurvivalStats,materializeNpcTierIndex } from '../../utils/npcStats';
 
 import { v4 as uuid } from 'uuid';
 
@@ -146,6 +151,10 @@ export function useStartScreen() {
     // 经营模块启用时，删除默认的货币资源（资金由经营资产统一管理）
     const hasBusinessModule = selectedWorldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
     const professionModule = isProfessionModuleEnabled(selectedWorldDef) ? selectedWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
+    const statModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled);
+    const statConfig = (statModule?.moduleConfig) as StatModuleSchema | undefined;
+    const progressionModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'progression' && module.enabled);
+    const progressionConfig = (progressionModule?.moduleConfig) as Record<string, unknown> | undefined;
     if (hasBusinessModule) {
       delete (gs.玩家 as any).货币资源;
     }
@@ -166,16 +175,10 @@ export function useStartScreen() {
     for (const npc of pi.customNpcs) {
       const npcId = `NPC_${npc.name}`;
 
-      // 构建 NPC 生存状态（从 survivalStats 获取，如果没有则使用默认值）
-      const npcSurvivalState: { 血量: number; 体力值: number;[key: string]: number } = { 血量: 100, 体力值: 100 };
-      if (npc.survivalStats && typeof npc.survivalStats === 'object') {
-        if (npc.survivalStats.血量 != null) npcSurvivalState.血量 = Number(npc.survivalStats.血量);
-        if (npc.survivalStats.体力值 != null) npcSurvivalState.体力值 = Number(npc.survivalStats.体力值);
-        for (let i = 1; i <= 6; i++) {
-          const key = `dim${i}`;
-          if (npc.survivalStats[key] != null) npcSurvivalState[key] = Number(npc.survivalStats[key]);
-        }
-      }
+      const npcSurvivalState = materializeNpcSurvivalStats(npc.survivalStats, statConfig);
+      const npcTierIndex = progressionModule
+        ? materializeNpcTierIndex(npc.tierIndex, progressionConfig?.currentTierIndex as number | undefined)
+        : undefined;
 
       gs.人物档案[npcId] = {
         姓名: npc.name, 种族: npc.race || '人类', 性别: npc.gender || '', 年龄: npc.age || '',
@@ -203,15 +206,16 @@ export function useStartScreen() {
         人物事迹: npc.chronicles || [],
         技能列表: npc.skillsList || {},
         物品列表: npc.itemsList || {},
+        ...(npcTierIndex !== undefined ? { 成长状态: { 当前段位索引: npcTierIndex, 当前经验值: 0 } } : {}),
       };
     }
-    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;
+    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig) : undefined;
     const initialized = professionConfig?.professions.length
       ? initializeProfessionSelection(gs, professionConfig, pi.professionId ?? null, pi.innateTalentIds ?? [], {
         talentBudgetOverride: selectedTalentBudgetOverride(professionConfig, pi.innateTalentIds ?? []),
       })
       : gs;
-    const migrated = migrateGameStateToV3(initialized);
+    const migrated = normalizeGameStateV3(initialized);
     migrated.v3!.featureFlags = {
       ...migrated.v3!.featureFlags,
       professionsEnabled: Boolean(professionConfig?.professions.length),
@@ -223,11 +227,22 @@ export function useStartScreen() {
 
   // ─── 开始游戏 ───
   const handleStartGame = async () => {
-    // 重置存档模块级变量，防止旧存档数据污染新存档
-    resetForNewGame();
-    // 重置世界推演引擎，防止旧存档的模拟数据串到新存档
-    resetSimulationEngine();
-    markNewGameStarted();
+    const currentWorldDef = wizard.allWorlds.find(w => w.id === wizard.selectedWorld);
+    let startingProfile = { ...wizard.personalInfo, customNpcs: [...wizard.personalInfo.customNpcs] };
+    let definition;
+    try {
+      if (currentWorldDef?.directorSource) {
+        definition = await getDirectorDefinition(currentWorldDef.directorSource.definitionId, currentWorldDef.directorSource.version);
+        if (!definition) throw new Error('主线剧情版本缺失，请先导入对应剧情资料');
+        if (!definition.stages.some(stage => stage.id === currentWorldDef.directorSource!.startStageId)) throw new Error('所选主线开局阶段不存在，请重新选择');
+        const identity = resolveDirectorInitialIdentity(definition, startingProfile.directorRole, Object.fromEntries(startingProfile.customNpcs.map(npc => [npc.id, { 姓名: npc.name }])));
+        if (identity.playerName && startingProfile.name !== identity.playerName) throw new Error(`当前扮演原角色「${identity.playerName}」，请保持原角色姓名或切回自创角色`);
+        startingProfile.customNpcs = startingProfile.customNpcs.filter(npc => !identity.excludedNpcIds.includes(npc.id));
+      }
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : String(error), { title: '无法开始冒险', danger: true });
+      return;
+    }
     // 开始游戏时清除缓存，下次进向导从头开始
     clearSegmentsCache();
     const characterHistory = charHistory.buildFullCharacterHistory();
@@ -256,14 +271,17 @@ export function useStartScreen() {
     }
 
     dispatch({ type: 'SET_WORLD', worldId: wizard.selectedWorld });
-    dispatch({ type: 'SET_PERSONAL_INFO', info: wizard.personalInfo });
+    wizard.setPersonalInfo(startingProfile);
+    dispatch({ type: 'SET_PERSONAL_INFO', info: startingProfile });
     dispatch({ type: 'SET_CHARACTER_HISTORY', history: characterHistory });
 
-    const currentWorldDef = wizard.allWorlds.find(w => w.id === wizard.selectedWorld);
+    resetForNewGame();
+    const directorEngine = resetSimulationEngine();
+    markNewGameStarted();
     engine.reset(currentWorldDef);
     const professionModule = isProfessionModuleEnabled(currentWorldDef) ? currentWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
-    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig ?? professionModule.data) : undefined;
-    engine.setPlayerProfile(professionConfig?.professions.length ? { ...wizard.personalInfo, initialSkills: {} } : wizard.personalInfo);
+    const professionConfig = professionModule ? resolveProfessionBinding(professionModule.moduleConfig) : undefined;
+    engine.setPlayerProfile(professionConfig?.professions.length ? { ...startingProfile, initialSkills: {} } : startingProfile);
     if (professionConfig?.professions.length) {
       engine.variableManager.setState(initializeProfessionSelection(
         engine.variableManager.getState(),
@@ -281,7 +299,7 @@ export function useStartScreen() {
 
     // Optional v3 modules are explicitly selected by the world and risk choice;
     // the world difficulty field is intentionally not consulted here.
-    const startedState = migrateGameStateToV3(engine.variableManager.getState());
+    const startedState = normalizeGameStateV3(engine.variableManager.getState());
     startedState.v3!.featureFlags = {
       ...startedState.v3!.featureFlags,
       professionsEnabled: Boolean(professionConfig?.professions.length),
@@ -290,8 +308,22 @@ export function useStartScreen() {
     };
     engine.variableManager.setState(startedState);
 
-    if (wizard.personalInfo.customNpcs.length > 0) {
-      engine.setInitialNPCs(wizard.personalInfo.customNpcs);
+    if (startingProfile.customNpcs.length > 0) {
+      engine.setInitialNPCs(startingProfile.customNpcs);
+    }
+
+    if (definition) {
+      const initialState = engine.variableManager.getState();
+      const selection = startingProfile.directorRole;
+      const identity = resolveDirectorInitialIdentity(definition, selection, initialState.人物档案);
+      if (selection?.mode === 'original') {
+        const actor = definition.characters.find(character => character.id === selection.actorId)!;
+        initialState.playerIdentity = { actorId: actor.id, name: actor.name, aliases: [...actor.aliases] };
+        enforcePlayerIdentity(initialState);
+        engine.variableManager.setState(initialState);
+      }
+      bindDirectorDefinition(ensureDirectorState(directorEngine.state), definition, { startStageId: selection?.startStageId ?? currentWorldDef?.directorSource?.startStageId, roleBinding: identity.roleBinding });
+      directorEngine.saveState();
     }
 
     // 自定义模块在初始 GameState 完整后启动；提交顺序与其它生命周期一致。
@@ -310,9 +342,11 @@ export function useStartScreen() {
     if (characterHistory.trim()) {
       // 附加快照到初始消息，确保第一轮重新发送时能回滚到初始状态
       const initialSnapshot = engine.variableManager.createSnapshot();
+      const directorSnapshot = directorEngine.createSnapshot(0, engine.variableManager.getState().世界.时间系统.当前时间, true, '开局');
       const historyMsg: ChatMessage = {
         id: uuid(), role: 'assistant', rawText: characterHistory, round: 0, timestamp: Date.now(),
         snapshot: initialSnapshot, snapshotTime: Date.now(),
+        simulationSnapshotId: directorSnapshot.id,
       };
       initialMessages.push(historyMsg);
       engine.addMessage(historyMsg);
@@ -326,7 +360,9 @@ export function useStartScreen() {
       messages: initialMessages, gameState: moduleBundle.coreState,
       moduleStates: moduleBundle.current,
       moduleCheckpoints: moduleBundle.checkpoints,
-      worldId: wizard.selectedWorld, personalInfo: wizard.personalInfo, characterHistory,
+      worldId: wizard.selectedWorld, personalInfo: startingProfile, characterHistory,
+      customWorld: currentWorldDef ? structuredClone(currentWorldDef) as unknown as Record<string, unknown> : undefined,
+      simulationState: structuredClone(directorEngine.state),
     };
     // 使用 performSave 保存存档（会同时更新 savesMeta 列表）
     const performSave = useSaveStore.getState().performSave;

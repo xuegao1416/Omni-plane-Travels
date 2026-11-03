@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Sparkles, Plus, Trash2 } from 'lucide-react';
+import { Sparkles,Plus,Trash2 } from 'lucide-react';
 import type { TalentModuleSchema } from '../../../modules/schema';
-import { inputStyle, labelStyle } from './shared';
-import { ConditionListEditor, CostListEditor, EffectListEditor } from './GameplayRuleEditors';
+import { inputStyle,labelStyle } from './shared';
+import { ConditionListEditor,CostListEditor,EffectListEditor } from './GameplayRuleEditors';
 
 /** 天赋体系编辑器 — 弹窗式 */
 export function TalentModuleEditor({ data, onChange, onAiGenerate, isGenerating }: {

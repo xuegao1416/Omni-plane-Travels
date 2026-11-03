@@ -31,11 +31,6 @@ export interface ProfessionPackValidationResult {
   errors: ProfessionPackValidationError[];
 }
 
-export interface ProfessionPackValidationOptions {
-  /** Explicitly permits additive migration of an old v1 package below the v3 content baseline. */
-  allowLegacyV1?: boolean;
-}
-
 const combat = (
   damage: number,
   target: CombatActionDefinition['target'] = 'enemy',
@@ -256,7 +251,7 @@ function makePack(id: string, name: string, description: string, source: Profess
   return {
     ...clone(source),
     schemaVersion: 2,
-    freeSkills: clone(source.freeSkillCatalog ?? source.freeSkills ?? []),
+    freeSkills: clone(source.freeSkills ?? []),
     manifest: {
       id,
       name,
@@ -299,12 +294,11 @@ export function professionPackToV2(pack: ProfessionPack): ProfessionPackV2 {
       abilities: profession.abilities.map(ability => abilityDefinitionFromProfessionAbility(ability, profession.id)),
     })),
     innateTalents: pack.innateTalents.map(abilityDefinitionFromInnateTalent),
-    freeSkills: (pack.freeSkillCatalog ?? pack.freeSkills ?? []).map(abilityDefinitionFromSkill),
+    freeSkills: (pack.freeSkills ?? []).map(abilityDefinitionFromSkill),
     creationTalentBudget: Math.max(0, Math.trunc(pack.creationTalentBudget)),
     allowNoProfession: pack.allowNoProfession !== false,
     initialAbilityPoints: Math.max(0, Math.trunc(pack.initialAbilityPoints ?? 0)),
     abilityPointsPerTier: Math.max(0, Math.trunc(pack.abilityPointsPerTier ?? 0)),
-    ...(pack.baselineStatus ? { baselineStatus: pack.baselineStatus } : {}),
   };
 }
 
@@ -385,13 +379,11 @@ export function professionPackFromV2(pack: ProfessionPackV2): ProfessionPack {
       tags: [...definition.tags],
       ...(definition.iconKey ? { iconKey: definition.iconKey } : {}),
     })),
-    freeSkillCatalog: freeSkills,
-    freeSkills: clone(freeSkills),
+    freeSkills,
     creationTalentBudget: pack.creationTalentBudget,
     allowNoProfession: pack.allowNoProfession,
     initialAbilityPoints: pack.initialAbilityPoints,
     abilityPointsPerTier: pack.abilityPointsPerTier,
-    ...(pack.baselineStatus ? { baselineStatus: pack.baselineStatus } : {}),
   };
 }
 
@@ -400,7 +392,7 @@ export const BUILTIN_PROFESSION_PACKS: ProfessionPack[] = [
   makePack('wuxia-core', '江湖武学职业典藏', '剑、刀、枪、拳、医者与奇门六条道路及独立生活技艺。', WUXIA_CORE_PROFESSION_PACK, ['武侠', '江湖']),
 ];
 
-/** Canonical v2 packages used by runtime/editor integrations; legacy projections remain for old callers. */
+/** Canonical v2 packages used by runtime/editor integrations. */
 export const BUILTIN_PROFESSION_PACKS_V2: ProfessionPackV2[] = BUILTIN_PROFESSION_PACKS.map(professionPackToV2);
 
 function readUserPacks(): ProfessionPack[] {
@@ -430,14 +422,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
-}
-
-function isLegacyV1Value(value: unknown): boolean {
-  const raw = asRecord(value);
-  const manifest = asRecord(raw?.manifest);
-  return raw?.schemaVersion === 1
-    || manifest?.schemaVersion === 1
-    || raw?.baselineStatus === 'legacy-v1-incomplete';
 }
 
 function pushValidationError(errors: ProfessionPackValidationError[], error: ProfessionPackValidationError): void {
@@ -478,11 +462,10 @@ function validateRawIds(value: unknown, errors: ProfessionPackValidationError[])
   }
 }
 
-export function validateProfessionPack(value: unknown, options: ProfessionPackValidationOptions = {}): ProfessionPackValidationResult {
+export function validateProfessionPack(value: unknown): ProfessionPackValidationResult {
   const errors: ProfessionPackValidationError[] = [];
   validateRawIds(value, errors);
   const pack = migrateProfessionPack(value);
-  const legacyV1 = options.allowLegacyV1 === true && isLegacyV1Value(value);
   const seenIds = new Map<string, string>();
   const registerId = (id: string, path: string) => {
     const previous = seenIds.get(id);
@@ -496,15 +479,15 @@ export function validateProfessionPack(value: unknown, options: ProfessionPackVa
     registerId(profession.id, `${professionPath}.id`);
     const byId = new Map(profession.abilities.map(ability => [ability.id, ability]));
     const tiers = new Set(profession.abilities.map(ability => ability.tier ?? 1));
-    if (!legacyV1 && profession.abilities.length < 8) pushValidationError(errors, { code: 'node-count', path: professionPath, message: `${profession.name} 至少需要 8 个能力节点。` });
-    if (!legacyV1 && (tiers.size !== 4 || ![1, 2, 3, 4].every(tier => tiers.has(tier)))) pushValidationError(errors, { code: 'tier-count', path: professionPath, message: `${profession.name} 必须覆盖明确的 1~4 阶。` });
+    if (profession.abilities.length < 8) pushValidationError(errors, { code: 'node-count', path: professionPath, message: `${profession.name} 至少需要 8 个能力节点。` });
+    if ((tiers.size !== 4 || ![1, 2, 3, 4].every(tier => tiers.has(tier)))) pushValidationError(errors, { code: 'tier-count', path: professionPath, message: `${profession.name} 必须覆盖明确的 1~4 阶。` });
     const ultimateCount = profession.abilities.filter(ability => ability.abilityType === 'ultimate').length;
-    if (!legacyV1 && ultimateCount !== 1) pushValidationError(errors, { code: 'ultimate-count', path: professionPath, message: `${profession.name} 必须恰有 1 个终极节点。` });
+    if (ultimateCount !== 1) pushValidationError(errors, { code: 'ultimate-count', path: professionPath, message: `${profession.name} 必须恰有 1 个终极节点。` });
     const branchCounts = new Map<string, number>();
     for (const [abilityIndex, ability] of profession.abilities.entries()) {
       const path = `${professionPath}.abilities[${abilityIndex}]`;
       registerId(ability.id, `${path}.id`);
-      if (!legacyV1 && !isMechanicalAbilityDefinition(ability)) pushValidationError(errors, { code: 'missing-mechanics', path, message: `能力「${ability.name}」没有可执行机械。` });
+      if (!isMechanicalAbilityDefinition(ability)) pushValidationError(errors, { code: 'missing-mechanics', path, message: `能力「${ability.name}」没有可执行机械。` });
       if (ability.exclusiveGroup && ability.abilityType === 'specialization') branchCounts.set(ability.exclusiveGroup, (branchCounts.get(ability.exclusiveGroup) ?? 0) + 1);
       for (const prerequisite of ability.prerequisites) {
         const parent = byId.get(prerequisite);
@@ -515,7 +498,7 @@ export function validateProfessionPack(value: unknown, options: ProfessionPackVa
         }
       }
     }
-    if (!legacyV1 && (branchCounts.size < 1 || [...branchCounts.values()].some(count => count < 2))) pushValidationError(errors, { code: 'exclusive-branches', path: professionPath, message: `${profession.name} 至少需要一组包含两条路线的互斥专精节点。` });
+    if ((branchCounts.size < 1 || [...branchCounts.values()].some(count => count < 2))) pushValidationError(errors, { code: 'exclusive-branches', path: professionPath, message: `${profession.name} 至少需要一组包含两条路线的互斥专精节点。` });
     const visiting = new Set<string>();
     const visited = new Set<string>();
     const visit = (id: string) => {
@@ -531,27 +514,24 @@ export function validateProfessionPack(value: unknown, options: ProfessionPackVa
     };
     for (const ability of profession.abilities) visit(ability.id);
   }
-  if (!legacyV1 && pack.innateTalents.length < 12) pushValidationError(errors, { code: 'innate-count', path: 'innateTalents', message: '职业包至少需要 12 个先天天赋。' });
+  if (pack.innateTalents.length < 12) pushValidationError(errors, { code: 'innate-count', path: 'innateTalents', message: '职业包至少需要 12 个先天天赋。' });
   for (const [index, talent] of pack.innateTalents.entries()) {
     registerId(talent.id, `innateTalents.${talent.id}`);
-    if (!legacyV1 && !isMechanicalAbilityDefinition(talent)) pushValidationError(errors, { code: 'missing-mechanics', path: `innateTalents[${index}]`, message: `先天天赋「${talent.name}」没有可执行机械。` });
+    if (!isMechanicalAbilityDefinition(talent)) pushValidationError(errors, { code: 'missing-mechanics', path: `innateTalents[${index}]`, message: `先天天赋「${talent.name}」没有可执行机械。` });
   }
-  if (!legacyV1 && pack.freeSkills.length < 12) pushValidationError(errors, { code: 'free-skill-count', path: 'freeSkills', message: '职业包至少需要 12 个自由技能。' });
+  if (pack.freeSkills.length < 12) pushValidationError(errors, { code: 'free-skill-count', path: 'freeSkills', message: '职业包至少需要 12 个自由技能。' });
   for (const [index, skill] of pack.freeSkills.entries()) {
     registerId(skill.id, `freeSkills.${skill.id}`);
-    if (!legacyV1 && !isMechanicalAbilityDefinition(skill)) pushValidationError(errors, { code: 'missing-mechanics', path: `freeSkills[${index}]`, message: `自由技能「${skill.name}」没有可执行机械。` });
+    if (!isMechanicalAbilityDefinition(skill)) pushValidationError(errors, { code: 'missing-mechanics', path: `freeSkills[${index}]`, message: `自由技能「${skill.name}」没有可执行机械。` });
   }
   return { ok: errors.length === 0, errors };
 }
 
 export function saveProfessionPack(pack: ProfessionPack): ProfessionPack {
-  const sourceIsLegacyV1 = isLegacyV1Value(pack);
-  const validation = validateProfessionPack(pack, { allowLegacyV1: true });
+  const validation = validateProfessionPack(pack);
   if (!validation.ok) throw new Error(`职业包验证失败：${validation.errors.map(error => error.message).join('；')}`);
-  const reachesV3Baseline = sourceIsLegacyV1 && validateProfessionPack(pack).ok;
   const next = normalizeProfessionPack({
     ...clone(pack),
-    ...(sourceIsLegacyV1 ? { baselineStatus: reachesV3Baseline ? 'v3-complete' as const : 'legacy-v1-incomplete' as const } : {}),
     manifest: { ...pack.manifest, builtin: false, updatedAt: Date.now() },
   });
   const packs = readUserPacks();
@@ -608,32 +588,12 @@ export function createEmptyProfessionPack(name = '新职业包'): ProfessionPack
     manifest: { id: `profession-pack-${now}`, name, version: '2.0.0', schemaVersion: 2, builtin: false, createdAt: now, updatedAt: now },
     professions: [{ id: `profession-${now}`, name: '新职业', description: '', abilities: [] }],
     innateTalents: [],
-    freeSkillCatalog: [],
     freeSkills: [],
     creationTalentBudget: 3,
     allowNoProfession: true,
     initialAbilityPoints: 1,
     abilityPointsPerTier: 1,
   };
-}
-
-/** 将旧世界内嵌的职业树提取为独立用户包；世界随后只保存返回的引用。 */
-export function extractLegacyProfessionPack(value: ProfessionModuleSchema, name = '旧世界职业包'): ProfessionWorldBinding {
-  const now = Date.now();
-  const pack = saveProfessionPack({
-    ...clone(value),
-    manifest: {
-      id: `legacy-profession-pack-${now}`,
-      name,
-      version: '1.0.0',
-      schemaVersion: 1,
-      builtin: false,
-      createdAt: now,
-      updatedAt: now,
-      description: '由旧世界内嵌职业配置自动提取。',
-    },
-  } as ProfessionPack);
-  return { packIds: [pack.manifest.id], allowNoProfession: value.allowNoProfession };
 }
 
 export function exportProfessionPack(pack: ProfessionPack): string {
@@ -646,11 +606,9 @@ export function importProfessionPack(json: string): ProfessionPack {
   const envelope = asRecord(parsed);
   if (envelope?.type && envelope.type !== ENVELOPE_TYPE) throw new Error('这不是世界漫游指南职业包');
   const raw = envelope?.data ?? parsed;
-  const legacyV1 = isLegacyV1Value(raw);
-  const validation = validateProfessionPack(raw, { allowLegacyV1: true });
+  const validation = validateProfessionPack(raw);
   if (!validation.ok) throw new Error(`职业包验证失败：${validation.errors.map(error => error.message).join('；')}`);
   const normalized = professionPackFromV2(migrateProfessionPack(raw));
-  if (legacyV1) normalized.baselineStatus = validateProfessionPack(raw).ok ? 'v3-complete' : 'legacy-v1-incomplete';
   const collision = listProfessionPacks().some(pack => pack.manifest.id === normalized.manifest.id);
   normalized.manifest = {
     ...normalized.manifest,
@@ -718,8 +676,7 @@ export function normalizeProfessionPack(raw: ProfessionPack): ProfessionPack {
     mechanics: normalizeAbilityMechanics(talent.mechanics),
     iconKey: isProfessionEmblemKey(talent.iconKey) ? talent.iconKey : undefined,
   }));
-  pack.freeSkillCatalog = Array.isArray(pack.freeSkillCatalog) ? pack.freeSkillCatalog : (Array.isArray(pack.freeSkills) ? pack.freeSkills : []);
-  pack.freeSkills = clone(pack.freeSkillCatalog);
+  pack.freeSkills = Array.isArray(pack.freeSkills) ? pack.freeSkills : [];
   return pack;
 }
 
@@ -746,41 +703,29 @@ function normalizeAbilityMechanics(value: ProfessionAbilityMechanics | undefined
 function isProfessionPack(value: unknown): value is ProfessionPack {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<ProfessionPack>;
-  return Boolean(item.manifest && typeof item.manifest === 'object' && Array.isArray(item.professions) && Array.isArray(item.innateTalents) && (Array.isArray(item.freeSkillCatalog) || Array.isArray(item.freeSkills) || item.freeSkillCatalog === undefined));
-}
-
-function isLegacyModule(value: unknown): value is ProfessionModuleSchema {
-  return Boolean(value && typeof value === 'object' && Array.isArray((value as ProfessionModuleSchema).professions));
+  return Boolean(item.manifest && typeof item.manifest === 'object' && Array.isArray(item.professions) && Array.isArray(item.innateTalents) && Array.isArray(item.freeSkills));
 }
 
 export function isProfessionBinding(value: unknown): value is ProfessionWorldBinding {
   return Boolean(value && typeof value === 'object' && Array.isArray((value as ProfessionWorldBinding).packIds));
 }
 
-export function resolveProfessionBinding(value: ProfessionWorldBinding | ProfessionModuleSchema | unknown): ProfessionModuleSchema {
-  if (isLegacyModule(value)) {
-    const legacyPack = normalizeProfessionPack({
-      ...(clone(value) as ProfessionModuleSchema),
-      manifest: { id: 'legacy-inline', name: '旧版内嵌职业', version: '1.0.0', schemaVersion: 1 },
-    });
-    const { manifest: _manifest, ...config } = legacyPack;
-    return config;
-  }
+export function resolveProfessionBinding(value: ProfessionWorldBinding | unknown): ProfessionModuleSchema {
   const binding: ProfessionWorldBinding = isProfessionBinding(value) ? value : { packIds: [] };
   const packs = binding.packIds.map(getProfessionPack).filter(Boolean) as ProfessionPack[];
   const allowed = binding.enabledProfessionIds?.length ? new Set(binding.enabledProfessionIds) : undefined;
   const professionById = new Map<string, ProfessionDef>();
   const talentById = new Map<string, ProfessionPack['innateTalents'][number]>();
-  const skillById = new Map<string, NonNullable<ProfessionPack['freeSkillCatalog']>[number]>();
+  const skillById = new Map<string, NonNullable<ProfessionPack['freeSkills']>[number]>();
   for (const pack of packs) {
     for (const profession of pack.professions) if (!allowed || allowed.has(profession.id)) professionById.set(profession.id, clone(profession));
     for (const talent of pack.innateTalents) talentById.set(talent.id, clone(talent));
-    for (const skill of pack.freeSkillCatalog ?? []) skillById.set(skill.id, clone(skill));
+    for (const skill of pack.freeSkills ?? []) skillById.set(skill.id, clone(skill));
   }
   return {
     professions: [...professionById.values()],
     innateTalents: [...talentById.values()],
-    freeSkillCatalog: [...skillById.values()],
+    freeSkills: [...skillById.values()],
     creationTalentBudget: binding.creationTalentBudget ?? Math.max(0, ...packs.map(pack => pack.creationTalentBudget ?? 0)),
     allowNoProfession: binding.allowNoProfession ?? packs.every(pack => pack.allowNoProfession !== false),
     initialAbilityPoints: Math.max(0, ...packs.map(pack => pack.initialAbilityPoints ?? 0)),
@@ -863,7 +808,7 @@ export function buildProfessionPackGenerationPrompt(intent: string, basePack?: P
       iconKey: talent.iconKey,
       tags: talent.tags ?? [],
     })),
-    freeSkillCatalog: (basePack.freeSkillCatalog ?? basePack.freeSkills ?? []).map(skill => ({
+    freeSkills: (basePack.freeSkills ?? []).map(skill => ({
       id: skill.id,
       name: skill.name,
       description: skill.description,
@@ -884,7 +829,7 @@ export function buildProfessionPackGenerationPrompt(intent: string, basePack?: P
 任务：${task}
 
 只输出 JSON，结构必须为：
-{"manifest":{"id":"stable-pack-id","name":"职业包名","version":"1.0.0","schemaVersion":1,"description":"说明","tags":[]},"professions":[{"id":"stable-id","name":"职业名","description":"定位","archetype":"原型","visual":{"emblemKey":"warrior","accentKey":"crimson"},"abilities":[{"id":"stable-id","name":"能力名","description":"语义说明","type":"active|passive|specialization|ultimate","tier":1,"prerequisites":[],"exclusiveGroup":"可选","iconKey":"warrior","rarity":"普通|精良|稀有|史诗|传说","target":"self|ally|enemy|area|none","tags":["语义标签"]}]}],"innateTalents":[{"id":"stable-id","name":"先天天赋","description":"出生特质","iconKey":"warrior","rarity":"普通|精良|稀有|史诗|传说","tags":["语义标签"]}],"freeSkillCatalog":[{"id":"stable-id","name":"自由技能","description":"用途与限制","rarity":"普通|精良|稀有|史诗|传说","target":"enemy","tags":["语义标签"]}],"creationTalentBudget":3,"allowNoProfession":true,"initialAbilityPoints":2,"abilityPointsPerTier":1}
+{"manifest":{"id":"stable-pack-id","name":"职业包名","version":"1.0.0","schemaVersion":2,"description":"说明","tags":[]},"professions":[{"id":"stable-id","name":"职业名","description":"定位","archetype":"原型","visual":{"emblemKey":"warrior","accentKey":"crimson"},"abilities":[{"id":"stable-id","name":"能力名","description":"语义说明","type":"active|passive|specialization|ultimate","tier":1,"prerequisites":[],"exclusiveGroup":"可选","iconKey":"warrior","rarity":"普通|精良|稀有|史诗|传说","target":"self|ally|enemy|area|none","tags":["语义标签"]}]}],"innateTalents":[{"id":"stable-id","name":"先天天赋","description":"出生特质","iconKey":"warrior","rarity":"普通|精良|稀有|史诗|传说","tags":["语义标签"]}],"freeSkills":[{"id":"stable-id","name":"自由技能","description":"用途与限制","rarity":"普通|精良|稀有|史诗|传说","target":"enemy","tags":["语义标签"]}],"creationTalentBudget":3,"allowNoProfession":true,"initialAbilityPoints":2,"abilityPointsPerTier":1}
 视觉字段只能使用本地白名单：emblemKey/iconKey 允许 warrior、mage、ranger、rogue、cleric、paladin、swordsman、bladesman、spearmaster、unarmed、healer、qimen；accentKey 允许 crimson、amber、jade、azure、violet、silver。不要输出 URL、路径或其他视觉键，缺省时由本地按职业 ID 稳定回退。
 
 硬规则：
@@ -899,7 +844,6 @@ function proposalTarget(value: unknown, fallback: AbilityProposalTarget): Abilit
 }
 
 function balanceGeneratedAbility(source: AbilityDefinition, category: AbilityCategory, professionId?: string): AbilityDefinition {
-  const legacy = asRecord(source.legacy);
   const passive = category === 'innate_talent' || source.abilityType === 'passive' || source.abilityType === 'specialization';
   const proposal = normalizeAbilityProposal({
     schemaVersion: 2,
@@ -908,7 +852,7 @@ function balanceGeneratedAbility(source: AbilityDefinition, category: AbilityCat
     description: source.description,
     category: passive ? 'innate_talent' : category,
     rarity: source.rarity,
-    target: proposalTarget(legacy?.target, passive ? 'self' : 'enemy'),
+    target: proposalTarget(source.target, passive ? 'self' : 'enemy'),
     tags: source.tags,
   });
   if (!proposal) throw new Error(`能力「${source.name}」缺少合法语义字段`);
@@ -925,7 +869,6 @@ function balanceGeneratedAbility(source: AbilityDefinition, category: AbilityCat
     ...(source.exclusiveGroup ? { exclusiveGroup: source.exclusiveGroup } : {}),
     tags: [...source.tags],
     ...(source.iconKey ? { iconKey: source.iconKey } : {}),
-    legacy: source.legacy,
   };
 }
 

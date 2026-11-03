@@ -1,11 +1,11 @@
 import React from 'react';
-import type { PlayerProfile, CustomNpc } from '../../../storage/db';
-import type { SkillData, InventoryItem } from '../../../schema/variables';
+import type { PlayerProfile,CustomNpc } from '../../../storage/db';
+import type { SkillData,InventoryItem } from '../../../schema/variables';
 import type { WorldModule } from '../../../data/worlds-schema';
 import type { WorldDef } from '../../../data/worldLoader';
 import type { WorldBookEntry } from '../../../worldbook/index';
 import type { ApiConfig } from '../../../api/types';
-import { Briefcase, Sparkles, Package, Users, BarChart3 } from 'lucide-react';
+import { Briefcase,Sparkles,Package,Users,BarChart3 } from 'lucide-react';
 
 export interface StepPersonalInfoProps {
   personalInfo: PlayerProfile;

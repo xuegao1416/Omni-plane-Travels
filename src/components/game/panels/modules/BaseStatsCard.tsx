@@ -1,6 +1,6 @@
 // 底层必选属性卡片 — 生命类 + 能量类进度条
 import { memo } from 'react';
-import { Heart, Zap, Plus } from 'lucide-react';
+import { Heart,Zap,Plus } from 'lucide-react';
 import type { StatModuleSchema } from '../../../../modules/schema';
 import { Collapsible } from '../../../shared/Collapsible';
 
@@ -88,8 +88,8 @@ function GaugeBar({ icon, label, value, max, color }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0' }}>
       <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>{icon}</span>
       <span style={{ minWidth: '36px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{label}</span>
-      <div style={{ flex: 1, height: '10px', background: 'var(--bg-tertiary)', borderRadius: '5px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '4px', transition: 'width 0.3s' }} />
+      <div className="game-status-meter game-status-meter--module" style={{ background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '999px', transition: 'width 0.3s' }} />
       </div>
       <span style={{ fontSize: 'var(--font-size-xs)', textAlign: 'right', color: 'var(--text-secondary)', minWidth: '60px' }}>{safeValue}/{safeMax}</span>
     </div>

@@ -1,5 +1,5 @@
 import type { FormState } from './types';
-import { inferWorldClockConfig, type WorldClockConfig, type WorldClockDate } from '../../../time/worldClock';
+import { inferWorldClockConfig,type WorldClockConfig,type WorldClockDate } from '../../../time/worldClock';
 import { ALL_WORLD_ICONS } from '@/components/shared/worldIcons';
 import ModuleSelector from '../ModuleSelector';
 import { StatModuleEditor } from '../moduleEditors/StatModuleEditor';
@@ -11,7 +11,7 @@ import { ProfessionModuleEditor } from '../moduleEditors/ProfessionModuleEditor'
 import CombatModuleEditor from '../moduleEditors/CombatModuleEditor';
 import { DiceModuleEditor } from '../moduleEditors/DiceModuleEditor';
 import {
-  X, ScrollText, Swords, DollarSign, Flag, User, Sparkles, BarChart3, Map, BookMarked, Loader, CalendarDays,
+X,ScrollText,Swords,DollarSign,Flag,User,Sparkles,BarChart3,Map,BookMarked,Loader,CalendarDays,
 } from 'lucide-react';
 
 export type ManualEditSection = 'seed' | 'geography' | 'history' | 'characters' | 'narrative' | 'modules';
@@ -122,6 +122,17 @@ export function ManualEditForm({
           ))}
         </div>
         <button className="btn-ghost" onClick={addLocation} style={{ marginTop: 8, fontSize: 'var(--font-size-base)' }}>+ 添加区域</button>
+      </div>}
+
+      {sectionEnabled('geography') && <div className="world-form-section"><h4>物品档案</h4>
+        <div className="world-dynamic-list">
+          {(form.items ?? []).map((item, i) => <div key={i} className="world-dynamic-item">
+            <button type="button" className="remove-btn" aria-label={`删除物品 ${item.name}`} onClick={() => update({ items: form.items.filter((_, index) => index !== i) })}><X size={14} /></button>
+            <div className="world-form-group"><label>物品名称</label><input value={item.name} onChange={e => update({ items: form.items.map((value, index) => index === i ? { ...value, name: e.target.value } : value) })} /></div>
+            <div className="world-form-group"><label>用途与设定</label><textarea rows={3} value={item.description} onChange={e => update({ items: form.items.map((value, index) => index === i ? { ...value, description: e.target.value } : value) })} /></div>
+          </div>)}
+        </div>
+        <button type="button" className="btn-ghost" onClick={() => update({ items: [...(form.items ?? []), { name: '', description: '' }] })}>+ 添加物品</button>
       </div>}
 
       {/* 文化风俗 */}

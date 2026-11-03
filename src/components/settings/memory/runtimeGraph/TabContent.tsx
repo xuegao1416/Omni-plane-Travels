@@ -1,6 +1,6 @@
-import { GitBranch, Code } from 'lucide-react';
+import { GitBranch,Code } from 'lucide-react';
 import { Button } from '../../SettingsUIComponents';
-import { MermaidGraphPanel, type NodeDetail } from '../../../shared/MermaidGraphPanel';
+import { MermaidGraphPanel,type NodeDetail } from '../../../shared/MermaidGraphPanel';
 
 interface TabContentProps {
   filteredData: unknown[];

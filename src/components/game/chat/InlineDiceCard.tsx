@@ -1,7 +1,7 @@
 // 内联骰子检定卡片：正文完成后由本地系统自动结算，玩家不选择机械结果。
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Dices, Sparkles, XCircle } from 'lucide-react';
-import type { DiceModuleSchema, DiceRoll, StatModuleSchema } from '../../../modules/schema';
+import { useEffect,useMemo,useRef,useState } from 'react';
+import { CheckCircle2,Dices,Sparkles,XCircle } from 'lucide-react';
+import type { DiceModuleSchema,DiceRoll,StatModuleSchema } from '../../../modules/schema';
 import { resolveCheckableAttribute } from '../../../modules/xpAlgorithm';
 import { createDiceRoll } from '../../../gameplay/modules/dice';
 import JourneyCardShell from '../shared/JourneyCardShell';

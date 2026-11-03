@@ -1,5 +1,5 @@
 /**
- * 效果日志 Tab — 展示世界动态系统产生的变量变化日志
+ * 效果日志 Tab — 展示独立玩法机械产生的变量变化日志
  */
 
 import type { EffectLogEntry } from '../../../../modules/schema';
@@ -65,7 +65,7 @@ export function EffectLogTab({ effectLog, variableLabels = {} }: EffectLogTabPro
         </div>
         <div style={{ fontSize: 'var(--font-size-sm)' }}>暂无效果日志</div>
         <div style={{ fontSize: 'var(--font-size-xs)', marginTop: '4px' }}>
-          世界动态产生的变量变化会记录在这里
+          确定性玩法机械产生的变量变化会记录在这里
         </div>
       </div>
     );

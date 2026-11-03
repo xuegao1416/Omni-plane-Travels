@@ -3,7 +3,7 @@
  */
 
 import type { PlayerHook } from '../../../../simulation/types';
-import { URGENCY_ICONS, URGENCY_LABELS } from './constants';
+import { URGENCY_ICONS,URGENCY_LABELS } from './constants';
 
 interface PlayerHookItemProps {
   hook: PlayerHook;

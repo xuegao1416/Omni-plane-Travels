@@ -87,7 +87,6 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
   const [worldEditorOpen, setWorldEditorOpen] = useState(false);
   const [editingWorld, setEditingWorld] = useState<WorldDef | null>(null);
   const [worldEditorInitialStep, setWorldEditorInitialStep] = useState<number | undefined>(undefined);
-  const aiWorldAbortRef = useRef<AbortController | null>(null);
 
   // 加载世界书（进入向导时触发，不再绑定特定步骤号）
   useEffect(() => {
@@ -98,14 +97,8 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
       const world = allWorlds.find(w => w.id === selectedWorld);
       if (!world) return;
 
-      // 旧模式：通过 entryId 查找
-      if (world.entryId != null) {
-        wb.enableEntry(world.entryId);
-        const entries = wb.getEnabledEntries();
-        setWorldEntry(entries.find(e => e.id === world.entryId) || null);
-      }
-      // v2.0 新模式：从 worldBookEntries 构造临时 entry 用于 UI 展示
-      else if (world.worldBookEntries && world.worldBookEntries.length > 0) {
+      // 从 canonical worldBookEntries 构造临时 entry 用于 UI 展示
+      if (world.worldBookEntries && world.worldBookEntries.length > 0) {
         const firstEntry = world.worldBookEntries[0];
         setWorldEntry({
           id: firstEntry.uid,

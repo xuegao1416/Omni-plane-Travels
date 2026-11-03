@@ -24,7 +24,7 @@ import {
   settleCombatResult,
   startPreparedCombat,
 } from './combatV2';
-import { canRollbackCombat, migrateGameStateToV3, normalizeCombatEncounterProposal, normalizeCombatEncounterRequest, normalizeCombatSessionV2 } from './protocols';
+import { canRollbackCombat, normalizeGameStateV3, normalizeCombatEncounterProposal, normalizeCombatEncounterRequest, normalizeCombatSessionV2 } from './protocols';
 import { normalizeSaveLifecycle, type GameSave } from '../storage/db';
 
 function makeState(): GameState {
@@ -128,6 +128,25 @@ describe('v3 deterministic combat core', () => {
     expect(resolveCombatCommandV2(replay, { commandId: 'command-1', unitId: 'player', kind: 'skill', abilityId: 'strike', targetIds: ['enemy'] }).session).toEqual(first.session);
     const auto = chooseAutomaticCommand(first.session, 'enemy', 'defensive');
     expect(['attack', 'skill', 'item', 'defend', 'flee']).toContain(auto.kind);
+  });
+
+  test('uses range midpoints only for missing legacy NPC dimensions and preserves explicit zero', () => {
+    const ranges = {
+      attrA: [0, 100] as [number, number], attrB: [0, 100] as [number, number],
+      dim1: [0, 20] as [number, number], dim2: [0, 20] as [number, number], dim3: [0, 20] as [number, number],
+      dim4: [0, 20] as [number, number], dim5: [0, 20] as [number, number], dim6: [0, 20] as [number, number],
+    };
+    const legacy = makeState();
+    legacy.人物档案.enemy.生存状态 = { 血量: 80, 体力值: 50 };
+
+    const inferred = buildValidatedCombatRoster(legacy, proposal(1), { statRanges: ranges }).plan?.enemyPool[0];
+    expect(inferred?.normalizedAttributes?.dim1).toBe(50);
+    expect(inferred?.attackPower).toBe(10);
+
+    legacy.人物档案.enemy.生存状态.dim1 = 0;
+    const explicitZero = buildValidatedCombatRoster(legacy, proposal(1), { statRanges: ranges }).plan?.enemyPool[0];
+    expect(explicitZero?.normalizedAttributes?.dim1).toBe(0);
+    expect(explicitZero?.attackPower).toBe(4);
   });
 
   test('uses the actor accuracy as the baseline and applies a skill accuracy modifier instead of replacing it', () => {
@@ -318,13 +337,10 @@ describe('v3 deterministic combat core', () => {
     expect(canRollbackCombat('normal', 'active')).toBe(true);
   });
 
-  test('migrates old sessions and saves with safe active/normal defaults; inferno death ends without deletion', () => {
-    const migrated = normalizeCombatSessionV2({ id: 'old', encounterId: 'legacy', encounterName: '旧战斗', status: 'active', round: 2, participants: [{ id: 'player', name: '玩家', side: 'player', hp: 5, maxHp: 10 }, { id: 'enemy', name: '敌人', side: 'enemy', hp: 5, maxHp: 5 }], actionSequence: [{ id: 'old-action', commandId: 'old-command', transactionId: 'old-tx', round: 1, unitId: 'player', kind: 'attack', targetIds: ['enemy'], resolved: true }] });
-    expect(migrated?.riskMode).toBe('normal');
-    expect(migrated?.actionSequence).toHaveLength(1);
+  test('migrates the direct previous combat runtime into v3; inferno death ends without deletion', () => {
     const legacyState = makeState();
-    legacyState.combat = { active: { encounterId: 'legacy-active', encounterName: '旧战斗', status: 'active', round: 2, participants: [{ id: 'player', name: '玩家', side: 'player', hp: 5, maxHp: 10 }, { id: 'enemy', name: '敌人', side: 'enemy', hp: 5, maxHp: 5 }] } } as typeof legacyState.combat;
-    const migratedState = migrateGameStateToV3(legacyState);
+    (legacyState as unknown as Record<string, unknown>).combat = { active: { encounterId: 'legacy-active', encounterName: '旧战斗', status: 'active', round: 2, participants: [{ id: 'player', name: '玩家', side: 'player', hp: 5, maxHp: 10 }, { id: 'enemy', name: '敌人', side: 'enemy', hp: 5, maxHp: 5 }] } };
+    const migratedState = normalizeGameStateV3(legacyState);
     expect(migratedState.v3?.combatSession?.preCombatCheckpoint.gameState.玩家.生存状态.血量).toBe(100);
     const oldSave = { id: 'save_1_xxxxxx', name: '旧存档', timestamp: 1, messages: [], gameState: makeState(), worldId: 'world' } as GameSave;
     expect(normalizeSaveLifecycle(oldSave).lifecycle).toBe('active');

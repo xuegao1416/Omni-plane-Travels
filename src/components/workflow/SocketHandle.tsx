@@ -1,7 +1,7 @@
 // ============================================================
 //  类型化端口 Handle — 带颜色指示器（缩小版）
 // ============================================================
-import { Handle, Position } from '@xyflow/react';
+import { Handle,Position } from '@xyflow/react';
 import type { SocketDefinition } from '../../modules/workflowSchema';
 import { SOCKET_COLORS } from '../../modules/workflowSchema';
 

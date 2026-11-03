@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronRight, ToggleRight, ToggleLeft, Trash2 } from 'lucide-react';
+import { ChevronDown,ChevronRight,ToggleRight,ToggleLeft,Trash2 } from 'lucide-react';
 import type { PresetPromptEntry } from '@/data/builtinPresets';
 import { Field } from '../SettingsUIComponents';
-import { iconBtnStyle, inputStyle, chipStyle } from './constants';
+import { iconBtnStyle,inputStyle,chipStyle } from './constants';
 
 interface PromptEntryProps {
   entry: PresetPromptEntry;

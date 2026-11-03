@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { AlertTriangle, Info, HelpCircle, X, Loader2 } from 'lucide-react';
+import { useState,useCallback } from 'react';
+import { AlertTriangle,Info,HelpCircle,Loader2 } from 'lucide-react';
 import { useConfigStore } from '../../stores/configStore';
 import OverlayPortal from './OverlayPortal';
 import s from './Dialog.module.css';

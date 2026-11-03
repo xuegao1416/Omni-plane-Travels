@@ -2170,24 +2170,6 @@
 .creation-ritual-shell .history-layout { min-height: 0; }
 .creation-ritual-shell .history-layout > .history-progress-rail { grid-column: 1 / -1; }
 
-.creation-ritual-world-choice {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 34%);
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--creation-border);
-  background: color-mix(in srgb, var(--creation-surface) 72%, transparent);
-}
-.creation-ritual-world-choice > div:first-child { display: grid; min-width: 0; gap: 3px; }
-.creation-ritual-world-choice strong { overflow: hidden; color: var(--creation-text); text-overflow: ellipsis; white-space: nowrap; }
-.creation-ritual-world-choice small { overflow: hidden; color: var(--creation-muted); text-overflow: ellipsis; white-space: nowrap; }
-.creation-ritual-world-choice__eyebrow { color: var(--creation-accent); font-size: 10px; letter-spacing: .1em; }
-.creation-ritual-world-choice select { min-width: 0; height: 34px; }
-.creation-ritual-world-choice__actions { display: flex; justify-content: flex-end; gap: 5px; }
-.creation-ritual-world-choice__actions button { padding: 6px 8px; border: 1px solid var(--creation-border); background: transparent; color: var(--creation-text); font-size: 11px; }
-
 @media (min-width: 721px) {
   .creation-ritual-shell__stage.is-step-2 .creation-ritual-shell__anchor img.is-astrolabe { width: min(100%, 360px); height: min(100%, 360px); }
   .creation-ritual-shell__stage.is-step-3 { grid-template-columns: minmax(0, 1fr); }
@@ -2201,8 +2183,6 @@
 }
 
 @media (max-width: 720px) {
-  .creation-ritual-world-choice { grid-template-columns: minmax(0, 1fr); }
-  .creation-ritual-world-choice__actions { justify-content: flex-start; }
   .portrait-editor__mirror { padding-inline: 8px; }
   .portrait-editor__ellipse { width: min(150px, 56vw); }
   .departure-gate-preview { width: min(100%, 300px); height: clamp(230px, 34vh, 280px); }
@@ -2503,8 +2483,7 @@
 [data-theme="dark"] .creation-ritual-shell .personal-info-box,
 [data-theme="dark"] .creation-ritual-shell .history-content,
 [data-theme="dark"] .creation-ritual-shell .confirm-card,
-[data-theme="dark"] .creation-ritual-shell .confirm-journey-strip,
-[data-theme="dark"] .creation-ritual-shell .creation-ritual-world-choice {
+[data-theme="dark"] .creation-ritual-shell .confirm-journey-strip {
   background: rgba(25, 35, 58, .72);
   color: #edf2ef;
   border-color: rgba(187, 207, 220, .46);
@@ -2566,8 +2545,7 @@
 }
 
 [data-theme="dark"] .creation-ritual-shell .pi-right-tab,
-[data-theme="dark"] .creation-ritual-shell .gender-radio,
-[data-theme="dark"] .creation-ritual-shell .creation-ritual-world-choice__actions button {
+[data-theme="dark"] .creation-ritual-shell .gender-radio {
   color: #edf2ef;
   border-color: rgba(187, 207, 220, .44);
 }
@@ -3616,5 +3594,219 @@
     height: 36px;
     padding-inline: 10px;
     font-size: 12px;
+  }
+}
+
+/* Stage 4 responsive follow-up: on narrow devices the journey controls are
+   structural chrome, not a floating overlay. Keeping them in-flow prevents
+   the navigation row from sitting on top of editable fields on short phones. */
+@media (max-width: 720px) {
+  .creation-ritual-shell__stage,
+  .creation-ritual-shell__stage.is-step-3 {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .creation-ritual-shell__scroll,
+  .creation-ritual-shell__stage.is-step-3 .creation-ritual-shell__scroll {
+    grid-row: 1;
+    padding-bottom: 14px;
+  }
+
+  .creation-ritual-shell__footer {
+    position: relative;
+    inset: auto;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-height: 52px;
+    padding: 6px 4px max(6px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(122, 166, 153, .3);
+    background: linear-gradient(180deg, rgba(255, 255, 248, .55), rgba(246, 249, 239, .9));
+    box-sizing: border-box;
+  }
+
+  .creation-ritual-shell__footer > div {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+
+  .creation-ritual-shell__footer > :first-child {
+    justify-content: flex-start;
+  }
+
+  .creation-ritual-shell__footer .entry-sliced-button--dawn-v4 {
+    min-width: 108px;
+  }
+}
+
+@media (max-width: 360px), (max-height: 620px) and (max-width: 720px) {
+  .creation-ritual-shell {
+    padding-top: max(38px, env(safe-area-inset-top));
+  }
+
+  .creation-ritual-shell__header {
+    padding-top: 2px;
+    padding-bottom: 4px;
+  }
+
+  .creation-ritual-shell__header h1 {
+    font-size: 1.18rem;
+  }
+
+  .creation-ritual-shell__header p {
+    display: none;
+  }
+
+  .creation-ritual-shell__steps {
+    min-height: 40px;
+    padding-bottom: 3px;
+  }
+
+  .creation-ritual-step {
+    min-height: 35px;
+    font-size: 9.5px;
+  }
+
+  .creation-ritual-shell__paper-frame .dawn-frame-v4__content {
+    padding: 10px 12px 8px;
+  }
+
+  .creation-ritual-shell__stage,
+  .creation-ritual-shell__stage.is-step-3 {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .creation-ritual-shell__anchor,
+  .creation-ritual-shell__stage.is-step-3 .creation-ritual-shell__anchor {
+    min-height: 72px;
+    padding-top: 2px;
+    padding-bottom: 6px;
+  }
+
+  .creation-ritual-shell__scroll,
+  .creation-ritual-shell__stage.is-step-3 .creation-ritual-shell__scroll {
+    padding: 9px 8px 10px;
+  }
+
+  .creation-ritual-shell__footer {
+    min-height: 48px;
+    padding-top: 4px;
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+
+  .creation-ritual-shell__footer .entry-sliced-button--dawn-v4 {
+    min-width: 96px;
+    min-height: 38px;
+  }
+}
+
+/* Stage 4 correction: the footer is a sibling of the Dawn paper frame. On
+   phones, turn the paper wrapper itself into a two-row layout so controls take
+   real space instead of shrinking the framed content sideways. */
+@media (max-width: 720px) {
+  .creation-ritual-shell__paper {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .creation-ritual-shell__paper-frame {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .creation-ritual-shell__stage,
+  .creation-ritual-shell__stage.is-step-3 {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .creation-ritual-shell__anchor,
+  .creation-ritual-shell__stage.is-step-3 .creation-ritual-shell__anchor {
+    grid-row: 1;
+  }
+
+  .creation-ritual-shell__scroll,
+  .creation-ritual-shell__stage.is-step-3 .creation-ritual-shell__scroll {
+    grid-row: 2;
+    padding-bottom: 12px;
+  }
+
+  .creation-ritual-shell__footer {
+    position: relative;
+    inset: auto;
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+  }
+}
+
+/* Stage 4 frame collision guard: the outer Dawn frame owns roughly the lower
+   40px on narrow phones. Keep journey controls above that ornament and let the
+   content column absorb the lost height through its existing scroll owner. */
+@media (max-width: 720px) {
+  .creation-ritual-shell {
+    padding-bottom: max(48px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 620px) and (max-width: 720px) {
+  .creation-ritual-shell {
+    padding-bottom: max(44px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 720px) {
+  .creation-ritual-shell__paper {
+    row-gap: 24px;
+  }
+}
+
+@media (max-height: 620px) and (max-width: 720px) {
+  .creation-ritual-shell__paper {
+    row-gap: 20px;
+  }
+}
+
+/* entry-crystal.css carries the legacy floating footer offsets with !important;
+   neutralize them only on the phone layout where the footer is intentionally
+   back in normal flow. */
+@media (max-width: 720px) {
+  .creation-ritual-shell__footer {
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+  }
+}
+
+/* Stage 4 content safe-zone: compact phones still need enough inner clearance
+   for the Dawn corner ornaments, especially on the denser profession screen. */
+@media (max-width: 720px) {
+  .creation-ritual-shell__paper-frame .dawn-frame-v4__content {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .creation-ritual-shell__scroll,
+  .creation-ritual-shell__stage.is-step-3 .creation-ritual-shell__scroll {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .creation-ritual-step {
+    padding-inline: 2px;
+    font-size: 9px;
+  }
+
+  .creation-ritual-step__index {
+    width: 17px;
+    height: 17px;
   }
 }

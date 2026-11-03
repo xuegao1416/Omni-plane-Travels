@@ -1,6 +1,7 @@
 # 规则画布工作流规范 v1.0
 
 > 解决核心问题：节点之间有"工作"但没有"流"。本规范定义节点如何连接、条件如何参与、以及图如何转换为 EventRule DSL。
+> **当前实现说明：** 本文保留早期 EventGraph 画布的设计记录；现行编辑器使用 `WorkflowDefinition` + `nodeRegistry.validateConnection()`，执行期由 `workflowEngine` 做 DAG/循环校验。文中的 `validateRuleGraph` 示例不再对应当前运行时代码。
 
 ---
 
@@ -243,7 +244,7 @@ trigger(dice_roll) → condition(hp<50, mode=and) → condition(has_key, mode=an
 | periodic 直连 effect（无 condition） | INFO | `DIRECT_PERIODIC_EFFECT` | 合法但提示：周期无条件 |
 | trigger 的 when 为空 | INFO | `EMPTY_TRIGGER_WHEN` | 触发器无自身条件，完全依赖 condition 节点 |
 
-### 5.3 校验增强（在现有 `validateRuleGraph` 基础上新增）
+### 5.3 历史设计：EventGraph 全图校验
 
 ```typescript
 // 新增校验项
@@ -474,7 +475,7 @@ type EventEdgeKind = 'flow' | 'constraint';  // 保持不变，constraint 仅 gu
 |------|-------|--------|------------|--------|--------|
 | condition 节点 logicMode + 多输入语义 | 高 | 高 | 高 | 中 | **P0** |
 | graphToRuleFile 重写（condition 参与 when 构建） | 高 | 高 | 高 | 中 | **P0** |
-| 连接规则校验（validateRuleGraph 增强） | 高 | 中 | 高 | 低 | **P0** |
+| 连接规则校验（现由 `nodeRegistry.validateConnection` + `workflowEngine` 承担） | 高 | 中 | 高 | 低 | **P0** |
 | PeriodicRule 扩展 when/actions | 中 | 高 | 高 | 低 | **P1** |
 | periodic → condition → effect 转换 | 中 | 高 | 中 | 中 | **P1** |
 | UI 连接合法性即时反馈（拖拽时灰显非法目标） | 中 | 中 | 高 | 中 | **P2** |

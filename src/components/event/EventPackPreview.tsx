@@ -2,9 +2,9 @@
 // 事件包预览 — 折叠列表：事件名 → 点开看卡片
 //   仅支持 canonical v2 CardWorkflowDefinition
 // ============================================================
-import { useEffect, useState } from 'react';
+import { useEffect,useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, X, Loader2, FileText, ScrollText, MessageCircle } from 'lucide-react';
+import { ChevronRight,X,Loader2,FileText,ScrollText,MessageCircle } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
 import type { CardNodeExecutionResult } from '../../modules/schema';
 import { executeCardWorkflow } from '../../modules/cardWorkflowEngine';

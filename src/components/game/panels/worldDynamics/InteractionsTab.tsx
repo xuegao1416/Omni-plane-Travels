@@ -2,7 +2,7 @@
  * 世界动态面板 — NPC 主动交互标签页
  */
 
-import { Trash2, Radio } from 'lucide-react';
+import { Trash2,Radio } from 'lucide-react';
 import { getSimulationEngine } from '../../../../simulation/SimulationApi';
 import type { NpcProactiveInteraction } from '../../../../simulation/types';
 import { NpcInteractionCard } from './NpcInteractionCard';

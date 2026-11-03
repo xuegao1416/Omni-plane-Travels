@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
-import { afterEach, describe, expect, test } from 'bun:test';
-import { clearCustomGameplayModules, getCustomGameplayModulesForWorld } from './custom-modules/storage';
+import { afterEach,describe,expect,test } from 'bun:test';
+import { clearCustomGameplayModules,getCustomGameplayModulesForWorld } from './custom-modules/storage';
 import { installWorkshopItem } from './workshopRuntime';
 
 const moduleDefinition = {

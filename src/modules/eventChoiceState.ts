@@ -59,12 +59,10 @@ export function clearPendingForSave(saveId: string): void {
 }
 
 /**
- * 把 delta 施加到 GameState 的 stat（走 stats 体系：玩家.生存状态 扁平 key）。
- * 与 WorldSimulationEngine 机械层结算约定一致：取当前值 + delta，下限 0。
- * 未知 statId 静默跳过（仍存在其它合法选项不崩）。
- * @deprecated 新代码请使用 applyEffectTarget，它同时支持 statId 与 resourcePath。
+ * 内部 statId 结算实现。公开选择卡入口统一使用 applyEffectTarget。
+ * 未知 statId 静默跳过，数值下限为 0。
  */
-export function applyStatDelta(state: GameState, statId: string, delta: number): void {
+function applyStatDelta(state: GameState, statId: string, delta: number): void {
   const stats = state?.玩家?.生存状态;
   if (!stats) return;
   if (!(statId in stats)) {

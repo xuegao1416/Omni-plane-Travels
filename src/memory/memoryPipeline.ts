@@ -1,10 +1,11 @@
+import { isMemoryVisibleInRuntime, projectMemoryRuntime, sameMemoryVisibility, memoryVisibilityMetadata, annotateNarrativeDiscoveries } from './memoryVisibility';
 // 记忆系统管线执行器 - 从 useGameEngine.ts 提取
 import { fetchRerank, requestCompletion } from '../api/client';
 import { waitForRateLimit } from '../api/rateLimiter';
 import type { MemoryPipelineContext } from './useMemorySystem';
 import type {
-  NarrativeMemoryRuntime, SummaryMemoryItem, VectorMemoryItem,
-  NarrativeStateSlot, NarrativeRelationEdge, NarrativeRelationNetworkItem, NarrativeArchiveCard,
+  NarrativeMemoryRuntime, VectorMemoryItem,
+  NarrativeArchiveCard,
   NarrativeConflictJudgeResult,
 } from './types';
 import { cosineSimilarity, normalizeVectorFact } from './vectorUtils';
@@ -111,7 +112,7 @@ async function recallVectorFacts(memStore: MemoryStore, ctx: MemoryPipelineConte
   });
 
   const eligible = memStore.vectorMemory.filter(item =>
-    item.state !== 'expired'
+    isMemoryVisibleInRuntime(item, memStore.getMemoryRuntime()) && item.state !== 'expired'
       && item.conflictStatus !== 'superseded'
       && item.conflictStatus !== 'rejected'
       && item.importance >= config.vectorRetrieveMinImportance
@@ -316,7 +317,7 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
           .replace(/\{\{剧情原文\}\}/g, ctx.batchText);
 
         const rawResult = await callMemoryAI(ctx.writeApiConfig ?? ctx.apiConfig, prompt, '请分析上述剧情并输出结构化叙事记忆 JSON。');
-        const parsed = parseNarrativeIngestResult(rawResult) as unknown as Record<string, unknown>;
+        const parsed = annotateNarrativeDiscoveries(runtime, parseNarrativeIngestResult(rawResult) as unknown as Record<string, unknown>, sourceEventId, ctx.floor);
         const conflictDecisions: ConflictDecisionMap = new WeakMap();
 
         // 冲突裁决覆盖全部结构化对象；裁决失败时仍由 versionedUpsert 保留历史。
@@ -351,6 +352,7 @@ export async function executeMemoryWrite(memStore: MemoryStore, ctx: MemoryPipel
                 existing.conflictStatus !== 'superseded'
                 && existing.conflictStatus !== 'rejected'
                 && existing.validUntilRound == null
+                && sameMemoryVisibility(existing, incoming)
                 && sameIdOr(existing, incoming, spec.matchFields)
               );
               if (existingIndex >= 0) {
@@ -825,9 +827,11 @@ export async function executeMemoryCompile(memStore: MemoryStore, ctx: MemoryPip
   const result = formatRuntimeToCompiledText(runtime, queryKeywords, DEFAULT_COMPILE_BUDGET, ctx.resourceState);
 
   const retrievedLines = (ctx._selectedEntries ?? [])
+    .filter(entry => isMemoryVisibleInRuntime(entry, runtime))
     .slice(0, memStore.config.compiler.rerankSelectedTotalLimit)
     .map(entry => `- [第${entry.sourceFloor}轮] ${entry.title}：${entry.summary}`);
   const vectorLines = (ctx._selectedVectorFacts ?? [])
+    .filter(entry => isMemoryVisibleInRuntime(entry, runtime))
     .slice(0, memStore.config.vectorRetrieveTopK)
     .map(entry => {
       const fact = String(entry.fact ?? '').trim();
@@ -856,7 +860,7 @@ export async function executeMemoryCompile(memStore: MemoryStore, ctx: MemoryPip
     compiledAt: Date.now(),
     fullText,
     sections: result.sections,
-    sceneAnchor: runtime.sceneAnchor,
+    sceneAnchor: projectMemoryRuntime(runtime).sceneAnchor,
   });
 
   memStore.appendCompileDebugLog({
@@ -869,7 +873,8 @@ export async function executeMemoryCompile(memStore: MemoryStore, ctx: MemoryPip
 
 // ─── 内部工具函数 ───
 
-function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, playerName: string): string {
+function buildIngestReferenceBlock(runtime: NarrativeMemoryRuntime, _playerName: string): string {
+  runtime = projectMemoryRuntime(runtime);
   const parts: string[] = [];
   if (runtime.sceneAnchor) {
     const sa = runtime.sceneAnchor;
@@ -909,6 +914,7 @@ function versionedUpsert<T extends { id: string }>(
   const idx = list.findIndex(item => {
     const record = asRecord(item);
     return matcher(item)
+      && sameMemoryVisibility(item, incoming)
       && record.conflictStatus !== 'superseded'
       && record.conflictStatus !== 'rejected'
       && record.validUntilRound == null;
@@ -917,6 +923,7 @@ function versionedUpsert<T extends { id: string }>(
     const record = asRecord(incoming);
     list.push({
       ...incoming,
+      id: list.some(item => item.id === incoming.id) ? uniqueVersionId(list, incoming.id, currentRound) : incoming.id,
       ...(record.createdAt == null ? { createdAt: Date.now() } : {}),
       updatedAt: Date.now(),
     } as T);
@@ -1000,7 +1007,7 @@ function normalizeIncomingObject(raw: Record<string, unknown>, sourceEventIds: s
   return normalized;
 }
 
-function applyIngestToRuntime(
+export function applyIngestToRuntime(
   runtime: NarrativeMemoryRuntime,
   parsed: Record<string, unknown>,
   sourceEventIds: string[] = [],
@@ -1025,6 +1032,8 @@ function applyIngestToRuntime(
 
     const sceneProvenance = normalizeIncomingObject(scenePatch, sourceEventIds, currentRound);
     runtime.sceneAnchor = {
+      ...memoryVisibilityMetadata(existing ?? {}),
+      ...Object.fromEntries(Object.entries(memoryVisibilityMetadata(sceneProvenance)).filter(([, value]) => value !== undefined)),
       timeLabel: pick('timeLabel'),
       locationLabel: newLocation,
       presentEntities: newPresentEntities,
@@ -1084,7 +1093,7 @@ function applyIngestToRuntime(
           patch[arrField] = [patch[arrField]];
         }
       }
-      const idx = runtime.entityCards.findIndex(c => (c.id === patch.id || c.name === patch.name) && c.conflictStatus !== 'superseded' && c.validUntilRound == null);
+      const idx = runtime.entityCards.findIndex(c => sameMemoryVisibility(c, patch) && (c.id === patch.id || c.name === patch.name) && c.conflictStatus !== 'superseded' && c.validUntilRound == null);
       const existing = idx >= 0 ? runtime.entityCards[idx] : undefined;
       const priorFacts = ensureArr(existing?.stableFacts);
       const incomingFacts = ensureArr(patch.stableFacts);
@@ -1128,7 +1137,7 @@ function applyIngestToRuntime(
           runtime.entityCards[idx] = { ...runtime.entityCards[idx], id: uniqueVersionId(runtime.entityCards, oldId, currentRound), conflictStatus: 'superseded', validUntilRound: currentRound, updatedAt: Date.now() };
           runtime.entityCards.push({ ...candidate, id: String(patch.id || oldId), previousVersionId: oldId, createdAt: Date.now(), updatedAt: Date.now() });
         }
-      } else runtime.entityCards.push({ ...candidate, createdAt: Date.now(), updatedAt: Date.now() });
+      } else runtime.entityCards.push({ ...candidate, id: runtime.entityCards.some(item => item.id === candidate.id) ? uniqueVersionId(runtime.entityCards, candidate.id, currentRound) : candidate.id, createdAt: Date.now(), updatedAt: Date.now() });
     }
   }
 
@@ -1137,7 +1146,7 @@ function applyIngestToRuntime(
   if (Array.isArray(stateSlotUpserts)) {
     for (const slot of stateSlotUpserts) {
       const incoming = normalizeIncomingObject(slot, sourceEventIds, currentRound) as unknown as typeof runtime.stateSlots[number];
-      const existing = runtime.stateSlots.find(item => item.id === incoming.id && item.conflictStatus !== 'superseded' && item.validUntilRound == null);
+      const existing = runtime.stateSlots.find(item => sameMemoryVisibility(item, incoming) && item.id === incoming.id && item.conflictStatus !== 'superseded' && item.validUntilRound == null);
       const history = existing && (existing.value !== incoming.value || existing.summary !== incoming.summary)
         ? [...(existing.history || []), { value: existing.value, summary: existing.summary, recordedAt: Date.now(), sourceType: existing.sourceType, layer: existing.layer, confidence: existing.confidence, sourceEventIds: existing.sourceEventIds }].slice(-12)
         : existing?.history;

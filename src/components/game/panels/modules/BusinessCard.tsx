@@ -1,6 +1,6 @@
 // 经营资产概览卡片 — 右侧面板摘要，点击展开覆盖层
 import { memo } from 'react';
-import { Briefcase, DollarSign, TrendingUp, TrendingDown, Building2, ChevronRight } from 'lucide-react';
+import { Briefcase,DollarSign,TrendingUp,TrendingDown,Building2,ChevronRight } from 'lucide-react';
 import type { BusinessModuleSchema } from '../../../../modules/schema';
 import { Collapsible } from '../../../shared/Collapsible';
 import { previewBusinessModule } from '../../../../gameplay/modules/business';
