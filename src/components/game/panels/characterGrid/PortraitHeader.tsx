@@ -5,46 +5,52 @@ import { useDialog } from '../../../shared/Dialog';
 import { useCharacterPortrait,buildPortraitPrompt,translatePromptWithLLM } from '../../../../hooks/useCharacterPortrait';
 import { imageDb } from '../../../../storage/imageDb';
 import { saveNpcTemplate } from '../../../../storage/templateStore';
-import { usePortraitStore } from '../../../../stores/portraitStore';
+import { useStoredImageUrl } from '../../../../hooks/useStoredImageUrl';
+import { useSaveStore } from '../../../../stores/saveStore';
 import type { KnownNPC } from '../../../../engine/playerKnowledge';
 import { categoryStyle,npcDataToCustomNpc } from './types';
 import { useUISettings } from '../../../../context/UISettingsContext';
 import { confirmNpcDeletion } from './confirmNpcDeletion';
 
-export function PortraitHeader({ npc, npcId, onClose, onPortraitChange, onDelete }: {
+export function PortraitHeader({ npc, npcId, onClose, onDelete }: {
   npc: KnownNPC; npcId: string; onClose: () => void;
-  onPortraitChange?: (npcId: string, url: string) => void;
   /** 提供时，标题栏会出现一个删除按钮；点击后弹出二次确认。 */
   onDelete?: () => void | Promise<void>;
 }) {
-  const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
   const [portraitStatus, setPortraitStatus] = useState('');
   const [showPortraitZoom, setShowPortraitZoom] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { DialogUI, prompt: dlgPrompt, alert: dlgAlert, confirm: dlgConfirm, loading: dlgLoading, close: dlgClose } = useDialog();
-  const { generatePortrait } = useCharacterPortrait();
-  const setPortrait = usePortraitStore(s => s.setPortrait);
+  const { generatePortrait, recoverPortrait, findRecoverableImage } = useCharacterPortrait();
   const { t } = useUISettings();
 
   const ext = npc as any;
+  const portraitUrl = useStoredImageUrl(ext.portraitBlobKey || `portrait-${npcId}`);
+  const portraitIdentity = JSON.stringify(npc);
+  const portraitOwner = useRef({ identity: portraitIdentity, npcId, mounted: true });
+  portraitOwner.current.identity = portraitIdentity; portraitOwner.current.npcId = npcId;
+  useEffect(() => {
+    portraitOwner.current.mounted = true;
+    return () => { portraitOwner.current.mounted = false; };
+  }, []);
   const cat = categoryStyle(npc.人物分类);
 
-  useEffect(() => {
-    const blobKey = ext.portraitBlobKey || `portrait-${npcId}`;
-    let cancelled = false;
-    (async () => {
-      try {
-        const record = await imageDb.getBlob(blobKey);
-        if (!cancelled && record?.blob) {
-          setPortraitUrl(URL.createObjectURL(record.blob));
-        }
-      } catch { /* no portrait saved yet */ }
-    })();
-    return () => { cancelled = true; };
-  }, [ext.portraitBlobKey, npcId]);
-
   const handleGeneratePortrait = async () => {
+    const saveId = useSaveStore.getState().currentSaveId;
+    const isCurrent = () => portraitOwner.current.mounted && portraitOwner.current.identity === portraitIdentity
+      && portraitOwner.current.npcId === npcId && useSaveStore.getState().currentSaveId === saveId;
+    const stableKey = `portrait-${npcId}`;
+    if (findRecoverableImage(stableKey)) {
+      try {
+        const recovered = await recoverPortrait(stableKey, isCurrent);
+        if (recovered && isCurrent()) {
+          ext.portraitBlobKey = recovered.blobKey;
+          setPortraitStatus('已恢复生成的画像');
+        }
+      } catch (error) { if (isCurrent()) setPortraitStatus(`恢复失败：${error instanceof Error ? error.message : String(error)}`); }
+      return;
+    }
     // 1. 显示加载弹窗
     dlgLoading('提示词翻译中，请稍候…', { title: '生成角色画像' });
 
@@ -59,27 +65,18 @@ export function PortraitHeader({ npc, npcId, onClose, onPortraitChange, onDelete
     }
 
     // 3. 关闭加载弹窗，显示可编辑的翻译结果
+    if (!isCurrent()) return;
     dlgClose();
     const editedPrompt = await dlgPrompt('编辑画像提示词（英文 booru 标签）：', {
       defaultValue: translatedPrompt, title: '生成角色画像',
     });
-    if (!editedPrompt?.trim()) return;
+    if (!editedPrompt?.trim() || !isCurrent()) return;
 
     // 4. 生成画像
-    const result = await generatePortrait(npc, setPortraitStatus, editedPrompt.trim());
-    if (result) {
-      // 用固定的 portrait-{npcId} 作为 key 再存一份，确保持久化可找回
-      const stableKey = `portrait-${npcId}`;
-      try {
-        const blobData = await imageDb.getBlob(result.blobKey);
-        if (blobData?.blob) {
-          await imageDb.saveBlob(stableKey, blobData.blob, blobData.mimeType, npc.姓名 || npcId);
-        }
-      } catch (e) { console.warn('[PortraitHeader] 复制头像到稳定 key 失败:', e); }
-      setPortraitUrl(result.url);
+    const result = await generatePortrait(npc, status => { if (isCurrent()) setPortraitStatus(status); }, editedPrompt.trim(),
+      { storageKey: stableKey, npcId, isCurrent });
+    if (result && isCurrent()) {
       ext.portraitBlobKey = stableKey;
-      setPortrait(npcId, result.url);
-      onPortraitChange?.(npcId, result.url);
     }
   };
 
@@ -87,16 +84,17 @@ export function PortraitHeader({ npc, npcId, onClose, onPortraitChange, onDelete
     const file = e.target.files?.[0];
     if (!file) return;
     const blobKey = `portrait-${npcId}`;
+    const saveId = useSaveStore.getState().currentSaveId;
+    const isCurrent = () => portraitOwner.current.mounted && portraitOwner.current.identity === portraitIdentity
+      && portraitOwner.current.npcId === npcId && useSaveStore.getState().currentSaveId === saveId;
     try {
-      await imageDb.saveBlob(blobKey, file, file.type, npc.姓名 || npcId);
-      const url = URL.createObjectURL(file);
-      setPortraitUrl(url);
+      await imageDb.saveBlob(blobKey, file, file.type, npc.姓名 || npcId, undefined, isCurrent);
+      if (!isCurrent()) return;
       ext.portraitBlobKey = blobKey;
-      setPortrait(npcId, url);
-      onPortraitChange?.(npcId, url);
+      setPortraitStatus('头像已保存');
     } catch (err) { console.error('上传头像失败:', err); }
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [npcId, ext]);
+  }, [npcId, ext, npc, portraitIdentity]);
 
   const handleSaveTemplate = async () => {
     const name = await dlgPrompt('请输入NPC模板名称：', { defaultValue: npc.姓名 || 'NPC模板', title: '保存NPC模板' });
@@ -132,7 +130,7 @@ export function PortraitHeader({ npc, npcId, onClose, onPortraitChange, onDelete
           <div onClick={() => portraitUrl && setShowPortraitZoom(true)} style={{ cursor: portraitUrl ? 'pointer' : 'default' }} title={portraitUrl ? '点击放大' : ''}>
             <Avatar name={npc.姓名 || npcId} size="lg" imageSrc={portraitUrl} />
           </div>
-          <button onClick={handleGeneratePortrait} title={portraitUrl ? '重新生成画像' : '生成画像'} style={{
+          <button onClick={handleGeneratePortrait} title={findRecoverableImage(`portrait-${npcId}`) ? '保存并使用已生成的画像（无需重新生成）' : portraitUrl ? '重新生成画像' : '生成画像'} style={{
             position: 'absolute', bottom: -2, right: -2, width: '20px', height: '20px', borderRadius: 'var(--radius-md)',
             background: 'var(--accent)', border: '2px solid var(--bg-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,

@@ -143,6 +143,18 @@
 
 /* Dawn V4 settings surface: the page owns scrolling, while the frame remains
    a decorative shell and never becomes a second fixed viewport. */
+/* Keep the previous screen mounted for its existing state/lifecycle, but stop
+   painting and animating it underneath the full-screen settings surface. */
+.settings-route__background {
+  visibility: hidden;
+  pointer-events: none;
+}
+.settings-route__background,
+.settings-route__background *,
+.settings-route__background *::before,
+.settings-route__background *::after {
+  animation-play-state: paused !important;
+}
 .settings-screen {
   position: fixed;
   inset: 0;
@@ -156,9 +168,7 @@
   padding: 16px;
   overflow: hidden;
   color: var(--text-primary);
-  background: color-mix(in srgb, var(--creation-bg, var(--bg-primary)) 28%, transparent);
-  -webkit-backdrop-filter: blur(7px) saturate(1.06);
-  backdrop-filter: blur(7px) saturate(1.06);
+  background: var(--creation-bg, var(--bg-primary));
   isolation: isolate;
 }
 .settings-screen__header {
@@ -240,8 +250,6 @@
   border-radius: 10px;
   background: color-mix(in srgb, var(--creation-surface, var(--bg-secondary)) 72%, transparent) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, white 48%, transparent), inset 0 0 34px color-mix(in srgb, var(--creation-glow, var(--accent-glow)) 32%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.08);
-  backdrop-filter: blur(14px) saturate(1.08);
 }
 .settings-screen__frame > .dawn-frame-v4__content {
   display: grid;

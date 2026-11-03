@@ -184,7 +184,7 @@ export default function ComfyConfig({ config, updateConfig }: ConfigSectionProps
 
       {/* 自定义工作流 */}
       <div style={{ padding: '0', borderBottom: '1px solid var(--border)' }}>
-        <ComfyWorkflowEditor />
+        <ComfyWorkflowEditor config={config} updateConfig={updateConfig} />
       </div>
     </>
   );

@@ -4,11 +4,12 @@ import { APP_VERSION } from '../../config/version';
 
 interface MainMenuViewProps {
   onStartWizard: () => void;
+  onResumeCreation?: () => void;
   title: string;
   subtitle: string;
 }
 
-export default function MainMenuView({ onStartWizard, title, subtitle }: MainMenuViewProps) {
+export default function MainMenuView({ onStartWizard, title, subtitle, onResumeCreation }: MainMenuViewProps) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function MainMenuView({ onStartWizard, title, subtitle }: MainMen
         >
           点击任意处开始
         </button>
+        {onResumeCreation && <button type="button" className="entry-start-hint" onClick={event => { event.stopPropagation(); onResumeCreation(); }}>继续创建角色</button>}
       </section>
 
       <div className="entry-home-footer" aria-label="版本">

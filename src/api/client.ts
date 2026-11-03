@@ -1,8 +1,9 @@
 import type { ApiConfig,Message,RequestOptions,StreamOptions,CompletionResult } from './types';
+import { createSyntheticToolDefinition, SyntheticStreamAccumulator, substituteToolName, unwrapSyntheticToolResponse } from './syntheticTool';
 import { nativeFetch } from '../utils/nativeFetch';
+import { abortableDelay } from '../utils/abortableDelay';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { notifyRateLimited,bucketKeyForConfig,parseRetryAfter } from './rateLimiter';
-import { getTrialClientId,isTrialApiConfig } from './trial';
 
 // 获取代理 URL（校验协议安全性）
 export function getProxyUrl(): string | null {
@@ -31,10 +32,8 @@ export function getProxyUrl(): string | null {
 }
 
 /** 统一准备请求 URL 和 Headers（处理代理逻辑） */
-export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>): { url: string; headers: Record<string, string> } {
-  // 体验路由是本项目固定的同源服务端入口，不能被用户配置的任意代理改写。
-  const isTrialEndpoint = endpoint.includes('/api/trial/');
-  const proxyUrl = isTrialEndpoint ? null : getProxyUrl();
+export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHeaders?: Record<string, string>, proxyOverride?: string | null): { url: string; headers: Record<string, string> } {
+  const proxyUrl = proxyOverride === undefined ? getProxyUrl() : validateProxyUrl(proxyOverride);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...extraHeaders,
@@ -65,27 +64,98 @@ export function prepareFetchRequest(endpoint: string, apiKey?: string, extraHead
   return { url: endpoint, headers };
 }
 
+/**
+ * 基址是否已经带版本段（/v1、/v4、/v1beta，允许结尾不带斜杠）。
+ *
+ * 判断"要不要再补 /v1"必须用这个：只看 `/v1` 结尾会漏掉别的版本号，
+ * 例如智谱 GLM 的端点是 https://open.bigmodel.cn/api/paas/v4 —— 误补一个
+ * /v1 会直接打到 https://open.bigmodel.cn/api/paas/v4/v1/chat/completions。
+ */
+function hasVersionSegment(base: string): boolean {
+  return /\/v\d+(\/|$)/i.test(base);
+}
+
 // URL拼接 - 支持多种provider
-export function buildEndpoint(config: ApiConfig): string {
-  const base = config.baseUrl.replace(/\/+$/, '');
-  if (isTrialApiConfig(config)) return `${base}/chat/completions`;
+export function buildEndpoint(config: ApiConfig, messages: Message[] = []): string {
+  const base = config.baseUrl.trim().replace(/\/+$/, '');
+  if (config.provider === 'deepseek') {
+    if (!base) return 'https://api.deepseek.com/beta/chat/completions';
+    try {
+      const url = new URL(base);
+      const last = messages[messages.length - 1];
+      const needsPrefix = last?.role === 'assistant' && last.prefix === true;
+      if (url.hostname === 'api.deepseek.com' && (!url.pathname.replace(/\/+$/, '') || needsPrefix)) {
+        return `${url.origin}/beta/chat/completions`;
+      }
+    } catch { /* 非官方地址沿用下方通用拼接与请求错误处理。 */ }
+    if (base.endsWith('/beta')) return `${base}/chat/completions`;
+  }
   if (base.endsWith('/chat/completions')) return base;
   if (base.endsWith('/v1') || base.endsWith('/openai')) return `${base}/chat/completions`;
   if (base.endsWith('/v1beta')) return `${base}/openai/chat/completions`;
-  // URL 已含版本路径（如 /v2/xxx）时直接追加 /chat/completions，不插入多余的 /v1
-  if (/\/v\d+\//.test(base)) return `${base}/chat/completions`;
+  // Gemini 的 OpenAI 兼容层挂在 /v1beta/openai 下；裸域名直接拼 /v1/chat/completions 会打到不存在的路径。
+  if (config.provider === 'google' && !hasVersionSegment(base)) return `${base}/v1beta/openai/chat/completions`;
+  // URL 已含版本路径（/v1、/v4、/v2/xxx 等）时只追加路径，不插多余的 /v1
+  if (hasVersionSegment(base)) return `${base}/chat/completions`;
   return `${base}/v1/chat/completions`;
+}
+
+/** OpenAI 兼容入口也可连接 DeepSeek，兼容策略由实际地址/模型共同判断。 */
+function isDeepSeekConfig(config: ApiConfig): boolean {
+  if (config.provider === 'deepseek') return true;
+  if (/(?:^|\/)deepseek(?:$|[-_:])/i.test(config.model.trim())) return true;
+  try {
+    const url = new URL(config.baseUrl);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname === 'api.deepseek.com';
+  } catch {
+    return false;
+  }
 }
 
 /** DeepSeek 推理模型首 token 和完整生成通常更慢，避免 2 分钟硬中止截断正文。 */
 export function getRequestTimeoutMs(config: ApiConfig): number {
-  return config.provider === 'deepseek' ? 300_000 : 120_000;
+  const custom = config.requestTimeoutMs;
+  if (typeof custom === 'number' && Number.isFinite(custom) && custom > 0) return custom;
+  return isDeepSeekConfig(config) ? 300_000 : 120_000;
 }
 
 function buildRequestBody(config: ApiConfig, messages: Message[], options: RequestOptions = {}) {
+  let requestMessages = messages;
+  let toolDefinition: ReturnType<typeof createSyntheticToolDefinition> | undefined;
+  if (options.syntheticTool) {
+    const tool = options.syntheticTool;
+    const pipelineMessages = normalizeMessages(config, tool.pipelineMessages.map(message => ({
+      ...message,
+      content: substituteToolName(message.content, tool.name),
+    })));
+    const descriptionParts = [tool.description.trim()];
+    if (tool.controlPrompt) {
+      const controlPrompt = messages.filter(message => message.role === 'system')
+        .map(message => message.content.trim()).filter(Boolean).join('\n\n');
+      if (controlPrompt) descriptionParts.push('【Control Prompt】\n' + controlPrompt);
+    }
+    if (tool.relocateContext) {
+      const relocatedContext = messages.filter(message => message.role !== 'system')
+        .map(message => message.content.trim()
+          ? '[' + message.role + ']\n' + message.content.trim()
+          : '')
+        .filter(Boolean).join('\n\n');
+      if (relocatedContext) descriptionParts.push('【Conversation Context】\n' + relocatedContext);
+      requestMessages = pipelineMessages;
+    } else if (pipelineMessages.length > 0) {
+      requestMessages = [...messages, ...pipelineMessages];
+    }
+
+    toolDefinition = createSyntheticToolDefinition({
+      ...tool,
+      fieldDescription: substituteToolName(tool.fieldDescription, tool.name),
+      pipelineMessages,
+    }, substituteToolName(descriptionParts.filter(Boolean).join('\n\n'), tool.name));
+  }
+
   const body: Record<string, unknown> = {
     model: config.model,
-    messages,
+    messages: requestMessages,
     temperature: options.temperature ?? config.temperature ?? 0.7,
     stream: options.stream ?? config.stream ?? true,
   };
@@ -95,13 +165,50 @@ function buildRequestBody(config: ApiConfig, messages: Message[], options: Reque
   if (topP != null) body.top_p = topP;
   if (config.topK != null) body.top_k = config.topK;
   if (config.reasoningEffort && config.reasoningEffort !== '关闭') body.reasoning_effort = config.reasoningEffort;
+  if (config.provider === 'deepseek') {
+    const effort = getDeepSeekReasoningEffort(config.reasoningEffort);
+    body.thinking = { type: effort ? 'enabled' : 'disabled' };
+    // DeepSeek 没有 top_k；思考下 temperature 不生效，top_p 按型号处理。
+    delete body.top_k;
+    delete body.reasoning_effort;
+    if (effort) {
+      body.reasoning_effort = effort;
+      delete body.temperature;
+      if (/(?:^|\/)deepseek-(?:v4(?:\.1)?-)?flash(?:$|[-_:])/i.test(config.model.trim())) {
+        if (typeof body.top_p === 'number') body.top_p = Math.max(0.95, Math.min(1, body.top_p));
+      } else {
+        delete body.top_p;
+      }
+    }
+  }
   if (options.responseFormat === 'json') body.response_format = { type: 'json_object' };
+  else if (typeof options.responseFormat === 'object' && options.responseFormat.type === 'json_schema') {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: options.responseFormat.name,
+        strict: options.responseFormat.strict ?? true,
+        schema: options.responseFormat.schema,
+      },
+    };
+  }
+  if (toolDefinition) {
+    body.tools = [toolDefinition];
+    body.tool_choice = 'auto';
+  }
   // Google不支持某些参数
   if (config.provider === 'google') {
     delete body.frequency_penalty;
     delete body.presence_penalty;
   }
   return body;
+}
+
+function getDeepSeekReasoningEffort(effort: string | undefined): 'low' | 'high' | 'max' | undefined {
+  if (effort === 'low' || effort === 'minimal') return 'low';
+  if (effort === 'medium' || effort === 'high' || effort === 'xhigh') return 'high';
+  if (effort === 'max' || effort === 'ultra') return 'max';
+  return undefined;
 }
 
 // 多格式内容提取
@@ -156,8 +263,20 @@ function mergeConsecutiveSameRole(messages: Message[]): Message[] {
   return merged;
 }
 
-function normalizeMessages(provider: string | undefined, messages: Message[]): Message[] {
-  if (provider === 'deepseek') return mergeConsecutiveSameRole(messages);
+function normalizeMessages(config: ApiConfig, messages: Message[]): Message[] {
+  if (config.provider === 'deepseek') {
+    // 对齐 SEMI_TOOLS 的文本消息处理：先合并，再转换中途 system，再合并。
+    // 显式重建消息，避免历史 prefix 标记随相邻消息合并传播。
+    const merged = mergeConsecutiveSameRole(messages.map(({ role, content }) => ({ role, content })));
+    const normalized = mergeConsecutiveSameRole(merged.map((message, index) => ({
+      ...message,
+      role: index > 0 && message.role === 'system' ? 'user' : message.role,
+    })));
+    const last = normalized[normalized.length - 1];
+    if (last?.role === 'assistant') last.prefix = true;
+    return normalized;
+  }
+  if (isDeepSeekConfig(config)) return mergeConsecutiveSameRole(messages);
   return messages;
 }
 
@@ -166,6 +285,8 @@ async function parseSSEStream(
   response: Response,
   onDelta: (delta: string, accumulated: string) => void,
   onReasoning?: (reasoning: string) => void,
+  signal?: AbortSignal,
+  syntheticTool?: RequestOptions['syntheticTool'],
 ): Promise<{ text: string; reasoning: string; finishReason?: string }> {
   if (!response.body) {
     throw new Error('SSE 响应体为空（服务端可能未返回流式数据）');
@@ -176,11 +297,15 @@ async function parseSSEStream(
   let accumulated = '';
   let reasoningAccum = '';
   let finishReason: string | undefined;
+  const syntheticAccumulator = syntheticTool
+    ? new SyntheticStreamAccumulator(syntheticTool.name, syntheticTool.paramName)
+    : undefined;
 
   /** 处理一批 SSE 行（主循环和 flush 共用，消除重复代码） */
   const processSSELines = (raw: string) => {
     const parts = raw.split('\n\n');
     for (const line of parts) {
+      signal?.throwIfAborted();
       const trimmed = line.trim();
       if (!trimmed || !trimmed.startsWith('data: ')) continue;
       const data = trimmed.slice(6).trim();
@@ -188,7 +313,11 @@ async function parseSSEStream(
 
       try {
         const json = JSON.parse(data);
-        const content = extractStreamContent(json);
+        const toolDelta = syntheticAccumulator?.absorb(json) ?? '';
+        const hasToolCallDelta = Array.isArray(json?.choices?.[0]?.delta?.tool_calls);
+        const content = syntheticAccumulator
+          ? toolDelta || (hasToolCallDelta ? '' : extractStreamContent(json))
+          : extractStreamContent(json);
         const reasoning = extractReasoningContent(json);
         finishReason = extractFinishReason(json) ?? finishReason;
 
@@ -203,60 +332,71 @@ async function parseSSEStream(
             onDelta(content, accumulated);
           }
         }
+        signal?.throwIfAborted();
         if (reasoning && onReasoning) {
           reasoningAccum += reasoning;
           onReasoning(reasoningAccum);
         }
       } catch {
+        signal?.throwIfAborted();
         // 跳过解析失败的行
       }
     }
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  let completed = false;
+  try {
+    while (true) {
+      signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      signal?.throwIfAborted();
+      if (done) { completed = true; break; }
+      buffer += decoder.decode(value, { stream: true });
 
-    const lastDoubleNewline = buffer.lastIndexOf('\n\n');
-    if (lastDoubleNewline === -1) continue;
+      const lastDoubleNewline = buffer.lastIndexOf('\n\n');
+      if (lastDoubleNewline === -1) continue;
 
-    const complete = buffer.slice(0, lastDoubleNewline);
-    buffer = buffer.slice(lastDoubleNewline + 2);
-    processSSELines(complete);
+      const complete = buffer.slice(0, lastDoubleNewline);
+      buffer = buffer.slice(lastDoubleNewline + 2);
+      processSSELines(complete);
+    }
+
+    // Flush remaining buffer content that didn't end with \n\n
+    if (buffer.trim()) processSSELines(buffer);
+    signal?.throwIfAborted();
+    const syntheticText = syntheticAccumulator?.finalize();
+    if (syntheticText && syntheticText !== accumulated) {
+      const delta = syntheticText.startsWith(accumulated) ? syntheticText.slice(accumulated.length) : syntheticText;
+      accumulated = syntheticText;
+      if (delta) onDelta(delta, accumulated);
+    }
+    return { text: accumulated, reasoning: reasoningAccum, finishReason };
+  } finally {
+    if (!completed) await reader.cancel(signal?.reason).catch(() => {});
+    reader.releaseLock();
   }
-
-  // Flush remaining buffer content that didn't end with \n\n
-  if (buffer.trim()) {
-    processSSELines(buffer);
-  }
-
-  return { text: accumulated, reasoning: reasoningAccum, finishReason };
 }
 
-// 非流式请求（使用 nativeFetch 绕过 CORS）
+// 非流式请求（浏览器与原生共享传输）
 export async function requestCompletion(
   config: ApiConfig,
   messages: Message[],
   options: RequestOptions = {},
 ): Promise<CompletionResult> {
   const start = Date.now();
-  const endpoint = buildEndpoint(config);
-  const normalized = normalizeMessages(config.provider, messages);
+  const normalized = normalizeMessages(config, messages);
+  const endpoint = buildEndpoint(config, normalized);
   const body = buildRequestBody(config, normalized, { ...options, stream: false });
   console.log(`🚀 [API] 发起请求 → ${endpoint} (${messages.length} 条消息)`);
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
-    endpoint,
-    isTrialApiConfig(config) ? undefined : config.apiKey,
-    isTrialApiConfig(config) ? { 'X-Trial-Client-Id': getTrialClientId(), ...(options.trialPurpose ? { 'X-Trial-Purpose': options.trialPurpose } : {}) } : undefined,
-  );
+  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
 
   const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify(body),
     signal: options.signal,
+    timeoutMs: getRequestTimeoutMs(config),
   });
 
   if (!res.ok) {
@@ -286,7 +426,11 @@ export async function requestCompletion(
   }
 
   const json = await res.json();
-  const text = json.choices?.[0]?.message?.content || extractStreamContent(json) || '';
+  const syntheticOutput = options.syntheticTool
+    ? unwrapSyntheticToolResponse(json, options.syntheticTool.name, options.syntheticTool.paramName)
+    : undefined;
+  const rawText = json.choices?.[0]?.message?.content || extractStreamContent(json) || '';
+  const text = syntheticOutput?.matched ? syntheticOutput.text : rawText;
   const reasoning = json.choices?.[0]?.message?.reasoning_content || '';
   const finishReason = extractFinishReason(json);
   const usage = json.usage ? {
@@ -307,21 +451,18 @@ export async function requestCompletionStream(
   options: StreamOptions,
 ): Promise<CompletionResult> {
   const start = Date.now();
-  const endpoint = buildEndpoint(config);
-  const normalized = normalizeMessages(config.provider, messages);
+  const normalized = normalizeMessages(config, messages);
+  const endpoint = buildEndpoint(config, normalized);
   const body = buildRequestBody(config, normalized, { ...options, stream: true });
 
-  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
-    endpoint,
-    isTrialApiConfig(config) ? undefined : config.apiKey,
-    isTrialApiConfig(config) ? { 'X-Trial-Client-Id': getTrialClientId(), ...(options.trialPurpose ? { 'X-Trial-Purpose': options.trialPurpose } : {}) } : undefined,
-  );
+  const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify(body),
     signal: options.signal,
+    timeoutMs: getRequestTimeoutMs(config),
   });
 
   if (!res.ok) {
@@ -341,12 +482,14 @@ export async function requestCompletionStream(
     throw Object.assign(new Error(`API ${res.status}: ${errText.slice(0, 200)}`), { status: res.status, retryAfterMs: parseRetryAfter(res.headers.get('Retry-After')) ?? undefined });
   }
 
-  const { text, reasoning, finishReason } = await parseSSEStream(res, options.onDelta, options.onReasoning);
+  const { text, reasoning, finishReason } = await parseSSEStream(
+    res, options.onDelta, options.onReasoning, options.signal, options.syntheticTool,
+  );
   return { text, reasoning: reasoning || undefined, finishReason, elapsed: Date.now() - start };
 }
 
 // 重试包装
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, signal?: AbortSignal, maxRetries = 3, baseDelay = 1000): Promise<T> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
@@ -357,7 +500,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 10
       if (attempt < maxRetries && retryable) {
         const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
         console.warn(`[API] 请求失败 (${status})，${attempt + 1}/${maxRetries} 次重试，等待 ${Math.round(delay)}ms...`);
-        await new Promise(r => setTimeout(r, delay));
+        await abortableDelay(delay, signal);
         continue;
       }
       throw err;
@@ -377,12 +520,14 @@ async function requestWithFallback(
   }
   try {
     const result = await requestCompletionStream(config, messages, options);
-    // 内容过短（≤5字符）视为异常响应（429被包装成200、内容审核截断等），触发重试
-    if (!result.text || result.text.trim().length <= 5) {
-      console.warn(`[API] 流式响应内容过短（${result.text.length} 字符），降级到非流式重试`);
+    // 空响应可以重试；简短但有效的回答不应被当作限流或审核失败。
+    if (!result.text?.trim()) {
+      if (result.finishReason === 'content_filter' || result.finishReason === 'content-filter') throw new Error('模型服务明确拒绝了本次请求');
+      console.warn('[API] 流式响应为空，降级到非流式重试');
       const fallback = await requestCompletion(config, messages, options);
-      if (!fallback.text || fallback.text.trim().length <= 5) {
-        throw new Error(`API 429: 流式和非流式均返回过短响应，疑似限流或内容审核`);
+      if (!fallback.text?.trim()) {
+        if (fallback.finishReason === 'content_filter' || fallback.finishReason === 'content-filter') throw new Error('模型服务明确拒绝了本次请求');
+        throw new Error('模型服务返回空响应，请重试或检查模型配置');
       }
       return fallback;
     }
@@ -402,85 +547,99 @@ export async function requestStreamWithRetry(
   messages: Message[],
   options: StreamOptions,
 ): Promise<CompletionResult> {
-  const timeoutMs = getRequestTimeoutMs(config);
   return withRetry(async () => {
-    if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-    // 内部控制器：超时或被外部 signal 中止时，真正 abort 底层 fetch
-    const controller = new AbortController();
-    const onExternalAbort = () => controller.abort();
-    if (options.signal) {
-      if (options.signal.aborted) controller.abort();
-      else options.signal.addEventListener('abort', onExternalAbort, { once: true });
-    }
-
-    const timeoutId = setTimeout(() => {
-      if (!controller.signal.aborted) {
-        console.warn(`[API] 请求已超过 ${Math.round(timeoutMs / 1000)}s，强制中止`);
-        controller.abort(new DOMException('Streaming timeout exceeded', 'TimeoutError'));
-      }
-    }, timeoutMs);
-
-    try {
-      // 用合并后的 signal 替代调用方的 signal，确保超时也能中止
-      return await requestWithFallback(config, messages, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(timeoutId);
-      if (options.signal) options.signal.removeEventListener('abort', onExternalAbort);
-    }
-  });
+    options.signal?.throwIfAborted();
+    return requestWithFallback(config, messages, options);
+  }, options.signal);
 }
 
 function getModelListUrls(config: ApiConfig): string[] {
-  const base = config.baseUrl.replace(/\/+$/, '');
+  const base = (config.baseUrl.trim() || (config.provider === 'deepseek' ? 'https://api.deepseek.com' : '')).replace(/\/+$/, '');
   if (config.provider === 'google') {
-    return [`${base}/v1beta/models?key=${config.apiKey}`];
+    // 基址已带版本段时沿用，避免拼出 /v1beta/v1beta/models。
+    const root = /\/v\d/i.test(base) ? base : `${base}/v1beta`;
+    return [`${root}/models?key=${config.apiKey}`];
   }
 
   const standardUrl = base.endsWith('/v1') || base.endsWith('/openai')
     ? `${base}/models`
     : base.endsWith('/v1/chat/completions')
       ? base.replace(/\/chat\/completions$/, '/models')
-      : /\/v\d+\//.test(base)
+      : hasVersionSegment(base)
         ? `${base}/models`
         : `${base}/v1/models`;
 
-  // DeepSeek 官方接口及部分公益站把模型目录放在 /models，
-  // 但聊天接口仍使用 /v1/chat/completions；两种路径都兼容。
+  // DeepSeek 模型目录优先使用根路径；beta 仅用于聊天补全。
   if (config.provider !== 'deepseek') return [standardUrl];
   const root = base
     .replace(/\/chat\/completions\/?$/, '')
-    .replace(/\/v\d+\/?$/, '');
+    .replace(/\/(?:v\d+|beta)\/?$/, '');
   return [...new Set([`${root}/models`, standardUrl])];
 }
 
-// 获取模型列表（使用 nativeFetch 绕过 CORS）
-export async function fetchModels(config: ApiConfig): Promise<string[]> {
+export interface ConnectionRequestOptions { signal?: AbortSignal; proxyUrl?: string | null; }
+function validateProxyUrl(value: string | null): string | null {
+  if (!value?.trim()) return null;
+  const url = new URL(value.trim());
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('代理地址必须以 http:// 或 https:// 开头');
+  return value.trim();
+}
+
+/** 认证和权限失败不能靠换模型目录路径解决，也不直接展示服务端凭据回显。 */
+function getApiAccessError(status: number, targetUrl: string): string | undefined {
+  if (status === 403) return 'API 访问被拒绝（403）。请检查密钥是否有此接口权限，或联系服务商确认访问限制。';
+  if (status !== 401) return undefined;
+  let message = 'API 密钥认证失败（401）。请检查密钥是否有效，并确认密钥与 API 端点属于同一服务商。';
+  try {
+    if (new URL(targetUrl).hostname === 'api.deepseek.com') {
+      message += '当前连接的是 DeepSeek 官方；第三方站点的密钥需要填写该站点提供的 API 端点。';
+    }
+  } catch { /* 地址格式错误由请求层处理。 */ }
+  return message;
+}
+
+// 获取模型列表（浏览器与原生共享传输）
+export async function fetchModels(config: ApiConfig, options?: ConnectionRequestOptions): Promise<string[]> {
   const urls = getModelListUrls(config);
   const failures: string[] = [];
+  let accessError: string | undefined;
 
   for (const url of urls) {
+    options?.signal?.throwIfAborted();
     const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(
       url,
       config.provider !== 'google' ? config.apiKey : undefined,
+      undefined, options?.proxyUrl,
     );
 
     // 每个候选地址单独计时，避免某个公益站端点无响应时按钮一直转圈。
     const controller = new AbortController();
+    const abort = () => controller.abort(options?.signal?.reason);
+    options?.signal?.addEventListener('abort', abort, { once: true });
+    if (options?.signal?.aborted) abort();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
       const res = await nativeFetch(fetchUrl, { headers: fetchHeaders, signal: controller.signal });
+      options?.signal?.throwIfAborted();
       if (!res.ok) {
+        accessError = getApiAccessError(res.status, url);
+        if (accessError) {
+          await res.body?.cancel().catch(() => {});
+          options?.signal?.throwIfAborted();
+          break;
+        }
         const errText = await res.text().catch(() => '');
         failures.push(`${url} → ${res.status} ${errText.slice(0, 120)}`);
         continue;
       }
       const json = await res.json();
+      options?.signal?.throwIfAborted();
       const models = Array.isArray(json.data) ? json.data : Array.isArray(json.models) ? json.models : [];
       const modelIds = models.map((m: any) => m.id || m.name).filter(Boolean);
       if (modelIds.length > 0) return modelIds;
       failures.push(`${url} → 返回了空模型列表`);
     } catch (err: unknown) {
+      options?.signal?.throwIfAborted();
       const errMsg = err instanceof Error ? err.message : String(err);
       if (err instanceof Error && err.name === 'AbortError') {
         failures.push(`${url} → 请求超时(30秒)`);
@@ -491,36 +650,46 @@ export async function fetchModels(config: ApiConfig): Promise<string[]> {
       }
     } finally {
       clearTimeout(timeoutId);
+      options?.signal?.removeEventListener('abort', abort);
     }
   }
 
-  throw new Error(`获取模型列表失败：${failures.join('；')}。部分公益站不开放模型列表时，可直接手动填写模型名称。`);
+  throw new Error(accessError ?? `获取模型列表失败：${failures.join('；')}。部分公益站不开放模型列表时，可直接手动填写模型名称。`);
 }
 
-// 测试连接（使用 nativeFetch 绕过 CORS）
-export async function testConnection(config: ApiConfig): Promise<{ success: boolean; message: string; elapsed: number }> {
+// 测试连接（浏览器与原生共享传输）
+export async function testConnection(config: ApiConfig, options?: ConnectionRequestOptions): Promise<{ success: boolean; message: string; elapsed: number }> {
   const start = Date.now();
   let endpoint = '';
   let fetchUrl = '';
   try {
     endpoint = buildEndpoint(config);
-    const body = {
+    const body = config.provider === 'deepseek' ? buildRequestBody(config, [{ role: 'user', content: 'Hi' }], { maxTokens: 5, stream: false }) : {
       model: config.model,
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 5,
       stream: false,
     };
 
-    const { url: resolvedFetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey);
+    const { url: resolvedFetchUrl, headers: fetchHeaders } = prepareFetchRequest(endpoint, config.apiKey, undefined, options?.proxyUrl);
     fetchUrl = resolvedFetchUrl;
 
     const res = await nativeFetch(fetchUrl, {
       method: 'POST',
       headers: fetchHeaders,
       body: JSON.stringify(body),
+      signal: options?.signal,
+      timeoutMs: getRequestTimeoutMs(config),
     });
 
+    options?.signal?.throwIfAborted();
     if (!res.ok) {
+      const accessError = getApiAccessError(res.status, endpoint);
+      if (accessError) {
+        await res.body?.cancel().catch(() => {});
+        options?.signal?.throwIfAborted();
+        return { success: false, message: accessError, elapsed: Date.now() - start };
+      }
       const errText = await res.text().catch(() => '');
       const proxyUrl = getProxyUrl();
       console.groupCollapsed(`%c[Proxy] ✗ 测试连接失败 ${res.status}`, 'color: #ef4444; font-weight: bold');
@@ -532,8 +701,12 @@ export async function testConnection(config: ApiConfig): Promise<{ success: bool
       return { success: false, message: `API ${res.status}: ${errText.slice(0, 200)}`, elapsed: Date.now() - start };
     }
 
+    await res.body?.cancel().catch(() => {});
+    options?.signal?.throwIfAborted();
     return { success: true, message: `连接成功 (${Date.now() - start}ms)`, elapsed: Date.now() - start };
   } catch (err: unknown) {
+    options?.signal?.throwIfAborted();
+    if (err instanceof Error && err.name === 'TimeoutError') return { success: false, message: '连接测试超时，请检查地址或服务状态后重试。', elapsed: Date.now() - start };
     const msg = err instanceof Error ? err.message : String(err);
     const proxyUrl = getProxyUrl();
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Network request failed')) {
@@ -574,22 +747,24 @@ export interface EmbeddingConfig {
 export async function fetchEmbedding(
   config: EmbeddingConfig,
   text: string,
+  options?: { signal?: AbortSignal },
 ): Promise<number[]> {
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/embeddings')) {
-    url = base.endsWith('/v1') ? `${base}/embeddings` : `${base}/v1/embeddings`;
+    url = hasVersionSegment(base) ? `${base}/embeddings` : `${base}/v1/embeddings`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify({
       model: config.model,
       input: text,
     }),
+    signal: options?.signal,
   });
 
   if (!res.ok) {
@@ -612,12 +787,12 @@ export async function fetchEmbeddingBatch(
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/embeddings')) {
-    url = base.endsWith('/v1') ? `${base}/embeddings` : `${base}/v1/embeddings`;
+    url = hasVersionSegment(base) ? `${base}/embeddings` : `${base}/v1/embeddings`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify({
@@ -686,16 +861,18 @@ export async function fetchRerank(
   config: RerankConfig,
   query: string,
   documents: string[],
+  options?: { signal?: AbortSignal },
 ): Promise<RerankResult[]> {
+  options?.signal?.throwIfAborted();
   const base = config.baseUrl.replace(/\/+$/, '');
   let url = base;
   if (!base.endsWith('/rerank') && !base.endsWith('/rerank/')) {
-    url = base.endsWith('/v1') ? `${base}/rerank` : `${base}/v1/rerank`;
+    url = hasVersionSegment(base) ? `${base}/rerank` : `${base}/v1/rerank`;
   }
 
   const { url: fetchUrl, headers: fetchHeaders } = prepareFetchRequest(url, config.apiKey);
 
-  const res = await fetch(fetchUrl, {
+  const res = await nativeFetch(fetchUrl, {
     method: 'POST',
     headers: fetchHeaders,
     body: JSON.stringify({
@@ -704,6 +881,7 @@ export async function fetchRerank(
       documents,
       top_n: documents.length,
     }),
+    signal: options?.signal,
   });
 
   if (!res.ok) {

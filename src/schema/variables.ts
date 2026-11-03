@@ -29,6 +29,8 @@ export interface SurvivalStats {
 }
 
 export interface SkillData {
+  /** 技能显示名。旧存档可能缺失，此时 UI 回落到字典键。 */
+  名称?: string;
   品质: '普通' | '精良' | '稀有' | '史诗' | '传说';
   描述: string;
   类型: string;
@@ -377,6 +379,8 @@ export interface NPCData {
 }
 
 export interface GameState {
+  /** Authored consequence deduplication lives in rollbackable save state. */
+  authoredEffectReceipts?: Record<string, { planId: string; effectSignature: string }>;
   playerIdentity?: { actorId: string; name: string; aliases: string[] };
   playerKnowledge?: import('../engine/playerKnowledge').PlayerKnowledgeState;
   世界: WorldState;
@@ -396,6 +400,9 @@ export interface GameState {
   };
   /** 自定义玩法模块的运行时状态；与事件包/工作流完全分离。 */
   customModules?: Record<string, import('../custom-modules/stateStore').CustomModuleRuntimeState>;
+  /** Once pinned, subsequent world bindings never change this save implicitly. */
+  customModuleBindingsInitialized?: boolean;
+  customModuleBindingWarnings?: string[];
   /** 六大内置模块共用的事务、事件、日志与迁移运行态。 */
   gameplay?: import('../gameplay/types').GameplayRuntimeState;
   /** Save-scoped event decisions; pending records survive failed narrative retries. */

@@ -42,9 +42,12 @@ import {
   normalizeProvenance,
 } from './normalize';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { cloneSnapshotWithSharing, shareSnapshotHistory } from '../utils/snapshotSharing';
 
-// ─── Loading 引用计数（防止并行任务提前关闭 loading 状态） ───
-let _loadingRefCount = 0;
+// Task scopes prevent cancelled finalizers from closing a replacement task.
+let loadingEpoch = 0;
+const loadingScopes = new Map<symbol, string>();
+function resetLoadingScopes() { loadingEpoch++; loadingScopes.clear(); }
 
 // ─── localStorage 持久化 ───
 
@@ -112,6 +115,8 @@ interface MemoryStoreActions {
   // 运行态管理
   initMemoryRuntime: (bankId?: string) => void;
   getMemoryRuntime: () => NarrativeMemoryRuntime;
+  getRuntimeVersion: () => number;
+  commitMemoryRuntime: (runtime: NarrativeMemoryRuntime, expectedVersion: number, baseline: NarrativeMemoryRuntime) => void;
   resetMemoryRuntime: () => void;
   bumpRuntimeVersion: () => void;
 
@@ -151,7 +156,7 @@ interface MemoryStoreActions {
   clearVectorMemory: () => void;
 
   // Checkpoint
-  createCheckpoint: () => NarrativeCheckpoint | null;
+  createCheckpoint: (retainedIds?: readonly string[]) => NarrativeCheckpoint | null;
   restoreCheckpoint: (checkpointId: string) => boolean;
 
   // Mutation 日志
@@ -174,6 +179,7 @@ interface MemoryStoreActions {
 
   // Loading 状态
   setLoading: (loading: boolean, stage?: string) => void;
+  beginLoading: (stage: string) => () => void;
   setError: (error: string | null) => void;
 
   // 序列化（用于存档）
@@ -241,29 +247,25 @@ function normalizeMemoryRuntime(raw: unknown): NarrativeMemoryRuntime {
       ? safe.sceneAnchor as SceneAnchor
       : null,
     activeThreads: normalizeArray(safe.activeThreads)
-      .map((t: unknown) => t && typeof t === 'object' ? normalizeThread(t as Record<string, unknown>) : t)
-      .slice(-30) as NarrativeThread[],
+      .map((t: unknown) => t && typeof t === 'object' ? normalizeThread(t as Record<string, unknown>) : t) as NarrativeThread[],
     stateSlots: normalizeArray(safe.stateSlots)
-      .map((s: unknown) => s && typeof s === 'object' ? normalizeStateSlot(s as Record<string, unknown>) : s)
-      .slice(-30) as NarrativeStateSlot[],
+      .map((s: unknown) => s && typeof s === 'object' ? normalizeStateSlot(s as Record<string, unknown>) : s) as NarrativeStateSlot[],
     relationEdges: normalizeArray(safe.relationEdges)
-      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationEdge(r as Record<string, unknown>) : r)
-      .slice(-50) as NarrativeRelationEdge[],
+      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationEdge(r as Record<string, unknown>) : r) as NarrativeRelationEdge[],
     relationNetwork: normalizeArray(safe.relationNetwork)
-      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationNetworkItem(r as Record<string, unknown>) : r)
-      .slice(-50) as NarrativeRelationNetworkItem[],
+      .map((r: unknown) => r && typeof r === 'object' ? normalizeRelationNetworkItem(r as Record<string, unknown>) : r) as NarrativeRelationNetworkItem[],
     eventCards: (normalizeArray(safe.eventCards) as unknown[])
       .map((c: unknown) => c && typeof c === 'object' ? normalizeEventCard(c as Record<string, unknown>) : c)
       .sort((a: any, b: any) => (Number(b.importance || 0) - Number(a.importance || 0)) || (Number(b.updatedAt || 0) - Number(a.updatedAt || 0)))
       .slice(0, 50) as NarrativeEventCard[],
     entityCards: normalizeArray(safe.entityCards)
-      .map((c: unknown) => c && typeof c === 'object' ? normalizeEntityCard(c as Record<string, unknown>) : c)
-      .slice(-30) as NarrativeEntityCard[],
+      .map((c: unknown) => c && typeof c === 'object' ? normalizeEntityCard(c as Record<string, unknown>) : c) as NarrativeEntityCard[],
     archiveCards: normalizeArray(safe.archiveCards)
       .map((a: unknown) => a && typeof a === 'object' ? normalizeProvenance(a as Record<string, unknown>) : a)
       .slice(-30) as NarrativeArchiveCard[],
     mutationLog: normalizeArray(safe.mutationLog).slice(-50) as NarrativeMutation[],
-    checkpoints: normalizeArray(safe.checkpoints).slice(-5) as NarrativeCheckpoint[],
+    // Message references own checkpoint retention; loading must not invalidate them.
+    checkpoints: normalizeArray(safe.checkpoints) as NarrativeCheckpoint[],
     summarySaveHistory: normalizeArray(safe.summarySaveHistory).slice(-MAX_SUMMARY_HISTORY) as SummarySaveRecord[],
     lastSummarySave: safe.lastSummarySave && typeof safe.lastSummarySave === 'object'
       ? safe.lastSummarySave as SummarySaveRecord
@@ -416,6 +418,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
   // ─── 运行态管理 ───
 
   initMemoryRuntime: (bankId = '') => {
+    resetLoadingScopes();
     // 始终创建新的运行时，防止跨存档污染
     set({
       memoryRuntime: createDefaultMemoryRuntime(bankId),
@@ -427,6 +430,8 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       retrieveDebugLogs: [],
       compileDebugLogs: [],
       runtimeVersion: 0,
+      isLoading: false,
+      loadingStage: '',
     });
   },
 
@@ -440,7 +445,29 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     return state.memoryRuntime;
   },
 
+  getRuntimeVersion: () => get().runtimeVersion,
+  commitMemoryRuntime: (runtime, expectedVersion, baseline) => {
+    const state = get();
+    const current = state.memoryRuntime;
+    // Summary/source consumers run in parallel with ingestion. Their append-only
+    // ledgers do not belong to the structured draft and must survive its commit.
+    const structuredFacts = (value: NarrativeMemoryRuntime) => {
+      const { summarySaveHistory: _summaries, lastSummarySave: _summary, sourceEvents: _events,
+        checkpoints: _checkpoints, lastCompiledContext: _compiled, lastRuntimeFlow: _flow, lastRetrievePlan: _plan,
+        writeDebugLogs: _writeLogs, retrieveDebugLogs: _retrieveLogs, compileDebugLogs: _compileLogs, vectorMemory: _vectors, ...facts } = value;
+      return facts;
+    };
+    if (!current || state.runtimeVersion < expectedVersion || JSON.stringify(structuredFacts(current)) !== JSON.stringify(structuredFacts(baseline))) {
+      throw new DOMException('记忆版本已变化，请重试当前阶段', 'AbortError');
+    }
+    // Only the incoming facts belong to the mutable task draft. Store-owned
+    // ledgers are already immutable; cloning them duplicates every historical
+    // rollback snapshot whenever a turn finishes writing memory.
+    set({ memoryRuntime: { ...current, ...structuredClone(structuredFacts(runtime)) }, runtimeVersion: state.runtimeVersion + 1 });
+  },
+
   resetMemoryRuntime: () => {
+    resetLoadingScopes();
     // 注意：只重置运行态数据，保留用户的配置设置
     // 配置应该通过 setConfig 或 fromJSON 单独管理
     set({
@@ -698,7 +725,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
 
   // ─── Checkpoint ───
 
-  createCheckpoint: () => {
+  createCheckpoint: (retainedIds = []) => {
     const state = get();
     if (!state.memoryRuntime) return null;
 
@@ -748,21 +775,25 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
       eventCards,
     };
 
+    const previous = state.memoryRuntime.checkpoints.at(-1);
     const checkpoint: NarrativeCheckpoint = {
-      id: `cp_${Date.now()}`,
+      id: `cp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       createdAt: Date.now(),
       lastIngestCursor: prunedRuntime.lastIngestCursor,
       activeThreadCount: prunedRuntime.activeThreads.length,
       eventCount: prunedRuntime.eventCards.length,
       entityCount: prunedRuntime.entityCards.length,
-      snapshot: JSON.parse(JSON.stringify(slimCheckpointSnapshot(prunedRuntime))),
-      vectorMemory: JSON.parse(JSON.stringify(state.vectorMemory)),
+      snapshot: cloneSnapshotWithSharing(slimCheckpointSnapshot(prunedRuntime), previous?.snapshot),
+      vectorMemory: cloneSnapshotWithSharing(state.vectorMemory, previous?.vectorMemory),
     };
 
     set((s) => {
       if (!s.memoryRuntime) return s;
       const MAX_CHECKPOINTS = 10;
-      const checkpoints = [...s.memoryRuntime.checkpoints, checkpoint].slice(-MAX_CHECKPOINTS);
+      const all = [...s.memoryRuntime.checkpoints, checkpoint];
+      const retained = new Set(retainedIds);
+      const recent = new Set(all.slice(-MAX_CHECKPOINTS).map(cp => cp.id));
+      const checkpoints = all.filter(cp => retained.has(cp.id) || recent.has(cp.id));
       return { memoryRuntime: { ...prunedRuntime, checkpoints } };
     });
 
@@ -776,13 +807,13 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const checkpoint = state.memoryRuntime.checkpoints.find(cp => cp.id === checkpointId);
     if (!checkpoint?.snapshot) return false;
 
-    const restored = normalizeMemoryRuntime(checkpoint.snapshot);
+    const restored = normalizeMemoryRuntime(structuredClone(checkpoint.snapshot));
     restored.checkpoints = state.memoryRuntime.checkpoints;
 
     // 新 checkpoint 带有独立的向量快照。旧 checkpoint 没有该字段时保留当前向量，
     // 这是唯一不会静默丢失记忆的兼容行为；未来重新提取时仍可继续更新它。
     const restoredVectorMemory = Array.isArray(checkpoint.vectorMemory)
-      ? checkpoint.vectorMemory
+      ? structuredClone(checkpoint.vectorMemory)
           .map((item: unknown) => item && typeof item === 'object' ? normalizeProvenance(item as Record<string, unknown>) : null)
           .filter((item): item is Record<string, unknown> => Boolean(item))
           .map((item) => item as unknown as VectorMemoryItem)
@@ -942,17 +973,19 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
 
   // ─── Loading 状态 ───
 
+  beginLoading: (stage) => {
+    const scope = Symbol(stage);
+    const epoch = loadingEpoch;
+    loadingScopes.set(scope, stage);
+    set({ isLoading: true, loadingStage: stage });
+    return () => {
+      if (epoch !== loadingEpoch || !loadingScopes.delete(scope)) return;
+      set({ isLoading: loadingScopes.size > 0, loadingStage: [...loadingScopes.values()].at(-1) ?? '' });
+    };
+  },
   setLoading: (loading, stage = '') => {
-    if (loading) {
-      _loadingRefCount++;
-      set({ isLoading: true, loadingStage: stage });
-    } else {
-      _loadingRefCount = Math.max(0, _loadingRefCount - 1);
-      if (_loadingRefCount === 0) {
-        set({ isLoading: false, loadingStage: '' });
-      }
-      // 如果还有其他任务在运行，不关闭 loading
-    }
+    resetLoadingScopes();
+    set({ isLoading: loading, loadingStage: loading ? stage : '' });
   },
 
   setError: (error) => {
@@ -971,6 +1004,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
   },
 
   fromJSON: (data) => {
+    resetLoadingScopes();
     // 如果存档中有配置则使用存档的配置，否则保留当前配置（避免丢失用户设置）
     const currentConfig = get().config;
     const config = data.config
@@ -981,6 +1015,7 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
     const memoryRuntime = data.memoryRuntime
       ? slimMemoryRuntimeForSave(normalizeMemoryRuntime(data.memoryRuntime))
       : null;
+    if (memoryRuntime) memoryRuntime.checkpoints = shareSnapshotHistory(memoryRuntime.checkpoints);
 
     const vectorMemory = Array.isArray(data.vectorMemory)
       ? data.vectorMemory
@@ -991,6 +1026,6 @@ export const useMemoryStore = create<MemoryStoreState & MemoryStoreActions>()((s
 
     // 同时保存到 localStorage，避免刷新后丢失
     saveMemoryConfigToStorage(config);
-    set({ config, memoryRuntime, vectorMemory });
+    set({ config, memoryRuntime, vectorMemory, isLoading: false, loadingStage: '' });
   },
 }));

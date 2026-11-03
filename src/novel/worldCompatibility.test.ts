@@ -3,7 +3,7 @@ import { createDefaultStatModule } from '../modules/defaults';
 import { formToWorldDef, injectModuleRuleEntries, worldToForm } from '../components/start/worldEditorForm/types';
 import type { WorldDef } from '../data/worlds-schema';
 import type { NovelDataset } from './types';
-import { createWorldFromNovel, getNovelWorldReadiness, regenerateNovelWorldMaterial } from './worldFactory';
+import { createNovelBackgroundWorld, createWorldFromNovel, getNovelWorldReadiness, regenerateNovelWorldMaterial } from './worldFactory';
 
 const dataset: NovelDataset = {
   id: 'dataset-native-world',
@@ -34,6 +34,20 @@ const dataset: NovelDataset = {
 };
 
 describe('novel world native compatibility', () => {
+  test('creates a playable background world without binding failed plot or changing its dataset', () => {
+    const source = { ...dataset, analysisStatus: 'partial' as const, overviewError: '总览失败', segments: dataset.segments.map(segment => ({ ...segment, status: 'failed' as const })) };
+    const before = structuredClone(source);
+    const world = createNovelBackgroundWorld(source);
+    // Entry uids are seeded from Date.now(), so compare content instead of the assignment order.
+    const content = (entries: WorldDef['worldBookEntries']) => (entries ?? []).map(({ uid: _uid, ...rest }) => rest);
+    expect(world.id).not.toBe(createWorldFromNovel(source).id);
+    expect(content(world.worldBookEntries)).toEqual(content(createWorldFromNovel(source).worldBookEntries));
+    expect(world.novelSource).toBeUndefined();
+    expect(world.directorSource).toBeUndefined();
+    expect(world.novelMaterialStatus).toBe('static_only');
+    expect(source).toEqual(before);
+    expect(() => createNovelBackgroundWorld({ ...source, staticMaterial: {} })).toThrow();
+  });
   test('saves untouched rich archives losslessly in the manual branch and protects subsequent edits', () => {
     const initial = createWorldFromNovel({ ...dataset, staticMaterial: { items: [{ id: 'sword', name: '旧剑', description: '原始', aliases: ['剑别名'], details: ['附加资料'] }] } });
     const form = worldToForm(initial);

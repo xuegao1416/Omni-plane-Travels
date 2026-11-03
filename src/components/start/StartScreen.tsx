@@ -9,9 +9,9 @@ import WorldEditorForm from './WorldEditorForm';
 import { useState,useEffect,useRef } from 'react';
 import { reportDepth } from '../../modules/playTracker';
 import { useConfigStore } from '../../stores/configStore';
-import { clearSegmentsCache } from '../../hooks/useCharacterHistory';
 import { Volume2,VolumeX } from 'lucide-react';
 import { STORAGE_KEYS } from '../../config/storageKeys';
+import { trySetItem } from '../../storage/safeStorage';
 
 /** 大厅背景音乐 — 仅在 WorldHallView 可见时播放，首页/过场/向导/游戏过程不播放 */
 function HallMusic() {
@@ -35,7 +35,8 @@ function HallMusic() {
     if (audioRef.current) {
       audioRef.current.volume = muted ? 0 : 0.45;
     }
-    localStorage.setItem(STORAGE_KEYS.HALL_MUSIC_MUTED, String(muted));
+    // 音量偏好属于尽力而为：存储写不进去也不该让大厅整页报错。
+    trySetItem(STORAGE_KEYS.HALL_MUSIC_MUTED, String(muted));
   }, [muted]);
 
   return (
@@ -94,13 +95,15 @@ export default function StartScreen() {
   }, [entryPhase, h.view]);
 
   const enterHall = () => setEntryPhase('transition');
-  const enterCharacterCreation = () => {
-    // 新旅程必须从空白向导开始，避免复用当前存档的角色与经历草稿。
-    clearSegmentsCache();
+  const enterCharacterCreation = async () => {
+    if (h.hasCreationDraft && !await h.confirmReplaceCreationDraft()) return;
     h.resetForNewJourney();
-    h.setSegments({});
-    h.setIncludeAgeStages(true);
     h.setView('wizard');
+    setEntryPhase('home');
+  };
+
+  const resumeCharacterCreation = () => {
+    h.resumeCreationDraft();
     setEntryPhase('home');
   };
 
@@ -117,6 +120,8 @@ export default function StartScreen() {
             setSelectedWorld={h.setSelectedWorld}
             onBackToHome={() => setEntryPhase('home')}
             onStartWizard={enterCharacterCreation}
+            creationDraftName={h.personalInfo.name}
+            onResumeCreation={h.hasCreationDraft ? resumeCharacterCreation : undefined}
             onOpenEvents={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('events'); }}
             onOpenCustomModules={() => setCustomModuleOpen(true)}
             onOpenSettings={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('settings'); }}
@@ -134,6 +139,7 @@ export default function StartScreen() {
       return (
         <MainMenuView
           onStartWizard={enterHall}
+          onResumeCreation={h.hasCreationDraft ? resumeCharacterCreation : undefined}
           title={h.t('start.title')}
           subtitle={h.t('start.subtitle')}
         />
@@ -160,7 +166,7 @@ export default function StartScreen() {
     return (
       <WizardShell
         step={h.step} setStep={h.setStep}
-        onBackToMenu={() => { h.setView('main'); h.setStep(1); setEntryPhase('hall'); }}
+        onBackToMenu={() => { h.setView('main'); setEntryPhase('hall'); }}
         title={h.t('start.title')} subtitle={h.t('start.subtitle')}
         selectedWorld={h.selectedWorld}
         allWorlds={h.allWorlds} createdWorlds={h.createdWorlds} worldEntry={h.worldEntry}
@@ -173,6 +179,9 @@ export default function StartScreen() {
         onGenerateAll={h.handleGenerateAll} onRegenerateSegment={h.handleRegenerateSegment}
         onLoadPreset={h.handleLoadPreset}
         onStartGame={h.handleStartGame}
+        isCreatingJourney={h.isCreatingJourney} onCancelCreation={h.cancelJourneyCreation}
+        onCancelGeneration={h.cancelHistoryGeneration}
+        draftWarning={h.draftWarning} onRetryDraftSave={h.retryDraftSave}
         onSaveWorld={h.handleSaveWorld}
         apiConfig={h.apiConfig}
       />

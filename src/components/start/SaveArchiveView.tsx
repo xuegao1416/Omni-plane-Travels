@@ -1,7 +1,7 @@
 import { useEffect,useMemo,useRef,useState } from 'react';
 import { Archive,ArrowLeft,ArrowRight,Clock3,Download,MessageSquare,MoreHorizontal,Plus,RotateCcw,Trash2,Upload } from 'lucide-react';
-import type { GameSave,SaveMeta } from '../../storage/db';
-import { loadGame as loadGameFromDb } from '../../storage/db';
+import type { SaveMeta } from '../../storage/db';
+import { SAVE_FILE_ACCEPT } from '../../storage/saveFileCodec';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { EntrySlicedButton } from './EntrySurface';
 
@@ -24,13 +24,11 @@ interface SaveArchiveViewProps {
   allSaves: SaveMeta[];
   currentSaveId: string | null;
   onClose: () => void;
-  onLoadSave: (save: GameSave) => void;
+  onLoadSave: (saveId: string) => Promise<void>;
   onCreateSave: () => void;
   onDeleteSave: (id: string) => void | Promise<void>;
   onImportSave: (file: File) => void | Promise<void>;
   onExportSave: (id: string) => void | Promise<void>;
-  /** DEV preview hook; production continues to use the real DB loader. */
-  loadGame?: (id: string) => Promise<GameSave | null>;
 }
 
 export default function SaveArchiveView({
@@ -42,14 +40,13 @@ export default function SaveArchiveView({
   onDeleteSave,
   onImportSave,
   onExportSave,
-  loadGame: loadGameOverride,
 }: SaveArchiveViewProps) {
-  const loadGame = loadGameOverride ?? (async (id: string) => (await loadGameFromDb(id)) ?? null);
   const firstId = currentSaveId && allSaves.some(save => save.id === currentSaveId)
     ? currentSaveId
     : allSaves[0]?.id ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(firstId);
   const [loading, setLoading] = useState(false);
+  const [transfer, setTransfer] = useState<'import' | 'export' | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const mobileActionsRef = useRef<HTMLDivElement>(null);
@@ -90,42 +87,43 @@ export default function SaveArchiveView({
     [allSaves, selectedId],
   );
   const handleContinue = async () => {
-    if (!selectedSave || loading || selectedSave.lifecycle === 'ended') return;
+    if (!selectedSave || loading || transfer || selectedSave.lifecycle === 'ended') return;
     setLoading(true);
     try {
-      const fullSave = await loadGame(selectedSave.id);
-      if (fullSave) onLoadSave(fullSave);
+      await onLoadSave(selectedSave.id);
     } finally {
       setLoading(false);
     }
   };
   const handleReview = async () => {
-    if (!selectedSave || loading || selectedSave.lifecycle !== 'ended') return;
+    if (!selectedSave || loading || transfer || selectedSave.lifecycle !== 'ended') return;
     setLoading(true);
     try {
-      const fullSave = await loadGame(selectedSave.id);
-      if (fullSave) onLoadSave(fullSave);
+      await onLoadSave(selectedSave.id);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-    void onImportSave(file);
     event.target.value = '';
+    if (!file || transfer || loading) return;
+    setTransfer('import');
+    try { await onImportSave(file); } finally { setTransfer(null); }
   };
 
   const openImportPicker = () => {
+    if (transfer || loading) return;
     setMobileMenuOpen(false);
     importInputRef.current?.click();
   };
 
-  const handleMobileExport = () => {
-    if (!selectedSave) return;
+  const handleExport = async () => {
+    if (!selectedSave || transfer || loading) return;
     setMobileMenuOpen(false);
-    void onExportSave(selectedSave.id);
+    setTransfer('export');
+    try { await onExportSave(selectedSave.id); } finally { setTransfer(null); }
   };
 
   const handleMobileDelete = () => {
@@ -179,12 +177,13 @@ export default function SaveArchiveView({
             <span className="entry-archive-space__kicker"><Archive size={14} /> 旅程档案 · SAVE INDEX</span>
             <h2 id="entry-archive-title">存档档案空间</h2>
             <p>{allSaves.length ? `已找到 ${allSaves.length} 个旅程切片` : '尚未记录可读取的旅程'}</p>
+            <p role="status">{transfer === 'import' ? '正在导入存档…' : transfer === 'export' ? '正在压缩导出完整存档…' : '支持旧 JSON 和压缩存档 ZIP，可直接导入，无需解压；导出包含自建世界和存档历史。'}</p>
           </div>
           <div className="entry-archive-space__header-actions entry-archive-space__header-actions--desktop" aria-label="存档管理">
             {allSaves.length > 0 && <>
-              <EntrySlicedButton frame="dawn-v4-compact" icon={Upload} onClick={() => importInputRef.current?.click()} aria-label="导入存档" data-layout-id="save.import" data-layout-label="导入存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">导入存档</EntrySlicedButton>
+              <EntrySlicedButton frame="dawn-v4-compact" icon={Upload} onClick={openImportPicker} disabled={transfer !== null || loading} aria-label="导入存档" data-layout-id="save.import" data-layout-label="导入存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">{transfer === 'import' ? '导入中…' : '导入存档'}</EntrySlicedButton>
               {selectedSave && <>
-                <EntrySlicedButton frame="dawn-v4-compact" icon={Download} onClick={() => void onExportSave(selectedSave.id)} aria-label="导出存档" data-layout-id="save.export" data-layout-label="导出存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">导出存档</EntrySlicedButton>
+                <EntrySlicedButton frame="dawn-v4-compact" icon={Download} onClick={handleExport} disabled={transfer !== null || loading} title="完整压缩存档（.save.zip）" aria-label="导出存档" data-layout-id="save.export" data-layout-label="导出存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">{transfer === 'export' ? '压缩导出中…' : '导出存档'}</EntrySlicedButton>
                 <EntrySlicedButton frame="dawn-v4-compact" icon={Trash2} onClick={() => void onDeleteSave(selectedSave.id)} aria-label="删除存档" className="entry-sliced-button--danger" data-layout-id="save.delete" data-layout-label="删除存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">删除存档</EntrySlicedButton>
               </>}
             </>}
@@ -206,13 +205,13 @@ export default function SaveArchiveView({
                 </EntrySlicedButton>
                 {mobileMenuOpen && (
                   <div className="entry-archive-space__mobile-menu" role="menu" aria-label="存档工具">
-                    <button type="button" role="menuitem" onClick={openImportPicker}>
+                    <button type="button" role="menuitem" onClick={openImportPicker} disabled={transfer !== null || loading}>
                       <Upload size={18} aria-hidden="true" />
                       <span>导入存档</span>
                     </button>
                     {selectedSave && (
                       <>
-                        <button type="button" role="menuitem" onClick={handleMobileExport}>
+                        <button type="button" role="menuitem" onClick={handleExport} disabled={transfer !== null || loading}>
                           <Download size={18} aria-hidden="true" />
                           <span>导出存档</span>
                         </button>
@@ -247,8 +246,8 @@ export default function SaveArchiveView({
                     <strong>{selectedSave.name || '未命名旅程'}</strong>
                     <span>{worldLabel(selectedSave.preview)} · {selectedSave.messageCount ?? 0} 条记录</span>
                      {selectedSave.lifecycle === 'ended' && <span role="status">{selectedSave.endReason || '炼狱战斗中玩家死亡，存档已封存为只读。可查看或导出。'}</span>}
-                     {selectedSave.lifecycle === 'ended' && <EntrySlicedButton frame="dawn-v4-compact" icon={ArrowRight} onClick={handleReview} disabled={loading}>查看回顾</EntrySlicedButton>}
-                     <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={ArrowRight} onClick={handleContinue} aria-label={selectedSave.lifecycle === 'ended' ? '封存存档不可继续' : '继续旅程'} disabled={loading || selectedSave.lifecycle === 'ended'} title={selectedSave.lifecycle === 'ended' ? (selectedSave.endReason || '此存档已封存，只可查看或导出') : undefined}>
+                     {selectedSave.lifecycle === 'ended' && <EntrySlicedButton frame="dawn-v4-compact" icon={ArrowRight} onClick={handleReview} disabled={loading || transfer !== null}>查看回顾</EntrySlicedButton>}
+                     <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={ArrowRight} onClick={handleContinue} aria-label={selectedSave.lifecycle === 'ended' ? '封存存档不可继续' : '继续旅程'} disabled={loading || transfer !== null || selectedSave.lifecycle === 'ended'} title={selectedSave.lifecycle === 'ended' ? (selectedSave.endReason || '此存档已封存，只可查看或导出') : undefined}>
                        {loading ? '读取中…' : selectedSave.lifecycle === 'ended' ? '已封存（不可继续）' : '继续旅程'}
                      </EntrySlicedButton>
                   </>
@@ -267,13 +266,13 @@ export default function SaveArchiveView({
             <p>返回大厅选择一个世界，开启你的第一段旅程。</p>
             <div className="entry-archive-empty__actions">
               <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-27-v2.png" icon={ArrowLeft} onClick={onClose}>返回大厅</EntrySlicedButton>
-              <EntrySlicedButton frame="dawn-v4-compact" icon={Upload} onClick={() => importInputRef.current?.click()}>导入存档</EntrySlicedButton>
+              <EntrySlicedButton frame="dawn-v4-compact" icon={Upload} onClick={openImportPicker} disabled={transfer !== null || loading}>{transfer === 'import' ? '导入中…' : '导入存档'}</EntrySlicedButton>
               <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={Plus} onClick={onCreateSave}>创建新旅程</EntrySlicedButton>
             </div>
-            <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImport} hidden />
+            <input ref={importInputRef} type="file" accept={SAVE_FILE_ACCEPT} onChange={handleImport} disabled={transfer !== null || loading} hidden />
           </section>
         )}
-        {allSaves.length > 0 && <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImport} hidden />}
+        {allSaves.length > 0 && <input ref={importInputRef} type="file" accept={SAVE_FILE_ACCEPT} onChange={handleImport} disabled={transfer !== null || loading} hidden />}
       </main>
     </div>
   );

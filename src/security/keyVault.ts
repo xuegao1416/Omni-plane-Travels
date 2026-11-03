@@ -1,11 +1,11 @@
 // 设备绑定的 API Key 加密存储
 //
-// 安全目标（L-01）：localStorage / Tauri store 中只存密文，同源脚本无法直接读出明文 Key。
+// 降低静态存储暴露；不防御能够调用同源保险库的脚本。
 //
 // 方案：
 // - 用 Web Crypto 生成 non-extractable 的 AES-GCM 256 密钥，持久化在 IndexedDB（IndexedDB 支持结构化克隆 CryptoKey）。
 // - 加密 apiKey 得到 `enc:v1:<base64(iv|cipher)>` 后落库；读取时解密到内存（内存中保持明文供请求使用）。
-// - 密钥不可导出（extractable:false），即便同源脚本读取到 localStorage 密文，无密钥也无法解密。
+// - 密钥不可导出（extractable:false）；同源脚本仍可调用 decrypt，因此这不是同源脚本隔离边界。
 // - 密钥按源（origin）独立生成；Tauri webview / 浏览器 / 不同源各自一套。
 
 import { openDB, type IDBPDatabase } from 'idb';
@@ -28,7 +28,7 @@ function getDB(): Promise<IDBPDatabase> {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         }
       },
-    });
+    }).catch(error => { dbPromise = null; throw error; });
   }
   return dbPromise;
 }
@@ -41,7 +41,7 @@ async function loadOrCreateKey(): Promise<CryptoKey> {
     if (record && record.key) {
       return record.key as CryptoKey;
     }
-    // 生成 non-extractable 的 AES-GCM 256 密钥（关键：不可导出，同源脚本无法 extract）
+    // 生成不可导出的 AES-GCM 256 密钥，避免直接导出原始密钥字节。
     const key = await crypto.subtle.generateKey(
       { name: 'AES-GCM', length: 256 },
       false,
@@ -77,12 +77,14 @@ export function isSealed(value: string | undefined | null): boolean {
  * - 已是密文则原样返回。
  * - Web Crypto 不可用时（非安全上下文）回退明文并告警，避免阻断保存流程。
  */
-export async function seal(plaintext: string): Promise<string> {
-  if (!plaintext) return plaintext;
-  if (isSealed(plaintext)) return plaintext;
+export type SealResult = { status: 'empty' | 'encrypted'; value: string } | { status: 'degraded'; value: string; warning: string } | { status: 'error'; message: string };
+export type UnsealResult = { status: 'empty' | 'plaintext' | 'ok'; value: string } | { status: 'error'; message: string };
+
+export async function sealResult(plaintext: string): Promise<SealResult> {
+  if (!plaintext) return { status: 'empty', value: '' };
+  if (isSealed(plaintext)) return { status: 'encrypted', value: plaintext };
   if (typeof crypto === 'undefined' || !crypto.subtle) {
-    console.warn('[keyVault] Web Crypto 不可用，API Key 将以明文存储（不安全，请使用 https 或 localhost）');
-    return plaintext;
+    return { status: 'degraded', value: plaintext, warning: '当前环境不支持 Web Crypto，密钥以明文保存；请使用 HTTPS 或 localhost。' };
   }
   try {
     const key = await loadOrCreateKey();
@@ -93,29 +95,29 @@ export async function seal(plaintext: string): Promise<string> {
     const combined = new Uint8Array(iv.length + cipher.length);
     combined.set(iv, 0);
     combined.set(cipher, iv.length);
-    return ENC_PREFIX + bytesToBase64(combined);
+    return { status: 'encrypted', value: ENC_PREFIX + bytesToBase64(combined) };
   } catch (err) {
-    console.warn('[keyVault] 加密失败，回退明文存储:', err);
-    return plaintext;
+    keyPromise = null;
+    return { status: 'error', message: '密钥加密失败，未保存。请检查此设备的本地存储权限。' };
   }
 }
 
 /**
  * 解密密文。非密文（遗留明文）原样返回。
- * 解密失败（如密钥丢失）返回空字符串，避免泄露异常信息。
+ * 解密失败（如密钥丢失）返回明确 error，绝不把错误伪装成空密钥。
  */
-export async function unseal(sealed: string): Promise<string> {
-  if (!sealed) return sealed;
-  if (!isSealed(sealed)) return sealed;
+export async function unsealResult(sealed: string): Promise<UnsealResult> {
+  if (!sealed) return { status: 'empty', value: '' };
+  if (!isSealed(sealed)) return { status: 'plaintext', value: sealed };
   try {
     const key = await loadOrCreateKey();
     const combined = base64ToBytes(sealed.slice(ENC_PREFIX.length));
     const iv = combined.slice(0, IV_LENGTH);
     const cipher = combined.slice(IV_LENGTH);
     const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
-    return new TextDecoder().decode(plainBuf);
+    return { status: 'ok', value: new TextDecoder().decode(plainBuf) };
   } catch (err) {
-    console.warn('[keyVault] 解密失败，返回空字符串（密钥可能已丢失）:', err);
-    return '';
+    keyPromise = null;
+    return { status: 'error', message: '无法解密此设备的连接密钥，原记录已保留。请恢复原设备/来源的密钥保险库后重试。' };
   }
 }

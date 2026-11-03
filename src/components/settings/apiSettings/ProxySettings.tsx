@@ -1,30 +1,16 @@
-import { useState,useCallback } from 'react';
+import { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
-import { STORAGE_KEYS } from '@/config/storageKeys';
 import ProxyTutorialOverlay from '../ProxyTutorialOverlay';
 import { rowStyle } from './types';
 
-export default function ProxySettings() {
-  const [proxyUrl, setProxyUrl] = useState<string>(() => {
-    try { return localStorage.getItem(STORAGE_KEYS.PROXY_URL) || ''; } catch { return ''; }
-  });
+export default function ProxySettings({ proxyUrl, onChange }: { proxyUrl: string; onChange: (value: string) => void }) {
   const [showTutorial, setShowTutorial] = useState(false);
-
-  const handleChange = useCallback((url: string) => {
-    setProxyUrl(url);
-    try { localStorage.setItem(STORAGE_KEYS.PROXY_URL, url); } catch {}
-  }, []);
-
-  const handleApplyProxy = useCallback((url: string) => {
-    setProxyUrl(url);
-    try { localStorage.setItem(STORAGE_KEYS.PROXY_URL, url); } catch {}
-  }, []);
 
   return (
     <>
       <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
             <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>代理地址（可选）</div>
             <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
               解决网页端 CORS 跨域问题，桌面版无需设置。同时适用于已开启的生图功能
@@ -34,6 +20,8 @@ export default function ProxySettings() {
             onClick={() => setShowTutorial(true)}
             style={{
               display: 'flex',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
               alignItems: 'center',
               gap: '6px',
               padding: '6px 12px',
@@ -57,9 +45,9 @@ export default function ProxySettings() {
           <input
             className="input-field"
             value={proxyUrl}
-            onChange={e => handleChange(e.target.value)}
+            onChange={e => onChange(e.target.value)}
             placeholder="https://你的worker名字.workers.dev"
-            style={{ flex: 1, fontSize: 'var(--font-size-base)', padding: '5px 10px' }}
+            style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-base)', padding: '5px 10px' }}
           />
         </div>
         {proxyUrl && (
@@ -69,15 +57,16 @@ export default function ProxySettings() {
             padding: '8px 10px',
             background: 'var(--bg-tertiary)',
             borderRadius: '6px',
+            overflowWrap: 'anywhere',
           }}>
-            ✅ 代理已启用：{proxyUrl}
+            保存后使用代理：{proxyUrl}
           </div>
         )}
       </div>
       {showTutorial && (
         <ProxyTutorialOverlay
           onClose={() => setShowTutorial(false)}
-          onApplyProxy={handleApplyProxy}
+          onApplyProxy={onChange}
         />
       )}
     </>

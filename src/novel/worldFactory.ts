@@ -46,6 +46,20 @@ export function createWorldFromNovel(dataset: NovelDataset, startSegmentIndex = 
   };
 }
 
+/** Copy stable material into an independent world; the dataset keeps all plot checkpoints. */
+export function createNovelBackgroundWorld(dataset: NovelDataset): WorldDef {
+  const world = createWorldFromNovel(dataset);
+  return {
+    ...world,
+    id: `${world.id}_background`,
+    name: `${dataset.title.trim() || '未命名小说'}（背景世界）`,
+    description: `由小说《${dataset.title.trim() || '未命名小说'}》的世界资料创建，自由展开剧情。`,
+    novelSource: undefined,
+    novelAdaptationMode: 'adapted',
+    novelMaterialStatus: 'static_only',
+  };
+}
+
 export function regenerateNovelWorldMaterial(world: WorldDef, dataset: NovelDataset, previousMaterial?: NovelStaticMaterial): WorldDef {
   if (world.novelSource?.datasetId !== dataset.id) throw new Error('世界与小说资料不匹配');
   const generated = buildNovelWorldBookEntries(dataset.staticMaterial, Date.now(), { datasetId: dataset.id, analysisVersion: dataset.analysisVersion ?? 2 });

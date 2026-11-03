@@ -18,7 +18,7 @@ export async function saveDirectorDefinition(definition: DirectorDefinition): Pr
     const { createdAt: newTime, ...newContent } = definition;
     if (contentHash(oldContent) !== contentHash(newContent)) {
       await tx.done;
-      throw new Error('该剧情版本已存在，禁止覆盖；请另存新版本');
+      throw new Error(`该剧情版本已存在，禁止覆盖：${definition.title}（${definition.id} / ${definition.version}）。导入文件与本地版本内容不同；请使用更新版本号的存档或世界文件，已有存档无需删除。`);
     }
   } else await tx.store.add({ id: key, definition: structuredClone(definition) } satisfies DirectorDefinitionRecord);
   await tx.done;
@@ -55,4 +55,14 @@ export async function getDirectorCompileJob(id: string): Promise<DirectorCompile
 export async function listDirectorCompileJobs(definitionId?: string): Promise<DirectorCompileJob[]> {
   const jobs: DirectorCompileJob[] = await (await getDB()).getAll(DIRECTOR_JOBS_STORE);
   return jobs.filter(job => !definitionId || job.definitionId === definitionId).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** 回收某个工作区（definitionId）下的全部编译任务与剧情版本，用于资料被删除时清理孤儿数据。 */
+export async function deleteDirectorWorkspace(definitionId: string): Promise<void> {
+  if (!definitionId) return;
+  const db = await getDB();
+  const jobs: DirectorCompileJob[] = await db.getAll(DIRECTOR_JOBS_STORE);
+  for (const job of jobs) if (job.definitionId === definitionId) await db.delete(DIRECTOR_JOBS_STORE, job.id);
+  const records = await db.getAll(DIRECTOR_DEFINITIONS_STORE) as DirectorDefinitionRecord[];
+  for (const record of records) if (record.definition.id === definitionId) await db.delete(DIRECTOR_DEFINITIONS_STORE, record.id);
 }

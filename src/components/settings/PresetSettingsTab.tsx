@@ -1,7 +1,7 @@
 // 预设管理 Tab — 预设列表 + 覆盖层编辑器（条目 + 正则一体化）
 import { useState,useRef,useCallback } from 'react';
 import { FileText,Upload } from 'lucide-react';
-import { usePresetStore } from '@/stores/presetStore';
+import { applyOverrides,usePresetStore } from '@/stores/presetStore';
 import { getBuiltinPresets,getBuiltinPreset } from '@/data/builtinPresets';
 import type { PresetPack } from '@/data/builtinPresets';
 import { exportPresetJSON,parsePresetJSON,downloadJSON } from '@/utils/presetIO';
@@ -11,7 +11,7 @@ import { PresetCard } from './presetSettings/PresetCard';
 import { PresetEditorOverlay } from './presetSettings/PresetEditorOverlay';
 
 export default function PresetSettingsTab() {
-  const { userPresets, activePresetId, builtinOverrides, builtinContentOverrides, savePreset, deletePreset, setActivePreset, resetToDefault, saveBuiltinOverride, saveBuiltinContentOverride, restoreBuiltinDefaults } = usePresetStore();
+  const { userPresets, activePresetId, builtinOverrides, builtinContentOverrides, savePreset, deletePreset, setActivePreset, resetToDefault, saveBuiltinEdits, restoreBuiltinDefaults } = usePresetStore();
   const { DialogUI, confirm: dlgConfirm } = useDialog();
   const [editingPreset, setEditingPreset] = useState<PresetPack | null>(null);
   const [error, setError] = useState('');
@@ -41,9 +41,9 @@ export default function PresetSettingsTab() {
   }, [savePreset, setActivePreset]);
 
   const handleExport = useCallback((pack: PresetPack) => {
-    const json = exportPresetJSON(pack);
+    const json = exportPresetJSON(applyOverrides(pack, builtinOverrides, builtinContentOverrides));
     downloadJSON(json, `preset_${pack.name || 'unnamed'}.json`);
-  }, []);
+  }, [builtinOverrides, builtinContentOverrides]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!await dlgConfirm('确定要删除这个预设吗？', { danger: true, confirmText: '删除' })) return;
@@ -99,18 +99,9 @@ export default function PresetSettingsTab() {
   }
 
   const isBuiltin = builtinPresets.some(bp => bp.id === editingPreset.id);
-  const displayPreset = isBuiltin ? {
-    ...editingPreset,
-    prompts: editingPreset.prompts.map(p => {
-      const override = builtinOverrides[editingPreset.id]?.[p.identifier];
-      const contentOverride = builtinContentOverrides[editingPreset.id]?.[p.identifier];
-      return {
-        ...p,
-        ...(override !== undefined ? { enabled: override } : {}),
-        ...(contentOverride !== undefined ? { content: contentOverride } : {}),
-      };
-    }),
-  } : editingPreset;
+  const displayPreset = isBuiltin
+    ? applyOverrides(getBuiltinPreset(editingPreset.id), builtinOverrides, builtinContentOverrides)
+    : editingPreset;
 
   // 内置预设同样允许编辑正文条目；“恢复默认”会清除全部内容覆盖层。
   const editableContentIdentifiers = isBuiltin
@@ -124,36 +115,7 @@ export default function PresetSettingsTab() {
       onClose={() => setEditingPreset(null)}
       onSave={(updated) => {
         if (isBuiltin) {
-          for (const p of updated.prompts) {
-            const original = editingPreset.prompts.find(op => op.identifier === p.identifier);
-            if (original && p.enabled !== original.enabled) {
-              saveBuiltinOverride(editingPreset.id, p.identifier, p.enabled);
-            }
-            if (original && editableContentIdentifiers.includes(p.identifier) && p.content !== original.content) {
-              saveBuiltinContentOverride(editingPreset.id, p.identifier, p.content);
-            }
-          }
-          const newDisplay = {
-            ...editingPreset,
-            prompts: editingPreset.prompts.map(p => {
-              const override = builtinOverrides[editingPreset.id]?.[p.identifier];
-              const contentOverride = builtinContentOverrides[editingPreset.id]?.[p.identifier];
-              const newEntry = updated.prompts.find(up => up.identifier === p.identifier);
-              if (newEntry) {
-                return {
-                  ...p,
-                  enabled: newEntry.enabled,
-                  ...(editableContentIdentifiers.includes(p.identifier) && newEntry.content !== p.content ? { content: newEntry.content } : {}),
-                };
-              }
-              return {
-                ...p,
-                ...(override !== undefined ? { enabled: override } : {}),
-                ...(contentOverride !== undefined ? { content: contentOverride } : {}),
-              };
-            }),
-          };
-          setEditingPreset(newDisplay);
+          saveBuiltinEdits(updated);
           setActivePreset(editingPreset.id);
         } else {
           savePreset(updated);

@@ -15,6 +15,13 @@ function row(overrides: Partial<WorkshopItemRow> = {}): WorkshopItemRow {
 }
 
 describe('workshop v2 metadata', () => {
+  test('publishes V3 resource modules through canonical validation', () => {
+    const craftingModule = { kind: 'custom-gameplay-module', schemaVersion: 3, id: 'forge', name: 'Forge', version: '1.0.0', author: 'test', scope: 'world', inputs: {}, state: {},
+      capabilities: ['currency', 'inventory'], items: { sword: { name: '铁剑' } }, permissions: { read: [], write: 'own-state-only' },
+      logic: { onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [{ id: 'forge', actions: [{ type: 'currency.consume', amount: 25 }, { type: 'item.grant', itemId: 'sword', amount: 1 }] }] } };
+    expect(validateWorkshopContent('gameplay_module', craftingModule).ok).toBe(true);
+    expect(validateWorkshopContent('gameplay_module', { ...craftingModule, capabilities: [] }).ok).toBe(false);
+  });
   test('rejects malformed publishable content and accepts each supported shape', () => {
     const valid: Record<string, unknown> = {
       world_package: { id: 'world-a', name: 'World A', description: 'A world', modules: [] },

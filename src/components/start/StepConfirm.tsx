@@ -128,7 +128,7 @@ export default function StepConfirm({
         ) : (
           <div className="confirm-card confirm-empty">
             <ScrollText size={32} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-            <p>暂无开局内容</p>
+            <p>不预写经历，直接开启旅程</p>
           </div>
         )}
         {showDifficulty && (

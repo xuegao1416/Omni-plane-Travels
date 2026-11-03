@@ -47,6 +47,7 @@ interface StepCharacterHistoryProps {
   hasApiConfig: boolean;
   onGenerateAll: (drafts?: Record<string, string>) => void;
   onRegenerateSegment: (id: string, draft?: string) => void;
+  onCancelGeneration?: () => void;
   onLoadPreset: (preset: HistoryPreset) => void;
   onStartGame: () => void;
   onPrev: () => void;
@@ -58,10 +59,9 @@ export default function StepCharacterHistory({
   segmentDefs, segments, setSegments, isGenerating, regeneratingId,
   includeAgeStages, setIncludeAgeStages,
   hasApiConfig, onGenerateAll, onRegenerateSegment, onLoadPreset,
-  onStartGame, onPrev, onModalStateChange, showNavigation = true,
+  onStartGame, onPrev, onModalStateChange, showNavigation = true, onCancelGeneration,
 }: StepCharacterHistoryProps) {
   const [activeId, setActiveId] = useState(segmentDefs[0]?.id ?? '');
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const presetMenuRef = useRef<HTMLDivElement>(null);
@@ -102,12 +102,9 @@ export default function StepCharacterHistory({
   };
 
   const hasContent = Object.values(segments).some(v => v.trim().length > 0);
-  // 验证：根据开关决定需要填写哪些阶段
-  const allSegmentsFilled = segmentDefs.every(def => segments[def.id]?.trim().length > 0);
 
   const activeDef = segmentDefs.find(d => d.id === activeId);
   const activeContent = segments[activeId] || '';
-  const activeDraft = drafts[activeId] || '';
   const isActiveRegenerating = regeneratingId === activeId;
   const isActiveEmpty = !activeContent.trim();
 
@@ -162,12 +159,13 @@ export default function StepCharacterHistory({
           {hasApiConfig && (
             <button
               className="btn-secondary pi-ai-btn"
-              onClick={() => onGenerateAll(drafts)}
+              onClick={() => onGenerateAll(segments)}
               disabled={isGenerating}
             >
               {isGenerating ? <><Loader size={12} className="animate-spin" /> 生成中</> : hasContent ? <><RefreshCw size={12} /> 全部重生成</> : '一键生成全部'}
             </button>
           )}
+          {isGenerating && <button type="button" className="btn-secondary" onClick={onCancelGeneration}>停止生成</button>}
         </div>
       </div>
 
@@ -181,7 +179,7 @@ export default function StepCharacterHistory({
               {hasApiConfig && !isActiveEmpty && (
                 <button
                   className="btn-ghost pi-ai-btn"
-                  onClick={() => onRegenerateSegment(activeId)}
+                  onClick={() => onRegenerateSegment(activeId, activeContent)}
                   disabled={isGenerating}
                   style={{ marginLeft: 'auto' }}
                 >
@@ -190,44 +188,22 @@ export default function StepCharacterHistory({
               )}
             </div>
             <div className="history-content-body">
-              {isActiveRegenerating ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent)', padding: '40px 0', justifyContent: 'center' }}>
-                  <div className="ai-spinner" style={{ width: '24px', height: '24px' }} />
-                  <span style={{ fontSize: 'var(--font-size-md)' }}>正在生成...</span>
-                </div>
-              ) : isActiveEmpty ? (
-                /* ── 空状态：草稿输入 + 生成按钮 ── */
-                <div className="history-draft-area">
-                  <textarea
-                    className="history-draft-textarea"
-                    value={activeDraft}
-                    onChange={e => setDrafts(prev => ({ ...prev, [activeId]: e.target.value }))}
-                    placeholder="写下你对这个阶段的想法，AI会参考你的草稿来生成（也可以留空直接生成）..."
-                    rows={6}
-                  />
-                  {hasApiConfig && (
-                    <button
-                      className="btn-primary pi-generate-btn"
-                      onClick={() => onRegenerateSegment(activeId, activeDraft)}
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? <><Loader size={12} className="animate-spin" /> 生成中</> : <><Sparkles size={12} /> 根据草稿生成</>}
-                    </button>
-                  )}
-                  {!hasApiConfig && (
-                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>
-                      请先配置API后再生成
-                    </span>
-                  )}
-                </div>
-              ) : (
-                /* ── 已有内容：编辑 textarea ── */
+              <div className="history-draft-area">
                 <textarea
                   value={activeContent}
                   onChange={e => setSegments({ ...segments, [activeId]: e.target.value })}
                   className="history-textarea"
+                  aria-label={`${activeDef.title}经历`}
+                  placeholder="可直接写下经历，也可让 AI 根据已有内容扩写；留空即可跳过。"
+                  rows={6}
                 />
-              )}
+                {hasApiConfig && isActiveEmpty && <button
+                  className="btn-primary pi-generate-btn"
+                  onClick={() => onRegenerateSegment(activeId, activeContent)}
+                  disabled={isGenerating}
+                ><Sparkles size={12} /> 根据草稿生成</button>}
+                {!hasApiConfig && <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>手写经历无需 API，也可留空直接启程</span>}
+              </div>
             </div>
           </>
         )}
@@ -265,10 +241,8 @@ export default function StepCharacterHistory({
             className="btn-primary"
             onClick={onStartGame}
             style={{ padding: '10px 32px', fontSize: 'var(--font-size-lg)', display: 'flex', alignItems: 'center', gap: '6px' }}
-            disabled={!allSegmentsFilled}
-            title={!allSegmentsFilled ? '请填写所有人生阶段的内容' : ''}
           >
-            <Play size={16} /> 下一步
+            <Play size={16} /> {hasContent ? '下一步' : '跳过经历'}
           </button>
         </div>
       )}

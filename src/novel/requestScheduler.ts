@@ -1,20 +1,10 @@
 import { requestCompletion, requestCompletionStream } from '../api/client';
 import { bucketKeyForConfig, setRateLimitInterval, waitForRateLimit } from '../api/rateLimiter';
 import type { ApiConfig, CompletionResult } from '../api/types';
-import type { NovelAnalysisRequest } from './analysisClient';
+import { assertNovelContentAllowed, type NovelAnalysisRequest } from './analysisClient';
 
 interface Pool { active: number; limit: number; blockedUntil: number; }
 const pools = new Map<string, Pool>();
-
-/** 可中断的等待竞态：取消任务时不必等完当前的限流间隔。 */
-function abortWhen(signal?: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    if (!signal) return;
-    const reason = () => signal.reason ?? new DOMException('Aborted', 'AbortError');
-    if (signal.aborted) { reject(reason()); return; }
-    signal.addEventListener('abort', () => reject(reason()), { once: true });
-  });
-}
 
 /**
  * 小说分析专用限流桶（`novel:analysis:` 前缀），独立于游戏内请求：
@@ -31,7 +21,7 @@ export async function applyNovelRateLimit(config: ApiConfig, signal?: AbortSigna
   if (typeof config.rateLimitMs === 'number' && config.rateLimitMs > 0) {
     setRateLimitInterval(config.rateLimitMs, bucket);
   }
-  await Promise.race([waitForRateLimit(bucket), abortWhen(signal)]);
+  await waitForRateLimit(bucket, signal);
 }
 
 export function waitNovelRequest(ms: number, signal?: AbortSignal): Promise<void> {
@@ -68,6 +58,7 @@ export function createNovelAnalysisRequest(onResult?: (result?: CompletionResult
         onResult?.(undefined, 'request');
         const request = transport ?? (config.stream === false ? requestCompletion : requestCompletionStream);
         const result = await request(config, messages, { ...options, signal: controller.signal });
+        assertNovelContentAllowed(result);
         if (!result.text.trim()) throw new Error('API 503: 返回内容为空');
         onResult?.(result); return result;
       } catch (error) {

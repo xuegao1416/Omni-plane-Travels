@@ -1,7 +1,6 @@
-import { getGlobal, putGlobal } from '../storage/db';
+import { getDB, getGlobal, putGlobal } from '../storage/db';
 import { validateCustomGameplayModule } from './validator';
 import type { CustomGameplayModuleDefinition, ModuleStatus } from './schema';
-import type { CustomModuleAgentSession } from './agentSession';
 
 export interface StoredCustomGameplayModule {
   module: CustomGameplayModuleDefinition;
@@ -9,16 +8,14 @@ export interface StoredCustomGameplayModule {
   worldIds: string[];
   installedAt: number;
   updatedAt: number;
+  /** Explicit world bindings retain their definition when the latest draft changes. */
+  worldDefinitions?: Record<string, CustomGameplayModuleDefinition>;
 }
 
 const REGISTRY_KEY = 'customGameplayModules.v1';
-const AGENT_SESSION_KEY = 'customModuleAgentSessions.v3';
-const LEGACY_AGENT_SESSION_KEY = 'customModuleAgentSession.v2';
-const AGENT_PHASES = new Set(['discovery', 'designing', 'draft_ready', 'revising']);
-const BRIEF_LIST_FIELDS = ['triggers', 'inputs', 'state', 'behavior', 'outputs', 'assumptions', 'unresolved'] as const;
 
 function copy<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 export interface CustomModuleDependencyResolution {
@@ -26,59 +23,31 @@ export interface CustomModuleDependencyResolution {
   warnings: string[];
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-function isValidAgentSessionSnapshot(value: unknown): value is CustomModuleAgentSession {
-  if (!isRecord(value) || (value.sessionVersion !== 1 && value.sessionVersion !== 2) || !AGENT_PHASES.has(String(value.phase))) return false;
-  if (typeof value.revision !== 'number' || !Number.isInteger(value.revision) || value.revision < 0) return false;
-
-  const world = value.world;
-  if (!isRecord(world) || typeof world.id !== 'string' || typeof world.name !== 'string') return false;
-  if (world.description !== undefined && typeof world.description !== 'string') return false;
-  if (world.survivalResourceIds !== undefined && !isStringArray(world.survivalResourceIds)) return false;
-  if (world.availability !== undefined) {
-    const availability = world.availability;
-    if (!isRecord(availability)) return false;
-    if (!['stat', 'survival', 'business', 'currency'].every((key) => typeof availability[key] === 'boolean')) return false;
-  }
-
-  if (value.conversation !== undefined && (!Array.isArray(value.conversation) || !value.conversation.every((item) => (
-    isRecord(item) && (item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string'
-  )))) return false;
-  const brief = value.brief;
-  if (!isRecord(brief) || typeof brief.goal !== 'string' || typeof brief.presentation !== 'string') return false;
-  if (!BRIEF_LIST_FIELDS.every((key) => isStringArray(brief[key]))) return false;
-
-  for (const draft of [value.draft, value.lastValidDraft]) {
-    if (draft === undefined) continue;
-    if (!validateCustomGameplayModule(draft).valid) return false;
-  }
-  return true;
-}
-
-function normalizeAgentSession(value: CustomModuleAgentSession): CustomModuleAgentSession {
-  return {
-    ...copy(value),
-    sessionVersion: 2,
-    conversation: Array.isArray((value as CustomModuleAgentSession & { conversation?: unknown }).conversation)
-      ? copy((value as CustomModuleAgentSession & { conversation: CustomModuleAgentSession['conversation'] }).conversation)
-      : [],
-  };
-}
-
 async function readRegistry(): Promise<StoredCustomGameplayModule[]> {
   const records = await getGlobal<StoredCustomGameplayModule[]>(REGISTRY_KEY);
-  return Array.isArray(records) ? records : [];
+  return Array.isArray(records) ? normalizeRegistry(records) : [];
 }
 
-async function writeRegistry(records: StoredCustomGameplayModule[]): Promise<void> {
-  await putGlobal(REGISTRY_KEY, records);
+function normalizeRegistry(records: StoredCustomGameplayModule[]): StoredCustomGameplayModule[] {
+  return records.map(record => ({
+    ...record,
+    module: validateCustomGameplayModule(record.module, 'internal').normalized ?? record.module,
+    worldDefinitions: Object.fromEntries(record.worldIds.map(worldId => {
+      const definition = record.worldDefinitions?.[worldId] ?? record.module;
+      return [worldId, validateCustomGameplayModule(definition, 'internal').normalized ?? definition];
+    })),
+  }));
+}
+
+async function mutateRegistry<T>(mutate: (records: StoredCustomGameplayModule[]) => T): Promise<T> {
+  const db = await getDB();
+  const tx = db.transaction('global', 'readwrite');
+  const record = await tx.store.get(REGISTRY_KEY);
+  const records = normalizeRegistry(Array.isArray(record?.value) ? record.value : []);
+  const result = mutate(records);
+  await tx.store.put({ key: REGISTRY_KEY, value: records });
+  await tx.done;
+  return copy(result);
 }
 
 export async function listCustomGameplayModules(): Promise<StoredCustomGameplayModule[]> {
@@ -97,7 +66,7 @@ export async function saveCustomGameplayModule(input: unknown): Promise<StoredCu
   }
 
   const module = result.normalized;
-  const records = await readRegistry();
+  return mutateRegistry((records) => {
   const now = Date.now();
   const existing = records.find((item) => item.module.id === module.id);
   const saved: StoredCustomGameplayModule = {
@@ -106,28 +75,28 @@ export async function saveCustomGameplayModule(input: unknown): Promise<StoredCu
     worldIds: existing?.worldIds ?? [],
     installedAt: existing?.installedAt ?? now,
     updatedAt: now,
+    worldDefinitions: existing?.worldDefinitions ?? Object.fromEntries((existing?.worldIds ?? []).map(worldId => [worldId, copy(existing!.module)])),
   };
-  const next = existing
-    ? records.map((item) => item.module.id === module.id ? saved : item)
-    : [...records, saved];
-  await writeRegistry(next);
-  return copy(saved);
+  if (existing) records[records.indexOf(existing)] = saved;
+  else records.push(saved);
+  return saved;
+  });
 }
 
 export async function bindCustomGameplayModule(id: string, worldId: string): Promise<StoredCustomGameplayModule> {
-  const records = await readRegistry();
+  return mutateRegistry((records) => {
   const index = records.findIndex((item) => item.module.id === id);
   if (index < 0) throw new Error(`找不到自定义玩法模块：${id}`);
   const current = records[index];
   const worldIds = current.worldIds.includes(worldId) ? current.worldIds : [...current.worldIds, worldId];
-  const updated = { ...current, worldIds, status: 'enabled' as const, updatedAt: Date.now() };
+  const updated = { ...current, worldIds, worldDefinitions: { ...current.worldDefinitions, [worldId]: copy(current.module) }, status: 'enabled' as const, updatedAt: Date.now() };
   records[index] = updated;
-  await writeRegistry(records);
-  return copy(updated);
+  return updated;
+  });
 }
 
 export async function disableCustomGameplayModuleForWorld(id: string, worldId: string): Promise<StoredCustomGameplayModule> {
-  const records = await readRegistry();
+  return mutateRegistry(records => {
   const index = records.findIndex((item) => item.module.id === id);
   if (index < 0) throw new Error(`找不到自定义玩法模块：${id}`);
   const current = records[index];
@@ -138,8 +107,9 @@ export async function disableCustomGameplayModuleForWorld(id: string, worldId: s
     updatedAt: Date.now(),
   };
   records[index] = updated;
-  await writeRegistry(records);
-  return copy(updated);
+  delete updated.worldDefinitions?.[worldId];
+  return updated;
+  });
 }
 
 function parseVersion(version: string | undefined): [number, number, number] | undefined {
@@ -147,7 +117,7 @@ function parseVersion(version: string | undefined): [number, number, number] | u
   return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : undefined;
 }
 
-function versionSatisfies(actual: string, required?: string): boolean {
+export function versionSatisfies(actual: string, required?: string): boolean {
   if (!required) return true;
   const actualVersion = parseVersion(actual);
   const requiredVersion = parseVersion(required);
@@ -162,7 +132,7 @@ function versionSatisfies(actual: string, required?: string): boolean {
  * disabled, unbound, or too-old required dependency.
  */
 export async function resolveCustomGameplayModulesForWorld(worldId: string): Promise<CustomModuleDependencyResolution> {
-  const records = await readRegistry();
+  const records = (await readRegistry()).map(record => ({ ...record, module: record.worldDefinitions?.[worldId] ?? record.module }));
   const byId = new Map(records.map((record) => [record.module.id, record]));
   const warnings: string[] = [];
   const warningSet = new Set<string>();
@@ -176,6 +146,8 @@ export async function resolveCustomGameplayModulesForWorld(worldId: string): Pro
     if (!record) { warn(`模块 ${requiredBy} 缺少依赖 ${id}`); memo.set(id, false); return false; }
     if (record.status !== 'enabled') { warn(`模块 ${requiredBy} 的依赖 ${id} 未启用`); memo.set(id, false); return false; }
     if (!record.worldIds.includes(worldId)) { warn(`模块 ${requiredBy} 的依赖 ${id} 未绑定当前世界`); memo.set(id, false); return false; }
+    const validation = validateCustomGameplayModule(record.module, 'internal');
+    if (!validation.valid) { warn(`模块 ${id} 无法启用：${validation.errors.map(error => error.message).join('；')}`); memo.set(id, false); return false; }
     if (visiting.has(id)) { warn(`模块依赖存在循环：${id}`); memo.set(id, false); return false; }
     visiting.add(id);
     let ok = true;
@@ -213,49 +185,16 @@ export async function getCustomGameplayModulesForWorld(worldId: string): Promise
 }
 
 export async function deleteCustomGameplayModule(id: string): Promise<void> {
-  const records = await readRegistry();
-  await writeRegistry(records.filter((item) => item.module.id !== id));
+  await mutateRegistry(records => { const index = records.findIndex(item => item.module.id === id); if (index >= 0) records.splice(index, 1); });
 }
 
 /** Restore an exact registry record during an atomic workshop rollback. */
 export async function restoreCustomGameplayModule(record: StoredCustomGameplayModule): Promise<void> {
-  const records = await readRegistry();
-  await writeRegistry([...records.filter((item) => item.module.id !== record.module.id), copy(record)]);
+  await mutateRegistry(records => { const index = records.findIndex(item => item.module.id === record.module.id); if (index >= 0) records[index] = copy(record); else records.push(copy(record)); });
 }
 
 /** Test/reset helper and a safe recovery path for a future module manager. */
 export async function clearCustomGameplayModules(): Promise<void> {
   await putGlobal(REGISTRY_KEY, []);
-}
-
-/** Draft sessions are deliberately stored separately from installed modules. */
-export async function saveCustomModuleAgentSession(session: CustomModuleAgentSession): Promise<void> {
-  if (!isValidAgentSessionSnapshot(session)) return;
-  const current = await getGlobal<Record<string, unknown>>(AGENT_SESSION_KEY);
-  const sessions = isRecord(current) ? current : {};
-  sessions[session.world.id] = normalizeAgentSession(session);
-  await putGlobal(AGENT_SESSION_KEY, sessions);
-}
-
-export async function loadCustomModuleAgentSession(worldId?: string): Promise<CustomModuleAgentSession | undefined> {
-  const stored = await getGlobal<unknown>(AGENT_SESSION_KEY);
-  if (isRecord(stored)) {
-    const candidate = worldId ? stored[worldId] : Object.values(stored)[0];
-    if (isValidAgentSessionSnapshot(candidate)) return normalizeAgentSession(candidate);
-  }
-
-  // One-time read compatibility for the pre-v3 single-session record.
-  const legacy = await getGlobal<unknown>(LEGACY_AGENT_SESSION_KEY);
-  if (isValidAgentSessionSnapshot(legacy) && (!worldId || legacy.world.id === worldId)) {
-    const normalized = normalizeAgentSession(legacy);
-    await saveCustomModuleAgentSession(normalized);
-    return normalized;
-  }
-  return undefined;
-}
-
-export async function clearCustomModuleAgentSession(): Promise<void> {
-  await putGlobal(AGENT_SESSION_KEY, undefined);
-  await putGlobal(LEGACY_AGENT_SESSION_KEY, undefined);
 }
 

@@ -3,9 +3,9 @@
 
 ## 9、UI 组件系统 — `src/components/`
 
-### 9.1 游戏主界面 — `src/components/game/GameScreen.tsx` (1204行)
+### 9.1 游戏主界面 — `src/components/game/GameScreen.tsx`
 
-**布局组件实际位置**:`DesktopLayout` / `MobileLayout` / `DrawerPanel` / `navConfig.ts` / `types.ts` 均在 `src/components/game/gameScreen/`;`ChatPanel` 在 `game/chat/`;`RightPanel` / `WorldDynamicsPanel` 在 `game/panels/`;`JourneyDossierContent` 在 `game/shared/`。
+**布局组件位置**:`DesktopLayout` / `MobileLayout` / `DrawerPanel` / `navConfig.ts` / `types.ts` 均在 `src/components/game/gameScreen/`;`ChatPanel` 在 `game/chat/`;`RightPanel` / `WorldDynamicsPanel` 在 `game/panels/`;`JourneyDossierContent` 在 `game/shared/`。
 
 **三栏桌面布局**:
 
@@ -19,8 +19,6 @@ DesktopLayout (gameScreen/DesktopLayout.tsx)
 ├── DrawerPanel (gameScreen/DrawerPanel.tsx) ← drawerContent 由 GameScreen 传入 JourneyDossierContent
 └── rightPanel (可折叠, rightCollapsed / onToggleRightPanel) → RightPanel / WorldDynamicsPanel
 ```
-
-左侧导航由 `DesktopLayout` 内联渲染为 `<nav className="game-journey__nav" aria-label="游戏导航">`，宽度由 CSS 类控制；图标为 `<Icon size={18} strokeWidth={1.5} />`，有 `emblemSrc` 时优先渲染 `<img>`。桌面端导航项不含 `Settings`（`settings` 仅在移动端 `navConfig.ts:54-65` 的 12 项列表中）。
 
 **移动端布局**:
 
@@ -52,22 +50,18 @@ useEffect(() => {
 }, [gameState, combatV3Enabled, readOnly, runCombatAutomationStep]);
 ```
 
-上面这个 `useEffect` 用 `setTimeout(runCombatAutomationStep, 0)` 立即触发一次，依赖数组含 `gameState` / `combatV3Enabled` / `readOnly` / `runCombatAutomationStep`。连续敌方行动之间的节奏间隔 `260ms` 在 `runCombatAutomationStep`（:855）内部自链式调度时使用（:892）；策略变更时另用 `setTimeout(runCombatAutomationStep, 0)`（:901）立即响应。计时器为 `const combatAutomationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)`（:96），在 :904 的卸载 effect 中 `clearTimeout` 清理。
+### 9.2 聊天面板 — `src/components/game/chat/ChatPanel.tsx`
 
-### 9.2 聊天面板 — `src/components/game/chat/ChatPanel.tsx` (181行)
+**ChatPanel 子组件**(ChatPanel.tsx:1-10 导入):`MessageBubble`、`ErrorBoundary`、`InputArea`、`PipelineMonitorModal`,以及 `messageWindow.ts` 的 `getInitialMessageStart` / `getPreviousMessageStart`。
 
-**ChatPanel 实际子组件**(ChatPanel.tsx:1-10 导入):`MessageBubble`、`ErrorBoundary`、`InputArea`、`PipelineMonitorModal`,以及 `messageWindow.ts` 的 `getInitialMessageStart` / `getPreviousMessageStart`。
-
-消息列表由 `ChatPanel` 内联的滚动容器（`onScroll={handleMessageListScroll}`，:129）直接 `map` 出 `MessageBubble` 渲染，没有独立的列表组件文件。
-
-**`src/components/game/chat/` 实际文件**:`ChatPanel.tsx`、`MessageBubble.tsx`、`InputArea.tsx`、`PipelineMonitorModal.tsx`、`ContextMenu.tsx`、`InlineDiceCard.tsx`、`InlineTalentCard.tsx`、`InlineImageGenButton.tsx`、`messageWindow.ts`、`pipelineUI.ts`、`messageBubble/` 子目录(`BubbleContent.tsx` / `EditMode.tsx` / `InlinePortals.tsx` / `renderPipeline.ts` / `types.ts` / `useMenuItems.tsx`)+ 3 个测试。
+**`src/components/game/chat/` 文件**:`ChatPanel.tsx`、`MessageBubble.tsx`、`InputArea.tsx`、`PipelineMonitorModal.tsx`、`ContextMenu.tsx`、`InlineDiceCard.tsx`、`InlineTalentCard.tsx`、`InlineImageGenButton.tsx`、`messageWindow.ts`、`pipelineUI.ts`、`messageBubble/` 子目录(`BubbleContent.tsx` / `EditMode.tsx` / `InlinePortals.tsx` / `renderPipeline.ts` / `types.ts` / `useMenuItems.tsx`)+ 3 个测试。
 
 **消息渲染管线**:
 
 ```
 MessageBubble (MessageBubble.tsx:1-9 导入)
   ├─ useRenderedContent / useDisplayScripts (messageBubble/renderPipeline.ts)
-  │    实际单行链式调用（renderPipeline.ts:69-73）:
+  │    单行链式调用（renderPipeline.ts:69-73）:
   │    const cleanedByRegex = stripTimeAdvanceTags(processRegexScripts(stripTimeAdvanceTags(raw), displayScripts));
   │    const cleaned = message.streaming ? cleanedByRegex : renderDialogueMarkup(cleanedByRegex);
   │    return parseContent(cleaned, {...});   // → Markdown / iframe
@@ -105,7 +99,7 @@ export function getPreviousMessageStart(currentStart: number): number {
 
 ### 9.3~9.9 (其他 UI 组件目录)
 
-7 个子目录(实际内容见上方 §9.3~9.9):
+7 个子目录(内容见上方 §9.3~9.9):
 
 - §9.3 卡片工作流 UI — `card-workflow/`
 - §9.4 事件组件 — `event/`

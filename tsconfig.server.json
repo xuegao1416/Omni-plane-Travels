@@ -14,5 +14,6 @@
     "resolveJsonModule": true,
     "allowJs": false
   },
-  "include": ["src/server", "functions"]
+  "include": ["src/server", "functions"],
+  "exclude": ["src/server/**/*.test.ts"]
 }

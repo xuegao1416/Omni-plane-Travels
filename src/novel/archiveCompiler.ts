@@ -20,12 +20,20 @@ export async function compileNovelArchives(datasetId: string, segments: NovelSeg
       findingId: `${segment.id}:${category}:${index}`, segmentId: segment.id, category, archive,
     })));
     findingsTotal += findings.length;
-    // Only explicit aliases or matching source IDs unify name buckets.
+    // A shared title/alias is not proof that different named entities are the same person.
+    const aliasOwners = new Map<string, Set<string>>();
+    for (const { archive } of findings) for (const alias of archive.aliases ?? []) {
+      const key = alias.trim();
+      if (!key) continue;
+      const owners = aliasOwners.get(key) ?? new Set<string>();
+      owners.add(archive.name.trim()); aliasOwners.set(key, owners);
+    }
+    // Only unambiguous explicit aliases or matching source IDs unify name buckets.
     const parent = new Map<string, string>();
     const find = (name: string): string => { const p = parent.get(name); if (!p || p === name) return name; const root = find(p); parent.set(name, root); return root; };
     for (const { archive } of findings) {
       const key = archive.name.trim();
-      for (const alias of archive.aliases ?? []) if (alias.trim()) parent.set(find(alias.trim()), find(key));
+      for (const alias of archive.aliases ?? []) if (alias.trim() && aliasOwners.get(alias.trim())?.size === 1) parent.set(find(alias.trim()), find(key));
     }
     const buckets = new Map<string, NovelArchiveFinding[]>();
     for (const finding of findings) {

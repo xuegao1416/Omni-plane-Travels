@@ -15,7 +15,8 @@ interface Props {
   gameState: GameState;
   worldId?: string;
   /** 生存资源：生成配方回调 */
-  onSurvivalGenerateRecipe?: (request: string) => Promise<void>;
+  onSurvivalGenerateRecipe?: (request: string) => Promise<boolean | void>;
+  onSurvivalCancelRecipeGeneration?: () => void;
   /** 生存资源：制作回调 */
   onSurvivalCraft?: (recipe: SurvivalRecipe) => void;
   /** 生存资源：解锁配方回调 */
@@ -79,7 +80,7 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
   );
 }
 
-export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCraft, onSurvivalUnlock, unlockedRecipeIds, onSurvivalGather, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
+export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCancelRecipeGeneration, onSurvivalCraft, onSurvivalUnlock, unlockedRecipeIds, onSurvivalGather, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
   const worldDef = worldId ? findWorldDef(worldId) : null;
@@ -323,6 +324,7 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
             title={moduleNames?.['生存资源']}
             runtimeResources={runtimeResources as any}
             onGenerateRecipe={onSurvivalGenerateRecipe}
+            onCancelRecipeGeneration={onSurvivalCancelRecipeGeneration}
             onCraft={onSurvivalCraft}
             onUnlock={onSurvivalUnlock}
             unlockedRecipeIds={unlockedRecipeIds}

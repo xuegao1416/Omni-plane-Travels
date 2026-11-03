@@ -27,6 +27,7 @@ export function craftSurvivalRecipe(
   state: GameState,
   recipe: SurvivalRecipe,
   context: GameplayExecutionContext,
+  outputLimit?: number,
 ): GameplayExecutionResult<GameState & GameplayStateRoot> {
   const resources = state.玩家.生存资源;
   if (!resources || !resources[recipe.output.resourceId]) {
@@ -39,6 +40,7 @@ export function craftSurvivalRecipe(
   const clock = state.世界.时间系统?.时钟 as WorldClockState | undefined;
   const clockConfig = context.worldClockConfig;
   const craftTimeMinutes = Math.max(0, Math.trunc(Number(recipe.craftTimeMinutes) || 0));
+  const outputMax = resources[recipe.output.resourceId].最大值 ?? outputLimit;
   const nextClock = clock && clockConfig && craftTimeMinutes > 0
     ? writeWorldClock(clock, clockConfig, { deltaMinutes: craftTimeMinutes, source: 'manual', reason: `制作${recipe.name}` })
     : undefined;
@@ -54,7 +56,8 @@ export function craftSurvivalRecipe(
       amount: Math.max(0, Number(amount) || 0),
     })),
     effects: [
-      { add: { path: `玩家.生存资源.${recipe.output.resourceId}.数量`, delta: Math.max(0, recipe.output.amount), min: 0 } },
+      { add: { path: `玩家.生存资源.${recipe.output.resourceId}.数量`, delta: Math.max(0, recipe.output.amount), min: 0,
+        ...(typeof outputMax === 'number' && Number.isFinite(outputMax) ? { max: Math.max(0, outputMax) } : {}) } },
       ...(nextClock ? [
         { set: { path: '世界.时间系统.时钟', value: { ...nextClock } as unknown as GameplayValue } } as GameplayEffect,
         { set: { path: '世界.时间系统.当前时间', value: formatWorldClock(nextClock, clockConfig!) } } as GameplayEffect,

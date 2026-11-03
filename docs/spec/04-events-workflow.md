@@ -3,7 +3,7 @@
 
 ## 4、事件与工作流系统
 
-### 4.1 卡片工作流引擎 — `src/modules/cardWorkflowEngine.ts` (233行)
+### 4.1 卡片工作流引擎 — `src/modules/cardWorkflowEngine.ts`
 
 **文件路径**: `src/modules/cardWorkflowEngine.ts`
 
@@ -90,7 +90,7 @@ export function executeCardWorkflow(
 
 ---
 
-### 4.2 卡片节点执行器 — `src/modules/cardNodeExecutors.ts` (291行)
+### 4.2 卡片节点执行器 — `src/modules/cardNodeExecutors.ts`
 
 **文件路径**: `src/modules/cardNodeExecutors.ts`
 
@@ -269,7 +269,7 @@ export function executeCardWorkflow(
 
 ---
 
-### 4.3 DAG 工作流引擎 — `src/modules/workflowEngine.ts` (258行)
+### 4.3 DAG 工作流引擎 — `src/modules/workflowEngine.ts`
 
 **文件路径**: `src/modules/workflowEngine.ts`
 
@@ -332,9 +332,7 @@ if (connectedFlowInputs.some(inputDef => inputs[inputDef.key] !== true)) {
 
 ---
 
-> 导出函数为 `executeWorkflow(...)`；`workflowEngine` 是所在模块名，引擎入口不暴露 `workflowEngine.execute()` 方法。
-
-### 4.4 规则引擎 — `src/modules/ruleEngine.ts` (325行)
+### 4.4 规则引擎 — `src/modules/ruleEngine.ts`
 
 **文件路径**: `src/modules/ruleEngine.ts`
 
@@ -472,7 +470,7 @@ export function evaluate(
 
 ---
 
-### 4.5 模块 Schema — `src/modules/schema.ts` (1572行)
+### 4.5 模块 Schema — `src/modules/schema.ts`
 
 **文件路径**: `src/modules/schema.ts`
 
@@ -739,7 +737,7 @@ executeCardWorkflow() / executeWorkflow() / simEngine.settleMechanics()
 eventDb.persist(state)
 ```
 
-#### 4.7.1 事件生态核心文件(漏列补充)
+#### 4.7.1 事件生态核心文件
 
 | 文件 | 职责 |
 |---|---|

@@ -3,8 +3,6 @@ export const STORAGE_KEYS = {
   // UI 设置
   UI_SETTINGS: 'world_travel_guide_ui_settings',
   API_CONFIG: 'world_travel_guide_api_config',
-  TRIAL_CLIENT_ID: 'world_travel_guide_trial_client_id',
-  TRIAL_ENABLED: 'world_travel_guide_trial_enabled',
 
   // 记忆系统
   MEMORY_CONFIG: 'world_travel_guide_memory_config',
@@ -23,6 +21,7 @@ export const STORAGE_KEYS = {
   NPC_TEMPLATES: 'world_travel_guide_npc_templates',
   CUSTOM_WORLDS: 'world_travel_guide_custom_worlds',
   WORLD_DRAFTS: 'world_travel_guide_world_drafts',
+  JOURNEY_CREATION_DRAFT: 'omni.journey.creation-draft.v1',
 
   // 存档系统
   ACTIVE_SAVE: 'world_travel_guide_active_save_id',

@@ -5,6 +5,7 @@ import { getGenerationConfigError } from '@/api/imageGen';
 import { useConfigStore } from '@/stores/configStore';
 import { requestCompletionStream } from '@/api/client';
 import type { KnownNPC } from '@/engine/playerKnowledge';
+import type { ImageTaskOptions } from '@/api/imageTasks';
 
 // ─── LLM 翻译 Prompt ───
 
@@ -120,15 +121,17 @@ export async function translatePromptWithLLM(npc: KnownNPC): Promise<string> {
 // ─── Hook ───
 
 export function useCharacterPortrait() {
-  const { config, generateAndSave, getImageUrl } = useImageGen();
+  const { config, generateAndSave, hasRecoverableImage, findRecoverableImage, reuseImageTask } = useImageGen();
 
   const generatePortrait = useCallback(async (
     npc: KnownNPC,
     onProgress?: (status: string) => void,
     promptOverride?: string,
-  ): Promise<{ url: string; blobKey: string } | null> => {
+    options: ImageTaskOptions = {},
+  ): Promise<{ blobKey: string } | null> => {
     const configError = getGenerationConfigError(config);
-    if (configError) {
+    const prompt = promptOverride?.trim() || buildPortraitPrompt(npc);
+    if (configError && !(options.storageKey && hasRecoverableImage(prompt, options.storageKey))) {
       onProgress?.(`配置错误: ${configError}`);
       return null;
     }
@@ -136,21 +139,16 @@ export function useCharacterPortrait() {
     const npcName = npc.姓名 || '未知';
     onProgress?.(`正在为 ${npcName} 生成画像...`);
 
-    const prompt = promptOverride?.trim() || buildPortraitPrompt(npc);
-
     try {
       const result = await generateAndSave(
         prompt,
-        { category: 'character', characterName: npcName },
+        { ...options, category: 'character', characterName: npcName },
         (s) => onProgress?.(s === 'generating' ? '生成中...' : s),
       );
 
       if (result?.imageBlobKey) {
-        const url = await getImageUrl(result);
-        if (url) {
-          onProgress?.('画像生成成功');
-          return { url, blobKey: result.imageBlobKey };
-        }
+        onProgress?.('画像生成成功');
+        return { blobKey: result.imageBlobKey };
       }
 
       onProgress?.('生成完成但未返回图片');
@@ -159,7 +157,14 @@ export function useCharacterPortrait() {
       onProgress?.(`生成失败: ${(e as Error).message}`);
       return null;
     }
-  }, [config, generateAndSave, getImageUrl]);
+  }, [config, generateAndSave, hasRecoverableImage]);
 
-  return { generatePortrait };
+  const recoverPortrait = useCallback(async (storageKey: string, isCurrent: () => boolean) => {
+    const previous = findRecoverableImage(storageKey);
+    if (!previous) return null;
+    const result = await reuseImageTask(previous.id, { storageKey, isCurrent });
+    return { blobKey: result.imageBlobKey! };
+  }, [findRecoverableImage, reuseImageTask]);
+
+  return { generatePortrait, recoverPortrait, findRecoverableImage };
 }

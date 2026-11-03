@@ -26,3 +26,10 @@ test('ambiguous actor matches stay unresolved and historical plan participants r
   expect(director.sourceBinding.roleBinding?.a).toBe('one');
   expect(director.plans.old.participants).toEqual(['a']);
 });
+
+test('two authored roles sharing a name do not capture the same single NPC by order',()=>{
+ const d=createEmptyDirectorState(); d.sourceBinding={type:'authored',sourceId:'d',version:'v',boundAt:1,actorNames:{a:'甲',b:'甲'}};
+ d.plans.p={id:'p',intent:'行动',participants:['a','b'],dependencies:[],status:'waiting',priority:80,visibility:'foreground',source:'authored',createdAt:1,updatedAt:1};
+ reconcileDirectorActors(d,{npc:{姓名:'甲'}});
+ expect(d.sourceBinding.roleBinding?.a).toBeUndefined(); expect(d.sourceBinding.roleBinding?.b).toBeUndefined();
+});

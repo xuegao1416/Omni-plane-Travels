@@ -1,7 +1,7 @@
 // 提示词组装器 —— 从结构化 prompts[] 构建完整的系统提示
 // 替代 useGameEngine.ts 中的内联字符串拼接
 
-import type { PresetPack } from '../data/builtinPresets';
+import type { PresetPack, PresetPromptEntry } from '../data/builtinPresets';
 import { getEnabledPrompts, filterTriggeredPrompts } from '../data/builtinPresets';
 import type { MacroEngine } from './macroEngine';
 
@@ -77,7 +77,17 @@ export interface AssembleResult {
   assistantPrefill?: string;
   /** 预设自带的深度注入条目（injection_position=1，如双人成行的 🔒丨文风 depth=2）。
    *  供调用方合并进 atDepthEntries，注入到聊天历史指定深度。现有 4 预设无此类条目。 */
-  depthEntries: Array<{ depth: number; content: string }>;
+  depthEntries: Array<{ depth: number; content: string; label?: string }>;
+  /** Optional Tavern-script replacement assembled from a preset's tool-channel entries. */
+  toolChannel?: {
+    toolNamePrefix: string;
+    paramName: string;
+    description: string;
+    fieldDescription: string;
+    controlPrompt: boolean;
+    relocateContext: boolean;
+    pipelineMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  };
 }
 
 /**
@@ -106,8 +116,56 @@ export function assembleSystemPrompt(
   ctx.macroEngine.setVar('user', ctx.userPersonaName ?? '');
   ctx.macroEngine.setVar('lastUserMessage', ctx.userText ?? '');
 
-  // 1. 获取已启用的条目并按 order 排序
-  const enabled = getEnabledPrompts(preset);
+  const VAR_SNAPSHOT_TOKEN_BUDGET = 1800;
+  const trimmedVarSnapshot = trimToTokenBudget(ctx.varSnapshot, VAR_SNAPSHOT_TOKEN_BUDGET);
+
+  // Tool-channel entries replace a Tavern request hook and must not leak into the
+  // ordinary system prompt or at-depth history.
+  const configuredChannel = preset.toolChannel;
+  const channelIds = configuredChannel
+    ? [...new Set([
+      configuredChannel.descriptionEntryId,
+      configuredChannel.fieldDescriptionEntryId,
+      ...configuredChannel.guideEntryIds,
+    ])]
+    : [];
+  const channelEntries = channelIds.map(id => preset.prompts.find(prompt => prompt.identifier === id));
+  const channelActive = configuredChannel?.enabled === true
+    && channelEntries.length >= 3
+    && channelEntries.every(entry => entry !== undefined && entry.enabled && entry.content.trim().length > 0);
+  const activeChannelIds = channelActive ? new Set(channelIds) : new Set<string>();
+  const enabled = getEnabledPrompts(preset).filter(prompt => !activeChannelIds.has(prompt.identifier));
+
+  const resolveChannelEntry = (identifier: string): string => {
+    const entry = preset.prompts.find(prompt => prompt.identifier === identifier);
+    if (!entry) return '';
+    return ctx.macroEngine.resolve(entry.content.replace(/\{\{VAR_SNAPSHOT\}\}/gi, trimmedVarSnapshot));
+  };
+  const descriptionEntry = channelActive
+    ? preset.prompts.find(prompt => prompt.identifier === configuredChannel!.descriptionEntryId)
+    : undefined;
+  const fieldEntry = channelActive
+    ? preset.prompts.find(prompt => prompt.identifier === configuredChannel!.fieldDescriptionEntryId)
+    : undefined;
+  const guideEntries = channelActive
+    ? configuredChannel!.guideEntryIds
+      .map(id => preset.prompts.find(prompt => prompt.identifier === id))
+      .filter((entry): entry is PresetPromptEntry => entry !== undefined)
+    : [];
+  const toolChannel = channelActive && descriptionEntry && fieldEntry && guideEntries.length > 0
+    ? {
+      toolNamePrefix: configuredChannel!.toolNamePrefix,
+      paramName: configuredChannel!.paramName,
+      description: resolveChannelEntry(descriptionEntry.identifier),
+      fieldDescription: resolveChannelEntry(fieldEntry.identifier),
+      controlPrompt: configuredChannel!.controlPrompt === true,
+      relocateContext: configuredChannel!.relocateContext === true,
+      pipelineMessages: guideEntries.map(entry => ({
+        role: entry.role,
+        content: resolveChannelEntry(entry.identifier),
+      })),
+    }
+    : undefined;
 
   // 2. 过滤 green 触发的条目
   const triggered = filterTriggeredPrompts(enabled, ctx.userText);
@@ -118,11 +176,8 @@ export function assembleSystemPrompt(
 
   // 3. 解析每个条目的宏并拼接
   // 对 varSnapshot 做 token budget 裁剪，防止系统提示过大撑爆上下文
-  const VAR_SNAPSHOT_TOKEN_BUDGET = 1800;
-  const trimmedVarSnapshot = trimToTokenBudget(ctx.varSnapshot, VAR_SNAPSHOT_TOKEN_BUDGET);
-
   const bodyParts: string[] = [];
-  const depthEntries: Array<{ depth: number; content: string }> = [];
+  const depthEntries: Array<{ depth: number; content: string; label?: string }> = [];
   let assistantPrefill: string | undefined;
 
   triggered.forEach((entry, i) => {
@@ -137,7 +192,7 @@ export function assembleSystemPrompt(
     // 深度注入条目：剥离正文，转为 depthEntries
     if (entry.injectionPosition === 1) {
       if (content.trim()) {
-        depthEntries.push({ depth: entry.injectionDepth ?? 4, content });
+        depthEntries.push({ depth: entry.injectionDepth ?? 4, content, ...(entry.injectionLabel ? { label: entry.injectionLabel } : {}) });
       }
       return;
     }
@@ -188,7 +243,12 @@ export function assembleSystemPrompt(
 
   parts.push(presetBody);
 
-  return { systemPrompt: parts.join('\n\n'), assistantPrefill, depthEntries };
+  return {
+    systemPrompt: parts.join('\n\n'),
+    assistantPrefill,
+    depthEntries,
+    ...(toolChannel ? { toolChannel } : {}),
+  };
 }
 
 /**
@@ -203,7 +263,7 @@ export function assembleSystemPrompt(
  */
 export function injectAtDepthEntries<T extends { role: string; content: string }>(
   chatHistory: T[],
-  atDepthEntries: Array<{ depth: number; content: string }>,
+  atDepthEntries: Array<{ depth: number; content: string; label?: string }>,
 ): T[] {
   if (!atDepthEntries || atDepthEntries.length === 0) return chatHistory;
 
@@ -216,7 +276,7 @@ export function injectAtDepthEntries<T extends { role: string; content: string }
     const insertPos = Math.max(0, result.length - entry.depth);
     const depthMsg = {
       role: 'user' as const,
-      content: `[世界书补充 - depth:${entry.depth}]\n${entry.content}`,
+      content: `[${entry.label ?? '世界书补充'} - depth:${entry.depth}]\n${entry.content}`,
     } as T;
     result.splice(insertPos, 0, depthMsg);
   }

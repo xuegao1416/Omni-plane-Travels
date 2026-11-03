@@ -15,4 +15,8 @@ test('failed or degraded writes block director progress; successful retry releas
   status.stages.memory_write.status = 'success';
   status.stages.memory_rerank.status = 'warning';
   expect(canReviewCommittedTurn(status)).toBe(true);
+  status.stages.settlement.status = 'error';
+  expect(canReviewCommittedTurn(status)).toBe(false);
+  status.stages.settlement.status = 'success';
+  expect(canReviewCommittedTurn(status)).toBe(true);
 });

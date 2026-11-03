@@ -5,6 +5,7 @@
 // ============================================================
 
 
+import { abortableDelay } from '../utils/abortableDelay';
 const DEFAULT_BUCKET = 'default';
 
 interface BucketState {
@@ -102,7 +103,9 @@ export function getRateLimitInterval(bucket: string = DEFAULT_BUCKET): number {
  */
 export async function waitForRateLimit(
   bucketOrConfig?: string | { provider?: string; baseUrl?: string } | null,
+  signal?: AbortSignal,
 ): Promise<void> {
+  signal?.throwIfAborted();
   const bucket =
     typeof bucketOrConfig === 'string'
       ? bucketOrConfig || DEFAULT_BUCKET
@@ -114,7 +117,7 @@ export async function waitForRateLimit(
   const blockWait = b.retryAfterUntil - now;
   if (blockWait > 0) {
     console.debug(`⏳ [限流] 桶 ${bucket} 处于 429 屏蔽期，等待 ${Math.round(blockWait)}ms`);
-    await new Promise((resolve) => setTimeout(resolve, blockWait));
+    await abortableDelay(blockWait, signal);
   }
 
   // 2) 最小间隔
@@ -122,8 +125,9 @@ export async function waitForRateLimit(
   if (since < b.interval) {
     const waitTime = b.interval - since;
     console.debug(`⏳ [限流] 桶 ${bucket} 间隔等待 ${Math.round(waitTime)}ms（间隔 ${b.interval}ms）`);
-    await new Promise((resolve) => setTimeout(resolve, waitTime));
+    await abortableDelay(waitTime, signal);
   }
+  signal?.throwIfAborted();
   b.lastCallTime = Date.now();
 }
 

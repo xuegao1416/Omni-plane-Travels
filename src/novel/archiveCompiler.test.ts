@@ -8,6 +8,20 @@ function segment(id: string, archives: NovelEvidenceNote['archives']): NovelSegm
 }
 
 describe('complete novel archive compiler', () => {
+  test('a shared alias cannot chain distinct people into the protagonist archive', async () => {
+    const result = await compileNovelArchives('book', [segment('s1', { characters: [
+      { name: '白昼', aliases: ['阿白', '少爷'], description: '药铺学徒' },
+      { name: '舟客', aliases: ['少爷', '公子'], description: '摆渡人' },
+      { name: '林青', aliases: ['公子'], description: '城中医师' },
+    ] }), segment('s2', { characters: [{ name: '阿白', description: '常年居住北城' }] })]);
+    expect(result.records).toHaveLength(3);
+    const protagonist = result.records.find(record => record.name === '白昼')!;
+    expect(protagonist.description).toContain('常年居住北城');
+    expect(protagonist.description).not.toContain('摆渡人');
+    expect(protagonist.description).not.toContain('城中医师');
+    expect(result.records.flatMap(record => record.sourceFindingIds ?? [])).toHaveLength(4);
+  });
+
   test('merges explicit aliases and exact discoveries while preserving every description and citation', async () => {
     const citation = { chapterId: 'c', startOffset: 0, endOffset: 2, excerpt: '证据', confidence: 'explicit' as const };
     const result = await compileNovelArchives('book', [

@@ -11,23 +11,28 @@ import type { PresetEditorOverlayProps } from './types';
 import { iconBtnStyle } from './constants';
 import { PromptEntry } from './PromptEntry';
 import { RegexEntry } from './RegexEntry';
+import { PresetQuickControls } from './PresetQuickControls';
 
-export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestoreDefaults, editableContentIdentifiers = [] }: PresetEditorOverlayProps) {
+export function PresetEditorOverlay({ preset, builtin, onClose, onSave: persistPreset, onRestoreDefaults, editableContentIdentifiers = [] }: PresetEditorOverlayProps) {
   const { DialogUI, confirm: dlgConfirm } = useDialog();
-  const [tab, setTab] = useState<'prompts' | 'regex'>('prompts');
+  const [tab, setTab] = useState<'quick' | 'prompts' | 'regex'>('quick');
+  const [saveError, setSaveError] = useState('');
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
   const [expandedRegex, setExpandedRegex] = useState<number | null>(null);
   const regexFileRef = useRef<HTMLInputElement>(null);
+  const onSave = useCallback((updated: typeof preset) => {
+    try { persistPreset(updated); setSaveError(''); }
+    catch (error) { setSaveError(error instanceof Error ? error.message : '预设保存失败，请重试。'); }
+  }, [persistPreset]);
 
   // 恢复内置预设默认值
   const handleRestoreDefaults = useCallback(async () => {
     if (!await dlgConfirm('确定要恢复默认设置吗？所有条目将重置为初始状态。', { confirmText: '恢复默认' })) return;
-    if (onRestoreDefaults) {
-      onRestoreDefaults();
-    } else {
-      const original = getBuiltinPreset(preset.id);
-      onSave({ ...original, builtin: true });
-    }
+    try {
+      if (onRestoreDefaults) onRestoreDefaults();
+      else onSave({ ...getBuiltinPreset(preset.id), builtin: true });
+      setSaveError('');
+    } catch (error) { setSaveError(error instanceof Error ? error.message : '恢复默认失败，请重试。'); }
   }, [preset.id, onSave, onRestoreDefaults, dlgConfirm]);
 
   // ─── 条目操作 ───
@@ -110,7 +115,7 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
       background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
     }} onClick={onClose}>
       {DialogUI}
-      <div style={{
+      <div role="dialog" aria-modal="true" aria-labelledby="preset-editor-title" style={{
         width: '90vw', maxWidth: '720px', height: '90vh',
         background: 'var(--bg-primary)', borderRadius: '12px',
         border: '1px solid var(--border)',
@@ -125,7 +130,7 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
           flexShrink: 0,
         }}>
           <FileText size={18} />
-          <span style={{ fontWeight: '600', fontSize: 'var(--font-size-lg)', flex: 1 }}>
+          <span id="preset-editor-title" style={{ fontWeight: '600', fontSize: 'var(--font-size-lg)', flex: 1 }}>
             {preset.name}{builtin && '（内置）'}
           </span>
           {builtin && (
@@ -133,7 +138,7 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
               🔄 恢复默认
             </button>
           )}
-          <button onClick={onClose} style={iconBtnStyle}><X size={18} /></button>
+          <button onClick={onClose} style={iconBtnStyle} aria-label="关闭预设编辑器"><X size={18} /></button>
         </div>
 
         {preset.attribution && (
@@ -175,20 +180,29 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
           flexShrink: 0,
         }}>
           <button
+            onClick={() => setTab('quick')}
+            style={{
+              flex: 1, padding: '10px', background: 'none', border: 'none', minHeight: '44px',
+              borderBottom: tab === 'quick' ? '2px solid var(--accent)' : '2px solid transparent',
+              color: tab === 'quick' ? 'var(--accent)' : 'var(--text-muted)',
+              fontWeight: '600', fontSize: 'var(--font-size-sm)', cursor: 'pointer',
+            }}
+          >快捷配置</button>
+          <button
             onClick={() => setTab('prompts')}
             style={{
-              flex: 1, padding: '10px', background: 'none', border: 'none',
+              flex: 1, padding: '10px', background: 'none', border: 'none', minHeight: '44px',
               borderBottom: tab === 'prompts' ? '2px solid var(--accent)' : '2px solid transparent',
               color: tab === 'prompts' ? 'var(--accent)' : 'var(--text-muted)',
               fontWeight: '600', fontSize: 'var(--font-size-sm)', cursor: 'pointer',
             }}
           >
-            📝 提示词条目 ({sortedPrompts.length})
+            📝 高级条目 ({sortedPrompts.length})
           </button>
           <button
             onClick={() => setTab('regex')}
             style={{
-              flex: 1, padding: '10px', background: 'none', border: 'none',
+              flex: 1, padding: '10px', background: 'none', border: 'none', minHeight: '44px',
               borderBottom: tab === 'regex' ? '2px solid var(--accent)' : '2px solid transparent',
               color: tab === 'regex' ? 'var(--accent)' : 'var(--text-muted)',
               fontWeight: '600', fontSize: 'var(--font-size-sm)', cursor: 'pointer',
@@ -198,8 +212,11 @@ export function PresetEditorOverlay({ preset, builtin, onClose, onSave, onRestor
           </button>
         </div>
 
+        {saveError && <div role="alert" style={{ padding: '10px 16px', color: 'var(--danger)', fontSize: 'var(--font-size-sm)' }}>{saveError}</div>}
+
         {/* ─── 内容区 ─── */}
         <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px' }}>
+          {tab === 'quick' && <PresetQuickControls preset={preset} onSave={onSave} />}
 
           {/* === 条目 Tab === */}
           {tab === 'prompts' && (

@@ -4,8 +4,8 @@ import type { ChatMessage } from '../../../../engine/types';
 import type { WorldSystemData,DiceRoll } from '../../../../modules/schema';
 import type { RenderedContent } from './renderPipeline';
 import { useImageStore } from '../../../../stores/imageStore';
-import { usePortraitStore } from '../../../../stores/portraitStore';
-import { imageDb } from '../../../../storage/imageDb';
+import { imageDb, imageUrls } from '../../../../storage/imageDb';
+import type { ImageUrlLease } from '../../../../storage/imageUrls';
 
 function applyDialoguePortrait(card: HTMLElement, url: string) {
   const avatar = card.querySelector<HTMLElement>('.inline-dialogue-card__avatar');
@@ -64,18 +64,18 @@ export function useInlinePortals(
 
     const placeholders = messageHtmlRef.current.querySelectorAll('.dice-roll-placeholder');
     if (placeholders.length === 0) return;
+    let cancelled = false;
 
     const mountDiceCards = async () => {
       const { default: InlineDiceCardComponent } = await import('../InlineDiceCard');
+      if (cancelled) return;
 
       placeholders.forEach((el, index) => {
         const attr = el.getAttribute('data-attr') || '';
         const dc = Number(el.getAttribute('data-dc')) || 10;
         const requestId = `${message.id}:dice:${index}`;
         const existingRoll = worldSystem.骰子检定?.history?.find(roll => roll.requestId === requestId);
-        const container = document.createElement('div');
-        el.replaceWith(container);
-        const root = createRoot(container);
+        const root = createRoot(el);
         root.render(
           <InlineDiceCardComponent
             attr={attr}
@@ -94,6 +94,7 @@ export function useInlinePortals(
     mountDiceCards();
 
     return () => {
+      cancelled = true;
       deferredUnmount(diceRootsRef.current);
       diceRootsRef.current = [];
     };
@@ -108,17 +109,17 @@ export function useInlinePortals(
 
     const placeholders = messageHtmlRef.current.querySelectorAll('.talent-gain-placeholder');
     if (placeholders.length === 0) return;
+    let cancelled = false;
 
     const mountTalentCards = async () => {
       const { default: InlineTalentCardComponent } = await import('../InlineTalentCard');
+      if (cancelled) return;
 
       placeholders.forEach(el => {
         const talentDataStr = el.getAttribute('data-talent') || '{}';
         try {
           const talentData = JSON.parse(talentDataStr);
-          const container = document.createElement('div');
-          el.replaceWith(container);
-          const root = createRoot(container);
+          const root = createRoot(el);
           root.render(
             <InlineTalentCardComponent
               name={talentData.name || '未知天赋'}
@@ -137,6 +138,7 @@ export function useInlinePortals(
     mountTalentCards();
 
     return () => {
+      cancelled = true;
       deferredUnmount(talentRootsRef.current);
       talentRootsRef.current = [];
     };
@@ -153,16 +155,16 @@ export function useInlinePortals(
 
     const placeholders = messageHtmlRef.current.querySelectorAll('.inline-image-gen-placeholder');
     if (placeholders.length === 0) return;
+    let cancelled = false;
 
     const mountImageButtons = async () => {
       const { default: InlineImageGenButtonComponent } = await import('../InlineImageGenButton');
+      if (cancelled) return;
 
       placeholders.forEach((el, index) => {
         const promptText = el.getAttribute('data-prompt') || '';
         if (!promptText.trim()) return;
-        const container = document.createElement('div');
-        el.replaceWith(container);
-        const root = createRoot(container);
+        const root = createRoot(el);
         root.render(<InlineImageGenButtonComponent prompt={promptText.trim()} msgId={message.id} imageKey={`${message.id}:inline-image:${index}`} />);
         imageGenRootsRef.current.push(root);
       });
@@ -171,6 +173,7 @@ export function useInlinePortals(
     mountImageButtons();
 
     return () => {
+      cancelled = true;
       deferredUnmount(imageGenRootsRef.current);
       imageGenRootsRef.current = [];
     };
@@ -185,38 +188,47 @@ export function useInlinePortals(
     const cards = Array.from(messageHtmlRef.current.querySelectorAll<HTMLElement>('.inline-dialogue-card'));
     if (cards.length === 0) return;
 
-    const applyFromStore = (portraits: Record<string, string>) => {
-      for (const card of cards) {
-        const npcId = card.dataset.npcid || card.dataset.name || '';
-        const fallback = card.dataset.avatar || '';
-        applyDialoguePortrait(card, portraits[npcId] || fallback);
+    let hydration = 0;
+    let held: ImageUrlLease[] = [];
+    const hydrate = async () => {
+      const version = ++hydration;
+      const acquired: ImageUrlLease[] = [];
+      const portraits = new Map<string, string>();
+      try {
+        for (const card of cards) {
+          const name = card.dataset.name || '';
+          const id = card.dataset.npcid || name;
+          if (!portraits.has(id)) {
+            let lease = await imageUrls.acquire(`portrait-${id}`);
+            if (!lease && name) {
+              const key = await imageDb.findPortraitKeyByName(name);
+              if (key) lease = await imageUrls.acquire(key);
+            }
+            if (lease) acquired.push(lease);
+            portraits.set(id, lease?.url || '');
+          }
+          if (cancelled || version !== hydration) break;
+        }
+        if (cancelled || version !== hydration) { acquired.forEach(lease => lease.release()); return; }
+        for (const card of cards) {
+          const id = card.dataset.npcid || card.dataset.name || '';
+          applyDialoguePortrait(card, portraits.get(id) || card.dataset.avatar || '');
+        }
+        // Update the DOM before releasing the former displayed revision.
+        held.forEach(lease => lease.release()); held = acquired;
+      } catch (error) {
+        acquired.forEach(lease => lease.release());
+        if (!cancelled) console.warn('[画像] 对话头像读取失败:', error);
       }
     };
-
-    applyFromStore(usePortraitStore.getState().portraits);
-    const unsubscribe = usePortraitStore.subscribe((state, previous) => {
-      if (state.portraits !== previous.portraits) applyFromStore(state.portraits);
-    });
-
-    const unresolved = new Map<string, string>();
-    const currentPortraits = usePortraitStore.getState().portraits;
-    for (const card of cards) {
-      const name = card.dataset.name || '';
-      const npcId = card.dataset.npcid || name;
-      if (name && !card.dataset.avatar && !currentPortraits[npcId]) unresolved.set(npcId, name);
-    }
-
-    for (const [npcId, name] of unresolved) {
-      imageDb.findPortraitUrlByName(name).then(url => {
-        if (cancelled || !url) return;
-        const store = usePortraitStore.getState();
-        if (store.portraits[npcId] !== url) store.setPortrait(npcId, url);
-      }).catch(() => { /* ignore */ });
-    }
+    void hydrate();
+    const unsubscribe = imageUrls.subscribe(() => { void hydrate(); });
 
     return () => {
       cancelled = true;
       unsubscribe();
+      cards.forEach(card => applyDialoguePortrait(card, ''));
+      held.forEach(lease => lease.release()); held = [];
     };
   }, [renderedContent, isUser, message.streaming, messageHtmlRef]);
 }

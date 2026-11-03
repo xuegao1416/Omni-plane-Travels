@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { VariableManager } from './variableManager';
 import type { WorldBookManager } from '../worldbook/index';
-import type { GameSave, PlayerProfile, CustomNpc } from '../storage/db';
+import type { GameSave } from '../storage/db';
 import type { PipelineStatus, PipelineTaskId } from './pipelineTypes';
 import type { WorldDef } from '../data/worlds-schema';
 import type { GameState } from '../schema/variables';
@@ -22,6 +22,8 @@ export interface ChatMessage {
   memoryCheckpointId?: string;
   /** 世界演化引擎快照 ID */
   simulationSnapshotId?: string;
+  /** Only unfinished accepted work; restored with its owning save, never global sessionStorage. */
+  turnRecovery?: import('./turnRecovery').TurnRecovery;
   /**
    * 消息序号（单调递增，用于增量存档）
    * 在消息创建时由引擎分配，确保存档时 seq 对齐
@@ -41,13 +43,20 @@ export interface SendMessageOptions {
   displayUserMessage?: boolean;
   /** Combat-owned state is restored after variable extraction/normal narration stages. */
   combatContinuation?: { protectedState: GameState; fallbackText?: string };
+  /** The input has entered the current turn; generation can still fail later. */
+  onAccepted?: () => void;
   onComplete?: (outcome: SendMessageOutcome) => void;
 }
 
 export interface GameEngine {
   sendMessage: (userText: string, options?: SendMessageOptions) => Promise<void>;
   cancel: () => void;
+  cancelAndWait: () => Promise<void>;
   readonly isReadOnly: boolean;
+  /** Accept a synchronous player result and refresh its complete rollback checkpoint. */
+  commitPlayerState: (state: GameState) => boolean;
+  preparePlayerStateJSON: (json: string) => GameState | null;
+  prepareSaveCapture: () => void;
   isGenerating: boolean;
   messages: ChatMessage[];
   variableManager: VariableManager;
@@ -61,9 +70,6 @@ export interface GameEngine {
   loadSave: (save: GameSave) => void;
   restoreCombatCheckpoint: (restore: CombatCheckpointRestore, saveId?: string) => void;
   reset: (worldDef?: WorldDef) => void;
-  setPlayerProfile: (profile: PlayerProfile) => void;
-  applyModuleInitData: (moduleInitData: Record<string, unknown>) => void;
-  setInitialNPCs: (npcs: CustomNpc[]) => void;
   addMessage: (msg: ChatMessage) => void;
   retryPipeline: () => Promise<void>;
   retrySingleStage: (taskId: PipelineTaskId) => Promise<void>;

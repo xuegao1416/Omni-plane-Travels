@@ -126,7 +126,7 @@ test('hall navigation remains a content-sized transparent group', () => {
     expect(wizardShell).not.toContain('<button type="button" className="btn-secondary"');
     expect(wizardShell).not.toContain('<button type="button" className="btn-primary"');
     expect(wizardShell).toContain('creation-ritual-shell__footer${currentStep === historyStep');
-    expect(wizardShell).toContain("${navigationBlocked ? ' is-modal-blocked' : ''}");
+    expect(wizardShell).toContain("${modalOpen || professionLibraryOpen ? ' is-modal-blocked' : ''}");
     expect(wizardShell).toContain('disabled={navigationBlocked}');
   });
 

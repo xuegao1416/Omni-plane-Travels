@@ -100,7 +100,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const goBack = useCallback(() => dispatch({ type: 'GO_BACK' }), []);
 
   const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
+  stateRef.current = state;
 
   const engineRef = useRef<GameEngine | null>(null);
 
@@ -122,11 +122,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const eng = engineRef.current;
       const s = stateRef.current;
       const saveId = useSaveStore.getState().currentSaveId;
-      if (!eng || eng.messages.length === 0 || !saveId) {
+      if (!eng || !saveId) {
         console.log('[auto-save] builder 检查:', { hasEngine: !!eng, messageCount: eng?.messages.length, saveId });
         return null;
       }
 
+      eng.prepareSaveCapture();
       const optimized = optimizeSnapshots([...eng.messages]);
       const memStore = useMemoryStore.getState();
       const memData = memStore.toJSON();
@@ -147,6 +148,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       return {
         id: saveId,
+        assetSourceSessionIds: useSaveStore.getState().currentAssetSourceSessionIds,
         name: useSaveStore.getState().currentSaveName || s.personalInfo?.name || '未命名存档',
         timestamp: Date.now(),
         messages: optimized,
@@ -183,7 +185,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     handleAutoSave,
   );
 
-  useEffect(() => { engineRef.current = engine; }, [engine]);
+  engineRef.current = engine;
 
   // 跟踪新游戏是否已开始，防止 auto-restore 覆盖新游戏状态
   const newGameStartedRef = useRef(false);
@@ -198,10 +200,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       loadGameFromDb(savedId).then(save => {
         // 如果新游戏已开始，不应用旧存档数据
         if (newGameStartedRef.current) return;
-        if (!cancelled && save && save.messages && save.messages.length > 0) {
-          useSaveStore.setState({ currentSaveId: savedId, currentSaveName: save.name });
-          dispatch({ type: 'LOAD_SAVE', save });
+        if (!cancelled && save && Array.isArray(save.messages)) {
           engine.loadSave(save);
+          useSaveStore.getState().activateSave(save);
+          dispatch({ type: 'LOAD_SAVE', save });
         } else if (!cancelled) {
           // 存档不存在或已空，清理所有残留状态
           localStorage.removeItem(ACTIVE_SAVE_KEY);
@@ -211,12 +213,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
       }).catch(err => {
         console.warn('[auto-restore] 加载存档失败:', err);
-        if (!cancelled) {
-          localStorage.removeItem(ACTIVE_SAVE_KEY);
-          useSaveStore.setState({ currentSaveId: null, currentSaveName: '' });
-          dispatch({ type: 'CLEAR_SAVE_DATA' });
-          engine.reset();
-        }
+        // A failed read is recoverable; do not erase the selected save or reset
+        // a journey created while the old read was outstanding.
       });
     }
     return () => { cancelled = true; };

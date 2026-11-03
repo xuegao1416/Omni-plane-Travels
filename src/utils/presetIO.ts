@@ -17,24 +17,28 @@ export function exportPresetJSON(pack: PresetPack): string {
     ...(pack.top_p != null && { top_p: pack.top_p }),
     ...(pack.max_tokens != null && { max_tokens: pack.max_tokens }),
     ...(pack.max_context != null && { max_context: pack.max_context }),
+    ...(pack.toolChannel && { toolChannel: pack.toolChannel }),
     // 提示词条目
     prompts: (pack.prompts || []).map(p => ({
       identifier: p.identifier,
       name: p.name,
       role: p.role,
       content: p.content,
-      injection_position: 0,
-      injection_depth: 4,
+      order: p.order,
+      ...(p.injectionPosition != null && { injection_position: p.injectionPosition }),
+      ...(p.injectionDepth != null && { injection_depth: p.injectionDepth }),
+      ...(p.injectionLabel && { injectionLabel: p.injectionLabel }),
+      ...(p.triggerMode && { triggerMode: p.triggerMode }),
+      ...(p.triggerKeywords && { triggerKeywords: p.triggerKeywords }),
       enabled: p.enabled,
       marker: false,
     })),
     // 排序
     prompt_order: [{
       character_id: 100001,
-      order: (pack.prompts || [])
-        .filter(p => p.enabled)
+      order: [...(pack.prompts || [])]
         .sort((a, b) => a.order - b.order)
-        .map(p => p.identifier),
+        .map(p => ({ identifier: p.identifier, enabled: p.enabled })),
     }],
     // 正则脚本 — 同时写入 v1 和 v2 路径
     extensions: {
@@ -76,7 +80,10 @@ function isStr(v: unknown): v is string { return typeof v === 'string'; }
 function isObj(v: unknown): v is Record<string, unknown> { return typeof v === 'object' && v !== null && !Array.isArray(v); }
 
 /** 解析并校验预设 JSON（兼容 SillyTavern 格式 + 项目自有格式） */
-export function parsePresetJSON(jsonStr: string): ValidateResult<PresetPack> {
+export function parsePresetJSON(
+  jsonStr: string,
+  options: { preserveEmptyPrompts?: boolean } = {},
+): ValidateResult<PresetPack> {
   let raw: unknown;
   try { raw = JSON.parse(jsonStr); } catch {
     return { ok: false, error: 'JSON 解析失败，请检查文件格式' };
@@ -90,8 +97,13 @@ export function parsePresetJSON(jsonStr: string): ValidateResult<PresetPack> {
   const name = isStr(data.name) ? data.name.trim() : '导入的预设';
   if (!name) return { ok: false, error: '预设名称不能为空' };
 
+  const toolChannel = parseToolChannel(data.toolChannel);
   // 提取 prompts
-  const prompts = parsePrompts(data.prompts);
+  const prompts = applyImportedOrder(
+    parsePrompts(data.prompts, options.preserveEmptyPrompts),
+    data.prompt_order,
+    toolChannel,
+  );
 
   // 提取 regex_scripts — 尝试多个位置
   const regexScripts = parseRegexScripts(data);
@@ -125,13 +137,36 @@ export function parsePresetJSON(jsonStr: string): ValidateResult<PresetPack> {
       max_context,
       prompts,
       regexScripts,
+      toolChannel,
       builtin: false,
       attribution,
     },
   };
 }
 
-function parsePrompts(raw: unknown): PresetPromptEntry[] {
+function parseToolChannel(raw: unknown): PresetPack['toolChannel'] {
+  if (!isObj(raw)
+    || !isStr(raw.toolNamePrefix) || !raw.toolNamePrefix.trim()
+    || !isStr(raw.paramName) || !/^[A-Za-z_][A-Za-z0-9_-]{0,63}$/.test(raw.paramName)
+    || !isStr(raw.descriptionEntryId) || !raw.descriptionEntryId.trim()
+    || !isStr(raw.fieldDescriptionEntryId) || !raw.fieldDescriptionEntryId.trim()
+    || !Array.isArray(raw.guideEntryIds)
+    || !raw.guideEntryIds.every(isStr)
+    || raw.guideEntryIds.length === 0) return undefined;
+
+  return {
+    enabled: raw.enabled === true,
+    toolNamePrefix: raw.toolNamePrefix,
+    paramName: raw.paramName,
+    descriptionEntryId: raw.descriptionEntryId,
+    fieldDescriptionEntryId: raw.fieldDescriptionEntryId,
+    guideEntryIds: raw.guideEntryIds.filter(isStr),
+    ...(typeof raw.controlPrompt === 'boolean' ? { controlPrompt: raw.controlPrompt } : {}),
+    ...(typeof raw.relocateContext === 'boolean' ? { relocateContext: raw.relocateContext } : {}),
+  };
+}
+
+function parsePrompts(raw: unknown, preserveEmptyPrompts = false): PresetPromptEntry[] {
   if (!Array.isArray(raw)) return [];
 
   return raw
@@ -143,8 +178,60 @@ function parsePrompts(raw: unknown): PresetPromptEntry[] {
       content: isStr(p.content) ? p.content : '',
       enabled: p.enabled !== false,
       order: typeof p.order === 'number' ? p.order : (index + 1) * 100,
+      ...(p.triggerMode === 'green' || p.triggerMode === 'blue' ? { triggerMode: p.triggerMode as 'green' | 'blue' } : {}),
+      ...(Array.isArray(p.triggerKeywords) ? { triggerKeywords: p.triggerKeywords.filter(isStr) } : {}),
+      ...((p.injectionPosition ?? p.injection_position) === 0 || (p.injectionPosition ?? p.injection_position) === 1
+        ? { injectionPosition: (p.injectionPosition ?? p.injection_position) as 0 | 1 } : {}),
+      ...(typeof (p.injectionDepth ?? p.injection_depth) === 'number'
+        ? { injectionDepth: (p.injectionDepth ?? p.injection_depth) as number } : {}),
+      ...(isStr(p.injectionLabel) ? { injectionLabel: p.injectionLabel } : {}),
     }))
-    .filter(p => p.content); // 过滤空内容
+    .filter(p => preserveEmptyPrompts || p.content); // 默认过滤 Tavern 空槽；昆仑显式保留可编辑空提示词
+}
+
+/** 外部排序表同时决定启用状态；支持旧字符串数组与当前酒馆对象数组。 */
+function applyImportedOrder(
+  prompts: PresetPromptEntry[],
+  raw: unknown,
+  toolChannel?: PresetPack['toolChannel'],
+): PresetPromptEntry[] {
+  if (!Array.isArray(raw)) return prompts;
+  const rows = raw.filter(isObj);
+  const row = rows.find(item => item.character_id === 100001) ?? rows[0];
+  if (!row || !Array.isArray(row.order)) return prompts;
+  const ordered = new Map<string, { rank: number; enabled: boolean }>();
+  for (const value of row.order) {
+    const identifier = isStr(value) ? value : isObj(value) && isStr(value.identifier) ? value.identifier : null;
+    if (identifier && !ordered.has(identifier)) ordered.set(identifier, {
+      rank: ordered.size, enabled: isStr(value) || (isObj(value) && value.enabled !== false),
+    });
+  }
+  const historyRank = ordered.get('chatHistory')?.rank;
+  const toolGuideIds = new Set(toolChannel?.guideEntryIds ?? []);
+  const ranked = prompts.filter(p => ordered.has(p.identifier))
+    .sort((a, b) => ordered.get(a.identifier)!.rank - ordered.get(b.identifier)!.rank);
+  // 自有导出中的权重若已符合排序表，原样保留；上游顺序不同则采用排序表。
+  const preserveWeights = ranked.every((p, index) => index === 0 || p.order > ranked[index - 1]!.order);
+  return prompts.map(p => {
+    const item = ordered.get(p.identifier);
+    const isAnchoredAfterHistory = historyRank != null && item != null && item.rank > historyRank;
+    return {
+      ...p,
+      // SillyTavern assistant entries are prompt context/acknowledgements, not a
+      // trailing model turn. Gemini rejects requests that end with such a turn.
+      ...(item != null && p.role === 'assistant' && !toolGuideIds.has(p.identifier) ? { role: 'system' as const } : {}),
+      // Entries after Chat History are tail prompts. Keep explicit at-depth placement intact;
+      // otherwise inject them immediately before the live user turn instead of flattening them
+      // back into the system-prompt head, which newer Gemini models largely ignore.
+      ...(isAnchoredAfterHistory && p.injectionPosition !== 1 ? {
+        injectionPosition: 1 as const,
+        injectionDepth: 0,
+        injectionLabel: p.name,
+      } : {}),
+      enabled: item?.enabled ?? false,
+      order: preserveWeights ? p.order : ((item?.rank ?? ordered.size) + 1) * 100,
+    };
+  });
 }
 
 function parseRegexScripts(data: Record<string, unknown>): RegexScript[] {

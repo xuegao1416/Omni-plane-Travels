@@ -3,16 +3,21 @@
 
 ## 2、记忆系统
 
-#### 2.0 记忆系统文件清单(漏列补充)
+#### 2.0 记忆系统文件清单
 
-`src/memory/` 实际 17 个文件(核心 15 + 2 测试),其中漏列:
+`src/memory/` 共 24 个文件（含 8 个测试）：
 
 - `embeddingRuntime.ts` — 嵌入运行时(向量化任务调度)
 - `embeddingRuntime.test.ts` — 嵌入运行时测试
+- `externalFacts.ts` / `externalFacts.test.ts` — 外部事实抽取
+- `memoryVisibility.ts` / `memoryVisibility.test.ts` — 可见性过滤
 - `memoryPipeline.regression.test.ts` — 记忆管线回归测试
 - `memoryStore.checkpoint.test.ts` — 记忆 store 检查点测试
+- `memoryCancellation.test.ts` — 取消路径测试
+- `memoryVersionChain.test.ts` — 版本链测试
+- `narrativeGraph.test.ts` — 叙事图测试
 
-### 2.1 9 阶段管线 — `src/memory/memoryPipeline.ts` (1211行)
+### 2.1 9 阶段管线 — `src/memory/memoryPipeline.ts`
 
 **文件路径**: `src/memory/memoryPipeline.ts`
 
@@ -65,7 +70,7 @@ interface NarrativeObject {
   relatedObjects: string[]; // 相关对象ID
 }
 
-// 调用 memoryPrompts.writePrompt 构建提示词
+// 使用 narrativePromptTemplates.ingest 构建提示词
 // 调用 API（writeConfig）提取叙事对象
 // 结果写入 memoryStore.runtime.narrativeObjects
 ```
@@ -82,14 +87,14 @@ interface NarrativeSummary {
   importantFacts: string[]; // 重要事实
 }
 
-// 调用 memoryPrompts.summaryPrompt
+// 使用 narrativePromptTemplates.summary
 // 结果写入 memoryStore.runtime.summarySaveHistory
 ```
 
 #### 2.1.3 vector阶段 — 向量事实提取
 
 ```typescript
-// 提取需要长期记忆的向量事实（实际定义见 memory/types.ts；字段远多于下）
+// 提取需要长期记忆的向量事实（定义见 memory/types.ts；字段远多于下）
 interface VectorFact {
   fact: string;                       // 事实内容（非 content）
   title?: string;
@@ -128,7 +133,7 @@ interface VectorFact {
 }
 // VectorMemoryItem = VectorFact & { id: string; searchText?; embeddingTimestamp? }
 
-// 调用 memoryPrompts.vectorExtractPrompt
+// 使用 narrativePromptTemplates.vectorExtract
 // 结果写入 memoryStore.vectorMemory
 // 同时调用 fetchEmbeddingBatch 向量化
 ```
@@ -145,7 +150,7 @@ interface QueryRewriteResult {
   timeContext: string;       // 时间上下文
 }
 
-// 调用 memoryPrompts.queryRewritePrompt
+// 使用 narrativePromptTemplates.queryRewrite
 // 结果写入 memCtx.queryRewriteResult
 ```
 
@@ -161,7 +166,7 @@ interface RetrievePlan {
   estimatedTokens: number;       // 预估token消耗
 }
 
-// 调用 memoryPrompts.retrievePlanPrompt
+// 使用 narrativePromptTemplates.retrievePlanner
 ```
 
 #### 2.1.6 multi_round阶段 — 多轮补充检索
@@ -170,7 +175,7 @@ interface RetrievePlan {
 // 基于检索结果，进行多轮补充检索
 // 每轮检索可能发现新的相关记忆
 // 最多5轮迭代（防止无限循环）
-// 调用 memoryPrompts.multiRoundPrompt
+// 使用 narrativePromptTemplates.multiRoundRetrievePlanner
 ```
 
 #### 2.1.7 rerank阶段 — 重排序
@@ -184,7 +189,7 @@ interface RerankedMemory {
   injectionPosition: 'before' | 'after' | 'replace';
 }
 
-// 调用 memoryPrompts.rerankPrompt
+// 使用 narrativePromptTemplates.rerank
 ```
 
 #### 2.1.8 finalize阶段 — 最终化
@@ -208,7 +213,7 @@ interface CompiledMemoryContext {
   injectionPoints: Array<{ position: string; content: string }>;
 }
 
-// 调用 memoryPrompts.compilePrompt
+// 编译阶段由 compileFormatter 生成注入文本
 // 结果写入 memoryStore.lastCompiledContext
 ```
 
@@ -216,18 +221,31 @@ interface CompiledMemoryContext {
 
 各阶段失败时向 `ctx._degradedStages` 追加阶段标识，由调用方按已降级阶段决定后续行为；不阻塞主线。
 
+降级包装统一由 `src/engine/useGameEngine.ts` 的 `withDegradationCheck(memCtx, label, task)` 完成：
+
 ```typescript
-ctx._degradedStages = ctx._degradedStages || [];
-ctx._degradedStages.push('memory_query_rewrite');
+function withDegradationCheck(
+  memCtx: MemoryPipelineContext,
+  label: string,
+  task: () => Promise<void>,
+): () => Promise<void> {
+  return async () => {
+    const before = memCtx._degradedStages?.length ?? 0;
+    await task();
+    if ((memCtx._degradedStages?.length ?? 0) > before) {
+      throw new Error(`[降级] ${label}失败，使用回退策略`);
+    }
+  };
+}
 ```
 
 #### 2.1.11 写入重试与失败记账
 
-`executeMemoryWrite` 按 `writePipeline.retryCount`（默认 2）与 `retryDelayMs`（默认 1200）重试 `retryCount + 1` 次。每次失败先记 `lastIngestFailure`（含 `sourceStartIndex` / `cursor` / `attempt` / `maxAttempts` / `status: 'active'`）并抛错；成功时推进 `lastIngestCursor`，若此前有 `active` 失败则置为 `resolved` 并写 `resolvedAt`。写入过程不引入暂存代理，失败一律记账到 runtime 而不落半个对象。
+`executeMemoryWrite` / `executeMemorySummary` 按 `writePipeline.retryCount`（默认 2）与 `retryDelayMs`（默认 1200）重试 `retryCount + 1` 次，重试间隔走 `abortableDelay(retryDelayMs, ctx.signal)` 以响应取消。每次失败先记 `lastIngestFailure`（含 `sourceStartIndex` / `cursor` / `attempt` / `maxAttempts` / `status: 'active'`）并抛错；成功时推进 `lastIngestCursor`，若此前有 `active` 失败则置为 `resolved` 并写 `resolvedAt`。写入不引入暂存代理，失败一律记账到 runtime，不落半个对象。
 
 ---
 
-### 2.2 记忆 Store — `src/memory/memoryStore.ts` (996行)
+### 2.2 记忆 Store — `src/memory/memoryStore.ts`
 
 **文件路径**: `src/memory/memoryStore.ts`
 
@@ -254,8 +272,8 @@ interface MemoryStore {
   setConfig: (config: Partial<MemorySystemConfig>) => void;
   resetConfig: () => void;
 
-  // 运行时(注意:不是 initialize)
-  initMemoryRuntime: (bankId?: string) => void;     // 实际是 initMemoryRuntime 不是 initialize
+  // 运行时
+  initMemoryRuntime: (bankId?: string) => void;
   getMemoryRuntime: () => NarrativeMemoryRuntime;
   resetMemoryRuntime: () => void;
   bumpRuntimeVersion: () => void;
@@ -274,7 +292,7 @@ interface MemoryStore {
 }
 ```
 
-#### 2.2.1 NarrativeMemoryRuntime 结构（完整定义见 memory/types.ts；下列为节选）
+#### 2.2.1 NarrativeMemoryRuntime 结构（完整定义见 `memory/types.ts`；下列为节选，另含 version/bankId/mutationLog/sourceEvents/lastSummarySave/lastRetrievePlan 等字段，且 SceneAnchor、NarrativeThread 等子结构字段以源码为准）
 
 ```typescript
 interface NarrativeMemoryRuntime {
@@ -330,7 +348,7 @@ interface NarrativeMemoryRuntime {
     首次出现回合: number;
   }>;
   
-  // 重要事件卡（实际类型为 NarrativeEventCard，见 memory/types.ts；hot/warm/cold 状态衰减）
+  // 重要事件卡（类型见 NarrativeEventCard，memory/types.ts；hot/warm/cold 状态衰减）
   eventCards: Array<{
     id: string;
     title: string;
@@ -360,11 +378,11 @@ interface NarrativeMemoryRuntime {
     最后活跃回合: number;
     重要性: number;
   }>;
-  
+
   // 归档线索ID列表
   archiveCards: string[];
   
-  // 向量记忆（长期事实；实际为可选字段 vectorMemory?: VectorFact[]）
+  // 向量记忆（长期事实，可选字段）
   vectorMemory?: VectorFact[];
   
   // 检查点（最多5个）
@@ -385,7 +403,7 @@ interface NarrativeMemoryRuntime {
 }
 ```
 
-#### 2.2.2 VectorFact 结构（完整定义见 memory/types.ts）
+#### 2.2.2 VectorFact 结构（以 `memory/types.ts` 为准）
 
 ````typescript
 ```typescript
@@ -430,7 +448,7 @@ export interface VectorFact {
   sourceEventIds?: string[];
 }
 
-// 实际存储类型为 VectorMemoryItem（extends VectorFact，额外含 id / searchText? / embeddingTimestamp?）
+// 存储类型为 VectorMemoryItem（extends VectorFact，额外含 id / searchText? / embeddingTimestamp?）
 ````
 
 ````
@@ -439,7 +457,7 @@ export interface VectorFact {
 
 ### 2.3 向量与嵌入运行时
 
-#### 2.3.1 向量工具 — `src/memory/vectorUtils.ts` (313行)
+#### 2.3.1 向量工具 — `src/memory/vectorUtils.ts`
 
 **文件路径**: `src/memory/vectorUtils.ts`
 
@@ -504,7 +522,7 @@ function searchBySimilarity(
 
 ---
 
-### 2.4 提示词模板 — `src/memory/memoryPrompts.ts` (545行)
+### 2.4 提示词模板 — `src/memory/memoryPrompts.ts`
 
 **文件路径**: `src/memory/memoryPrompts.ts`
 
@@ -604,10 +622,10 @@ const rerankPrompt = `对检索到的记忆进行相关性打分...
 ## 待评分记忆
 {memories}`;
 
-// compilePrompt — 上下文编译
-// 输入: rerankedMemories, userQuery, budget
-// 输出: { fullText, tokenCount, memoryCount }
-const compilePrompt = `将记忆片段编译成连贯的上下文文本...
+// 编译注入文本（由 compileFormatter 生成）
+// 输入: runtime, queryKeywords, budget, resourceState
+// 输出: string
+const compiledText = `将记忆片段编译成连贯的上下文文本...
 
 ## 记忆片段
 {memories}
@@ -623,63 +641,44 @@ const compilePrompt = `将记忆片段编译成连贯的上下文文本...
 
 ### 2.5 编译/叙事/候选
 
-| 文件                                                                | 行数   | 职责                                                           |
-| ----------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
-| `src/memory/compileFormatter.ts`                                  | 371  | 把 `RerankedMemory[]` 编译成最终注入文本(`fullText`),控制 token 预算与排版    |
-| `src/memory/narrativeGraph.ts`                                    | 1340 | 记忆运行时图谱构建与 Mermaid 导出(`buildMemoryRuntimeGraphPayload` / `buildMemoryRuntimeMermaidGraph`) |
-| `src/memory/narrativeParsers.ts`                                  | 578  | 从 AI 响应解析叙事对象,补充 `write` 阶段提取不到的实体引用                         |
-| `src/memory/narrativePng.ts`                                      | 505  | 叙事图 PNG 导出(可视化调试,可选)                                         |
-| `src/memory/memoryCandidates.ts`                                  | 163  | 候选记忆去重/合并策略(`entities`/`keywords`/`primaryType` 重叠检测)        |
-| `src/memory/memoryConfig.ts`                                      | 258  | 记忆系统配置 schema(嵌入模型/管线预算/降级策略)                                |
-| `src/memory/types.ts`                                             | 730  | `NarrativeMemoryRuntime` / `VectorFact` / `Checkpoint` 等类型定义 |
+| 文件                                                                | 职责                                                           |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| `src/memory/compileFormatter.ts`                                  | 把 `RerankedMemory[]` 编译成最终注入文本(`fullText`),控制 token 预算与排版    |
+| `src/memory/narrativeGraph.ts` | `multi_round` 阶段遍历相关记忆 |
+| `src/memory/narrativeParsers.ts`                                  | 从 AI 响应解析叙事对象,补充 `write` 阶段提取不到的实体引用                         |
+| `src/memory/narrativePng.ts`                                      | 叙事图 PNG 导出(可视化调试,可选)                                         |
+| `src/memory/memoryCandidates.ts`                                  | 候选记忆去重/合并策略(`entities`/`keywords`/`primaryType` 重叠检测)        |
+| `src/memory/memoryConfig.ts`                                      | 记忆系统配置 schema(嵌入模型/管线预算/降级策略)                                |
+| `src/memory/normalize.ts`                                         | 记忆数据标准化(版本兼容/字段合并)                                           |
+| `src/memory/types.ts`                                      | `NarrativeMemoryRuntime` / `VectorFact` / `Checkpoint` 等类型定义 |
 
 **`compileFormatter` 与 `compile` 阶段的关系**:
 
-- `memoryPipeline.compile()` 调用 `compileFormatter.format(reranked, query, budget)` 生成 `fullText`
+- 编译阶段 `executeMemoryCompile` 调用 `compileFormatter.formatRuntimeToCompiledText(runtime, queryKeywords, budget, resourceState)` 生成注入文本
 - 输出写入 `memoryStore.lastCompiledContext`,供下次 `mainTask` 步骤 6 使用
 - 失败兜底:返回空字符串,不阻塞主线(但会触发 `_degradedStages` 标记)
 
 **叙事图谱 (`narrativeGraph`)**:
 
-```typescript
-interface NarrativeGraph {
-  nodes: Map<string, GraphNode>;      // entityId -> node
-  edges: Map<string, GraphEdge[]>;    // entityId -> related edges
-  addNode(node: GraphNode): void;
-  addEdge(edge: GraphEdge): void;
-  traverse(startId: string, depth: number): GraphNode[];  // BFS
-  findRelated(entityId: string, hops: number): VectorFact[];
-}
-```
+文件共 1386 行，对外只导出两个入口：
 
-### 2.6 记忆系统 Hook — `src/memory/useMemorySystem.ts`
+- `buildMemoryRuntimeGraphPayload(options: GraphPayloadOptions)`（L1276）— 把运行时结构转成 `GraphBuilderResult`（`definition` 文本 + `nodeDetails` 明细）
+- `buildMemoryRuntimeMermaidGraph(options: GraphPayloadOptions)`（L1384）— 直接产出 Mermaid 文本
+- 另有 `TAB_LABELS`（L30）与 `GraphPayloadOptions` 接口（L1250）
 
-**文件路径**: `src/memory/useMemorySystem.ts`
+内部的 `GraphNode`（L171）/ `GraphEdge`（L178）/ `GraphBuilderResult`（L185）与 `createGraphBuilder(direction)`（L190，提供 `addNode` 等构建方法）均不导出，仅供本文件组装图谱使用。
 
-**职责**: 提供给 React 组件使用的记忆系统访问入口,封装 store 订阅 + 初始化 + 加载逻辑。
+### 2.6 管线上下文类型 — `src/memory/useMemorySystem.ts`
 
-```typescript
-export function useMemorySystem() {
-  const config = useMemoryStore(s => s.config);
-  const runtime = useMemoryStore(s => s.runtime);
-  const vectorMemory = useMemoryStore(s => s.vectorMemory);
-  
-  return {
-    config,
-    runtime,
-    vectorMemory,
-    search: (query: string, opts?: SearchOptions) => useMemoryStore.getState().search(query, opts),
-    compileContext: (input: string, cfg: CompileConfig) => useMemoryStore.getState().compileContext(input, cfg),
-    reset: () => useMemoryStore.getState().resetMemoryRuntime(),
-  };
-}
-```
+**文件路径**: `src/memory/useMemorySystem.ts`（60 行）
 
-**典型消费者**:
+**职责**: 现为**纯类型模块**，不再包含 React Hook。早先的同名 Hook 没有运行时调用方，已移除，仅保留管线契约类型：
 
-- `GameScreen` 订阅 `runtime` 变化触发重新渲染(场景锚点/活跃线索变化)
-- `NotebookPanel`(7.4 内部组件)读取 `vectorMemory` 显示重要事实
-- 调试工具读取原始 store state
+- `MemoryPipelineContext`（L16）— 管线各阶段共享的输入输出载体：`floor` / `signal` / `batchText` / `inputText` / `assistantText` / `recentContext` / `playerName` / `apiConfig` 及各阶段独立 `*ApiConfig`；管线间共享数据用下划线前缀字段（`_queryRewriteResult` / `_plannerResult` / `_rerankResult` / `_selectedEntries` / `_selectedVectorFacts` / `_compiledContext` / `_retrievalKeywords` / `_semanticQuery` / `_finalSelectedTitles` / `_candidateList` / `_allMemories` / `_hitDetails` / `_degradedStages`），另有 `resourceState`
+- `RetrieveResult`（L8）— `entries` / `retrievalKeywords` / `compiledContext` / `hitDetails`
+- 重新导出 `MemoryEntry`（L6）
+
+**典型消费者**: `src/engine/useGameEngine.ts:57`、`src/engine/turnRecovery.ts:1`、`src/memory/memoryPipeline.ts:8`、`src/memory/memoryPipeline.regression.test.ts:12` 均以 `import type { MemoryPipelineContext }` 引用，无运行时依赖。
 
 ---
 

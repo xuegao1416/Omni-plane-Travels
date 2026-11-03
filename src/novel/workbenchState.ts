@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { buildNovelSegments, hashNovelText } from './segmentation';
+import { buildNovelSemanticSegments, hashNovelText } from './segmentation';
 import type { NovelChapter, NovelDataset } from './types';
 
 function normalizeChapters(chapters: NovelChapter[]): NovelChapter[] {
@@ -73,8 +73,20 @@ export function canCreateNovelWorld(dataset: NovelDataset | undefined, startSegm
 export function rebuildNovelDatasetSegments(
   dataset: NovelDataset,
   chapters: NovelChapter[],
-  options: Parameters<typeof buildNovelSegments>[2] = {},
+  options: Parameters<typeof buildNovelSemanticSegments>[2] = {},
 ): NovelDataset {
+  const taskPreparation = { mode: options.mode ?? 'auto' as const, maxTokens: options.maxTokens ?? dataset.taskPreparation?.maxTokens ?? 6000,
+    startChapterIndex: options.startChapterIndex ?? 0, endChapterIndex: options.endChapterIndex ?? chapters.length - 1 };
+  const selected = chapters.filter(chapter => chapter.included !== false && (taskPreparation.mode !== 'custom'
+    || (chapter.index >= taskPreparation.startChapterIndex && chapter.index <= taskPreparation.endChapterIndex))).map(chapter => chapter.id);
+  const previousSelected = new Set(dataset.segments.flatMap(segment => segment.chapterIds));
+  const unchanged = chapters.length === dataset.chapters.length && chapters.every((chapter, index) => {
+    const old = dataset.chapters[index];
+    return chapter.id === old.id && chapter.title === old.title && chapter.content === old.content && chapter.included === old.included;
+  });
+  if (unchanged && selected.length === previousSelected.size && selected.every(id => previousSelected.has(id))) {
+    return { ...dataset, taskPreparation, updatedAt: Date.now() };
+  }
   const version = hashNovelText(chapters.map(chapter => `${chapter.id}|${chapter.title}|${chapter.included !== false}|${chapter.content}`).join('\n'));
   let cursor = 0;
   const rawText = chapters.map(chapter => `${chapter.title}\n${chapter.content}`).join('\n\n');
@@ -101,15 +113,19 @@ export function rebuildNovelDatasetSegments(
     }
     return Object.fromEntries(Object.entries(row).map(([key, item]) => [key, rebase(item)]));
   };
-  const previous = new Map(dataset.segments.map(segment => [segment.inputHash, segment]));
-  const segments = buildNovelSegments(dataset.id, normalized, options).map(segment => {
-    const old = previous.get(segment.inputHash);
+  // Recompute structural identity: older analysis runs overwrote inputHash with
+  // the model fingerprint. Evidence/plot caches have their own dedicated hashes.
+  const previous = new Map(dataset.segments.map(segment => [
+    hashNovelText(`${segment.chapterIds.join('|')}\n${(segment.sourceText ?? '').trim()}`), segment,
+  ]));
+  const segments = buildNovelSemanticSegments(dataset.id, normalized, options).map(segment => {
+    const old = segment.inputHash ? previous.get(segment.inputHash) : undefined;
     if (!old || old.title !== segment.title || old.sourceText !== segment.sourceText) return segment;
-    return { ...rebase(old) as typeof old, datasetId: dataset.id, index: segment.index, sourceRanges: segment.sourceRanges,
+    return { ...rebase(old) as typeof old, datasetId: dataset.id, index: segment.index, inputHash: segment.inputHash, sourceRanges: segment.sourceRanges,
       status: old.status === 'processing' ? 'pending' as const : old.status };
   });
   const changed = segments.length !== dataset.segments.length || segments.some((segment, index) => segment.id !== dataset.segments[index]?.id);
-  return { ...dataset, chapters: normalized, segments, sourceVersion: version, rawText, rawTextLength: rawText.length,
+  return { ...dataset, taskPreparation, chapters: normalized, segments, sourceVersion: version, rawText, rawTextLength: rawText.length,
     ...(changed ? { overviewInputHash: undefined, overviewCheckpoints: undefined, analysisStatus: 'draft' as const } : {}),
     updatedAt: Date.now() };
 }

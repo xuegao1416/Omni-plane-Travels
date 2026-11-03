@@ -4,7 +4,7 @@
 
 import { Search } from 'lucide-react';
 import type { MemorySystemConfig } from '../../../memory/types';
-import type { ApiPreset } from '../apiPresetUtils';
+import type { ApiPreset } from '../../../api/presets';
 import { Section,FieldGrid,Field,Select,Toggle } from '../SettingsUIComponents';
 
 interface Props {

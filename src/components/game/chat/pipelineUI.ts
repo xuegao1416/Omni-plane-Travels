@@ -19,6 +19,7 @@ export const STAGE_META: Record<PipelineTaskId, { icon: LucideIcon; color: strin
   memory_retrieve_finalize:{ icon: Search,    color: '#4c1d95', desc: '本地匹配 + 去重 + 排序' },
   memory_compile:         { icon: Puzzle,     color: 'var(--warning)', desc: '组装记忆上下文注入系统提示词' },
   variable:               { icon: Variable,   color: 'var(--danger)', desc: '提取游戏变量更新' },
+  settlement:             { icon: Puzzle,     color: 'var(--accent)', desc: '接纳行动结果、时间与玩法消耗' },
 };
 
 /** 阶段执行顺序 */
@@ -32,6 +33,7 @@ export const STAGE_ORDER: PipelineTaskId[] = [
   'memory_retrieve_finalize',
   'memory_compile',
   'variable',
+  'settlement',
 ];
 
 /** 状态视觉配置 */

@@ -6,10 +6,11 @@
  * 用途：发给 AI API、变量提取、记忆系统
  */
 import { stripTimeAdvanceTags } from '../time/worldClock';
+import { stripUnclosedKernelTrace } from '../utils/regexScripts';
 
 export function extractContentForPrompt(rawText: string): string {
   if (!rawText) return '';
-  rawText = stripTimeAdvanceTags(rawText);
+  rawText = stripUnclosedKernelTrace(stripTimeAdvanceTags(rawText));
 
   // 优先合并所有非空 <contenttext> 正文块。部分中转服务会先吐出一个
   // 空占位块，再返回真正正文；只读取第一个块会把有效回复误判为空回。

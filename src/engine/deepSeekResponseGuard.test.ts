@@ -12,6 +12,7 @@ const complete = `<contenttext>完整正文。</contenttext>
 [OPTION]{t: "观察环境", d: "留意附近的变化"}
 [OPTION]{t: "询问同伴", d: "和在场角色交谈"}
 [OPTION_END]`;
+const timeAdvance = '<TimeAdvance>{"minutes":20,"reason":"沿路步行","evidence":"走了二十分钟"}</TimeAdvance>';
 
 describe('DeepSeek response completion guard', () => {
   test('accepts only a closed narrative followed by a closed option block', () => {
@@ -21,6 +22,87 @@ describe('DeepSeek response completion guard', () => {
     expect(isDeepSeekResponseComplete(complete.replace('[OPTION_END]', ''))).toBe(false);
     expect(isDeepSeekResponseComplete(`[OPTION_START]\n[OPTION]{t: "乱序", d: "选项在正文前"}\n[OPTION_END]\n<contenttext>正文</contenttext>`)).toBe(false);
     expect(isDeepSeekResponseComplete(`${complete}\n未完成的多余尾巴`)).toBe(false);
+  });
+
+  test('accepts a single valid host time receipt after the option block', () => {
+    expect(isDeepSeekResponseComplete(`${complete}\n${timeAdvance}`)).toBe(true);
+    expect(isDeepSeekResponseComplete(`${complete}\n<TimeAdvance>{"minutes":0}</TimeAdvance>`)).toBe(true);
+    for (const tail of [
+      '<TimeAdvance>{"minutes":20',
+      '<TimeAdvance>{"minutes":}</TimeAdvance>',
+      '<TimeAdvance>{"minutes":-1}</TimeAdvance>',
+      '<TimeAdvance>{"date":"2028-01-01"}</TimeAdvance>',
+      `${timeAdvance}\n${timeAdvance}`,
+      `${timeAdvance}\n多余尾巴`,
+      `多余尾巴\n${timeAdvance}`,
+    ]) {
+      expect(isDeepSeekResponseComplete(`${complete}\n${tail}`)).toBe(false);
+    }
+  });
+
+  test('repairs only the time receipt when the narrative and options are already complete', () => {
+    for (const tail of ['<TimeAdvance>{"minutes":20', '<TimeAdvance>{"minutes":}</TimeAdvance>']) {
+      const partial = `${complete}\n${tail}`;
+      const prompt = buildDeepSeekRepairPrompt(partial);
+      expect(prompt).toContain('TimeAdvance');
+      expect(prompt).not.toContain('补足 3-5');
+      expect(prompt).not.toContain('最后输出 [OPTION_END]');
+      const repaired = appendDeepSeekRepair(partial, timeAdvance);
+      expect(repaired).toBe(`${complete}\n${timeAdvance}`);
+      expect(isDeepSeekResponseComplete(repaired)).toBe(true);
+    }
+  });
+
+  test('preserves a valid receipt while locally rebuilding incomplete options', () => {
+    const partial = `<contenttext>正文</contenttext>\n[OPTION_START]\n[OPTION]{t: "已有选项", d: "保留这个选项"}\n[OPTION_END]\n${timeAdvance}`;
+    const repaired = ensureDeepSeekResponseFallback(partial);
+    expect(repaired).toContain('已有选项');
+    expect(repaired.match(/\[OPTION\]/g)).toHaveLength(3);
+    expect(repaired.endsWith(timeAdvance)).toBe(true);
+    expect(isDeepSeekResponseComplete(repaired)).toBe(true);
+  });
+
+  test('keeps the original receipt last when appending missing options before local fallback', () => {
+    const partialOptions = '<contenttext>正文</contenttext>\n[OPTION_START]\n[OPTION]{t: "已有选项", d: "保留这个选项"}';
+    const suffixOptions = '[OPTION]{t: "补写选项二", d: "执行第二个行动"}\n[OPTION]{t: "补写选项三", d: "执行第三个行动"}\n[OPTION_END]';
+    for (const optionTail of ['\n[OPTION_END]', '', '\n[OPTION]{t: "截断选项']) {
+      for (const extraReceipt of ['', `\n${timeAdvance}`, '\n<TimeAdvance>{"minutes":999,"reason":"补写冲突"}</TimeAdvance>']) {
+        const raw = `${partialOptions}${optionTail}\n${timeAdvance}`;
+        const combined = appendDeepSeekRepair(raw, `${suffixOptions}${extraReceipt}`);
+        const repaired = ensureDeepSeekResponseFallback(combined);
+        expect(repaired.endsWith(timeAdvance)).toBe(true);
+        expect(repaired.match(/<TimeAdvance>/g)).toHaveLength(1);
+        expect(repaired.match(/\[OPTION\]/g)).toHaveLength(3);
+        expect(repaired).toContain('补写选项二');
+        expect(repaired).not.toContain('补写冲突');
+        expect(isDeepSeekResponseComplete(repaired)).toBe(true);
+      }
+    }
+  });
+
+  test('local fallback drops invalid receipts without inventing elapsed time', () => {
+    for (const tail of ['<TimeAdvance>{"minutes":20', '<TimeAdvance>{"minutes":}</TimeAdvance>', `${timeAdvance}\n${timeAdvance}`]) {
+      const repaired = ensureDeepSeekResponseFallback(`${complete}\n${tail}`);
+      expect(repaired).toBe(complete);
+      expect(repaired).not.toContain('TimeAdvance');
+    }
+  });
+
+  test('keeps a zero-minute receipt when the final option and closing marker are truncated', () => {
+    const receipt = '<TimeAdvance>{"minutes":0,"reason":"只是一瞬"}</TimeAdvance>';
+    const partial = `${complete.replace('[OPTION_END]', '[OPTION]{t: "未完成')}\n${receipt}`;
+    const repaired = ensureDeepSeekResponseFallback(partial);
+    expect(repaired).toBe(`${complete}\n${receipt}`);
+    expect(isDeepSeekResponseComplete(repaired)).toBe(true);
+  });
+
+  test('does not treat another malformed repair as a valid replacement receipt', () => {
+    const partial = `${complete}\n<TimeAdvance>{"minutes":`;
+    const invalidRepair = '<TimeAdvance>{"minutes":true}</TimeAdvance>';
+    const combined = appendDeepSeekRepair(partial, invalidRepair);
+    expect(combined).toBe(`${partial}\n${invalidRepair}`);
+    expect(isDeepSeekResponseComplete(combined)).toBe(false);
+    expect(ensureDeepSeekResponseFallback(combined)).toBe(complete);
   });
 
   test('asks for only the missing suffix without repeating the existing response', () => {

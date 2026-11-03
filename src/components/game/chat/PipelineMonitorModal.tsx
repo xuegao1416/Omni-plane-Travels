@@ -13,10 +13,11 @@ interface Props {
   status: PipelineStatusType | null;
   onClose: () => void;
   onRetrySingleStage?: (taskId: PipelineTaskId) => void;
+  onRetryPipeline?: () => void;
   isGenerating?: boolean;
 }
 
-export default function PipelineMonitorModal({ status, onClose, onRetrySingleStage, isGenerating }: Props) {
+export default function PipelineMonitorModal({ status, onClose, onRetrySingleStage, onRetryPipeline, isGenerating }: Props) {
   const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const toggleError = (id: string) => setExpandedErrors((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -60,6 +61,9 @@ export default function PipelineMonitorModal({ status, onClose, onRetrySingleSta
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {onRetryPipeline && status.stages.main.status === 'success' && (
+              <button onClick={onRetryPipeline} disabled={isGenerating} style={styles.retrySmallBtn}>补交未完成步骤</button>
+            )}
             {successCount > 0 && <span style={{ fontSize: 'var(--font-size-sm)', color: '#4caf50' }}>✓{successCount}</span>}
             {skipCount > 0 && <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>-{skipCount}</span>}
             {errorCount > 0 && <span style={{ fontSize: 'var(--font-size-sm)', color: '#f44336' }}>✕{errorCount}</span>}
@@ -154,7 +158,7 @@ export default function PipelineMonitorModal({ status, onClose, onRetrySingleSta
                         </div>
                       )}
                     </div>
-                    {allDone && (stage.status === 'success' || stage.status === 'error') && RETRYABLE_STAGES.has(id) && onRetrySingleStage && (
+                    {!isGenerating && id !== 'main' && (stage.status === 'error' || stage.status === 'warning') && RETRYABLE_STAGES.has(id) && onRetrySingleStage && (
                       <button
                         onClick={() => { onRetrySingleStage(id); }}
                         disabled={isGenerating}

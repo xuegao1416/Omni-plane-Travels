@@ -110,10 +110,11 @@ export function EntryEditor({
             </label>
             <label className="wbe-field wbe-field-sm">
               <span className="wbe-label">类型</span>
+              {/* 「全局」是条目锁定的唯一根因：constant 决定它每轮都注入。
+                  这里必须保持可改，否则玩家只能导出 JSON 手动改再导入。 */}
               <select
                 className="wbe-input"
                 value={entry.constant ? 'constant' : 'trigger'}
-                disabled={isGlobal}
                 onChange={e2 => onUpdate(entry.uid, { constant: e2.target.value === 'constant' })}
               >
                 <option value="trigger">触发式</option>
@@ -168,7 +169,7 @@ export function EntryEditor({
 
           {isGlobal && (
             <div className="wbe-global-hint">
-              <Lock size={12} /> 全局条目无法在此编辑。如需修改，请导出 → 编辑JSON → 重新导入。
+              <Lock size={12} /> 全局条目每轮都会注入，内容暂不可直接改。把上方「类型」改为「触发式」即可自由编辑或移除。
             </div>
           )}
         </div>

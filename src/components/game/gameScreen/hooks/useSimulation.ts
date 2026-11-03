@@ -1,7 +1,6 @@
 import { useState,useEffect,useCallback } from 'react';
 import { getSimulationEngine,requestDirectorReview,setWorldContext } from '../../../../simulation/SimulationApi';
 import { extractWorldContext } from '../../../../simulation/worldContext';
-import { useSimulationStore } from '../../../../stores/simulationStore';
 import type { GameEngine } from '../../../../engine/types';
 import type { WorldDef } from '../../../../data/worlds-schema';
 import type { ApiConfig } from '../../../../api/types';
@@ -40,8 +39,8 @@ export function useSimulation(
     if (isCombatInteractionPaused(engine.variableManager.getState())) return;
     setIsSimulating(true);
     try {
-      // 同步 store 配置到引擎
-      simEngine.state.config = { ...useSimulationStore.getState().simState.config };
+      // 推演配置由引擎持有（面板开关走 mutateBackgroundState 写入引擎），
+      // 这里不再用 UI store 的副本覆盖引擎，避免把过期的配置写回去。
 
       // 手动按钮复用已提交正文的审查通道，强制后台分支执行一次。
       // 这样不会绕过回合身份/快照校验，也不会重新引入已废弃的 engine.tick。

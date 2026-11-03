@@ -1,245 +1,78 @@
-// 生图 React Hook — 队列、生成、存储、URL 缓存
-
-import { useCallback } from 'react';
+// Shared image requests; the existing stores own configuration, task state and paid bytes.
+import { useCallback, useEffect } from 'react';
 import { useImageStore } from '@/stores/imageStore';
+import { useSaveStore, captureCurrentSave } from '@/stores/saveStore';
 import { imageDb } from '@/storage/imageDb';
-import {
-  generateConfiguredImage,
-  fetchComfyUIData,
-  getGenerationConfigError,
-  resolvePromptsForEngine,
-} from '@/api/imageGen';
-import type { ImageTask, ImageCategory, ImageGenConfig } from '@/api/imageGenTypes';
+import { generateConfiguredImage, fetchComfyUIData, getGenerationConfigError } from '@/api/imageGen';
+import { ImageTaskQueue, type ImageTaskOptions } from '@/api/imageTasks';
+import type { ImageGenConfig } from '@/api/imageGenTypes';
 
-// ─── 全局队列（跨组件共享） ───
-
-let globalQueueRunning = false;
-const globalQueue: Array<{
-  taskFn: () => Promise<unknown>;
-  onStatusChange?: (status: string) => void;
-  resolve: (value: unknown) => void;
-  reject: (reason: unknown) => void;
-}> = [];
-
-function processQueue() {
-  if (globalQueueRunning || globalQueue.length === 0) return;
-  globalQueueRunning = true;
-
-  const task = globalQueue.shift()!;
-  if (task.onStatusChange) task.onStatusChange('generating');
-
-  task
-    .taskFn()
-    .then(task.resolve)
-    .catch(task.reject)
-    .finally(() => {
-      globalQueueRunning = false;
-      processQueue();
-    });
-}
-
-function enqueueTask<T>(taskFn: () => Promise<T>, onStatusChange?: (status: string) => void): Promise<T> {
-  return new Promise((resolve, reject) => {
-    globalQueue.push({ taskFn, onStatusChange, resolve: resolve as (v: unknown) => void, reject });
-    if (onStatusChange) onStatusChange('queued');
-    processQueue();
-  });
-}
-
-// ─── URL 缓存（带 LRU 淘汰，防止 Object URL 无限增长） ───
-
-const IMAGE_URL_CACHE_MAX = 50;
-const imageUrlCache = new Map<string, string>();
-
-function evictOldCacheEntries() {
-  if (imageUrlCache.size <= IMAGE_URL_CACHE_MAX) return;
-  const toEvict = imageUrlCache.size - IMAGE_URL_CACHE_MAX;
-  const keys = imageUrlCache.keys();
-  for (let i = 0; i < toEvict; i++) {
-    const key = keys.next().value;
-    if (key) {
-      const url = imageUrlCache.get(key);
-      if (url) URL.revokeObjectURL(url);
-      imageUrlCache.delete(key);
-    }
-  }
-}
-
-// ─── Hook ───
+const imageQueue = new ImageTaskQueue({
+  generate: generateConfiguredImage,
+  add: task => useImageStore.getState().addTask(task),
+  update: (id, patch) => useImageStore.getState().updateTask(id, patch),
+  tasks: () => useImageStore.getState().tasks,
+  save: async (record, isCurrent) => {
+    await imageDb.saveGenerated(record, isCurrent);
+  },
+  retain: record => imageDb.retainGenerated(record),
+  read: key => imageDb.getBlob(key),
+  records: () => imageDb.getAllBlobsStrict(),
+});
 
 export function useImageGen() {
-  const config = useImageStore((s) => s.config);
-  const tasks = useImageStore((s) => s.tasks);
-  const addTask = useImageStore((s) => s.addTask);
-  const updateTask = useImageStore((s) => s.updateTask);
-  const removeTask = useImageStore((s) => s.removeTask);
-  const setComfyData = useImageStore((s) => s.setComfyData);
-  const comfyData = useImageStore((s) => s.comfyData);
+  const config = useImageStore(s => s.config);
+  const tasks = useImageStore(s => s.tasks);
+  const comfyData = useImageStore(s => s.comfyData);
+  useEffect(() => { void imageQueue.restore().catch(error => console.warn('[生图] 已完成任务恢复失败:', error)); }, []);
 
-  // 生成并保存
-  const generateAndSave = useCallback(
-    async (
-      prompt: string,
-      options: {
-        category?: ImageCategory;
-        characterName?: string;
-        negativePrompt?: string;
-        /** Persist this image even when it belongs to inline story content. */
-        persist?: boolean;
-        /** Stable blob key used to restore an inline image after its message remounts. */
-        storageKey?: string;
-      } = {},
-      onStatusChange?: (status: string) => void,
-    ) => {
-      return enqueueTask(async () => {
-        const taskId = 'si-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-
-        const effectiveConfig = config;
-        const { positivePrompt, negativePrompt } = resolvePromptsForEngine(prompt, options, effectiveConfig);
-
-        const taskRecord: ImageTask = {
-          id: taskId,
-          status: 'generating',
-          prompt: positivePrompt || String(prompt ?? ''),
-          negativePrompt,
-          imageUrl: '',
-          imageBlobKey: null,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          params: {},
-          errorMessage: '',
-          category: options.category || 'story',
-          characterName: options.characterName || '',
-        };
-
-        addTask(taskRecord);
-
-        try {
-          const result = await generateConfiguredImage(prompt, effectiveConfig);
-
-          const isPersistent = taskRecord.category !== 'story' || options.persist === true || Boolean(options.storageKey);
-          const imageBlobKey = isPersistent ? (options.storageKey || taskId) : null;
-
-          if (imageBlobKey) {
-            await imageDb.saveBlob(imageBlobKey, result.blob, 'image/png', options.characterName);
-          }
-
-          // Non-persistent previews use a temporary URL; persisted inline
-          // images and portraits are resolved through getStoredImageUrl.
-          const blobUrl = isPersistent ? '' : URL.createObjectURL(result.blob);
-
-          // 更新任务记录
-          updateTask(taskId, {
-            status: 'completed',
-            imageBlobKey,
-            imageUrl: blobUrl,
-            updatedAt: Date.now(),
-            prompt: result.prompt || taskRecord.prompt,
-            negativePrompt: result.negativePrompt || taskRecord.negativePrompt,
-            params: {
-              seed: result.seed,
-              width: result.width,
-              height: result.height,
-              model: result.model,
-              sampler: result.sampler,
-              steps: result.steps,
-              scale: result.scale,
-            },
-          });
-
-          return { ...taskRecord, status: 'completed' as const, imageBlobKey, imageUrl: blobUrl };
-        } catch (e) {
-          updateTask(taskId, {
-            status: 'failed',
-            errorMessage: (e as Error).message,
-            updatedAt: Date.now(),
-          });
-          throw e;
-        }
-      }, onStatusChange);
-    },
-    [config, addTask, updateTask],
-  );
-
-  const getStoredImageUrl = useCallback(async (blobKey: string): Promise<string> => {
-    const cacheKey = `blob:${blobKey}`;
-    if (imageUrlCache.has(cacheKey)) return imageUrlCache.get(cacheKey)!;
-
-    if (blobKey) {
-      const blobData = await imageDb.getBlob(blobKey);
-      if (blobData && blobData.blob) {
-        const objectUrl = URL.createObjectURL(blobData.blob);
-        imageUrlCache.set(cacheKey, objectUrl);
-        evictOldCacheEntries();
-        return objectUrl;
+  const generateAndSave = useCallback((prompt: string, options: ImageTaskOptions = {}, onStatusChange?: (status: string) => void) => {
+    const sessionId = options.sessionId ?? useSaveStore.getState().currentSaveId ?? undefined;
+    const isCurrent = () => {
+      if (sessionId && useSaveStore.getState().currentSaveId !== sessionId) return false;
+      if (options.isCurrent && !options.isCurrent()) return false;
+      if (options.messageId) {
+        try { return captureCurrentSave().messages.some(message => message.id === options.messageId); }
+        catch { return false; }
       }
-    }
+      return true;
+    };
+    return imageQueue.generate(prompt, config, { ...options, sessionId, isCurrent }, onStatusChange);
+  }, [config]);
 
-    return '';
+  const hasRecoverableImage = useCallback((prompt: string, storageKey: string) => Boolean(imageQueue.recoverable(prompt, {
+    storageKey, sessionId: useSaveStore.getState().currentSaveId ?? undefined,
+  })), []);
+
+  const findRecoverableImage = useCallback((storageKey: string) => tasks.findLast(task => task.deliveryKey === storageKey
+    && task.hasResult && task.status === 'failed' && task.sessionId === (useSaveStore.getState().currentSaveId ?? undefined)), [tasks]);
+  const reuseImageTask = useCallback((id: string, options: ImageTaskOptions = {}) => {
+    const sessionId = useSaveStore.getState().currentSaveId;
+    return imageQueue.reuse(id, { ...options, isCurrent: () => useSaveStore.getState().currentSaveId === sessionId
+      && (!options.isCurrent || options.isCurrent()) });
   }, []);
 
-  // 获取图片 URL
-  const getImageUrl = useCallback(async (task: ImageTask): Promise<string> => {
-    const blobKey = task.imageBlobKey || task.id;
-    const storedUrl = await getStoredImageUrl(blobKey);
-    if (storedUrl) return storedUrl;
+  const deleteImageTask = useCallback(async (id: string) => {
+    const task = useImageStore.getState().tasks.find(task => task.id === id);
+    if (!task) return;
+    if (task.status === 'queued' || task.status === 'generating') throw new Error('图片正在生成，请完成或取消后删除');
+    if (task.deliveryKey && task.deliveryKey !== id) {
+      const delivered = await imageDb.getBlob(task.deliveryKey);
+      if (delivered?.generation?.id === id) await imageDb.deleteBlob(task.deliveryKey);
+    }
+    await imageDb.deleteBlob(id);
+    useImageStore.getState().removeTask(id);
+  }, []);
 
-    return task.imageUrl || '';
-  }, [getStoredImageUrl]);
+  const validateConfig = useCallback((override?: Partial<ImageGenConfig>) => getGenerationConfigError(override || config), [config]);
+  const loadComfyUIData = useCallback(async (apiUrl?: string) => {
+    const url = apiUrl || config.comfyUrl;
+    if (!url) return;
+    const data = await fetchComfyUIData(url);
+    useImageStore.getState().setComfyData(data);
+    return data;
+  }, [config.comfyUrl]);
 
-  // 删除任务
-  const deleteImageTask = useCallback(
-    async (taskId: string) => {
-      const task = tasks.find((t) => t.id === taskId);
-      if (task) {
-        const cacheKey = `blob:${task.imageBlobKey || task.id}`;
-        const cachedUrl = imageUrlCache.get(cacheKey);
-        if (cachedUrl) {
-          URL.revokeObjectURL(cachedUrl);
-          imageUrlCache.delete(cacheKey);
-        }
-        const blobKey = task.imageBlobKey || task.id;
-        if (blobKey) await imageDb.deleteBlob(blobKey);
-      }
-      removeTask(taskId);
-    },
-    [tasks, removeTask],
-  );
-
-  // 验证配置
-  const validateConfig = useCallback(
-    (cfgOverride?: Partial<ImageGenConfig>): string => {
-      return getGenerationConfigError(cfgOverride || config);
-    },
-    [config],
-  );
-
-  // 获取 ComfyUI 数据
-  const loadComfyUIData = useCallback(
-    async (apiUrl?: string) => {
-      const url = apiUrl || config.comfyUrl;
-      if (!url) return;
-      try {
-        const data = await fetchComfyUIData(url);
-        setComfyData(data);
-        return data;
-      } catch (e) {
-        console.error('[useImageGen] 获取 ComfyUI 数据失败:', e);
-        throw e;
-      }
-    },
-    [config.comfyUrl, setComfyData],
-  );
-
-  return {
-    config,
-    tasks,
-    comfyData,
-    generateAndSave,
-    getImageUrl,
-    getStoredImageUrl,
-    deleteImageTask,
-    validateConfig,
-    loadComfyUIData,
-  };
+  return { config, tasks, comfyData, generateAndSave, deleteImageTask,
+    hasRecoverableImage, findRecoverableImage, reuseImageTask, validateConfig, loadComfyUIData };
 }

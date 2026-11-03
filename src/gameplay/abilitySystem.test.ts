@@ -168,7 +168,10 @@ describe('unified ability system', () => {
     expect(accepted.definition?.mechanics?.combatAction?.damage).toBeLessThan(999999);
     expect(accepted.state.v3?.pendingAbilityProposals).toBeUndefined();
     expect(accepted.state.v3?.abilityInstances?.['story-flame'].acquiredAt).toBe(12);
-    expect(accepted.state.玩家.技能系统['story-flame'].描述).toContain('训练');
+    // 技能系统的键是技能显示名（与 personalInfo.initialSkills / TaskPanel 按“技能名”查找保持一致）；
+    // 机械态的已掌握技能仍然按能力 id 记录。
+    expect(accepted.state.玩家.技能系统['余烬术'].描述).toContain('训练');
+    expect(accepted.state.玩家.技能系统['余烬术'].名称).toBe('余烬术');
     expect(accepted.state.玩家.能力系统?.已掌握技能['story-flame'].等级).toBe(1);
   });
 

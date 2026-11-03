@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { buildNovelSegments, hashNovelText } from './segmentation';
+import { buildNovelSemanticSegments, hashNovelText } from './segmentation';
 import type { NovelChapter, NovelDataset, NovelStaticMaterial } from './types';
 
 const numeric = '[零〇一二三四五六七八九十百千万两\\d]+';
@@ -164,7 +164,7 @@ export function createNovelDatasetFromText(
     rawText,
     chapters,
     staticMaterial,
-    segments: buildNovelSegments(id, chapters),
+    segments: buildNovelSemanticSegments(id, chapters),
     analysisStatus: 'draft',
     analysisVersion: 1,
     createdAt: now,

@@ -1,6 +1,7 @@
 import type { WorldBookEntryDef,WorldDef } from '../../../../data/worlds-schema';
 import { findWorldDef } from '../../../../data/worldLoader';
 import { STORAGE_KEYS } from '../../../../config/storageKeys';
+import { safeSetItem } from '../../../../storage/safeStorage';
 
 /** 持久化世界到 localStorage（CUSTOM_WORLDS） */
 export function persistWorldToStorage(updatedWorld: WorldDef) {
@@ -12,7 +13,7 @@ export function persistWorldToStorage(updatedWorld: WorldDef) {
     } else {
       stored.push(updatedWorld);
     }
-    localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(stored));
+    safeSetItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(stored));
   } catch (err) {
     console.error('[世界书] 持久化失败:', err);
     throw err;

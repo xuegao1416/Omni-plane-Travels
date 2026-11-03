@@ -12,10 +12,9 @@ import type { ApiPromptWorkflow } from '@/api/comfy/comfyWorkflow';
 import { Section,Toggle } from './SettingsUIComponents';
 import { Wand2 } from 'lucide-react';
 import { PresetCard,ImportPanel,buildAutoMapping,setMappingParam } from './comfyWorkflow';
+import type { ConfigSectionProps } from './imageGenSettings/types';
 
-export default function ComfyWorkflowEditor() {
-  const config = useImageStore((s) => s.config);
-  const updateConfig = useImageStore((s) => s.updateConfig);
+export default function ComfyWorkflowEditor({ config, updateConfig }: ConfigSectionProps) {
   const comfyData = useImageStore((s) => s.comfyData);
   const { loadComfyUIData } = useImageGen();
 

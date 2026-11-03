@@ -1,3 +1,4 @@
+import type { ChronicleMergeOptions } from './chronicleActions';
 import type { LucideIcon } from 'lucide-react';
 import { User,FileText,Swords,Backpack } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
@@ -8,8 +9,8 @@ import type { CustomNpc } from '../../../../storage/db';
 export interface CharacterGridProps {
   gameState: GameState;
   worldId?: string;
-  onUpdateChronicles?: (npcId: string, chronicles: string[]) => void;
-  onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number) => Promise<boolean>;
+  onUpdateChronicles?: (npcId: string, chronicles: string[], expectedChronicles?: string[]) => boolean | void;
+  onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number, options?: ChronicleMergeOptions) => Promise<boolean>;
   /**
    * 删除指定 NPC：调用方负责清理外部资源并保存存档。
    * 返回 false 表示删除未生效（如 NPC 不存在或处于只读模式）。

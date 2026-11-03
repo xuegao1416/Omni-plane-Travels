@@ -63,7 +63,7 @@ export function memoryVisibilityMetadata(value: MemoryVisibility): MemoryVisibil
 
 /** A detached projection; director inspection cannot mutate knowledge or stored facts. */
 export function projectMemoryRuntime(runtime: NarrativeMemoryRuntime, audience: MemoryAudience = 'player'): NarrativeMemoryRuntime {
-  const result = structuredClone(runtime);
+  const result = { ...runtime };
   const hiddenSources = new Set(runtime.sourceEvents.filter(event => !isMemoryVisible(event, audience)).map(event => event.id));
   const visible = (value: MemoryProvenance) => isMemoryVisible(value, audience)
     && (audience === 'director' || Boolean(value.playerKnown && value.discovery?.sourceEventId && value.discovery.evidence)
@@ -90,5 +90,7 @@ export function projectMemoryRuntime(runtime: NarrativeMemoryRuntime, audience: 
     result.retrieveDebugLogs = [];
     result.compileDebugLogs = [];
   }
-  return result;
+  // Filter before detaching so player retrieval never copies discarded rollback
+  // snapshots, debug logs or hidden facts into a temporary full-size runtime.
+  return structuredClone(result);
 }

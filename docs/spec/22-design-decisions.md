@@ -11,12 +11,12 @@
 | 2 | 声明式 DSL | 白名单动作(set/addEvent/modifyResource 等)                                                                                                     | 永不执行玩家代码      |
 | 3 | 确定性优先   | `performance.now()` 计时                                                                                                                   | 业务逻辑尽量可复现     |
 | 4 | 增量优先 | 消息分片 + compactHead | 避免全量重写存档 |
-| 5 | 三重快照链 | 变量、记忆与演化快照绑定每条 AI 消息；单项异常被 try/catch 隔离，缺失项为 undefined | 支持任意历史回滚 |
+| 5 | 三重快照链 | 变量、记忆、演化快照绑定每条 AI 消息；任一快照源在异常隔离（try/catch）后可能为 `undefined`，此时只有部分快照生效 | 支持任意历史回滚（部分场景降级） |
 | 6 | 每存档 simulationState | simulationState 存 GameSave 内 | 解决多开串存档 |
 | 7 | 模块化数据驱动 | 世界模块完全 AI 生成数据驱动 | 引擎解释执行,无需硬编码 |
 | 8 | 双写模式 | ref + state | 性能关键路径避免重渲染 |
-| 9 | 作用域守卫 | `AbortController` + `controller.signal.aborted` 判定取消状态，`pipelineExecutor` 内部通过 signal 传递 | 取消/重试操作作用于正确上下文 |
-| 10 | 二级开关 | `sessionActivePacks` 为 `undefined` 时取全局已启用列表，否则以本局列表为准（`EventConfigPanel.tsx`） | 防止跨世界事件包污染 |
+| 9 | 作用域守卫 | 每轮管线持有 `AbortController`，各阶段通过 `signal` 传递取消状态；`pipelineExecutor` 用 `controller.signal.aborted` 判断是否停止调度同层剩余任务 | 取消/重试操作作用于正确上下文 |
+| 10 | 二级开关 | `sessionActivePacks` 为 `undefined` 时取全局已启用列表，否则按该列表取交集 | 防止跨世界事件包污染 |
 
 `Date.now()` 允许用于 ID、日志和交互时间戳；确定性要求只约束会影响同一输入机械结算结果的核心状态推进。
 
@@ -31,7 +31,7 @@
 | 虚拟滚动          | visibleStart + 批量加载 80 条                                                                                                                                                        | 长对话不卡顿     |
 | 双写模式          | messagesRef + messages state                                                                                                                                                    | 同步访问+触发 UI |
 | 增量存档          | newMessages 过滤 + 滑动窗口优化                                                                                                                                                         | 减少写入量      |
-| Coalescing 防抖 | `_saveQueued` 合并连续存档请求：`saveGame` 进行中再次调用则置 `_saveQueued=true` 并返回在途 Promise，循环结束后用最新 buildSaveData 再存一次（`saveStore.ts:68/349/355/360`） | 合并连续存档请求   |
+| Coalescing 防抖 | `saveStore` 用 `_saveQueued` 合并存档请求：`saveGame` 进行中再次调用则置 `_saveQueued = true`（`:349`）并返回在途 Promise，循环结束后用最新 `buildSaveData` 再存一次（`:355` 复位、`:360` `do/while` 重跑），实现请求合并 | 合并连续存档请求   |
 | 500ms 自动存档防抖  | setTimeout 清除重设计时器                                                                                                                                                              | 减少存档次数     |
 | 快照优化          | optimizeSnapshots 保留关键帧                                                                                                                                                         | 内存占用降低     |
 | 消息分片          | IndexedDB 分片+复合主键                                                                                                                                                               | 加载速度提升     |

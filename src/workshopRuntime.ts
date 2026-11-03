@@ -1,4 +1,5 @@
 import { getGlobal,putGlobal } from './storage/db';
+import { trySetItem } from './storage/safeStorage';
 import {
 deleteHistoryPreset,
 deleteNpcTemplate,saveHistoryPreset,
@@ -291,6 +292,7 @@ export async function restoreCustomWorldStorage(
   key: string,
   previous: string | null,
 ): Promise<void> {
+  // 回滚是尽力而为：已经写满时不能再让还原动作本身抛错。
   if (previous === null) localStorage.removeItem(key);
-  else localStorage.setItem(key, previous);
+  else trySetItem(key, previous);
 }

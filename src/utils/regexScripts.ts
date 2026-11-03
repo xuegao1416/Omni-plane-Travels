@@ -32,6 +32,11 @@ export interface RegexScript {
   maxDepth?: number | null;
 }
 
+/** Remove Kunlun's hidden trace, including an unterminated preamble before the body container. */
+export function stripUnclosedKernelTrace(text: string): string {
+  return text.replace(/<!--\s*\[KERNEL_AST_TRACE\][\s\S]*?(?:-->|(?=<content(?:text)?\b)|$)/gi, '');
+}
+
 // ============ 内部辅助函数 ============
 
 function parseRegexBool(value: unknown): boolean {
@@ -92,7 +97,8 @@ export function processRegexScripts(
   placement?: number | string,
   depth: number | null = null,
 ): string {
-  if (!text || !scripts || scripts.length === 0) return text;
+  if (!text) return text;
+  if (!scripts || scripts.length === 0) return stripUnclosedKernelTrace(text);
 
   let processedText = text;
   const normPlacements = placement !== undefined ? normalizeRegexPlacement(placement) : [];
@@ -173,7 +179,7 @@ export function processRegexScripts(
     }
   }
 
-  return processedText;
+  return stripUnclosedKernelTrace(processedText);
 }
 
 /**

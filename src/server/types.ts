@@ -16,13 +16,6 @@ export interface Bindings {
   EMAIL_FROM: string;
   /** 允许跨域（桌面端 Bearer）的 Origin 列表，逗号分隔。 */
   ALLOWED_ORIGINS?: string;
-  /** 免费体验上游（仅服务端使用，绝不返回客户端）。 */
-  TRIAL_LLM_BASE_URL?: string;
-  TRIAL_LLM_API_KEY?: string;
-  TRIAL_LLM_MODEL?: string;
-  TRIAL_MAX_REQUESTS?: string;
-  /** 匿名体验 token 签名密钥；未设置时回退 SESSION_SECRET。 */
-  TRIAL_ID_SECRET?: string;
 }
 
 export type WorkshopItemType = WorkshopAssetType;

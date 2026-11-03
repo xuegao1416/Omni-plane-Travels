@@ -8,7 +8,7 @@ import { callAuxiliaryApi, extractVariableRules } from '../api/auxiliaryApi';
 import { eventBus, EVENTS } from './eventBus';
 import { buildVariableExtractionPrompt } from '../utils/prompts';
 import { findWorldDef } from '../data/worldLoader';
-import { loadPresets } from '../components/settings/apiPresetUtils';
+import { apiPresetStore } from '../stores/apiPresetStore';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { buildModuleContextProjection, projectProfessionModuleConfig } from '../gameplay/moduleRuntime/contextRouter';
 import { normalizeAbilityProposal, normalizeCombatEncounterRequest, type AbilityProposal, type CombatEncounterRequest } from '../gameplay/protocols';
@@ -18,7 +18,9 @@ import { isCombatAllyNpc } from '../gameplay/combatV2';
 import type { StatModuleSchema } from '../modules/schema';
 import { ensureNpcModuleDefaults } from '../utils/npcStats';
 import { getNpcCategoryValue } from '../utils/npcHelpers';
-import { applyPlayerObservations, type PlayerObservation } from './playerKnowledge';
+import { type PlayerObservation } from './playerKnowledge';
+import { applyNarrativeKnowledge } from './narrativeKnowledge';
+import { abortableDelay } from '../utils/abortableDelay';
 
 export function extractPlayerObservations(input: unknown): PlayerObservation[] {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return [];
@@ -91,10 +93,6 @@ export function hasResolvedCombatOutcome(aiText: string): boolean {
   if (!narrative) return false;
   return /(战斗|交锋|冲突|危机).{0,10}(?:结束|告终|解除|落幕|胜负已定)|(?:敌人|对手|袭击者|追杀者|守卫|士兵|怪物|他|她|其).{0,20}(?:被(?:你|玩家)?.{0,8})?(?:杀死|击杀|击毙|斩杀|处决|毙命|身亡|死亡|断气|咽气|倒地不起|失去战斗能力)|(?:你|玩家).{0,16}(?:杀死|击杀|击毙|斩杀|处决).{0,16}(?:敌人|对手|袭击者|追杀者|守卫|士兵|怪物|他|她|其)|(?:已经|成功|终于).{0,10}(?:甩脱|摆脱|逃脱|脱离)|追兵.{0,10}(?:退去|离开)|敌方.{0,10}(?:投降|溃败|撤退)/.test(narrative);
 }
-function sleep(ms: number): Promise<void> {
-  if (ms <= 0) return Promise.resolve();
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 /**
  * 精简 GameState 用于变量提取 API 调用
@@ -119,6 +117,7 @@ export function createVariableExtractionSnapshot(state: GameState, narrativeText
       const npcInventory = (npc as unknown as Record<string, unknown>).物品栏;
       const hasInventory = !!npcInventory && typeof npcInventory === 'object' && !Array.isArray(npcInventory)
         && Object.keys(npcInventory as Record<string, unknown>).length > 0;
+      // 技能列表/物品列表/装备列表属静态定义，按既有约定不进提取快照（见 variableExtractionSnapshot.test.ts）
       const cleaned = Object.fromEntries(Object.entries({
         姓名: npc.姓名,
         种族: npc.种族,
@@ -162,6 +161,7 @@ async function callAuxiliaryApiForEngine(
   aiContentText: string,
   worldId: string,
   signal?: AbortSignal,
+  repair?: { output: string; reason: string },
 ): Promise<string | null> {
   const worldDef = findWorldDef(worldId);
   const moduleProjection = buildModuleContextProjection({
@@ -198,6 +198,9 @@ async function callAuxiliaryApiForEngine(
     messages.push({ role: 'user', content: userMessage });
   }
   messages.push({ role: 'assistant', content: aiContentText });
+  if (repair) {
+    messages.push({ role: 'user', content: `[上次变量输出校验失败]\n原因：${repair.reason}\n上次输出（未应用）：\n${repair.output}\n请依据同一正文和快照修正这份输出，返回完整合法的 GameplayTransaction。只修复指出的结构、JSON或权限问题；不要添加未发生的事实，不得修改本地权威时钟。` });
+  }
 
   // 获取成长体系配置（从世界定义读取，不存入 GameState）
   const relevant = new Set(moduleProjection.relevantModuleIds);
@@ -230,8 +233,14 @@ async function callAuxiliaryApiForEngine(
     hasEnabledCombatModule(worldDef, gameState) ? COMBAT_ENCOUNTER_CONTRACT_PROMPT : ''
   }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}
 【玩家观察记录】
-在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"observed|disclosed",introduces:false}]。
-只记录本轮已提交正文中玩家亲眼观察或明确获告知的具体字段，quote 必须逐字引用正文并能够支持该字段。不能从变量快照、读者视角或幕后叙述补充玩家不知道的内容。见面不等于获知全部资料，未获知的字段省略。内心想法、真实目标、里性格等秘密仅当正文明确向玩家披露时用 disclosed。新认识人物先提供姓名字段和 introduces:true。人物必须使用人物档案中的规范 ID，path 为字段路径，例如 个人信息.当前状态；不得直接修改 playerKnowledge。没有实际观察则省略。
+在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"disclosed",introduces:false}]。
+公开字段（姓名、种族、性别、人物分类、外貌、表性格、当前穿着、当前位置、当前状态、当前行动、关系数据）由系统按本轮正文自动同步，不必输出。
+自动同步的前提是人物档案已正确更新：亲自与玩家互动的角色必须在 effects 中设为“在场”，并按本轮实际行动更新位置和关系数据。人物档案中已有规范ID不等于玩家已经认识；首次见面时先输出 path:"姓名"、introduces:true 的有效观察，再输出其他字段。不要只输出关系观察却遗漏首次姓名登记，也不要把“无更新”作为已发生互动的替代。
+例外（重要）：若你在正文里只用代称描写某个角色（"老头""老板娘""那位客人"等），而人物档案里用的是正式姓名，系统按姓名匹配不到，这个角色就不会进入角色关系面板。此时必须补一条出场声明，把正文代称和正式姓名连起来：
+playerObservations:[{"npcId":"人物档案中的规范ID","path":"姓名","value":"你在人物档案里写的正式姓名","quote":"本轮正文里该角色的代称原文（逐字）","mode":"observed","introduces":true}]
+首次登记该角色用 introduces:true；若该角色已经认识，则用 introduces:false，并在同一轮用同一段代称原文补上你更新过的公开字段（外貌、当前穿着、当前位置、当前状态、当前行动、关系数据.关系类型、关系数据.好感度）。
+这里还需要补充"正文明确向玩家披露的秘密"：当前想法、里性格、真实目标（短期/长期）、背景、备注、生存状态数值、技能与天赋等，mode 用 disclosed。
+quote 必须逐字引用正文并能够支持该字段；不能从变量快照、读者视角或幕后叙述补充玩家不知道的内容。人物必须使用人物档案中的规范 ID；不得直接修改 playerKnowledge。没有被披露的秘密则省略该字段。
 【机械结算只读边界】
 simulationRuntime 及其 effectLog 属于本地规则运行记录，不是允许修改的变量路径。下面是最近已结算记录，快照数值已包含这些变化，不得因为正文再次提及而重复加减。不要输出主线进度、候选事件或未来剧情为实际状态；只提取这轮正文已经发生且尚未结算的事实。
 ${JSON.stringify(gameState.simulationRuntime?.effectLog?.slice(-12) ?? []).slice(0, 5000)}`;
@@ -252,12 +261,17 @@ export async function runVariableExtraction(params: {
   signal?: AbortSignal;
   /** A retry must still belong to the same save, world, turn and manager. */
   isCurrent?: () => boolean;
+  /** Draft callers publish accepted effects only after their version check. */
+  onEncounter?: (request: CombatEncounterRequest) => void;
+  onUpdate?: () => void;
 }): Promise<void> {
   const { varMgr, parsed, round, userText, mainApiConfig, worldBook, worldId, delayMs, maxRetries, signal } = params;
   const assertCurrent = () => {
     signal?.throwIfAborted();
     if (params.isCurrent && !params.isCurrent()) throw new DOMException('变量提取对应的回合已失效', 'AbortError');
   };
+  const notify = () => params.onUpdate ? params.onUpdate() : eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+  const publishEncounter = (request: CombatEncounterRequest) => params.onEncounter ? params.onEncounter(request) : eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, request);
   assertCurrent();
 
   if (!parsed.content.trim()) {
@@ -268,23 +282,24 @@ export async function runVariableExtraction(params: {
 
   // 选择 API 配置：优先变量提取专用预设 > 主API
   let effectiveConfig: ApiConfig = mainApiConfig;
+  let varPresetId: string | null = null;
   try {
-    const varPresetId = localStorage.getItem(STORAGE_KEYS.VARIABLE_API_PRESET);
-    if (varPresetId) {
-      const presets = loadPresets();
-      const preset = presets.find(p => p.id === varPresetId);
-      if (preset) {
-        effectiveConfig = { ...preset.config };
-      }
-    }
+    varPresetId = localStorage.getItem(STORAGE_KEYS.VARIABLE_API_PRESET);
   } catch { /* localStorage 不可用时 fallback */ }
+  if (varPresetId) {
+    const presets = await apiPresetStore.getPresets();
+    assertCurrent();
+    const preset = presets.find(p => p.id === varPresetId);
+    if (preset) effectiveConfig = { ...preset.config };
+  }
 
   // 等待可配置的延迟（管线执行器已保证记忆任务先于此阶段完成）
   if (delayMs > 0) {
-    await sleep(delayMs);
+    await abortableDelay(delayMs, signal);
   }
 
   let lastError: unknown = null;
+  let repair: { output: string; reason: string } | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -299,13 +314,14 @@ export async function runVariableExtraction(params: {
         parsed.content,
         worldId,
         signal,
+        repair,
       );
       assertCurrent();
 
       // AI 返回 null/空字符串/仅空白：视为无需更新，不是错误
       if (!updateText || !updateText.trim()) {
         console.log('[变量提取] AI 未返回有效更新内容，跳过变量更新');
-        eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+        notify();
         return;
       }
 
@@ -349,26 +365,35 @@ export async function runVariableExtraction(params: {
             }
           }
         }
-        if (!applied && !encounter && abilityProposals.length === 0 && observations.length === 0) {
-          throw new Error(`变量更新内容无法应用：${jsonContent.slice(0, 120)}`);
+        const hasMetadata = !!encounter || abilityProposals.length > 0 || observations.length > 0;
+        const headerKeys = new Set(['id', 'moduleId', 'source', 'label']);
+        const metadataOnly = !!gameplayUpdate && typeof gameplayUpdate === 'object' && !Array.isArray(gameplayUpdate)
+          && Object.keys(gameplayUpdate).every(key => headerKeys.has(key));
+        // Valid observation/ability metadata cannot make a rejected transaction
+        // appear successful. Metadata-only outputs retain their existing route.
+        if (!applied && (!hasMetadata || !metadataOnly)) {
+          const reason = varMgr.getLastAiUpdateRejection() ?? '变量事务未通过校验';
+          repair = { output: updateText, reason };
+          throw new Error(`变量更新校验失败：${reason}`);
         }
         if (abilityProposals.length > 0) {
           let proposalState = varMgr.getState();
           for (const proposal of abilityProposals) proposalState = stageAbilityProposalOnGameState(proposalState, proposal).state;
           varMgr.setState(proposalState);
         }
-        if (encounter) eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, encounter);
-        if (observations.length) {
-          let hash = 2166136261;
-          for (let i = 0; i < parsed.content.length; i++) hash = Math.imul(hash ^ parsed.content.charCodeAt(i), 16777619);
-          const eventId = `narrative:${worldId}:${round}:${(hash >>> 0).toString(36)}`;
-          const result = applyPlayerObservations(varMgr.getState(), { id: `observation:${eventId}`, turnId: eventId, eventId, turnNumber: round, committed: true, text: parsed.content, observations });
-          assertCurrent();
-          varMgr.setState(result.state);
-        }
+        if (encounter) publishEncounter(encounter);
+        let hash = 2166136261;
+        for (let i = 0; i < parsed.content.length; i++) hash = Math.imul(hash ^ parsed.content.charCodeAt(i), 16777619);
+        const eventId = `narrative:${worldId}:${round}:${(hash >>> 0).toString(36)}`;
+        const observedState = applyNarrativeKnowledge(varMgr.getState(), {
+          id: `observation:${eventId}`, turnId: eventId, eventId, turnNumber: round,
+          committed: true, text: parsed.content, observations,
+        });
+        assertCurrent();
+        varMgr.setState(observedState);
       }
 
-      eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+      notify();
       return;
     } catch (err: unknown) {
       assertCurrent();
@@ -377,7 +402,7 @@ export async function runVariableExtraction(params: {
       if (attempt < maxRetries) {
         // 指数退避，避免瞬时网络抖动时连续重试都打在同一次故障上
         const waitMs = delayMs > 0 ? delayMs * Math.pow(2, attempt) : 0;
-        await sleep(waitMs);
+        await abortableDelay(waitMs, signal);
       }
     }
   }
@@ -390,7 +415,7 @@ export async function runVariableExtraction(params: {
   // 保守的本地即时冲突判定，变量阶段本身继续如实报告失败。
   if (hasEnabledCombatModule(findWorldDef(worldId), varMgr.getState())) {
     const fallbackEncounter = inferImmediateCombatEncounterRequest(userText, parsed.content, varMgr.getState(), round);
-    if (fallbackEncounter) eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, fallbackEncounter);
+    if (fallbackEncounter) publishEncounter(fallbackEncounter);
   }
   console.warn('[变量提取] 全部重试失败:', finalError.message);
   eventBus.emit(EVENTS.VARIABLE_EXTRACTION_FAILED, finalError.message);

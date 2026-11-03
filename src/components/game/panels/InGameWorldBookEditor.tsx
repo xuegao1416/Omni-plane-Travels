@@ -36,7 +36,14 @@ export default function InGameWorldBookEditor({ engine, worldId, onClose }: Prop
     setEntries(prev => prev.map(e => e.uid === uid ? { ...e, ...patch, _dirty: true } : e));
   };
   const deleteEntry = (uid: number) => {
-    setEntries(prev => prev.filter(e => e.uid === uid ? !e.constant : true));
+    // 「全局」条目受保护。原来直接 filter 掉会静默无效（点了什么也没发生），
+    // 这里改成明确拒绝并说明解锁方式。
+    if (entries.some(e => e.uid === uid && e.constant)) {
+      setSaveMsg({ type: 'error', text: '「全局」条目受保护：请先把「类型」改为「触发式」，之后即可自由编辑或移除。' });
+      setTimeout(() => setSaveMsg(null), 4000);
+      return;
+    }
+    setEntries(prev => prev.filter(e => e.uid !== uid));
   };
   const addEntry = () => {
     const uid = genUid();

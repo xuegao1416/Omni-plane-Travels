@@ -1,4 +1,5 @@
 import type { GameState, NPCData } from '../schema/variables';
+import type { DirectorAuthoredEffect } from './authoredEffectsTypes';
 
 export type DirectorTruth = 'true' | 'false' | 'unknown';
 export type PlotPlanStatus = 'waiting' | 'ready' | 'directed' | 'occurred' | 'blocked' | 'invalid' | 'superseded';
@@ -17,6 +18,7 @@ export interface PlotPlanDependency {
 }
 
 export interface PlotPlan {
+  authorEffects?: DirectorAuthoredEffect[];
   stageId?: string;
   id: string;
   intent: string;
@@ -133,7 +135,7 @@ export interface DirectorOutcomeReceipt {
 export interface DirectorSourceBinding {
   actorNames?: Record<string, string>;
   actorAliases?: Record<string, string[]>;
-  stages?: Array<{ id: string; title: string; mode: 'all' | 'any'; planIds: string[]; completionPlanIds: string[]; status: 'pending' | 'active' | 'completed' | 'failed' }>;
+  stages?: Array<{ id: string; title: string; mode: 'all' | 'any'; failurePolicy?: 'stop' | 'continue'; planIds: string[]; completionPlanIds: string[]; status: 'pending' | 'active' | 'completed' | 'failed' }>;
   currentStageId?: string;
   definitionId?: string;
   startStageId?: string;

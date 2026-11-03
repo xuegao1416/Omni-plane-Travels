@@ -14,11 +14,33 @@ export interface ApiConfig {
   reasoningEffort?: string;
   /** API 调用限流间隔（毫秒），默认 10000 */
   rateLimitMs?: number;
+  /** 单次模型请求的超时时间（毫秒）。未设置时 DeepSeek（含兼容入口识别到的地址/模型）300000，其余 120000。 */
+  requestTimeoutMs?: number;
 }
 
 export interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** DeepSeek 原生前缀续写：仅最后一条 assistant 发送此标记。 */
+  prefix?: boolean;
+}
+
+/** A prompt-defined native function-call channel used in place of Tavern request scripts. */
+export interface SyntheticToolRequest {
+  name: string;
+  paramName: string;
+  description: string;
+  fieldDescription: string;
+  controlPrompt: boolean;
+  relocateContext: boolean;
+  pipelineMessages: Message[];
+}
+
+export interface JsonSchemaResponseFormat {
+  type: 'json_schema';
+  name: string;
+  schema: Record<string, unknown>;
+  strict?: boolean;
 }
 
 export interface RequestOptions {
@@ -27,9 +49,8 @@ export interface RequestOptions {
   topP?: number;
   signal?: AbortSignal;
   stream?: boolean;
-  responseFormat?: 'json' | 'text';
-  /** 体验模式只允许主对话请求消耗额度。 */
-  trialPurpose?: 'conversation';
+  responseFormat?: 'json' | 'text' | JsonSchemaResponseFormat;
+  syntheticTool?: SyntheticToolRequest;
 }
 
 export interface StreamOptions extends RequestOptions {

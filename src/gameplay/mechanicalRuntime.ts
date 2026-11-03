@@ -52,7 +52,7 @@ export class MechanicalRuntime {
       return { gameState, mechanicalEffects: {}, effectLog: [], settled: false, notifications };
     }
     // Proposed clock is committed only after the caller accepts the variable transaction.
-    const nextClock = { lastTurnId: turnId, lastRound: round, lastTime: gameTime.current, tickCount: clock.tickCount + 1 };
+    const nextClock: NonNullable<SimulationState['mechanics']> = { lastTurnId: turnId, lastRound: round, lastTime: gameTime.current, tickCount: clock.tickCount + 1 };
     gameState.simulationRuntime ??= createDefaultSimulationRuntimeState();
     gameState.simulationRuntime.tick = nextClock.tickCount;
     const mechanical = this.resolveMechanicalEffects(gameState, notifications);
@@ -64,6 +64,11 @@ export class MechanicalRuntime {
       gameState.simulationRuntime.tick = nextClock.tickCount;
       gameState.simulationRuntime.effectLog = [...gameState.simulationRuntime.effectLog, ...mechanical.log].slice(-100);
     }
+    nextClock.lastSettlement = {
+      round, turnId, time: gameTime.current, effectCount: mechanical.log.length,
+      notificationCount: notifications.eventCards.length + notifications.combatRequests.length,
+      origin: 'live',
+    };
     return { gameState, mechanicalEffects: mechanical.effects, effectLog: mechanical.log, settled: true, notifications, nextMechanics: nextClock };
   }
 

@@ -44,7 +44,7 @@ export interface MobileNavItem {
 }
 
 export function buildMobileNavItems(opts: {
-  navigate: (screen: Screen) => void;
+  navigate: (screen: 'start' | 'settings') => void;
   setShowLeftOverlay: (v: boolean) => void;
   setMobileActivePanel: (panel: OverlayPanel) => void;
 }): MobileNavItem[] {

@@ -5,7 +5,7 @@ import type { VariableManager } from './variableManager';
 import type { WorldBookManager } from '../worldbook/index';
 import type { ParsedResponse } from './responseExtractor';
 import type { ApiConfig } from '../api/types';
-import { runVariableExtraction } from './variableExtraction';
+import { runTurnVariableExtraction } from './turnVariableExtraction';
 import { waitForRateLimit } from '../api/rateLimiter';
 
 /** 管线执行回调 */
@@ -21,6 +21,7 @@ export const RETRYABLE_STAGES = new Set<PipelineTaskId>([
   'main', 'memory_write', 'memory_summary', 'memory_vector',
   'memory_query_rewrite', 'memory_retrieve_plan', 'memory_multi_round',
   'memory_rerank', 'variable',
+  'settlement',
 ]);
 
 /** 管线执行结果 */
@@ -59,14 +60,32 @@ export interface MemoryTasks {
 export class PipelineExecutor {
   private status: PipelineStatus;
   private onUpdate: () => void;
+  private mainResult: PipelineResult['mainResult'] = null;
+  private assertCurrent: () => void = () => {};
 
-  constructor(round: number, callbacks: PipelineCallbacks) {
-    this.status = createPipelineStatus(round);
+  constructor(round: number, callbacks: PipelineCallbacks, recovered?: PipelineResult) {
+    this.status = recovered ? structuredClone(recovered.status) : createPipelineStatus(round);
+    this.mainResult = recovered ? structuredClone(recovered.mainResult) : null;
+    for (const stage of Object.values(this.status.stages)) {
+      if (stage.status === 'running') {
+        stage.status = 'error';
+        stage.error = '处理已中断，可以补交此阶段';
+      }
+    }
     this.onUpdate = callbacks.onUpdate;
   }
 
   getStatus(): PipelineStatus {
     return this.status;
+  }
+
+  getMainResult(): PipelineResult['mainResult'] { return this.mainResult; }
+
+  private resumeTiming() {
+    const lastEnd = this.status.endTime ?? Math.max(this.status.startTime,
+      ...Object.values(this.status.stages).map(stage => stage.endTime ?? this.status.startTime));
+    this.status.startTime = Date.now() - Math.max(0, lastEnd - this.status.startTime);
+    this.status.endTime = undefined;
   }
 
   private updateStage(taskId: PipelineTaskId, updates: Partial<PipelineStageResult>) {
@@ -87,17 +106,35 @@ export class PipelineExecutor {
     mainApiConfig: ApiConfig;
     worldId?: string;
     signal: AbortSignal;
+    isCurrent?: () => boolean;
+    /** Continue the same turn without repeating accepted work. */
+    resume?: boolean;
+    onMainAccepted?: () => void;
     /** 记忆系统任务集（可选，由外部注入） */
     memoryTasks?: MemoryTasks;
+    /** Deterministic effects and module lifecycles share one recoverable boundary. */
+    settlementTask?: (result: PipelineResult) => Promise<void>;
   }): Promise<PipelineResult> {
     const { config, mainTask, varMgr, worldBook, userText, mainApiConfig, worldId = 'default', signal, memoryTasks } = params;
-    let mainResult: { text: string; parsed: ParsedResponse } | null = null;
+    this.assertCurrent = () => {
+      signal.throwIfAborted();
+      if (params.isCurrent?.() === false) throw new DOMException('回合已失效', 'AbortError');
+    };
+    let mainResult = params.resume ? this.mainResult : null;
+    if (params.resume) this.resumeTiming();
+    this.status.endTime = undefined;
 
-    for (const step of config.executionOrder) {
-      if (signal.aborted) {
-        this.skipRemaining();
-        break;
-      }
+    for (const configuredStep of config.executionOrder) {
+      this.assertCurrent();
+      let step = params.resume ? configuredStep.filter(id => !['success', 'skipped'].includes(this.status.stages[id].status)) : configuredStep;
+      step = step.filter(id => {
+        if ((id === 'variable' && !config.variableEnabled) || (id.startsWith('memory_') && !config.memoryEnabled)) {
+          this.updateStage(id, { status: 'skipped', skipped: true });
+          return false;
+        }
+        return true;
+      });
+      if (step.length === 0) continue;
 
       const hasMain = step.includes('main');
       const otherTasks = step.filter(t => t !== 'main');
@@ -106,28 +143,44 @@ export class PipelineExecutor {
       // 纯本地操作（finalize/compile）也不限流，因为不调 API
       const hasApiTask = step.some(t => !LOCAL_ONLY_STAGES.has(t));
       if (!hasMain && hasApiTask) {
-        await waitForRateLimit();
+        await waitForRateLimit(undefined, signal);
+        this.assertCurrent();
       }
 
       if (hasMain) {
         mainResult = await this.executeMain(mainTask);
+        params.onMainAccepted?.();
         if (otherTasks.length > 0 && !signal.aborted) {
-          await waitForRateLimit();
-          await Promise.all(otherTasks.map(taskId =>
+          await waitForRateLimit(undefined, signal);
+          this.assertCurrent();
+          await this.settleTasks(otherTasks.map(taskId =>
             this.executeTask(taskId, config, mainResult!, varMgr, worldBook, userText, mainApiConfig, worldId, signal, memoryTasks)
           ));
         }
       } else {
         // 整层并行
-        await Promise.all(step.map(taskId =>
+        await this.settleTasks(step.map(taskId =>
           this.executeTask(taskId, config, mainResult, varMgr, worldBook, userText, mainApiConfig, worldId, signal, memoryTasks)
         ));
       }
     }
 
+    this.assertCurrent();
+    if (!params.resume || !['success', 'skipped'].includes(this.status.stages.settlement.status)) {
+      await this.executeMemoryTask('settlement', Boolean(mainResult), params.settlementTask
+        ? () => params.settlementTask!({ mainResult, status: this.status }) : undefined);
+    }
+    this.assertCurrent();
     this.status.endTime = Date.now();
     this.onUpdate();
     return { mainResult, status: this.status };
+  }
+
+  private async settleTasks(tasks: Promise<void>[]): Promise<void> {
+    const results = await Promise.allSettled(tasks);
+    const rejected = results.find(result => result.status === 'rejected');
+    if (rejected?.status === 'rejected') throw rejected.reason;
+    this.assertCurrent();
   }
 
   /** 执行正文生成任务 */
@@ -138,6 +191,8 @@ export class PipelineExecutor {
 
     try {
       const result = await mainTask();
+      this.assertCurrent();
+      this.mainResult = result;
       this.updateStage('main', {
         status: 'success',
         endTime: Date.now(),
@@ -169,6 +224,7 @@ export class PipelineExecutor {
     signal: AbortSignal,
     memoryTasks?: MemoryTasks,
   ): Promise<void> {
+    this.assertCurrent();
     switch (taskId) {
       case 'variable':
         return this.executeVariable(config, varMgr, mainResult, userText, mainApiConfig, worldBook, worldId, signal);
@@ -223,6 +279,7 @@ export class PipelineExecutor {
         endTime: Date.now(),
         error: errMsg,
       });
+      if (err instanceof Error && err.name === 'AbortError') throw err;
       // 写入调试日志（UI 可见）
       debugLogger?.(taskId, errMsg);
       console.warn(`[管线] ${STAGE_LABELS[taskId]}${isDegraded ? '降级' : '失败'}:`, errMsg);
@@ -249,7 +306,7 @@ export class PipelineExecutor {
     this.updateStage('variable', { status: 'running', startTime: Date.now(), maxAttempts });
 
     try {
-      await runVariableExtraction({
+      await runTurnVariableExtraction({
         varMgr,
         parsed: mainResult.parsed,
         round: this.status.round,
@@ -260,6 +317,7 @@ export class PipelineExecutor {
         delayMs: config.variableDelayMs,
         maxRetries: config.variableMaxRetries,
         signal,
+        isCurrent: () => { this.assertCurrent(); return true; },
       });
 
       this.updateStage('variable', {
@@ -275,6 +333,7 @@ export class PipelineExecutor {
         error: errMsg,
         attempts: maxAttempts,
       });
+      if (err instanceof Error && err.name === 'AbortError') throw err;
       console.warn('[管线] 变量提取失败（不影响正文和快照保存）:', errMsg);
       // 不重新抛出：变量提取失败不应阻断管线，快照仍需保存以保持轮次连续性
       // 变量状态保持上一轮的值，用户可通过单步重试恢复
@@ -285,7 +344,11 @@ export class PipelineExecutor {
    * 重试单个阶段
    * 将该阶段重置为 running 状态，执行 taskFn，更新最终状态
    */
-  async retryStage(taskId: PipelineTaskId, taskFn: () => Promise<void>): Promise<void> {
+  async retryStage(taskId: PipelineTaskId, taskFn: () => Promise<void>, isCurrent: () => boolean = () => true): Promise<void> {
+    const assert = () => { if (!isCurrent()) throw new DOMException('回合已失效', 'AbortError'); };
+    assert();
+    if (['success', 'skipped'].includes(this.status.stages[taskId].status)) return;
+    this.resumeTiming();
     this.updateStage(taskId, {
       status: 'running', startTime: Date.now(),
       endTime: undefined, error: undefined, skipped: false,
@@ -300,15 +363,11 @@ export class PipelineExecutor {
         status: isDegraded ? 'warning' : 'error', endTime: Date.now(),
         error: errMsg,
       });
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+    } finally {
+      this.status.endTime = Date.now();
+      this.onUpdate();
     }
   }
 
-  /** 跳过所有剩余 pending 阶段 */
-  private skipRemaining() {
-    for (const [key, stage] of Object.entries(this.status.stages)) {
-      if (stage.status === 'pending') {
-        this.updateStage(key as PipelineTaskId, { status: 'skipped', skipped: true });
-      }
-    }
-  }
 }

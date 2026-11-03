@@ -5,7 +5,7 @@ deleteSave,
 getAllSaveMeta,
 importSaveFromData,
 loadGame,
-planV3ToV4Migration,
+planV4ToV5Migration,
 saveAllSaveMeta,
 saveGameIncremental,
 SAVE_SCHEMA_VERSION,
@@ -70,41 +70,19 @@ function makeOldSave(): GameSave {
   };
 }
 
-describe('db 迁移 planV3ToV4Migration', () => {
-  it('将内联 messages 拆分为分片并生成紧凑头部', () => {
-    const plan = planV3ToV4Migration(makeOldSave());
-    expect(plan).not.toBeNull();
-    expect(plan!.head.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
-    expect(plan!.head.messageCount).toBe(3);
-    expect(plan!.head.lastMessageSeq).toBe(2);
-    expect(plan!.messageRecords.length).toBe(3);
-    expect(plan!.messageRecords[0].seq).toBe(0);
-    expect(plan!.messageRecords[1].seq).toBe(1);
-    expect(plan!.messageRecords[2].seq).toBe(2);
-    expect(plan!.messageRecords[0].key).toBe('save_1#0');
-    expect(plan!.messageRecords[2].saveId).toBe('save_1');
-    expect(plan!.head.round).toBe(1);
+describe('db direct previous compact migration', () => {
+  const oldHead = () => {
+    const { messages, ...head } = makeOldSave();
+    return { ...head, schemaVersion: 4, round: 1, messageCount: messages.length, lastMessageSeq: 2 };
+  };
+  it('upgrades v4 marker while preserving plain history and metadata', () => {
+    const head = { ...oldHead(), memoryRuntime: { legacy: true } };
+    expect(planV4ToV5Migration(head)).toEqual({ ...head, schemaVersion: SAVE_SCHEMA_VERSION });
   });
-
-  it('已是新格式（schemaVersion>=4）返回 null（跳过）', () => {
-    const save = makeOldSave() as any;
-    save.schemaVersion = 4;
-    expect(planV3ToV4Migration(save)).toBeNull();
-  });
-
-  it('更早于 v3 的内部存档不再串联迁移', () => {
-    const save = makeOldSave() as any;
-    save.schemaVersion = 2;
-    expect(() => planV3ToV4Migration(save)).toThrow('仅保留 v3 → v4');
-  });
-
-  it('无消息的存档生成空分片头部', () => {
-    const save = makeOldSave();
-    save.messages = [];
-    const plan = planV3ToV4Migration(save);
-    expect(plan).not.toBeNull();
-    expect(plan!.head.messageCount).toBe(0);
-    expect(plan!.messageRecords.length).toBe(0);
+  it('skips current schema and rejects older internal or inline formats', () => {
+    expect(planV4ToV5Migration({ ...oldHead(), schemaVersion: SAVE_SCHEMA_VERSION })).toBeNull();
+    expect(() => planV4ToV5Migration({ ...oldHead(), schemaVersion: 3 })).toThrow('仅保留 v4 → v5');
+    expect(() => planV4ToV5Migration({ ...oldHead(), messages: [] } as any)).toThrow();
   });
 });
 

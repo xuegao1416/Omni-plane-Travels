@@ -1,10 +1,12 @@
 import { describe,expect,test } from 'bun:test';
 import { customGameplayModuleSchema,parseCustomGameplayModule } from './manifestSchema';
-import type { CustomGameplayModule } from './schema';
+import type { CustomGameplayModuleV3 } from './schema';
+import { normalizeCustomGameplayModule } from './normalize';
 
-const validModule: CustomGameplayModule = {
+const validModule: CustomGameplayModuleV3 = {
   kind: 'custom-gameplay-module',
-  schemaVersion: 1,
+  schemaVersion: 3,
+  capabilities: [], items: {}, inputs: {},
   id: 'reputation-system',
   name: '声望系统',
   version: '1.0.0',
@@ -39,7 +41,8 @@ const validModule: CustomGameplayModule = {
     onGameStart: [],
     onTurnEnd: [
       {
-        when: { type: 'compare', path: 'score', operator: 'gte', value: 0 },
+        id: 'turn-reputation',
+        when: { type: 'compare', source: 'state', path: 'score', operator: 'gte', value: 0 },
         actions: [
           { type: 'add', path: 'score', value: 1 },
           { type: 'log', message: '声望回合结算完成' },
@@ -48,6 +51,7 @@ const validModule: CustomGameplayModule = {
     ],
     onTick: [],
     onChoice: [],
+    onButton: [],
   },
   view: {
     slot: 'right-panel',
@@ -75,7 +79,7 @@ const validModule: CustomGameplayModule = {
       },
     ],
   },
-  permissions: { read: ['world.time', 'player.behavior'], write: 'own-state-only' },
+  permissions: { read: [], write: 'own-state-only' },
 };
 
 describe('custom gameplay module schema', () => {
@@ -83,6 +87,7 @@ describe('custom gameplay module schema', () => {
     const v2 = {
       ...validModule,
       schemaVersion: 2,
+      capabilities: undefined, items: undefined,
       inputs: { health: 'player.stats.attrA', primaryCurrency: 'player.currency.primary' },
       logic: {
         onGameStart: [], onTurnEnd: [], onTick: [],
@@ -96,16 +101,17 @@ describe('custom gameplay module schema', () => {
         }],
       },
     };
-    expect(customGameplayModuleSchema.safeParse(v2).success).toBe(true);
+    const { capabilities, items, ...legacy } = v2;
+    expect(normalizeCustomGameplayModule(legacy).ok).toBe(true);
   });
 
-  test('accepts the v1 world-scoped module contract and all supported field/component kinds', () => {
+  test('accepts the canonical V3 world-scoped contract and all supported field/component kinds', () => {
     const result = customGameplayModuleSchema.safeParse(validModule);
 
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.kind).toBe('custom-gameplay-module');
-      expect(result.data.schemaVersion).toBe(1);
+      expect(result.data.schemaVersion).toBe(3);
       expect(result.data.scope).toBe('world');
     }
   });
@@ -124,6 +130,7 @@ describe('custom gameplay module schema', () => {
         onTurnEnd: [],
         onTick: [],
         onChoice: [],
+        onButton: [],
       });
     }
   });
@@ -163,6 +170,16 @@ describe('custom gameplay module schema', () => {
     expect(customGameplayModuleSchema.safeParse({ ...validModule, kind: 'event-pack' }).success).toBe(false);
     expect(customGameplayModuleSchema.safeParse({ ...validModule, schemaVersion: 2 }).success).toBe(false);
     expect(customGameplayModuleSchema.safeParse({ ...validModule, scope: 'player' }).success).toBe(false);
+  });
+
+  test.each(['constructor', 'prototype'])('rejects reserved module and dependency IDs: %s', id => {
+    expect(customGameplayModuleSchema.safeParse({ ...validModule, id }).success).toBe(false);
+    expect(customGameplayModuleSchema.safeParse({ ...validModule, dependencies: [{ id }] }).success).toBe(false);
+    const { capabilities, items, ...v2 } = validModule;
+    const legacy = { ...v2, id, schemaVersion: 2, logic: { onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [] } };
+    expect(normalizeCustomGameplayModule(legacy).ok).toBe(false);
+    const { inputs, ...v1 } = legacy;
+    expect(normalizeCustomGameplayModule({ ...v1, schemaVersion: 1, logic: { onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [] } }).ok).toBe(false);
   });
 
   test('parseCustomGameplayModule returns structured issues without throwing', () => {

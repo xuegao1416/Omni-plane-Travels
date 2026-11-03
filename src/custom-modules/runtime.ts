@@ -56,7 +56,7 @@ function resolveReference(
   return readPath(root, value.path);
 }
 
-function evaluateV2Condition(
+export function evaluateV2Condition(
   condition: V2Condition,
   state: Record<string, JsonValue>,
   operands: CustomModuleOperandContext,
@@ -88,9 +88,9 @@ function evaluateV2Condition(
   }
 }
 
-function buildV2Operands(module: CustomGameplayModuleDefinition, context?: CustomModuleHostContext): CustomModuleOperandContext {
+export function buildV2Operands(module: CustomGameplayModuleDefinition, context?: CustomModuleHostContext): CustomModuleOperandContext {
   const input: Record<string, JsonValue> = {};
-  if (module.schemaVersion === 2 && context) {
+  if (module.schemaVersion !== 1 && context) {
     for (const [alias, binding] of Object.entries(module.inputs)) {
       const path = typeof binding === 'string' ? binding : binding.path;
       const value = readPath(context as unknown as Record<string, JsonValue>, path);
@@ -156,13 +156,14 @@ export function executeCustomModuleLifecycle(
       warnings.push(`生命周期动作预算已耗尽：${lifecycle}`);
       break;
     }
-    const matches = !rule.when || (normalized.schemaVersion === 2
-      ? evaluateV2Condition(rule.when as V2Condition, nextState.values, operands, 0, options.maxConditionDepth ?? DEFAULT_MAX_CONDITION_DEPTH)
-      : evaluateCondition(rule.when as Condition, nextState.values, 0, options.maxConditionDepth ?? DEFAULT_MAX_CONDITION_DEPTH));
+    const matches = !rule.when || evaluateV2Condition(rule.when as V2Condition, nextState.values, operands, 0, options.maxConditionDepth ?? DEFAULT_MAX_CONDITION_DEPTH);
     if (!matches) continue;
+    if ((rule.actions as Array<{ type: string }>).some(action => action.type.includes('.'))) {
+      warnings.push('宿主资源动作需要通过 executeCustomModuleInGame 执行');
+      continue;
+    }
     const result = executeCustomModuleActions(normalized, nextState, rule.actions as never[], lifecycle, now, actionBudget, operands);
-    nextState = result.nextState;
-    applied += result.applied;
+    if (result.warnings.length === 0) { nextState = result.nextState; applied += result.applied; }
     actionBudget -= rule.actions.length;
     warnings.push(...result.warnings);
   }
@@ -175,4 +176,3 @@ export function executeCustomModuleLifecycle(
   }
   return { nextState, applied, warnings };
 }
-

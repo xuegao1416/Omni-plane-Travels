@@ -5,7 +5,7 @@
 
 ### 8.1 API 客户端 — `src/api/`
 
-#### 8.1.1 核心客户端 — `src/api/client.ts` (723行)
+#### 8.1.1 核心客户端 — `src/api/client.ts`
 
 **文件路径**: `src/api/client.ts`
 
@@ -32,31 +32,34 @@ requestStreamWithRetry(config, messages, options)      // :400
 
 | 函数                            | 签名                             | 用途                                                                                                                                                                                                                                |
 | ----------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `getRequestTimeoutMs(config)` | `(ApiConfig) => number`        | DeepSeek 推理模型首 token 与完整生成较慢,返回 `300_000`ms;其它 provider 默认 `120_000`ms。`requestStreamWithRetry` 与 `callAuxiliaryApi` 都使用此值驱动 `AbortController` 超时。                                                                                |
+| `getRequestTimeoutMs(config)` | `(ApiConfig) => number`        | DeepSeek 推理模型首 token 与完整生成较慢，默认 `300_000`ms；其他配置默认 `120_000`ms。DeepSeek 识别覆盖显式 provider、官方端点与明确的模型名，因此从 OpenAI 兼容 / 自定义入口接入时也享有相同策略；用户显式超时优先。`requestStreamWithRetry` 与 `callAuxiliaryApi` 共用此策略。 |
 | `extractFinishReason(json)`   | `(any) => string \| undefined` | 归一化多 provider 的结束原因字段:`choices[0].finish_reason`(OpenAI) / `candidates[0].finishReason`(Gemini) / `stop_reason`(Anthropic),返回第一个非空字符串,否则 undefined。`CompletionResult.finishReason` 由 `requestCompletion` 与 `parseSSEStream` 各自填充。 |
 
 #### 8.1.2 多 Provider 特殊处理
 
-§8.5 差异化处理与 §8.6 多格式兼容散节整合详见下方。
+多 provider 的请求体差异在 `buildRequestBody` 内按 `config.provider` 分支处理；响应侧的多格式兼容由 `extractStreamContent` / `extractReasoningContent` / `extractFinishReason` 完成（见 §8.1.1）。
+
+显式选择 `provider: deepseek` 时采用 DeepSeek 原生文本聊天协议：空地址与官方根地址使用 `/beta/chat/completions`，官方地址存在末尾 assistant 预填时确保使用 Beta；第三方明确版本路径和完整端点保持填写值。消息先合并相邻角色，中途 system 转 user 后再合并，仅末尾 assistant 加 `prefix: true`，输入消息不原地修改。复用 `reasoningEffort`：未设置或“关闭”明确发送 `thinking.disabled`，开启时发送 `thinking.enabled` 与对应强度（`medium → high`）；不发送 `top_k`，思考模式采样参数按当前官方支持范围处理。连接测试也使用该协议。OpenAI / custom 仅保留 DeepSeek 的识别超时和合并兼容，不自动启用这套专属参数。
+
+上述对齐酒馆原生 DeepSeek 的普通三角色文本请求，不导入酒馆的工具、多媒体、姓名转换、插件或世界书组装管线。外部预设导入仍遵守本项目的宿主规范，不能因具备 API 前缀续写就视为完整支持 SPreset 原版运行时。
 
 #### 8.1.3 SSE 流解析
 
-流式字段路径详见 §8.6.1。
+流式增量由 `parseSSEStream` 产生：按行切分 `data:` 帧、跳过 `[DONE]`，逐帧交给 `extractStreamContent` 与 `extractReasoningContent` 提取正文与推理内容。
 
 #### 8.1.4 降级策略
 
-降级触发条件详见 §8.6.4。
+流式返回空文本时降级为非流式 `requestCompletion` 重试；`finishReason` 为 `content_filter` 时直接报「模型服务明确拒绝了本次请求」；流式请求返回 400 且消息含 `stream` 时同样转非流式。
 
 #### 8.1.5 辅助 API
 
 | 文件                                            | 职责                                       |
 | --------------------------------------------- | ---------------------------------------- |
-| `trial.ts`                                    | 试用 API(免费额度 + 自动选择 backend)              |
 | `auxiliaryApi.ts`                             | 辅助 API(嵌入/补全/翻译)                         |
 | `imageGen.ts`                                 | 图像生成 API                                 |
 | `imageGenTypes.ts`                            | 图像生成类型                                   |
 | `rateLimiter.ts`                              | 限流器(滑动窗口 + token bucket)                 |
-| `types.ts`                                    | API 层共享类型(51 行)                          |
+| `types.ts`                                    | API 层共享类型                                 |
 | `comfy/comfyWorkflow.ts`                      | ComfyUI 工作流客户端(本地 SD),`comfy/` 下仅此 1 个文件 |
 | `client.test.ts` / `client.embedding.test.ts` | 客户端测试                                    |
 
@@ -79,11 +82,11 @@ requestStreamWithRetry(config, messages, options)      // :400
 
 ### 8.2 IndexedDB 存储层 — `src/storage/`
 
-#### 8.2.1 数据库 — `src/storage/db.ts` (1411行)
+#### 8.2.1 数据库 — `src/storage/db.ts`
 
 **文件路径**: `src/storage/db.ts`
 
-**当前 DB 版本**: `DB_VERSION = 10`。支持上一正式版 2.8.2 的 DB v5 及中间 v6～v9 直接升级；在原子事务中补齐当前表和索引，保留全部既有记录，修正旧小说分段索引，失败则回滚并允许重试。存档 payload 的 v3→v4 迁移窗口独立于 DB 部署版本。下列仅为历史结构记录，不逐级重放：
+**当前 DB 版本**: `DB_VERSION = 10`。支持 DB v4～v9 直接升级，包括已有消息分片的 v4 和 2.8.2 的 v5；在原子事务中补齐当前表和索引，保留全部既有记录，修正旧小说分段索引，失败则回滚并允许重试。存档 payload 的 v4→v5 迁移窗口独立于 DB 部署版本。下列仅为历史结构记录，不逐级重放：
 
 - v1-v3:`saves` + `global` 两个 store；`saves` 含 `timestamp` 索引。
 - v4:`messages` 分片 store + `saveId`、`saveId_seq` 索引。
@@ -92,7 +95,6 @@ requestStreamWithRetry(config, messages, options)      // :400
 - v9:对 `novel_chapters` / `novel_segments` / `novel_chunks` / `novel_jobs` / `novel_archives` / `novel_checkpoints` 补 `datasetId` 索引;`novel_segments` 的 `datasetId_index` 改为复合 `[datasetId, index]`;新增 `novel_sources` store。
 - v10: 当前结构还包含 `novel_materials`、`director_definitions`、`director_jobs`。
 
-- 迁移路径中**不存在 v7→v8 分支**；`novel_archives` / `novel_checkpoints` 在 v9 才被纳入迁移（≤v8 数据库里首次出现于 v9 的 `createObjectStore` 兜底分支）。
 **16 个 store 清单**:
 
 ```typescript
@@ -130,12 +132,12 @@ interface GameSave {
   characterHistory?: string;
   memoryRuntime?: unknown;
   memoryConfig?: unknown;
-  vectorMemory?: unknown[];   // 注意:实际类型是 unknown[],非 VectorFact[]
+  vectorMemory?: unknown[];   // 存储层按 unknown[] 声明,不绑定 VectorFact[]
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
   enabledMods?: string[];
-  moduleStates?: ModuleStateRecord[];     // 注意:类型名是 ModuleStateRecord,非 RecordState
+  moduleStates?: ModuleStateRecord[];
   moduleCheckpoints?: ModuleStateRecord[];
   lifecycle?: SaveLifecycle;              // export type SaveLifecycle = 'active' | 'ended' (db.ts:117)
   endedAt?: number;
@@ -146,7 +148,7 @@ interface GameSave {
 > **注**:`interface GameSave`(db.ts:120)**未加 export**;`SaveLifecycle`(db.ts:117)、`SaveMeta`(db.ts:164)、`CompactSaveRecord`(db.ts:740)均为 `export`。`enabledMods` 带 TODO 注释,计划下次格式升级改名为 `enabledEventPacks`。
 
 ```typescript
-// CompactSaveRecord — v4+存档存储格式(不含 messages),db.ts:740
+// CompactSaveRecord — v5 存档头部格式（不含 messages）
 export interface CompactSaveRecord {
   id: string; name: string; timestamp: number;
   schemaVersion: number; round: number;
@@ -159,6 +161,7 @@ export interface CompactSaveRecord {
   variableConfig?: { apiPresetId?: string };
   customWorld?: Record<string, unknown>;
   simulationState?: SimulationState;
+  encodedHistory?: StorageEncoding; // 大 memoryRuntime/simulationState 的存储编码，读取后恢复明文字段
   enabledMods?: string[];
   messageCount: number;
   lastMessageSeq: number;
@@ -192,7 +195,7 @@ export async function saveGameIncremental(
 
 #### 8.2.4 配额治理
 
-配额治理详见 §8.7。
+配额治理在 `src/storage/db.ts`：`checkQuota()` 读 `navigator.storage.estimate()`，已用超过 90% 即 `isNearQuota`；`pruneColdMessages(saveId, keepRecent = 200)` 保留最近 200 条与每 10 条一个 keyframe，删除其余冷消息；`autoPruneIfNeeded(saveId)` 在每次 `performSave` 前先检查再自动清理。
 
 #### 8.2.5 其他存储
 
@@ -207,7 +210,7 @@ export async function saveGameIncremental(
 
 ### 8.3 全局 Zustand Stores — `src/stores/`
 
-#### 8.3.1 存档 Store — `src/stores/saveStore.ts` (426行)
+#### 8.3.1 存档 Store — `src/stores/saveStore.ts`
 
 **`SaveState` 实际状态字段**(saveStore.ts:33):`savesMeta: SaveMeta[]`、`currentSaveId: string | null`、`currentSaveName: string`、`sessionActivePacks: string[] | undefined`。
 
@@ -250,20 +253,20 @@ let _autoSaveBuilder: (() => GameSave | null) | null = null;
 
 #### 8.3.2 全局 Stores 索引
 
-`src/stores/` 共 **11 个 store 文件**（含 §8.3.1 的 `saveStore.ts`）。各 store 的状态字段与 actions 如下：
+`src/stores/` 共 **10 个 store 文件**（含 §8.3.1 的 `saveStore.ts`）。下表列出各 store 的职责、状态字段与 actions：
 
-| Store                 | 行数  | 职责             | 实际状态字段                                                                                                               | 实际 actions                                                                                                                                                                               |
-| --------------------- | --- | -------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `saveStore.ts`        | 426 | 存档 CRUD + 自动存档 | `savesMeta`, `currentSaveId`, `currentSaveName`, `sessionActivePacks`                                                | 见 §8.3.1                                                                                                                                                                                 |
-| `presetStore.ts`      | 207 | API 预设管理       | `userPresets`(**非** `presets`), `activePresetId`, `builtinOverrides`, `builtinContentOverrides`                      | `savePreset`, `deletePreset`, `setActivePreset`, `resetToDefault`, `saveBuiltinOverride`, `saveBuiltinContentOverride`, `restoreBuiltinDefaults`, `getActivePreset`, `getUserPresetById` |
-| `authStore.ts`        | 119 | 用户认证           | `user: User \| null`, `isLoading`, `isAuthenticated`(**无** `token` / `mode`)                                         | `checkAuth`, `sendCode`, `register`, `login`, `resetPassword`, `logout`                                                                                                                  |
-| `cloudSaveStore.ts`   | 203 | 云存档槽位          | `slots: CloudSaveSlot[]`(**非** `cloudSaves`), `isLoading`, `error`(**无** `syncing`)                                  | `fetchSlots`, `uploadSave`, `downloadSave`, `deleteSave`                                                                                                                                 |
-| `configStore.ts`      | 270 | 全局 UI/API 配置   | `settings: UISettings`(**非** `config`), `apiConfig: ApiConfig \| null`, `trialMode: boolean`(**无** `dirty`)          | `updateSettings`, `setApiConfig`, `enableTrial`, `disableTrial`, `initApiConfig`, `t`, `initialize`                                                                                      |
-| `imageStore.ts`       | 118 | 图像生成配置与任务队列    | `config: ImageGenConfig`, `tasks: ImageTask[]`, `comfyData`(**无** `images: Map`)                                     | `updateConfig`, `setConfig`, `initImageConfig`, `addTask`, `updateTask`, `removeTask`, `setTasks`, `setComfyData`                                                                        |
-| `novelConfigStore.ts` | 36  | 小说工作台配置        | `config: NovelWorkbenchConfig`, `loaded: boolean`(**非** `progress`)                                                  | `initialize`, `save`                                                                                                                                                                     |
-| `portraitStore.ts`    | 27  | NPC 头像 URL 映射  | `portraits: Record<string, string>`(npcId → objectURL,**非** `Map<npcId, blob>`)                                      | `setPortrait`, `clearPortrait`                                                                                                                                                           |
-| `simulationStore.ts`  | 115 | 世界推演运行时        | `simState: SimulationState`, `isSimulating: boolean`, `lastError: string \| null`(**无** `tick` / `activeStorylines`) | `updateConfig`, `setSimState`, `setIsSimulating`, `setLastError`, `resetSimulation`, `loadFromStorage`, `syncFromEngine`                                                                 |
-| `workshopStore.ts`    | 218 | 工作坊资产浏览/发布     | `items: WorkshopItem[]`, `total`, `page`, `pageSize: 20`, `isLoading`, `error`(**无** `installedPacks` / `editing`)   | `fetchItems`, `fetchItem`, `downloadItem`, `createItem`, `deleteItem`, `checkInstall`, `getInstallPlan`                                                                                  |
+| Store                 | 职责             | 实际状态字段                                                                                                               | 实际 actions                                                                                                                                                                               |
+| --------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `saveStore.ts`        | 存档 CRUD + 自动存档 | `savesMeta`, `currentSaveId`, `currentSaveName`, `sessionActivePacks`                                                | 见 §8.3.1                                                                                                                                                                                 |
+| `presetStore.ts`      | API 预设管理       | `userPresets`(**非** `presets`), `activePresetId`, `builtinOverrides`, `builtinContentOverrides`                      | `savePreset`, `deletePreset`, `setActivePreset`, `resetToDefault`, `saveBuiltinOverride`, `saveBuiltinContentOverride`, `restoreBuiltinDefaults`, `getActivePreset`, `getUserPresetById` |
+| `authStore.ts`        | 用户认证           | `user: User \| null`, `isLoading`, `isAuthenticated`(**无** `token` / `mode`)                                         | `checkAuth`, `sendCode`, `register`, `login`, `resetPassword`, `logout`                                                                                                                  |
+| `cloudSaveStore.ts`   | 云存档槽位          | `slots: CloudSaveSlot[]`(**非** `cloudSaves`), `isLoading`, `error`(**无** `syncing`)                                  | `fetchSlots`, `uploadSave`, `downloadSave`, `deleteSave`                                                                                                                                 |
+| `configStore.ts`      | 全局 UI/API 配置   | `settings: UISettings`(**非** `config`), `apiConfig: ApiConfig \| null`          | `updateSettings`, `setApiConfig`, `initApiConfig`, `t`, `initialize`                                                                                      |
+| `imageStore.ts`       | 图像生成配置与任务队列    | `config: ImageGenConfig`, `tasks: ImageTask[]`, `comfyData`(**无** `images: Map`)                                     | `updateConfig`, `setConfig`, `initImageConfig`, `addTask`, `updateTask`, `removeTask`, `setTasks`, `setComfyData`                                                                        |
+| `novelConfigStore.ts` | 小说工作台配置        | `config: NovelWorkbenchConfig`, `loaded: boolean`(**非** `progress`)                                                  | `initialize`, `save`                                                                                                                                                                     |
+| `portraitStore.ts`    | NPC 头像 URL 映射  | `portraits: Record<string, string>`(npcId → objectURL,**非** `Map<npcId, blob>`)                                      | `setPortrait`, `clearPortrait`                                                                                                                                                           |
+| `simulationStore.ts`  | 世界推演运行时        | `simState: SimulationState`, `isSimulating: boolean`, `lastError: string \| null`(**无** `tick` / `activeStorylines`) | `updateConfig`, `setSimState`, `setIsSimulating`, `setLastError`, `resetSimulation`, `loadFromStorage`, `syncFromEngine`                                                                 |
+| `workshopStore.ts`    | 工作坊资产浏览/发布     | `items: WorkshopItem[]`, `total`, `page`, `pageSize: 20`, `isLoading`, `error`(**无** `installedPacks` / `editing`)   | `fetchItems`, `fetchItem`, `downloadItem`, `createItem`, `deleteItem`, `checkInstall`, `getInstallPlan`                                                                                  |
 
 **`configStore.ts` 导出类型**:`Theme = 'light' \| 'dark' \| 'metal' \| 'green'`、`FontFamily = 'yahei' \| 'source' \| 'menglong' \| 'hanchan' \| 'shanggu'`、`FontSize = '小' \| '中' \| '大'`、`LineHeight = '紧凑' \| '舒适' \| '宽松'`、`Language = 'zh-CN' \| 'en'`、`UISettings`(8 字段:`language` / `theme` / `font` / `uiFontSize` / `bodyFontSize` / `lineHeight` / `centeredNarrative` / `autoScroll`)。
 
@@ -275,36 +278,33 @@ let _autoSaveBuilder: (() => GameSave | null) | null = null;
 
 `src/server/` 实际共 **14 个文件** = 10 个源文件 + 4 个测试:
 
-| 源文件             | 行数  | 职责           |
-| --------------- | --- | ------------ |
-| `index.ts`      | 295 | Worker 路由总入口 |
-| `db.ts`         | 63  | D1 访问封装      |
-| `saves.ts`      | 151 | 云存档槽位 API    |
-| `session.ts`    | 125 | 会话/令牌        |
-| `trial.ts`      | 277 | 试用额度与预占租约    |
-| `playStats.ts`  | 145 | 游玩统计         |
-| `workshop.ts`   | 631 | 工作坊资产/依赖安装计划 |
-| `crypto.ts`     | 104 | 密码哈希/加密工具    |
-| `email-auth.ts` | 265 | 邮箱验证码认证      |
-| `types.ts`      | 118 | 后端共享类型       |
+| 源文件             | 职责           |
+| --------------- | ------------ |
+| `index.ts`      | Worker 路由总入口 |
+| `db.ts`         | D1 访问封装      |
+| `saves.ts`      | 云存档槽位 API    |
+| `session.ts`    | 会话/令牌        |
+| `playStats.ts`  | 游玩统计         |
+| `workshop.ts`   | 工作坊资产/依赖安装计划 |
+| `crypto.ts`     | 密码哈希/加密工具    |
+| `email-auth.ts` | 邮箱验证码认证      |
+| `types.ts`      | 后端共享类型       |
 
-测试文件(4 个):`playStats.test.ts`、`trial.test.ts`、`trial.migration.test.ts`、`workshop.test.ts`。
+测试文件(2 个):`playStats.test.ts`、`workshop.test.ts`。
 
 - 部署入口:根目录 `server.ts` + `wrangler.toml` + `functions/api/[[route]].ts`
 - 9 个 D1 SQL 迁移 `migrations/0001_init.sql` ~ `0009_trial_reservation_leases.sql`(详见 §19.3)
-
-### 8.5~8.7 (Provider / 多格式兼容 / 配额治理)
-
-§8.5/§8.6/§8.7 实际内容在 §8.5~8.7 子节中。
 
 ---
 
 
 
-## 8.9 当前存档 schema 与兼容窗口（v2.8.3）
+### 8.5 当前存档 schema 与文件格式
 
-- 内部 `SAVE_SCHEMA_VERSION = 4`。v4 将存档头和消息分离，消息按 `${saveId}#${seq}` 存在 messages store。
-- 自动迁移只保留直接上一代：**v3 内联 messages → v4 分片**，入口为 `planV3ToV4Migration` / `migrateV3ToV4`。
-- v0/v1/v2 内部 IndexedDB 结构已退出当前兼容窗口，不再通过多代链式迁移加载。
-- 外部存档 JSON 导入由 `importSaveFromData` 规范化后直接写成当前 v4；这是文件导入协议，不属于内部 schema 历史链。
-- 当前 v4 运行时不再回退读取老的内联 messages 记录。
+- 内部 `SAVE_SCHEMA_VERSION = 5`，继续使用存档头和 `${saveId}#${seq}` 消息分片。自动迁移仅保留 **v4 分片 → v5**，入口为 `planV4ToV5Migration` / `loadSaveWithMigration`；事务内读取当前头后升级版本标记，不批量改写历史。
+- 大消息 `snapshot` 存为 `MessageRecord.encodedSnapshot`；头部的大 `memoryRuntime/simulationState` 存为 `encodedHistory`。`storageCodec.ts` 使用带 version/type 的 ZIP JSON 编码，只在压缩确实缩小时使用；小记录和旧 v4 分片可保持明文。
+- 编码在写事务前完成；三种消息读取函数在 cursor 事务结束后解码，`loadGame` / `loadSaveWithMigration` / `exportSave` 恢复正常对象。`gameState` 保持明文，模块应用/恢复可继续透传其余存档头字段。
+- v0～v3 内部格式已退出兼容窗口，原始数据库记录不删除。需要先用相应旧 App 导出 JSON，再以外部协议导入。
+- `exportSave` 仍返回外部协议 **2.0 JSON Blob**，供云端等消费者使用；外部 JSON v1/v2 导入由 `importSaveFromData` 规范化后直接写成 v5，不属于内部迁移链。
+- 本地文件导出由 `saveFileCodec.ts` 打包为标准 DEFLATE ZIP，扩展名 `.save.zip`，仅包含完整 `save.json`。本地 UI 与 `importSaveFromFile` 共用内容识别解码器，支持旧 JSON 和 ZIP；ZIP 校验 CRC，损坏或缺少 `save.json` 明确报错。
+- 无损压缩不增加快照裁剪，也不改变现有回滚引用、模块 checkpoint 修订及云端裁剪策略。

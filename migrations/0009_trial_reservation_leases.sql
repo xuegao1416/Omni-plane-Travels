@@ -1,4 +1,7 @@
 -- 每次免费体验请求使用独立租约，Worker 中断后可按 expires_at 回收。
+--
+-- 注：匿名免费体验功能已废弃（未接入免费上游），相关代码已移除；
+-- 本表保留为空表、不再读写，无需删除。
 CREATE TABLE IF NOT EXISTS trial_reservations (
   reservation_id TEXT PRIMARY KEY,
   identity_key TEXT NOT NULL,

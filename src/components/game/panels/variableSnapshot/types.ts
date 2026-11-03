@@ -8,10 +8,11 @@ export { formatTime, getSnapshotPreview } from '../../shared/snapshotUtils';
 export interface VariableSnapshotPanelProps {
   messages: ChatMessage[];
   varMgr: VariableManager;
-  onRestoreSnapshot?: (snapshot: GameState) => void;
-  onRollbackToSnapshot?: (msgIndex: number) => void;
+  onRollbackToSnapshot: (msgIndex: number) => void;
   onSave?: () => void;
-  onCommitState?: () => Promise<void>;
+  onPrepareStateJSON: (json: string) => GameState | null;
+  onIsCurrent?: () => boolean;
+  onCommitState: (next: GameState) => boolean | Promise<boolean>;
 }
 
 // Re-export SnapshotLayer type for consumers

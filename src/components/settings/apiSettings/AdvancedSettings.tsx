@@ -1,4 +1,5 @@
 import type { ApiConfig } from '../../../api/types';
+import { getRequestTimeoutMs } from '../../../api/client';
 import { Toggle } from '../SettingsUIComponents';
 import { rowStyle,REASONING_OPTIONS,warningStyle } from './types';
 
@@ -8,6 +9,12 @@ interface Props {
 }
 
 export default function AdvancedSettings({ config, set }: Props) {
+  const nativeDeepSeek = config.provider === 'deepseek';
+  const deepSeekThinking = nativeDeepSeek && !!config.reasoningEffort && config.reasoningEffort !== '关闭';
+  const deepSeekFlash = nativeDeepSeek && /(?:^|\/)deepseek-(?:v4(?:\.1)?-)?flash(?:$|[-_:])/i.test(config.model.trim());
+  const deepSeekTopPIgnored = nativeDeepSeek && (deepSeekThinking ? !deepSeekFlash : deepSeekFlash);
+  const defaultTimeoutSeconds = getRequestTimeoutMs({ ...config, requestTimeoutMs: undefined }) / 1000;
+  const timeoutSeconds = Math.max(1, Math.round(getRequestTimeoutMs(config) / 1000));
   return (
     <>
       <div className="settings-api-section-title">
@@ -57,10 +64,12 @@ export default function AdvancedSettings({ config, set }: Props) {
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>随机性 (Temperature)</div>
+          {deepSeekThinking && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>DeepSeek 思考模式下不生效</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
             type="range" min="0" max="2" step="0.05"
+            disabled={deepSeekThinking}
             value={config.temperature ?? 1.2}
             onChange={e => set('temperature', parseFloat(e.target.value))}
             style={{ width: '100px' }}
@@ -75,10 +84,13 @@ export default function AdvancedSettings({ config, set }: Props) {
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>核采样 (Top P)</div>
+          {deepSeekTopPIgnored && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>当前 DeepSeek 模式下不生效</div>}
+          {deepSeekFlash && deepSeekThinking && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>思考模式有效范围 0.95–1，低于 0.95 按 0.95 发送</div>}
         </div>
         <input
           type="number"
           step="0.01"
+          disabled={deepSeekTopPIgnored}
           value={config.topP ?? 0.65}
           onChange={e => set('topP', parseFloat(e.target.value) || 0)}
           style={{ width: '110px', fontSize: 'var(--font-size-base)', padding: '5px 10px', textAlign: 'right', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}
@@ -86,7 +98,7 @@ export default function AdvancedSettings({ config, set }: Props) {
       </div>
 
       {/* Top K */}
-      <div style={rowStyle}>
+      {!nativeDeepSeek && <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>Top K</div>
         </div>
@@ -96,12 +108,13 @@ export default function AdvancedSettings({ config, set }: Props) {
           onChange={e => set('topK', parseInt(e.target.value) || 0)}
           style={{ width: '110px', fontSize: 'var(--font-size-base)', padding: '5px 10px', textAlign: 'right', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}
         />
-      </div>
+      </div>}
 
       {/* 推理强度 */}
       <div style={rowStyle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>推理强度 (Reasoning Effort)</div>
+          {nativeDeepSeek && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>关闭会明确禁用思考；low / medium / high 开启思考，medium 按 high 处理。</div>}
         </div>
         <select
           value={config.reasoningEffort ?? '关闭'}
@@ -145,7 +158,7 @@ export default function AdvancedSettings({ config, set }: Props) {
               const { requestCompletion } = await import('../../../api/client');
               const testCall = async () => {
                 await requestCompletion(
-                  { ...config, provider: 'openai' },
+                  config,
                   [{ role: 'user', content: 'Hi' }],
                   { maxTokens: 5 }
                 );
@@ -178,6 +191,65 @@ export default function AdvancedSettings({ config, set }: Props) {
               {ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* 请求超时 */}
+      <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500' }}>请求超时</div>
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>
+              单次模型请求的最长等待时间。共创、剧情整理等耗时较长的任务若超过该值会被判定为超时中断。
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              type="number"
+              min={30}
+              max={3600}
+              step={30}
+              value={timeoutSeconds}
+              onChange={e => {
+                const seconds = parseInt(e.target.value, 10);
+                set('requestTimeoutMs', Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined);
+              }}
+              style={{ width: '100px', fontSize: 'var(--font-size-base)', padding: '5px 10px', textAlign: 'right', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-primary)', color: 'var(--text-primary)', outline: 'none' }}
+            />
+            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>秒</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {[60, 120, 300, 600, 900].map(seconds => {
+            const active = timeoutSeconds === seconds;
+            return (
+              <button
+                key={seconds}
+                onClick={() => set('requestTimeoutMs', seconds * 1000)}
+                style={{
+                  padding: '3px 10px', fontSize: 'var(--font-size-xs)',
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: '12px', cursor: 'pointer',
+                  background: active ? 'var(--accent-dim)' : 'var(--bg-primary)',
+                  color: active ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {seconds >= 60 ? `${seconds / 60} 分钟` : `${seconds} 秒`}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => set('requestTimeoutMs', undefined)}
+            style={{
+              padding: '3px 10px', fontSize: 'var(--font-size-xs)',
+              border: `1px solid ${config.requestTimeoutMs === undefined ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '12px', cursor: 'pointer',
+              background: config.requestTimeoutMs === undefined ? 'var(--accent-dim)' : 'var(--bg-primary)',
+              color: config.requestTimeoutMs === undefined ? 'var(--accent)' : 'var(--text-muted)',
+            }}
+          >
+            按模型默认（{defaultTimeoutSeconds}s）
+          </button>
         </div>
       </div>
     </>

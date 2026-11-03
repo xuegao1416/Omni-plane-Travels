@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import { getCreationDraftOwner } from './creationDraftOwner';
 import { WORLDS, type WorldDef } from '../data/worldLoader';
 import type { PlayerProfile } from '../storage/db';
 import type { WorldBookEntry } from '../worldbook/index';
-import { loadWorldBook } from '../engine/worldPersonality';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { trySetItem } from '@/storage/safeStorage';
 import { normalizeModules } from '../modules/normalizeModule';
 import { deleteCustomWorldFromList, type CustomWorldDeleteResult } from '../data/customWorldLifecycle';
 
@@ -11,58 +12,33 @@ const CREATED_WORLDS_KEY = STORAGE_KEYS.CUSTOM_WORLDS;
 
 interface UseWizardOptions {
   initialWorld?: string;
-  initialPersonalInfo?: PlayerProfile | null;
 }
 
-export function useWizard({ initialWorld = 'default', initialPersonalInfo }: UseWizardOptions = {}) {
-  // ─── 向导状态 ───
+export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
   const [view, setView] = useState<'main' | 'wizard' | 'saves'>('main');
-  const [step, setStep] = useState(1);
-  const [selectedWorld, setSelectedWorld] = useState(initialWorld);
-
-  // 世界切换时重置世界书加载状态
-  const prevWorldRef = useRef(selectedWorld);
-  useEffect(() => {
-    if (prevWorldRef.current !== selectedWorld) {
-      prevWorldRef.current = selectedWorld;
-      setWorldBookLoaded(false);
-      setWorldEntry(null);
-    }
-  }, [selectedWorld]);
-
-  // ─── 世界书 ───
-  const [worldBookLoaded, setWorldBookLoaded] = useState(false);
-  const [worldEntry, setWorldEntry] = useState<WorldBookEntry | null>(null);
-
-  // ─── 空白角色模板 ───
-  const emptyProfile: PlayerProfile = {
-    name: '', gender: '', age: '', background: '', personality: '', appearance: '',
-    career: '', socialClass: '', organization: '', specialIdentity: '',
-    perspective: '第三人称', initialSkills: {}, initialItems: {}, customNpcs: [],
-    combatRiskMode: 'normal',
-  };
-
-  // ─── 角色信息 ───
-  const [personalInfo, setPersonalInfo] = useState<PlayerProfile>({
-    ...emptyProfile,
-    ...(initialPersonalInfo || {}),
-  });
-
-  // 开始一段全新的旅程时，不应把上一个存档的旅者资料带进向导。
-  const resetForNewJourney = () => {
-    setPersonalInfo({ ...emptyProfile });
-    setStep(1);
-  };
-
-  // 返回首页时重置角色信息
-  const prevViewRef = useRef(view);
-  useEffect(() => {
-    if (prevViewRef.current === 'wizard' && view === 'main') {
-      setPersonalInfo({ ...emptyProfile });
-      setStep(1);
-    }
-    prevViewRef.current = view;
-  }, [view]);
+  const [hallWorld, setHallWorld] = useState(initialWorld);
+  const creationDraftOwner = getCreationDraftOwner();
+  const draft = useSyncExternalStore(creationDraftOwner.subscribe, creationDraftOwner.getSnapshot, creationDraftOwner.getSnapshot);
+  // The active save's profile is never an input to a new creation document.
+  const personalInfo = draft.profile;
+  const step = draft.step;
+  const selectedWorld = view === 'wizard' ? draft.selectedWorld : hallWorld;
+  const setStep: Dispatch<SetStateAction<number>> = useCallback(value => {
+    const current = creationDraftOwner.getSnapshot().step;
+    creationDraftOwner.edit({ step: typeof value === 'function' ? value(current) : value });
+  }, [creationDraftOwner]);
+  const setPersonalInfo: Dispatch<SetStateAction<PlayerProfile>> = useCallback(value => {
+    const current = creationDraftOwner.getSnapshot().profile;
+    creationDraftOwner.edit({ profile: typeof value === 'function' ? value(current) : value });
+  }, [creationDraftOwner]);
+  const setSelectedWorld: Dispatch<SetStateAction<string>> = useCallback(value => {
+    if (view === 'wizard') {
+      const current = creationDraftOwner.getSnapshot().selectedWorld;
+      creationDraftOwner.edit({ selectedWorld: typeof value === 'function' ? value(current) : value });
+    } else setHallWorld(value);
+  }, [creationDraftOwner, view]);
+  const resetForNewJourney = () => creationDraftOwner.reset(hallWorld);
+  const resumeCreationDraft = () => { setView('wizard'); };
 
   // ─── 用户创建的世界 ───
   const [createdWorlds, setCreatedWorlds] = useState<WorldDef[]>(() => {
@@ -88,37 +64,25 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
   const [editingWorld, setEditingWorld] = useState<WorldDef | null>(null);
   const [worldEditorInitialStep, setWorldEditorInitialStep] = useState<number | undefined>(undefined);
 
-  // 加载世界书（进入向导时触发，不再绑定特定步骤号）
-  useEffect(() => {
-    if (view !== 'wizard' || worldBookLoaded) return;
-    loadWorldBook().then(wb => {
-      setWorldBookLoaded(true);
-      if (!wb) return;
-      const world = allWorlds.find(w => w.id === selectedWorld);
-      if (!world) return;
-
-      // 从 canonical worldBookEntries 构造临时 entry 用于 UI 展示
-      if (world.worldBookEntries && world.worldBookEntries.length > 0) {
-        const firstEntry = world.worldBookEntries[0];
-        setWorldEntry({
-          id: firstEntry.uid,
-          comment: firstEntry.comment,
-          content: firstEntry.content,
-          constant: firstEntry.constant,
-          enabled: !firstEntry.disable,
-          selective: (firstEntry.key?.length ?? 0) > 0,
-          keys: firstEntry.key ?? [],
-          secondaryKeys: firstEntry.keysecondary ?? [],
-          position: firstEntry.position ?? 'after_char',
-          insertionOrder: firstEntry.order ?? 0,
-        });
-      }
-    });
-  }, [view, selectedWorld, worldBookLoaded]);
+  // The world entry is a projection of the selected definition, so a previous world's
+  // asynchronous load cannot supply a prompt after a selection change.
+  const worldEntry = useMemo<WorldBookEntry | null>(() => {
+    const entry = allWorlds.find(world => world.id === selectedWorld)?.worldBookEntries?.[0];
+    if (!entry) return null;
+    return {
+      id: entry.uid, comment: entry.comment, content: entry.content,
+      constant: entry.constant, enabled: !entry.disable,
+      selective: (entry.key?.length ?? 0) > 0, keys: entry.key ?? [],
+      secondaryKeys: entry.keysecondary ?? [], position: entry.position ?? 'after_char',
+      insertionOrder: entry.order ?? 0,
+    };
+  }, [selectedWorld, allWorlds]);
 
   // 持久化用户创建的世界
+  // 自建世界带有完整世界书，体积可观：配额耗尽时只跳过本次落盘，
+  // 不能让同步异常冒泡掀翻整个界面（内存态仍然有效）。
   useEffect(() => {
-    localStorage.setItem(CREATED_WORLDS_KEY, JSON.stringify(createdWorlds));
+    trySetItem(CREATED_WORLDS_KEY, JSON.stringify(createdWorlds));
   }, [createdWorlds]);
 
   // ─── 世界编辑器操作 ───
@@ -166,7 +130,11 @@ export function useWizard({ initialWorld = 'default', initialPersonalInfo }: Use
     worldEntry,
     // 角色
     personalInfo, setPersonalInfo,
-    resetForNewJourney,
+    resetForNewJourney, resumeCreationDraft,
+    creationDraftOwner,
+    hasCreationDraft: creationDraftOwner.hasDraft(),
+    draftWarning: draft.warning,
+    retryDraftSave: creationDraftOwner.retrySave,
     // 世界列表
     allWorlds, createdWorlds,
     // 编辑器

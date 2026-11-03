@@ -1,8 +1,8 @@
 import { useState,useRef } from 'react';
 import { ArrowLeft,Save,Trash2,User,FolderOpen,Download,Upload,Edit3,Check,X,AlertTriangle } from 'lucide-react';
 import EmptyState from '../shared/EmptyState';
-import type { SaveMeta,GameSave } from '../../storage/db';
-import { loadGame as loadGameFromDb } from '../../storage/db';
+import type { SaveMeta } from '../../storage/db';
+import { SAVE_FILE_ACCEPT } from '../../storage/saveFileCodec';
 
 /** 格式化字节数为可读字符串 */
 function formatBytes(bytes: number): string {
@@ -16,12 +16,12 @@ interface SavesViewProps {
   locale: string;
   currentSaveId: string | null;
   onBack: () => void;
-  onLoadSave: (save: GameSave) => void;
+  onLoadSave: (saveId: string) => Promise<void>;
   onDeleteSave: (id: string) => void;
   onForceDeleteSave: (id: string) => void;
   onRenameSave: (id: string, newName: string) => void;
-  onImportSave: (file: File) => void;
-  onExportSave: (id: string) => void;
+  onImportSave: (file: File) => void | Promise<void>;
+  onExportSave: (id: string) => void | Promise<void>;
 }
 
 export default function SavesView({
@@ -31,16 +31,14 @@ export default function SavesView({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [transfer, setTransfer] = useState<'import' | 'export' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLoadSelected = async () => {
-    if (!selectedId) return;
+    if (!selectedId || loading) return;
     setLoading(true);
     try {
-      const fullSave = await loadGameFromDb(selectedId);
-      if (fullSave) {
-        onLoadSave(fullSave);
-      }
+      await onLoadSave(selectedId);
     } finally {
       setLoading(false);
     }
@@ -58,12 +56,18 @@ export default function SavesView({
     setEditingId(null);
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      onImportSave(file);
-      e.target.value = '';
-    }
+    e.target.value = '';
+    if (!file || transfer) return;
+    setTransfer('import');
+    try { await onImportSave(file); } finally { setTransfer(null); }
+  };
+
+  const handleExport = async () => {
+    if (!selectedId || transfer) return;
+    setTransfer('export');
+    try { await onExportSave(selectedId); } finally { setTransfer(null); }
   };
 
   return (
@@ -91,6 +95,8 @@ export default function SavesView({
           </h2>
           <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginLeft: 'var(--space-2)' }}>{allSaves.length} 个存档</span>
         </div>
+
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: '1rem' }}>支持旧 JSON 和压缩存档 ZIP；ZIP 可直接导入，无需解压。导出包含自建世界和存档历史。</p>
 
         {/* 存档列表 */}
         {allSaves.length === 0 ? (
@@ -213,6 +219,7 @@ export default function SavesView({
 
           <button
             onClick={() => fileInputRef.current?.click()}
+            disabled={transfer !== null || loading}
             style={{
               padding: '10px 20px',
               border: '1px solid var(--border)',
@@ -226,12 +233,14 @@ export default function SavesView({
               gap: '6px',
             }}
           >
-            <Upload size={14} /> 导入存档
+            <Upload size={14} /> {transfer === 'import' ? '导入中…' : '导入存档'}
           </button>
 
           {selectedId && (
             <button
-              onClick={() => onExportSave(selectedId)}
+              onClick={handleExport}
+              disabled={transfer !== null || loading}
+              title="导出完整压缩存档（.save.zip），保留正文及回滚历史"
               style={{
                 padding: '10px 20px',
                 border: '1px solid var(--border)',
@@ -245,7 +254,7 @@ export default function SavesView({
                 gap: '6px',
               }}
             >
-              <Download size={14} /> 导出存档
+              <Download size={14} /> {transfer === 'export' ? '压缩导出中…' : '导出存档'}
             </button>
           )}
 
@@ -272,7 +281,7 @@ export default function SavesView({
           {selectedId && (
             <button
               onClick={handleLoadSelected}
-              disabled={loading}
+              disabled={loading || transfer !== null}
               style={{
                 padding: '10px 24px',
                 border: '1px solid var(--accent)',
@@ -296,7 +305,8 @@ export default function SavesView({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json"
+          accept={SAVE_FILE_ACCEPT}
+          disabled={transfer !== null || loading}
           onChange={handleImport}
           style={{ display: 'none' }}
         />

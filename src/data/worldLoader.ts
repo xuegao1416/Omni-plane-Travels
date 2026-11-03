@@ -1,6 +1,7 @@
 // 世界数据加载器 —— 从 worlds.json 加载内置世界定义
 import type { WorldDef, WorldBookEntryDef } from './worlds-schema';
 import { STORAGE_KEYS } from '../config/storageKeys';
+import { safeSetItem } from '../storage/safeStorage';
 import { normalizeModules } from '../modules/normalizeModule';
 
 // ── 从 worlds.json 导入内置世界定义 ──
@@ -95,7 +96,7 @@ export function saveWorldDraft(draft: WorldDraft): void {
   const idx = drafts.findIndex(d => d.id === draft.id);
   if (idx >= 0) drafts[idx] = draft;
   else drafts.push(draft);
-  localStorage.setItem(STORAGE_KEYS.WORLD_DRAFTS, JSON.stringify(drafts));
+  safeSetItem(STORAGE_KEYS.WORLD_DRAFTS, JSON.stringify(drafts));
 }
 
 /** 列出所有草稿 */
@@ -108,7 +109,7 @@ export function listWorldDrafts(): WorldDraft[] {
 /** 删除草稿 */
 export function deleteWorldDraft(draftId: string): void {
   const drafts = listWorldDrafts().filter(d => d.id !== draftId);
-  localStorage.setItem(STORAGE_KEYS.WORLD_DRAFTS, JSON.stringify(drafts));
+  safeSetItem(STORAGE_KEYS.WORLD_DRAFTS, JSON.stringify(drafts));
 }
 
 /** 将草稿正式保存为自定义世界（从草稿移除，写入 CUSTOM_WORLDS） */
@@ -123,7 +124,7 @@ export function promoteDraftToCustomWorld(draft: WorldDraft): WorldDef {
   const idx = customs.findIndex(w => w.id === world.id);
   if (idx >= 0) customs[idx] = world;
   else customs.push(world);
-  localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(customs));
+  safeSetItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(customs));
   deleteWorldDraft(draft.id);
   return world;
 }

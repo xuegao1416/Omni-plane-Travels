@@ -189,3 +189,9 @@ function exactSlices(source: string, maxTokens: number): string[] {
   }
   return result;
 }
+
+/** Semantic result boundaries stay fixed when the network input budget changes. */
+export function buildNovelSemanticSegments(datasetId: string, chapters: NovelChapter[], options: Parameters<typeof buildNovelSegments>[2] = {}): NovelSegment[] {
+  const selected = options.mode === 'custom' ? chapters.filter(chapter => chapter.index >= (options.startChapterIndex ?? 0) && chapter.index <= (options.endChapterIndex ?? chapters.length - 1)) : chapters;
+  return buildNovelSegments(datasetId, selected, { mode: 'single_chapter', maxTokens: 4000 });
+}

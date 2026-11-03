@@ -22,7 +22,7 @@ describe('director causal plans and actual outcomes', () => {
     const { sim, director, context } = fixture();
     alignDirectorPlans(director, context);
     const directive = compileDirectorDirective(sim, 't1', 'v1')!;
-    const input = { director, directive, narrative: '证人来到酒馆。', turnId: 't2', stateVersion: 'v2', config: {} as ApiConfig };
+    const input = { director, directive, narrative: '证人来到酒馆。', turnId: 't2', stateVersion: 'v2', config: { apiKey: 'key', baseUrl: 'https://example.test/v1', model: 'test-model', provider: 'custom' } as ApiConfig };
     await expect(evaluateDirectiveOutcome(input, async () => { throw new Error('API 429'); })).rejects.toThrow('API 429');
     expect(director.receipts).toHaveLength(0);
     expect(director.plans.meeting.status).toBe('directed');

@@ -20,7 +20,7 @@ import type { WorldDef } from '../../data/worldLoader';
 import { saveWorldDraft,deleteWorldDraft,type WorldDraft } from '../../data/worldLoader';
 import { resolveWorldArtwork } from '../../data/worldArtwork';
 import WorldForkSelectModal from './WorldForkSelectModal';
-import type { GameSave,SaveMeta } from '../../storage/db';
+import type { SaveMeta } from '../../storage/db';
 import { TABS,type TabKey } from './stepWorldBrowser/constants';
 import { normalizeExternal } from './stepWorldBrowser/constants';
 import { restoreDirectorDependencies } from '../../director/dependencies';
@@ -339,6 +339,8 @@ interface WorldHallViewProps {
   setSelectedWorld: (id: string) => void;
   onBackToHome: () => void;
   onStartWizard: () => void;
+  creationDraftName?: string;
+  onResumeCreation?: () => void;
   onOpenEvents: () => void;
   onOpenCustomModules: () => void;
   onOpenSettings: () => void;
@@ -346,7 +348,7 @@ interface WorldHallViewProps {
   onOpenEditor: (world: WorldDef | null, step?: number) => void;
   onDeleteWorld: (worldId: string) => void | Promise<{ ok: boolean }>;
   onImportWorld: (world: WorldDef) => void;
-  onLoadSave: (save: GameSave) => void;
+  onLoadSave: (saveId: string) => Promise<void>;
   onDeleteSave: (id: string) => void | Promise<void>;
   onImportSave: (file: File) => void | Promise<void>;
   onExportSave: (id: string) => void | Promise<void>;
@@ -360,6 +362,7 @@ export default function WorldHallView({
   setSelectedWorld,
   onBackToHome,
   onStartWizard,
+  creationDraftName, onResumeCreation,
   onOpenEvents,
   onOpenCustomModules,
   onOpenSettings,
@@ -408,6 +411,38 @@ export default function WorldHallView({
     updateHallLayout();
     window.addEventListener('resize', updateHallLayout);
     return () => window.removeEventListener('resize', updateHallLayout);
+  }, []);
+
+  // 校准锚点布局的 clamp 只按校准时的固定像素宽度限位；按钮组是流式尺寸，
+  // 视口宽于校准窗口时实际内容更宽，右缘会冲出屏幕。这里实测矩形后写入
+  // 位移校正量（--entry-hall-nav-shift-x/y），保证导航条任何宽度下都不出界。
+  const navActionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = navActionsRef.current;
+    if (!el) return undefined;
+    const EDGE = 8;
+    const update = () => {
+      el.style.setProperty('--entry-hall-nav-shift-x', '0px');
+      el.style.setProperty('--entry-hall-nav-shift-y', '0px');
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const overflowRight = rect.right - (window.innerWidth - EDGE);
+      const overflowLeft = EDGE - rect.left;
+      const overflowBottom = rect.bottom - (window.innerHeight - EDGE);
+      const overflowTop = EDGE - rect.top;
+      const shiftX = overflowRight > 0 ? -overflowRight : overflowLeft > 0 ? overflowLeft : 0;
+      const shiftY = overflowBottom > 0 ? -overflowBottom : overflowTop > 0 ? overflowTop : 0;
+      if (shiftX) el.style.setProperty('--entry-hall-nav-shift-x', `${shiftX.toFixed(1)}px`);
+      if (shiftY) el.style.setProperty('--entry-hall-nav-shift-y', `${shiftY.toFixed(1)}px`);
+    };
+    update();
+    window.addEventListener('resize', update);
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      window.removeEventListener('resize', update);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -530,7 +565,8 @@ export default function WorldHallView({
           <span className="entry-hall-brand__mark"><Compass size={15} /></span>
           <span><b>世界漫游指南</b><small>OMNI PLANE TRAVELS</small></span>
         </div>
-        <div className="entry-hall-header__actions" data-layout-id="hall.nav" data-layout-label="顶部导航整体" data-layout-editable="true" data-layout-container="hall.screen">
+        <div ref={navActionsRef} className="entry-hall-header__actions" data-layout-id="hall.nav" data-layout-label="顶部导航整体" data-layout-editable="true" data-layout-container="hall.screen">
+          {onResumeCreation && <EntrySlicedButton frame="dawn-v4-compact" onClick={onResumeCreation} title={creationDraftName}>继续创建</EntrySlicedButton>}
           <EntrySlicedButton frame="dawn-v4-compact" icon={Sparkles} onClick={() => setNovelOpen(true)}>小说拆解台</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-26-v2.png" icon={Settings} onClick={onOpenSettings} data-layout-id="hall.nav.save" data-layout-label="导航 · 设置" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">设置</EntrySlicedButton>
           <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-07-v2.png" icon={Boxes} onClick={() => { playHallSound('confirm'); onOpenEvents(); }} data-layout-id="hall.nav.events" data-layout-label="导航 · 事件中心" data-layout-editable="true" data-layout-container="hall.screen" data-layout-kind="compact">事件中心</EntrySlicedButton>

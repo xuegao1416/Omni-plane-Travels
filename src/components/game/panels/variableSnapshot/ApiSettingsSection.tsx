@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Settings,ChevronDown,ChevronRight } from 'lucide-react';
-import { loadPresets } from '../../../settings/apiPresetUtils';
+import { useApiPresets } from '../../../../stores/apiPresetStore';
 
 interface Props {
   varApiPresetId: string;
@@ -10,7 +10,7 @@ interface Props {
 
 export function ApiSettingsSection({ varApiPresetId, onPresetIdChange, onSave }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const apiPresets = loadPresets();
+  const { presets: apiPresets } = useApiPresets();
 
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>

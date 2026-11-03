@@ -1,5 +1,26 @@
 # 更新日志
 
+## v2.8.4 — 玩法模块共创 Agent、数据库 v4 升级与设置页性能修复 (2026-09-19)
+
+本版本合并 v2.8.3 之后的全部开发提交，并收尾数据库升级窗口、剧情导演降级提示与设置页性能。
+
+### ✨ 玩法模块工坊（共创 Agent）
+
+- 工坊升级为原生工具调用共创 Agent：通过能力查询、草稿创建与局部修改、校验和真实试玩共同制作玩法模块；聊天、执行记录和模块版本分别管理。
+- 模块可原子消耗或增加金币、背包物品和生存资源；资源不足、重复事件或规则失败不会产生部分结算。
+- 支持版本差异、显式回退与绑定世界；对既有存档提供预览影响、手动应用和恢复点还原，旧 V2 会话首次打开对应世界时迁移。
+
+### 🔧 修复与优化
+
+- **共创兼容性**：不支持原生工具调用时自动尝试文本操作，严格校验后才修改草稿；兼容接口拒绝可选参数时有界降级，修复重复工具 ID 和末步完成误报。
+- **小说与导演补强**：保留分段未变化的分析检查点，导入资料先校验再恢复主线依赖；自动人物观察只同步正文中的在场角色，阻止空阶段和依赖后续阶段导致的主线卡住。
+- **请求与导入边界**：变量提取的超时和取消覆盖响应正文读取；结构化请求可降级普通文本，拒绝截断、过滤和取消后的结果；修复导入模块期间切换会话可能覆盖其他草稿的问题，并拦截保留字模块 ID。
+- **数据库升级**：IndexedDB 支持 v4～v9 无损补齐到 v10，修复旧用户导入 TXT 被版本门槛拦截的问题；早于 v4 的数据库仍停止升级并保留原数据。
+- **请求稳定性**：修复兼容接口鉴权头、短流式回答被误判为 429 降级、工具 Schema，以及 ComfyUI 的类型收窄问题。
+- **剧情导演**：结构协议连续失败时，降级提示重新上报给用户，不再静默。
+- **设置页性能**：设置界面打开后暂停被遮挡页面的动画并移除大面积双层模糊，降低浏览器持续渲染负担。
+- **界面细节**：完善人物迷雾、物品展示、世界大厅和玩法模块界面，继续优化移动端布局。
+
 ## v2.8.3 — 小说拆解台、剧情导演与累计体验更新 (2026-09-12)
 
 本版本合并 v2.8.2 之后的全部开发提交及同期工作区成果。
@@ -290,31 +311,31 @@
 
 ## v2.5.0 — 发布就绪改造 + 功能增强 (2026-07-12)
 
-### 🔒 安全 / 稳定（G0）
+### 🔒 安全 / 稳定
 
-- **L-01** API Key 加密存储（Web Crypto AES-GCM non-extractable + IndexedDB）
-- **L-02** iframe DOMPurify 净化 + sandbox=allow-scripts（移除 allow-same-origin 防沙箱逃逸）
-- **L-03** Tauri CSP 最小白名单（非 null）
-- **L-04** 流式超时 120s AbortController 真正 abort（消除永久卡死）
-- **L-05** 依赖钉定精确版本 + 移除冗余 @types/uuid/@types/dompurify
-- **L-06** build.ts 全量输出多 chunk
-- **L-07** Tauri devUrl→3456 + http:default 能力
+- API Key 加密存储（Web Crypto AES-GCM non-extractable + IndexedDB）
+- iframe DOMPurify 净化 + sandbox=allow-scripts（移除 allow-same-origin 防沙箱逃逸）
+- Tauri CSP 最小白名单（非 null）
+- 流式超时 120s AbortController 真正 abort（消除永久卡死）
+- 依赖钉定精确版本 + 移除冗余 @types/uuid/@types/dompurify
+- build.ts 全量输出多 chunk
+- Tauri devUrl→3456 + http:default 能力
 
-### 📄 发布就绪（G1）
+### 📄 发布就绪
 
-- **L-08** 新增 LICENSE（MIT）、CONTRIBUTING、PRIVACY.md
-- **L-09** 新增用户教程（配 Key→建世界→发消息→回滚变量全流程）
-- **L-10** 新增独立落地页（docs/site/index.html）
-- **L-11** 新增内容政策 + 社区准则
-- **L-12** 新增治理文档（永久开源免费）
-- **L-13** 语义色全量 token 化（var() 替代硬编码色值）
-- **L-14** 桌面 DrawerPanel a11y（role/aria-modal/Esc/焦点陷阱）
-- **L-15** 桌面图标导航补 aria-label
-- **L-16** 核心纯函数单测（variableManager/responseExtractor/rateLimiter/db迁移）
-- **L-17** 429 尊重 Retry-After + 分桶限流
-- **L-18** 补最小 sw.js（PWA 可安装）
-- **L-19** 原型污染防护（isSafePath/containsDangerousKey）
-- **L-20** @types/uuid 版本错配清理 + typecheck 脚本
+- 新增 LICENSE（MIT）、CONTRIBUTING、PRIVACY.md
+- 新增用户教程（配 Key→建世界→发消息→回滚变量全流程）
+- 新增独立落地页（docs/site/index.html）
+- 新增内容政策 + 社区准则
+- 新增治理文档（永久开源免费）
+- 语义色全量 token 化（var() 替代硬编码色值）
+- 桌面 DrawerPanel a11y（role/aria-modal/Esc/焦点陷阱）
+- 桌面图标导航补 aria-label
+- 核心纯函数单测（variableManager/responseExtractor/rateLimiter/db迁移）
+- 429 尊重 Retry-After + 分桶限流
+- 补最小 sw.js（PWA 可安装）
+- 原型污染防护（isSafePath/containsDangerousKey）
+- @types/uuid 版本错配清理 + typecheck 脚本
 
 ### ⚡ 功能增强
 

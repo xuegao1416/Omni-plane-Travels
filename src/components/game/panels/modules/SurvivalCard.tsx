@@ -21,7 +21,8 @@ interface SurvivalCardProps {
     usage?: string;
   }>;
   /** 生成配方回调（玩家需求 → AI生成） */
-  onGenerateRecipe?: (request: string) => Promise<void>;
+  onGenerateRecipe?: (request: string) => Promise<boolean | void>;
+  onCancelRecipeGeneration?: () => void;
   /** 制作回调（消耗资源+产出） */
   onCraft?: (recipe: SurvivalRecipe) => void;
   /** 解锁配方回调 */
@@ -41,7 +42,7 @@ interface SurvivalCardProps {
 }
 
 export default memo(function SurvivalCard({
-  data, title, runtimeResources, onGenerateRecipe, onCraft, unlockedRecipeIds = [], onGather, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
+  data, title, runtimeResources, onGenerateRecipe, onCancelRecipeGeneration, onCraft, unlockedRecipeIds = [], onGather, onDeleteRecipe, isGeneratingRecipe, onOpenOverlay, recentChanges,
 }: SurvivalCardProps) {
   const displayTitle = title || '生存资源';
   const threshold = data.rules?.criticalThreshold ?? 2;
@@ -98,8 +99,8 @@ export default memo(function SurvivalCard({
   }, [mergedResources.map(r => r.id).join(',')]);
 
   const handleGenerate = async () => {
-    if (!recipeRequest.trim() || !onGenerateRecipe) return;
-    await onGenerateRecipe(recipeRequest.trim());
+    if (!recipeRequest.trim() || !onGenerateRecipe || isGeneratingRecipe) return;
+    if (await onGenerateRecipe(recipeRequest.trim()) === false) return;
     setRecipeRequest('');
     setShowRecipeInput(false);
   };
@@ -242,7 +243,7 @@ export default memo(function SurvivalCard({
         </div>
 
         {/* 配方生成输入框 */}
-        {showRecipeInput && (
+        {(showRecipeInput || isGeneratingRecipe) && (
           <div style={{
             display: 'flex', gap: '4px', marginBottom: '8px',
             padding: '6px', borderRadius: '6px',
@@ -252,7 +253,7 @@ export default memo(function SurvivalCard({
               value={recipeRequest}
               onChange={e => setRecipeRequest(e.target.value)}
               placeholder="描述你想制作的东西（如：石斧、熟肉）"
-              onKeyDown={e => e.key === 'Enter' && handleGenerate()}
+              onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229 && handleGenerate()}
               style={{
                 flex: 1, background: 'none', border: 'none',
                 color: 'var(--text-primary)', fontSize: 'var(--font-size-xs)',
@@ -277,6 +278,9 @@ export default memo(function SurvivalCard({
               }
               生成
             </button>
+            {isGeneratingRecipe && onCancelRecipeGeneration && <button type="button" onClick={onCancelRecipeGeneration}
+              style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', background: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}>取消</button>}
           </div>
         )}
 

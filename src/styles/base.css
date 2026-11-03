@@ -297,3 +297,23 @@ select.input-field {
 button:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* ─── 性能模式：关闭动态特效（设置 → 界面 → 关闭动态特效） ───
+   用近零时长而不是 animation/transition: none，保证 transitionend / animationend 事件仍会触发。
+   同时停用 backdrop-filter / filter，这些是移动端发热的主要来源。 */
+:root[data-effects='off'] *,
+:root[data-effects='off'] *::before,
+:root[data-effects='off'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+  animation-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+:root[data-effects='off'] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+  will-change: auto !important;
+}

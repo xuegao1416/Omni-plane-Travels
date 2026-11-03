@@ -3,11 +3,19 @@ import type { DirectorDefinition } from './definitionTypes';
 
 const text = z.string().trim().min(1);
 const strings = z.array(text);
+const reference = text.regex(/^[A-Za-z0-9_\u0080-\uFFFF][A-Za-z0-9_.:\-\u0080-\uFFFF]*$/);
+const ownerField = text.refine(value => value.split('.').every(part => /^[A-Za-z_\u0080-\uFFFF][A-Za-z0-9_\u0080-\uFFFF]*$/.test(part) && !['__proto__', 'prototype', 'constructor'].includes(part)), '无效模块声明字段');
+const authoredEffect = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('npc.move'), actorId: text, location: text }).strict(),
+  z.object({ type: z.literal('npc.die'), actorId: text, status: text.optional() }).strict(),
+  z.object({ type: z.literal('module.rule'), moduleId: reference, moduleVersion: text, lifecycle: z.enum(['onGameStart', 'onTurnEnd', 'onChoice', 'onButton', 'onTick']), ruleId: reference }).strict(),
+  z.object({ type: z.literal('uniqueItem.transfer'), moduleId: reference, moduleVersion: text, itemId: reference, ownerField, expectedOwner: text, newOwner: text }).strict(),
+]);
 const predicate = z.object({ path: text, operator: z.enum(['eq', 'neq', 'exists', 'gt', 'gte', 'lt', 'lte']), value: z.union([z.string(), z.number().finite(), z.boolean(), z.null()]).optional() }).strict();
 export const directorDraftSchema = z.object({
   title: text, coreConflict: text, anchors: strings,
-  stages: z.array(z.object({ id: text, title: text, description: text, nodeIds: strings, completion: z.object({ mode: z.enum(['all', 'any']), nodeIds: strings.min(1) }).strict().optional() }).strict()).min(1),
-  nodes: z.array(z.object({ id: text, stageId: text, title: text, intent: text, actorIds: strings, execution: z.enum(['foreground', 'offscreen', 'either']), conditions: z.array(z.object({ id: text, description: text, predicates: z.array(predicate).optional() }).strict()), dependsOn: strings, constraints: strings, sourceRefs: strings.min(1), referenceOutcome: text.optional() }).strict()).min(1),
+  stages: z.array(z.object({ id: text, title: text, description: text, nodeIds: strings.min(1, '阶段至少需要一个事件'), completion: z.object({ mode: z.enum(['all', 'any']), nodeIds: strings.min(1) }).strict().optional(), failurePolicy: z.enum(['stop', 'continue']).optional() }).strict()).min(1),
+  nodes: z.array(z.object({ id: text, stageId: text, title: text, intent: text, actorIds: strings, execution: z.enum(['foreground', 'offscreen', 'either']), conditions: z.array(z.object({ id: text, description: text, predicates: z.array(predicate).optional() }).strict()), dependsOn: strings, constraints: strings, sourceRefs: strings.min(1), referenceOutcome: text.optional(), effects: z.array(authoredEffect).max(64).optional() }).strict()).min(1),
   characters: z.array(z.object({ id: text, name: text, aliases: strings }).strict()),
   coverage: z.object({ complete: z.boolean(), gaps: strings, boundary: text }).strict(),
 }).strict();
@@ -21,12 +29,18 @@ export function validateDirectorDraft(value: unknown, allowedSources?: readonly 
   const actors = unique(draft.characters.map(c => c.id), '人物');
   unique(draft.nodes.flatMap(n => n.conditions.map(c => c.id)), '条件');
   const sources = allowedSources && new Set(allowedSources);
+  const stageOrder = new Map(draft.stages.map((stage, index) => [stage.id, index]));
+  const nodeStages = new Map(draft.nodes.map(node => [node.id, node.stageId]));
   const listed = draft.stages.flatMap(s => s.nodeIds);
   for (const stage of draft.stages) if (stage.completion?.nodeIds.some(id => !stage.nodeIds.includes(id))) throw new Error('阶段完成条件引用了其他阶段事件');
   if (listed.length !== nodes.size || new Set(listed).size !== nodes.size || listed.some(id => !nodes.has(id))) throw new Error('阶段必须恰好覆盖全部事件');
   for (const node of draft.nodes) {
     if (!stages.has(node.stageId) || !draft.stages.find(s => s.id === node.stageId)!.nodeIds.includes(node.id)) throw new Error('阶段引用失效');
     if (node.actorIds.some(id => !actors.has(id)) || node.dependsOn.some(id => !nodes.has(id))) throw new Error('人物或因果引用失效');
+    for (const effect of node.effects ?? []) {
+      if ('actorId' in effect && (!actors.has(effect.actorId) || !node.actorIds.includes(effect.actorId))) throw new Error('效果人物引用失效');
+    }
+    if (node.dependsOn.some(id => stageOrder.get(nodeStages.get(id)!)! > stageOrder.get(node.stageId)!)) throw new Error('前一阶段事件不能依赖尚未开启的后续阶段事件');
     if (sources && node.sourceRefs.some(id => !sources.has(id))) throw new Error('来源引用不存在');
   }
   const visited = new Set<string>(), visiting = new Set<string>();

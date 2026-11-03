@@ -12,7 +12,7 @@
 | `src/gameplay/kernel.ts` | 539 | 玩法内核主入口(条件求值/状态机/事件分发)                           |
 | `src/gameplay/types.ts`  | 166 | `GameplayStateRoot` / `Condition` / `Action` 等类型 |
 
-**`kernel.ts` 提供**(均为实际导出符号;无 `applyGameplayAction` / `registerGameplayModule`):
+**`kernel.ts` 导出**:
 
 - `evaluateGameplayCondition(condition, state, events)` — §4.4 规则引擎委托的核心条件求值
 - `executeGameplayTransaction(state, transaction)` — 玩法事务执行(含条件校验)
@@ -52,9 +52,9 @@ combatNarrativeBoundary.ts 返回正文
 
 能力(技能/天赋/职业/ innate 天赋)的统一构建与实例化管理接口。
 
-> 注:`AbilityDefinition` 接口本身定义在 `src/gameplay/protocols.ts`(含 `schemaVersion`/`id`/`name`/`category`/`rarity`/`maxRank`/`pointCost`/`prerequisites`/`tags`/`mechanics` 等字段),**不存在 `trigger` 字段**;触发逻辑位于 `mechanics` 内的 `cooldownRounds`/`statuses`/`combat` 等子字段。
+> 注:`AbilityDefinition` 接口定义在 `src/gameplay/protocols.ts`(含 `schemaVersion`/`id`/`name`/`category`/`rarity`/`maxRank`/`pointCost`/`prerequisites`/`tags`/`mechanics` 等字段);触发逻辑位于 `mechanics` 内的 `cooldownRounds`/`statuses`/`combat` 等子字段。
 
-`abilitySystem.ts` 实际导出的关键函数(无 `registerAbility` / `executeAbility`):
+`abilitySystem.ts` 导出的关键函数:
 
 ```typescript
 function createAbilityInstance(definition: AbilityDefinition, source: AbilityCategory, acquiredAt?: number): AbilityInstance;
@@ -82,7 +82,7 @@ interface NarrativeDecisionRecord {
 }
 ```
 
-实际导出函数(无 `logDecision` / `getDecisionsForRound`):
+导出函数:
 
 ```typescript
 function createNarrativeDecisionRecord(input: NarrativeDecisionRecordInput): NarrativeDecisionRecord;
@@ -112,7 +112,7 @@ function getNarrativeDecisionPromptSnapshot(state, saveId?): NarrativeDecisionPr
 | ----------------------------- | ------------------------ |
 | `src/gameplay/creation/`      | 角色创建流程(数据 schema + 步骤定义) |
 | `src/gameplay/profession/`    | 职业系统(职业库/技能树/晋升)         |
-| `src/gameplay/moduleRuntime/` | 模块运行时(实际装载到 varMgr 的接口)  |
+| `src/gameplay/moduleRuntime/` | 模块运行时(装载到 varMgr 的接口)  |
 | `src/gameplay/modules/`       | 具体玩法模块(每个模块一个目录)         |
 
 ---

@@ -8,7 +8,7 @@
 ```
 用户输入
   ↓
-(navigate('game') 只切换 currentScreen,不触发 sendMessage — 实际由用户点发送按钮或回车调用)
+(navigate('game') 只切换 currentScreen,不触发 sendMessage;发送由用户点发送按钮或回车调用)
   ↓
 engine.sendMessage(userText, options)
   ├─ [守卫检查] isSaveReadOnly / !apiConfig / generatingRef.current / 战斗暂停(combatContinuation 例外)
@@ -27,12 +27,12 @@ engine.sendMessage(userText, options)
        │    ├─ buildModuleContextProjection() → coreSnapshot + moduleProjection.summary
        │    ├─ worldBookRef.scanAndBuildInjection(chatHistory, userText)
        │    │    └─ 返回 { beforeChar, afterChar, atDepthEntries[] }
-       │    ├─ (无 buildMainlineInjection) — 实际通过 simEngine.getWorldNewsBrief() + simEngine.getAllStorylineSummaries() 注入 simulationBrief
-       │    ├─ (无 compileMemoryContext) — 实际是 executeMemoryPrepareForMain + 读取 memStore.lastCompiledContext?.fullText
+       │    ├─ simEngine.getWorldNewsBrief() + simEngine.getAllStorylineSummaries() → simulationBrief
+       │    ├─ executeMemoryPrepareForMain() + 读取 memStore.lastCompiledContext?.fullText
        │    ├─ playerProfileBlock 拼接
        │    ├─ assembleSystemPrompt(preset, { varSnapshot, wbInjection, ... })
-       │    │    └─ assembleResult.depthEntries 由 assembler 内部计算,**不是入参**
-       │    ├─ requestStreamWithRetry() — 实际流式在 src/api/client.ts:165-235(parseSSEStream 不在 useGameEngine.ts)
+       │    │    └─ assembleResult.depthEntries 由 assembler 内部计算
+       │    ├─ requestStreamWithRetry() — 流式实现位于 src/api/client.ts:165-235
        │    │    └─ onDelta 中实时调用 applyCombatBoundary() = constrainPreCombatNarrative()(图形化战斗时),而非单一线性步骤
        │    ├─ DeepSeek 格式修复(useFormatRepairGuard)
        │    └─ StatusPlaceHolderImpl 处理
@@ -78,7 +78,7 @@ GameScreen bumpVersion()(监听 VARIABLE_UPDATE_ENDED) → 全组件重渲染
   ↓
 emitCanonicalEventCard(eventId, eventPackIds, isCurrent)  // 3 参数,返回 Promise<boolean>
   ↓
-CardOverlay(React 函数组件,不是 .render() 方法)
+CardOverlay(React 函数组件,工作流执行在 openCard 回调中)
   ├─ eventBus.on(EVENTS.EVENT_CARD) → openCard(evt)  // CardOverlay.tsx:39
   └─ openCard(CardEvent)  // CardOverlay.tsx:44-72
        ├─ 调用 executeCardWorkflow(workflow, ctx)  // 内部走 src/modules/cardWorkflowEngine.ts
@@ -103,10 +103,10 @@ CardOverlay(React 函数组件,不是 .render() 方法)
 
 **关键设计说明**:
 
-- `emitCanonicalEventCard` 实际签名是 `emitCanonicalEventCard(eventId: string, eventPackIds: string[], isCurrent: boolean)`,返回 `Promise<boolean>`(成功/失败/过期),不是 1 参数
-- `CardOverlay` 是 React 函数组件,工作流执行在 `openCard` 回调中(不是 `.render()` 方法)
-- 选项点击后通过 `createNarrativeDecisionRecord` + `applyNarrativeDecision` 链路应用效果(`applyEffectTarget` 在 `eventChoiceState.ts` 中,是 `applyNarrativeDecision` 的内部实现细节,不直接调用)
-- `CardOverlay` 中没有 `bumpVersion`(`bumpVersion` 仅存在于 `GameScreen`,通过 `EVENTS.VARIABLE_UPDATE_ENDED` 事件链路触发)
+- `emitCanonicalEventCard(eventId: string, eventPackIds: string[], isCurrent: boolean)` 返回 `Promise<boolean>`(成功/失败/过期)
+- `CardOverlay` 是 React 函数组件,工作流执行在 `openCard` 回调中
+- 选项点击后通过 `createNarrativeDecisionRecord` + `applyNarrativeDecision` 链路应用效果(`applyEffectTarget` 在 `eventChoiceState.ts` 中,是 `applyNarrativeDecision` 的内部实现细节)
+- `bumpVersion` 仅存在于 `GameScreen`,通过 `EVENTS.VARIABLE_UPDATE_ENDED` 事件链路触发
 
 ### 21.3 世界书扫描 → 提示词注入
 
@@ -123,7 +123,7 @@ worldBookRef.scanAndBuildInjection(chatHistory, userText)  // src/worldbook/inde
        │    ├─ 常驻条目(constant=true / 无 key)始终激活
        │    ├─ 主关键词 + selectiveLogic 次级关键词(AND_ANY / NOT_ALL / NOT_ANY / AND_ALL)
        │    └─ useProbability 概率门控
-       ├─ resolveGroupExclusions()(分组互斥) — 实际变量名是 winners,不是 allActivated
+       ├─ resolveGroupExclusions()(分组互斥,内部使用 winners)
        ├─ 递归轮次控制:excludeRecursion=true → 后续轮次不参与;preventRecursion=true → 终止
        └─ compareWorldInfoEntriesBySendOrder()(排序)
   ↓
@@ -149,8 +149,8 @@ assembleSystemPrompt(preset, {
 
 - `scanAndBuildInjection` 中间会合并 `mergedOptions`,默认注入 NPC 抑制回调 `shouldSuppressCharacterWorldBookEntry`
 - `WIScanner.checkEntry` 还包含常驻条目(constant)始终激活、递归轮次控制(`excludeRecursion` / `preventRecursion`)、`suppressCharacterEntry` 回调检查等
-- 分组互斥裁决使用 `winners` 变量(在 `scanWorldInfo` 内部),不是 `allActivated`
-- `assembleSystemPrompt` 的 `depthEntries` 不是入参,而是返回值 `assembleResult.depthEntries`
+- 分组互斥裁决在 `scanWorldInfo` 内部使用 `winners` 变量
+- `depthEntries` 由 `assembleSystemPrompt` 返回(`assembleResult.depthEntries`),不作为入参
 
 ---
 

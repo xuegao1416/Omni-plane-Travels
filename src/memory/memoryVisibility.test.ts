@@ -45,6 +45,26 @@ test('same-name public entity cannot inherit hidden facts during an ordinary wri
   expect(formatRuntimeToCompiledText(runtime, ['甲']).text).not.toContain('SECRET');
 });
 
+test('player projection omits checkpoint payloads before cloning and detaches visible facts', () => {
+  useMemoryStore.getState().initMemoryRuntime('projection');
+  useMemoryStore.getState().updateSceneAnchor({ locationLabel: '旅店' });
+  const runtime = useMemoryStore.getState().getMemoryRuntime();
+  const checkpoint = useMemoryStore.getState().createCheckpoint()!;
+  let snapshotReads = 0;
+  const snapshot = checkpoint.snapshot;
+  Object.defineProperty(checkpoint, 'snapshot', { enumerable: true, get: () => { snapshotReads++; return snapshot; } });
+  const current = useMemoryStore.getState().getMemoryRuntime();
+  const projected = projectMemoryRuntime(current);
+  expect(snapshotReads).toBe(0);
+  expect(projected.checkpoints).toEqual([]);
+  projected.sceneAnchor!.locationLabel = '城门';
+  expect(runtime.sceneAnchor?.locationLabel).toBe('旅店');
+  expect(current.checkpoints).toHaveLength(1);
+  const director = projectMemoryRuntime(current, 'director');
+  expect(director.checkpoints[0]?.snapshot).toEqual(snapshot);
+  expect(snapshotReads).toBeGreaterThan(0);
+});
+
 test('reunion records only the narrated injury as discovered while its hidden cause remains secret', () => {
   useMemoryStore.getState().resetMemoryRuntime();
   const runtime = structuredClone(useMemoryStore.getState().getMemoryRuntime());

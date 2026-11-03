@@ -20,9 +20,9 @@ describe('plain-text novel import', () => {
 
   test('creates pending semantic segments instead of pretending excerpts are summaries', () => {
     const dataset = createNovelDatasetFromText('导入测试', sampledHeadingFormat);
-    expect(dataset.segments).toHaveLength(1);
+    expect(dataset.segments).toHaveLength(dataset.chapters.length);
     expect(dataset.segments[0]).toMatchObject({
-      chapterIds: dataset.chapters.map(chapter => chapter.id), status: 'pending', summary: '',
+      chapterIds: [dataset.chapters[0].id], status: 'pending', summary: '',
     });
   });
 

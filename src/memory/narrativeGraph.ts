@@ -21,6 +21,7 @@ import type {
   RetrievePlanSnapshot,
   DebugLog,
 } from './types';
+import { directorTitle, isReconstructed } from '../utils/directorDisplayText';
 
 // ============================================================
 //  常量
@@ -88,6 +89,28 @@ function takeItems<T>(arr: T[] | null | undefined, limit: number): T[] {
   if (!Array.isArray(arr)) return [];
   return arr.slice(0, limit);
 }
+
+// Only documented enum values are translated; future/custom values remain inspectable.
+const STATUS_LABELS: Record<string, string> = {
+  open: '进行中', blocked: '受阻', suspended: '暂停', resolved: '已解决', failed: '失败',
+  superseded: '已替代', active: '有效', expired: '已过期', broken: '已断裂', changed: '已变化',
+  hot: '热点', warm: '温态', cold: '冷态', unknown: '未知', success: '成功', error: '失败',
+};
+const statusLabel = (value: string): string => STATUS_LABELS[value] || value;
+const scopeLabel = (value: string): string => ({ player: '玩家', npc: '角色', location: '地点', world: '世界' }[value] || value);
+const timeScopeLabel = (value: string): string => ({ short: '短期', mid: '中期', long: '长期' }[value] || value);
+const retrieveModeLabel = (value: string): string => ({ summary: '摘要', excerpt: '摘录', full: '完整内容' }[value] || value);
+const retrieveSourceLabel = (value: string): string => ({
+  hot_thread: '活跃线程', hot_state: '当前状态', hot_relation: '当前关系', hot_event: '热点事件',
+  hot_entity: '当前实体', archive: '归档', summary_history: '摘要历史', vector: '向量记忆', scene: '场景',
+}[value] || value);
+function referenceLabel(value: string): string {
+  if (/^NPC_[\u3400-\u9fff]/.test(value)) return value.slice(4);
+  // Generated machine identifiers have no reliable narrative name.
+  if (/^(?:entity|evt|event|thread|location|checkpoint|cp)_[A-Za-z0-9_-]+$/.test(value)) return '未命名对象';
+  return value;
+}
+interface NamedGraphOptions { entityLabel?: (id: string) => string }
 
 // ─── 详情字段构建 ───
 
@@ -319,11 +342,12 @@ function addCollectionNodes(
   prefix: string,
   maxItems = 6,
   label = '包含',
+  displayItem: (value: string) => string = value => value,
 ): void {
   const shown = takeItems(items, maxItems);
   for (let i = 0; i < shown.length; i++) {
     const nodeId = `${prefix}_${i}`;
-    builder.addNode(nodeId, shown[i], 'rounded', '', buildTruncatedNodeDetail(shown[i], shown[i]));
+    builder.addNode(nodeId, displayItem(shown[i]), 'rounded', '', createNodeDetail(displayItem(shown[i]), [{ label: '原始标识', value: shown[i] }]));
     builder.addEdge(parentId, nodeId, label);
   }
   if (items.length > maxItems) {
@@ -360,13 +384,13 @@ function buildEmptyGraph(tabLabel: string): GraphBuilderResult {
 
 // ─── 场景图谱 ───
 
-interface SceneGraphOptions {
+interface SceneGraphOptions extends NamedGraphOptions {
   sceneAnchor: SceneAnchor | null;
   query?: string;
 }
 
 function buildSceneGraph(options: SceneGraphOptions): GraphBuilderResult {
-  const { sceneAnchor, query } = options;
+  const { sceneAnchor, query, entityLabel = referenceLabel } = options;
   if (!sceneAnchor) return buildEmptyGraph(TAB_LABELS.scene);
 
   const builder = createGraphBuilder('TB');
@@ -389,9 +413,9 @@ function buildSceneGraph(options: SceneGraphOptions): GraphBuilderResult {
   if (sceneAnchor.presentEntities?.length) {
     const presentId = 'scene_present';
     builder.addNode(presentId, `在场 (${sceneAnchor.presentEntities.length})`, 'rounded', 'collectionNode',
-      buildCollectionNodeDetail('在场实体', sceneAnchor.presentEntities));
+      buildCollectionNodeDetail('在场实体', sceneAnchor.presentEntities.map(entityLabel)));
     builder.addEdge(rootId, presentId);
-    addCollectionNodes(builder, presentId, sceneAnchor.presentEntities, 'scene_entity', 8, '出场');
+    addCollectionNodes(builder, presentId, sceneAnchor.presentEntities, 'scene_entity', 8, '出场', entityLabel);
   }
 
   // 目标
@@ -438,13 +462,13 @@ function buildSceneGraph(options: SceneGraphOptions): GraphBuilderResult {
 
 // ─── 线程图谱 ───
 
-interface ThreadsGraphOptions {
+interface ThreadsGraphOptions extends NamedGraphOptions {
   threads: NarrativeThread[];
   query?: string;
 }
 
 function buildThreadsGraph(options: ThreadsGraphOptions): GraphBuilderResult {
-  const { threads, query } = options;
+  const { threads, query, entityLabel = referenceLabel } = options;
   if (!threads || threads.length === 0) return buildEmptyGraph(TAB_LABELS.threads);
 
   const builder = createGraphBuilder('TB');
@@ -455,30 +479,31 @@ function buildThreadsGraph(options: ThreadsGraphOptions): GraphBuilderResult {
   for (let i = 0; i < threads.length; i++) {
     const t = threads[i];
     const nodeId = `thread_${i}`;
-    const statusIcon = t.status === 'open' ? '[O]' : t.status === 'blocked' ? '[B]' : t.status === 'resolved' ? '[R]' : t.status === 'failed' ? '[F]' : `[${t.status.charAt(0).toUpperCase()}]`;
+    const statusIcon = statusLabel(t.status);
     const label = `${statusIcon} ${truncateText(t.title || t.id, 40)}`;
 
     builder.addNode(nodeId, label, 'rounded', `thread_${t.status}`,
       createNodeDetail(t.title || t.id, [
         { label: 'ID', value: t.id },
-        { label: '状态', value: t.status },
+        { label: '状态', value: statusLabel(t.status) },
         { label: '优先级', value: String(t.priority) },
         { label: '目标', value: t.goal },
         { label: '摘要', value: truncateText(t.summary, 100) },
         { label: '阻塞原因', value: t.blockingReason },
         { label: '截止时间', value: t.deadline },
-        { label: '关联实体', value: Array.isArray(t.relatedEntities) ? t.relatedEntities.join(', ') : '' },
-        { label: '关联物品', value: Array.isArray(t.relatedItems) ? t.relatedItems.join(', ') : '' },
-        { label: '关联地点', value: Array.isArray(t.relatedLocations) ? t.relatedLocations.join(', ') : '' },
+        { label: '关联实体', value: Array.isArray(t.relatedEntities) ? t.relatedEntities.map(entityLabel).join(', ') : '' },
+        { label: '关联物品', value: Array.isArray(t.relatedItems) ? t.relatedItems.map(entityLabel).join(', ') : '' },
+        { label: '关联地点', value: Array.isArray(t.relatedLocations) ? t.relatedLocations.map(entityLabel).join(', ') : '' },
+        { label: '关联标识（核查）', value: [...(t.relatedEntities ?? []), ...(t.relatedItems ?? []), ...(t.relatedLocations ?? [])].join(', ') },
         { label: '来源范围', value: formatRange(t.sourceStartIndex, t.sourceEndIndex) },
         { label: '创建时间', value: formatShortDateTime(t.createdAt) },
         { label: '更新时间', value: formatShortDateTime(t.updatedAt) },
       ]));
-    builder.addEdge(rootId, nodeId, t.status);
+    builder.addEdge(rootId, nodeId, statusLabel(t.status));
 
     // 关联实体子节点
     if (t.relatedEntities?.length) {
-      addCollectionNodes(builder, nodeId, t.relatedEntities, `thread_${i}_entity`, 4, '关联');
+      addCollectionNodes(builder, nodeId, t.relatedEntities, `thread_${i}_entity`, 4, '关联', entityLabel);
     }
   }
 
@@ -489,13 +514,13 @@ function buildThreadsGraph(options: ThreadsGraphOptions): GraphBuilderResult {
 
 // ─── 状态槽图谱 ───
 
-interface StatesGraphOptions {
+interface StatesGraphOptions extends NamedGraphOptions {
   states: NarrativeStateSlot[];
   query?: string;
 }
 
 function buildStatesGraph(options: StatesGraphOptions): GraphBuilderResult {
-  const { states, query } = options;
+  const { states, query, entityLabel = referenceLabel } = options;
   if (!states || states.length === 0) return buildEmptyGraph(TAB_LABELS.states);
 
   const builder = createGraphBuilder('TB');
@@ -514,7 +539,7 @@ function buildStatesGraph(options: StatesGraphOptions): GraphBuilderResult {
 
   const scopeLabels: Record<string, string> = {
     player: '玩家',
-    npc: 'NPC',
+    npc: '角色',
     location: '地点',
     world: '世界',
   };
@@ -527,15 +552,16 @@ function buildStatesGraph(options: StatesGraphOptions): GraphBuilderResult {
     for (let i = 0; i < items.length; i++) {
       const s = items[i];
       const nodeId = `state_${scope}_${i}`;
-      const statusIcon = s.status === 'active' ? '[A]' : s.status === 'resolved' ? '[R]' : '[E]';
+      const statusIcon = statusLabel(s.status);
       const label = `${statusIcon} ${truncateText(s.slotType || s.summary || s.id, 36)}`;
 
       builder.addNode(nodeId, label, 'rounded', `state_${s.status}`,
         createNodeDetail(s.slotType || s.id, [
           { label: 'ID', value: s.id },
-          { label: '范围', value: `${s.scopeType}/${s.scopeId}` },
+          { label: '范围', value: `${scopeLabel(s.scopeType)}/${entityLabel(s.scopeId)}` },
+          { label: '范围标识（核查）', value: `${s.scopeType}/${s.scopeId}` },
           { label: '类型', value: s.slotType },
-          { label: '状态', value: s.status },
+          { label: '状态', value: statusLabel(s.status) },
           { label: '优先级', value: String(s.priority) },
           { label: '当前值', value: truncateText(s.value, 100) },
           { label: '摘要', value: truncateText(s.summary, 100) },
@@ -554,13 +580,13 @@ function buildStatesGraph(options: StatesGraphOptions): GraphBuilderResult {
 
 // ─── 关系图谱 ───
 
-interface RelationsGraphOptions {
+interface RelationsGraphOptions extends NamedGraphOptions {
   relations: NarrativeRelationEdge[];
   query?: string;
 }
 
 function buildRelationsGraph(options: RelationsGraphOptions): GraphBuilderResult {
-  const { relations, query } = options;
+  const { relations, query, entityLabel = referenceLabel } = options;
   if (!relations || relations.length === 0) return buildEmptyGraph(TAB_LABELS.relations);
 
   const builder = createGraphBuilder('LR');
@@ -581,7 +607,7 @@ function buildRelationsGraph(options: RelationsGraphOptions): GraphBuilderResult
   for (const entity of entitySet) {
     const nodeId = `entity_${entityIdx}`;
     entityNodeIdMap.set(entity, nodeId);
-    builder.addNode(nodeId, truncateText(entity, 24), 'circle', 'entityNode');
+    builder.addNode(nodeId, truncateText(entityLabel(entity), 24), 'circle', 'entityNode', createNodeDetail(entityLabel(entity), [{ label: '原始标识', value: entity }]));
     builder.addEdge(rootId, nodeId);
     entityIdx++;
   }
@@ -598,12 +624,13 @@ function buildRelationsGraph(options: RelationsGraphOptions): GraphBuilderResult
       const label = `${r.relationType} ${stanceIcon} (${r.strength.toFixed(1)})`;
 
       builder.addNode(relId, `${r.relationType}: ${truncateText(r.summary, 40)}`, 'rect', `rel_${r.status}`,
-        createNodeDetail(`${r.sourceEntityId} - ${r.targetEntityId}`, [
+        createNodeDetail(`${entityLabel(r.sourceEntityId)} - ${entityLabel(r.targetEntityId)}`, [
           { label: 'ID', value: r.id },
+          { label: '关系两端标识（核查）', value: `${r.sourceEntityId} → ${r.targetEntityId}` },
           { label: '关系类型', value: r.relationType },
-          { label: '立场', value: r.stance },
+          { label: '立场', value: ({ ally: '友方', enemy: '敌方', neutral: '中立' }[r.stance] || r.stance) },
           { label: '强度', value: r.strength.toFixed(2) },
-          { label: '状态', value: r.status },
+          { label: '状态', value: statusLabel(r.status) },
           { label: '摘要', value: truncateText(r.summary, 100) },
           { label: '来源范围', value: formatRange(r.sourceStartIndex, r.sourceEndIndex) },
         ]));
@@ -619,13 +646,13 @@ function buildRelationsGraph(options: RelationsGraphOptions): GraphBuilderResult
 
 // ─── 关系网图谱 ───
 
-interface RelationNetworkGraphOptions {
+interface RelationNetworkGraphOptions extends NamedGraphOptions {
   relationNetwork: NarrativeRelationNetworkItem[];
   query?: string;
 }
 
 function buildRelationNetworkGraph(options: RelationNetworkGraphOptions): GraphBuilderResult {
-  const { relationNetwork, query } = options;
+  const { relationNetwork, query, entityLabel = referenceLabel } = options;
   if (!relationNetwork || relationNetwork.length === 0) return buildEmptyGraph(TAB_LABELS.relationNetwork);
 
   const builder = createGraphBuilder('LR');
@@ -645,7 +672,7 @@ function buildRelationNetworkGraph(options: RelationNetworkGraphOptions): GraphB
   for (const entity of entitySet) {
     const nodeId = `net_entity_${entityIdx}`;
     entityNodeIdMap.set(entity, nodeId);
-    builder.addNode(nodeId, truncateText(entity, 24), 'circle', 'entityNode');
+    builder.addNode(nodeId, truncateText(entityLabel(entity), 24), 'circle', 'entityNode', createNodeDetail(entityLabel(entity), [{ label: '原始标识', value: entity }]));
     builder.addEdge(rootId, nodeId);
     entityIdx++;
   }
@@ -660,12 +687,13 @@ function buildRelationNetworkGraph(options: RelationNetworkGraphOptions): GraphB
       const label = `${r.relationType} (${r.strength.toFixed(1)})`;
 
       builder.addNode(`net_rel_${i}`, `${r.relationType}: ${truncateText(r.summary, 36)}`, 'rect', `net_rel_${r.status}`,
-        createNodeDetail(`${r.sourceEntityId} -> ${r.targetEntityId}`, [
+        createNodeDetail(`${entityLabel(r.sourceEntityId)} → ${entityLabel(r.targetEntityId)}`, [
           { label: 'ID', value: r.id },
+          { label: '关系两端标识（核查）', value: `${r.sourceEntityId} → ${r.targetEntityId}` },
           { label: '关系类型', value: r.relationType },
           { label: '强度', value: r.strength.toFixed(2) },
           { label: '置信度', value: r.confidence.toFixed(2) },
-          { label: '状态', value: r.status },
+          { label: '状态', value: statusLabel(r.status) },
           { label: '摘要', value: truncateText(r.summary, 100) },
           { label: '来源范围', value: formatRange(r.sourceStartIndex, r.sourceEndIndex) },
         ]));
@@ -681,13 +709,13 @@ function buildRelationNetworkGraph(options: RelationNetworkGraphOptions): GraphB
 
 // ─── 事件图谱 ───
 
-interface EventsGraphOptions {
+interface EventsGraphOptions extends NamedGraphOptions {
   events: NarrativeEventCard[];
   query?: string;
 }
 
 function buildEventsGraph(options: EventsGraphOptions): GraphBuilderResult {
-  const { events, query } = options;
+  const { events, query, entityLabel = referenceLabel } = options;
   if (!events || events.length === 0) return buildEmptyGraph(TAB_LABELS.events);
 
   const builder = createGraphBuilder('TB');
@@ -710,18 +738,24 @@ function buildEventsGraph(options: EventsGraphOptions): GraphBuilderResult {
       const e = groupEvents[i];
       const nodeId = `${groupId}_${i}`;
       const importanceBar = '★'.repeat(Math.min(e.importance, 5));
-      const label = `${importanceBar} ${truncateText(e.title, 36)}`;
+      const label = `${importanceBar} ${truncateText(directorTitle(e.title, '事件记录'), 36)}`;
 
       builder.addNode(nodeId, label, 'rounded', `event_${e.status}`,
-        createNodeDetail(e.title, [
+        createNodeDetail(directorTitle(e.title, '事件记录'), [
           { label: 'ID', value: e.id },
-          { label: '状态', value: e.status },
+          { label: '状态', value: statusLabel(e.status) },
           { label: '重要度', value: `${e.importance}/5` },
-          { label: '摘要', value: truncateText(e.summary, 120) },
-          { label: '摘录', value: truncateText(e.excerpt, 80) },
+          { label: '摘要', value: truncateText(isReconstructed(e.summary) ? directorTitle(e.summary, '事件记录') : e.summary, 120) },
+          { label: '摘录', value: truncateText(isReconstructed(e.excerpt) ? directorTitle(e.excerpt, '事件记录') : e.excerpt, 80) },
+          ...(isReconstructed(e.title) || isReconstructed(e.summary) || isReconstructed(e.excerpt) ? [
+            { label: '原始标题（核查）', value: e.title },
+            { label: '原始摘要（核查）', value: e.summary },
+            { label: '原始摘录（核查）', value: e.excerpt },
+          ] : []),
           { label: '时间标签', value: Array.isArray(e.timeLabels) ? e.timeLabels.join(', ') : '' },
-          { label: '关联实体', value: Array.isArray(e.entityRefs) ? e.entityRefs.join(', ') : '' },
-          { label: '关联地点', value: Array.isArray(e.locationRefs) ? e.locationRefs.join(', ') : '' },
+          { label: '关联实体', value: Array.isArray(e.entityRefs) ? e.entityRefs.map(entityLabel).join(', ') : '' },
+          { label: '关联地点', value: Array.isArray(e.locationRefs) ? e.locationRefs.map(entityLabel).join(', ') : '' },
+          { label: '关联标识（核查）', value: [...(e.entityRefs ?? []), ...(e.locationRefs ?? [])].join(', ') },
           { label: '关联线程', value: Array.isArray(e.threadRefs) ? e.threadRefs.join(', ') : '' },
           { label: '来源范围', value: formatRange(e.sourceStartIndex, e.sourceEndIndex) },
           { label: '创建时间', value: formatShortDateTime(e.createdAt) },
@@ -730,7 +764,7 @@ function buildEventsGraph(options: EventsGraphOptions): GraphBuilderResult {
 
       // 关联实体
       if (e.entityRefs?.length) {
-        addCollectionNodes(builder, nodeId, e.entityRefs, `${nodeId}_ent`, 3, '涉及');
+        addCollectionNodes(builder, nodeId, e.entityRefs, `${nodeId}_ent`, 3, '涉及', entityLabel);
       }
     }
   }
@@ -787,10 +821,10 @@ function buildEntitiesGraph(options: EntitiesGraphOptions): GraphBuilderResult {
     for (let i = 0; i < items.length; i++) {
       const e = items[i];
       const nodeId = `ent_${type}_${i}`;
-      const label = `${truncateText(e.name, 30)}`;
+      const label = `${truncateText(referenceLabel(e.name), 30)}`;
 
       builder.addNode(nodeId, label, 'rounded', 'entityCard',
-        createNodeDetail(e.name, [
+        createNodeDetail(referenceLabel(e.name), [
           { label: 'ID', value: e.id },
           { label: '类型', value: typeLabels[e.entityType] || e.entityType },
           { label: '别名', value: Array.isArray(e.aliases) ? e.aliases.join(', ') : '' },
@@ -808,12 +842,12 @@ function buildEntitiesGraph(options: EntitiesGraphOptions): GraphBuilderResult {
 
       // 关联线程
       if (e.relatedThreads?.length) {
-        addCollectionNodes(builder, nodeId, e.relatedThreads, `${nodeId}_thread`, 3, '线程');
+        addCollectionNodes(builder, nodeId, e.relatedThreads, `${nodeId}_thread`, 3, '线程', referenceLabel);
       }
 
       // 关联事件
       if (e.relatedEvents?.length) {
-        addCollectionNodes(builder, nodeId, e.relatedEvents, `${nodeId}_event`, 3, '事件');
+        addCollectionNodes(builder, nodeId, e.relatedEvents, `${nodeId}_event`, 3, '事件', referenceLabel);
       }
     }
   }
@@ -825,13 +859,13 @@ function buildEntitiesGraph(options: EntitiesGraphOptions): GraphBuilderResult {
 
 // ─── 归档图谱 ───
 
-interface ArchivesGraphOptions {
+interface ArchivesGraphOptions extends NamedGraphOptions {
   archives: NarrativeArchiveCard[];
   query?: string;
 }
 
 function buildArchivesGraph(options: ArchivesGraphOptions): GraphBuilderResult {
-  const { archives, query } = options;
+  const { archives, query, entityLabel = referenceLabel } = options;
   if (!archives || archives.length === 0) return buildEmptyGraph(TAB_LABELS.archives);
 
   const builder = createGraphBuilder('TB');
@@ -851,7 +885,8 @@ function buildArchivesGraph(options: ArchivesGraphOptions): GraphBuilderResult {
         { label: '摘要', value: truncateText(a.summary, 120) },
         { label: '时间跨度', value: a.timeSpan },
         { label: '关键词', value: Array.isArray(a.keywords) ? a.keywords.join(', ') : '' },
-        { label: '关联实体', value: Array.isArray(a.entityRefs) ? a.entityRefs.join(', ') : '' },
+        { label: '关联实体', value: Array.isArray(a.entityRefs) ? a.entityRefs.map(entityLabel).join(', ') : '' },
+        { label: '关联实体标识（核查）', value: Array.isArray(a.entityRefs) ? a.entityRefs.join(', ') : '' },
         { label: '来源范围', value: formatRange(a.sourceStartIndex, a.sourceEndIndex) },
         { label: '创建时间', value: formatShortDateTime(a.createdAt) },
         { label: '归档时间', value: formatShortDateTime(a.archivedAt) },
@@ -939,8 +974,8 @@ function buildVectorGraph(options: VectorGraphOptions): GraphBuilderResult {
           { label: '规则', value: Array.isArray(v.rules) ? v.rules.join(', ') : '' },
           { label: '时间标记', value: Array.isArray(v.timeMarkers) ? v.timeMarkers.join(', ') : '' },
           { label: '重要度', value: `${v.importance}/5` },
-          { label: '时间范围', value: v.timeScope },
-          { label: '状态', value: v.state },
+          { label: '时间范围', value: timeScopeLabel(v.timeScope) },
+          { label: '状态', value: statusLabel(v.state) },
           { label: '来源范围', value: formatRange(v.sourceStartIndex ?? null, v.sourceEndIndex ?? null) },
         ]));
       builder.addEdge(groupId, nodeId);
@@ -982,14 +1017,14 @@ function buildSummaryGraph(options: SummaryGraphOptions): GraphBuilderResult {
     for (let i = 0; i < recent.length; i++) {
       const s = recent[i];
       const nodeId = `summary_save_${i}`;
-      const statusIcon = s.status === 'success' ? '[OK]' : '[ERR]';
+      const statusIcon = statusLabel(s.status);
       const timeStr = formatShortDateTime(s.savedAt);
       const counts = s.applyResult;
       const label = `${statusIcon} ${timeStr} (${counts.otherCharacterCount + counts.playerCount + counts.itemCount}条)`;
 
       builder.addNode(nodeId, label, 'rounded', `summary_${s.status}`,
         createNodeDetail(`摘要保存 ${timeStr}`, [
-          { label: '状态', value: s.status === 'success' ? '成功' : '失败' },
+          { label: '状态', value: statusLabel(s.status) },
           { label: '保存时间', value: formatShortDateTime(s.savedAt) },
           { label: '来源范围', value: formatRange(s.sourceStartIndex, s.sourceEndIndex) },
           { label: '角色记忆', value: String(counts.otherCharacterCount) },
@@ -1017,7 +1052,7 @@ function buildSummaryGraph(options: SummaryGraphOptions): GraphBuilderResult {
         { label: '策略', value: lastRetrievePlan.strategy },
         { label: '候选数', value: String(lastRetrievePlan.candidates?.length || 0) },
         { label: '已选标题', value: Array.isArray(lastRetrievePlan.selectedTitles) ? lastRetrievePlan.selectedTitles.join(', ') : '' },
-        { label: '检索模式', value: Array.isArray(lastRetrievePlan.selectedModes) ? lastRetrievePlan.selectedModes.join(', ') : '' },
+        { label: '检索模式', value: Array.isArray(lastRetrievePlan.selectedModes) ? lastRetrievePlan.selectedModes.map(retrieveModeLabel).join(', ') : '' },
       ]));
     builder.addEdge(rootId, planId);
 
@@ -1028,8 +1063,8 @@ function buildSummaryGraph(options: SummaryGraphOptions): GraphBuilderResult {
         const c = cands[i];
         const candId = `plan_cand_${i}`;
         builder.addNode(candId, truncateText(c.title, 36), 'rounded', 'candidateNode',
-          createFallbackNodeDetail(c.title, c.source || ''));
-        builder.addEdge(planId, candId, c.source);
+          createFallbackNodeDetail(c.title, retrieveSourceLabel(c.source || '')));
+        builder.addEdge(planId, candId, retrieveSourceLabel(c.source || ''));
       }
     }
   }
@@ -1059,11 +1094,13 @@ function buildMutationsGraph(options: MutationsGraphOptions): GraphBuilderResult
     const m = mutations[i];
     const nodeId = `mutation_${i}`;
     const timeStr = formatShortDateTime(m.createdAt);
-    const label = `${m.type} - ${timeStr} (应用${m.appliedCount}条)`;
+    const typeLabel = m.type === 'ingest' ? '叙事写入' : /^[\u3400-\u9fff]/.test(m.type) ? m.type : '其他变更';
+    const label = `${typeLabel} - ${timeStr} (应用${m.appliedCount}条)`;
 
     builder.addNode(nodeId, label, 'rounded', 'mutationNode',
-      createNodeDetail(`变更 ${m.type}`, [
-        { label: '类型', value: m.type },
+      createNodeDetail(`变更 ${typeLabel}`, [
+        { label: '类型', value: typeLabel },
+        { label: '原始类型（核查）', value: m.type },
         { label: '时间', value: timeStr },
         { label: '来源范围', value: formatRange(m.sourceStartIndex, m.sourceEndIndex) },
         { label: '应用数量', value: String(m.appliedCount) },
@@ -1097,10 +1134,10 @@ function buildCheckpointsGraph(options: CheckpointsGraphOptions): GraphBuilderRe
     const cp = checkpoints[i];
     const nodeId = `checkpoint_${i}`;
     const timeStr = formatShortDateTime(cp.createdAt);
-    const label = `${cp.id} - ${timeStr}`;
+    const label = `检查点 ${i + 1} - ${timeStr}`;
 
     builder.addNode(nodeId, label, 'rounded', 'checkpointNode',
-      createNodeDetail(`检查点 ${cp.id}`, [
+      createNodeDetail(`检查点 ${i + 1}`, [
         { label: 'ID', value: cp.id },
         { label: '创建时间', value: timeStr },
         { label: '最后游标', value: String(cp.lastIngestCursor) },
@@ -1116,7 +1153,7 @@ function buildCheckpointsGraph(options: CheckpointsGraphOptions): GraphBuilderRe
       builder.addNode(snapId, '快照数据', 'subroutine', 'snapshotNode',
         createNodeDetail('检查点快照', [
           { label: '版本', value: cp.snapshot.version },
-          { label: '银行ID', value: cp.snapshot.bankId },
+          { label: '记忆库标识', value: cp.snapshot.bankId },
           { label: '线程数', value: String(cp.snapshot.activeThreads?.length || 0) },
           { label: '状态槽', value: String(cp.snapshot.stateSlots?.length || 0) },
           { label: '事件卡', value: String(cp.snapshot.eventCards?.length || 0) },
@@ -1240,41 +1277,49 @@ export function buildMemoryRuntimeGraphPayload(
   options: GraphPayloadOptions,
 ): { definition: string; nodeDetails: Record<string, unknown> } {
   const { tabKey, query } = options;
+  const entityNames = new Map((options.entities ?? []).filter(entity => entity.name?.trim()).map(entity => [entity.id, referenceLabel(entity.name)]));
+  const entityLabel = (id: string): string => entityNames.get(id) || referenceLabel(id);
 
   switch (tabKey) {
     case 'scene':
       return buildSceneGraph({
         sceneAnchor: options.sceneAnchor ?? null,
+        entityLabel,
         query,
       });
 
     case 'threads':
       return buildThreadsGraph({
         threads: options.threads ?? [],
+        entityLabel,
         query,
       });
 
     case 'states':
       return buildStatesGraph({
         states: options.states ?? [],
+        entityLabel,
         query,
       });
 
     case 'relations':
       return buildRelationsGraph({
         relations: options.relations ?? [],
+        entityLabel,
         query,
       });
 
     case 'relationNetwork':
       return buildRelationNetworkGraph({
         relationNetwork: options.relationNetwork ?? [],
+        entityLabel,
         query,
       });
 
     case 'events':
       return buildEventsGraph({
         events: options.events ?? [],
+        entityLabel,
         query,
       });
 
@@ -1287,6 +1332,7 @@ export function buildMemoryRuntimeGraphPayload(
     case 'archives':
       return buildArchivesGraph({
         archives: options.archives ?? [],
+        entityLabel,
         query,
       });
 

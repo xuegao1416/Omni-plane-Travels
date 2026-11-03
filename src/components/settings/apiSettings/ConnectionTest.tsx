@@ -12,12 +12,12 @@ interface Props {
 
 export default function ConnectionTest({ testing, testResult, testSuccess, onTest, t, onSave, onBack }: Props) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', minWidth: 0 }}>
       <button
         onClick={onTest}
         disabled={testing}
         style={{
-          padding: '8px 18px', fontSize: 'var(--font-size-md)', fontWeight: '500',
+          padding: '8px 18px', fontSize: 'var(--font-size-md)', fontWeight: '500', whiteSpace: 'nowrap',
           border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer',
           background: 'var(--bg-secondary)', color: 'var(--text-primary)',
         }}
@@ -25,18 +25,18 @@ export default function ConnectionTest({ testing, testResult, testSuccess, onTes
         {testing ? t('settings.testing') : '测试连接'}
       </button>
       {testResult && (
-        <span style={{ fontSize: 'var(--font-size-base)', flex: 1, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <div role="status" aria-live="polite" style={{ fontSize: 'var(--font-size-base)', flexBasis: '100%', minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 4, order: 1 }}>
           {testSuccess === true && <CheckCircle size={14} color="var(--success)" style={{ flexShrink: 0 }} />}
           {testSuccess === false && <XCircle size={14} color="var(--danger)" style={{ flexShrink: 0 }} />}
-          {testResult}
-        </span>
+          <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{testResult}</span>
+        </div>
       )}
       <div style={{ flex: 1 }} />
       {onBack && (
         <button
           onClick={onBack}
           style={{
-            padding: '8px 20px', fontSize: 'var(--font-size-md)', fontWeight: '500',
+            padding: '8px 20px', fontSize: 'var(--font-size-md)', fontWeight: '500', whiteSpace: 'nowrap',
             border: '1px solid var(--border)', borderRadius: '8px', cursor: 'pointer',
             background: 'var(--bg-secondary)', color: 'var(--text-primary)',
           }}
@@ -48,7 +48,7 @@ export default function ConnectionTest({ testing, testResult, testSuccess, onTes
         <button
           onClick={onSave}
           style={{
-            padding: '8px 28px', fontSize: 'var(--font-size-md)', fontWeight: '600',
+            padding: '8px 28px', fontSize: 'var(--font-size-md)', fontWeight: '600', whiteSpace: 'nowrap',
             border: 'none', borderRadius: '8px', cursor: 'pointer',
             background: 'var(--accent)', color: '#fff',
           }}

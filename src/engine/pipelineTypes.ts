@@ -14,7 +14,8 @@ export type PipelineTaskId =
   | 'memory_retrieve_finalize' // 检索收尾（本地匹配 + 去重）
   | 'memory_compile'    // 上下文编译（组装注入文本）
   | 'memory_vector'     // 向量事实提取
-  | 'variable';         // 变量提取（最后执行）
+  | 'variable'
+  | 'settlement';       // 本地玩法、时间及模块回合收尾
 
 /** 管线阶段状态 */
 export type PipelineStageStatus = 'pending' | 'running' | 'success' | 'warning' | 'error' | 'skipped';
@@ -93,6 +94,7 @@ export const STAGE_LABELS: Record<PipelineTaskId, string> = {
   memory_compile: '上下文编译',
   memory_vector: '向量提取',
   variable: '变量提取',
+  settlement: '玩法结算',
 };
 
 /** 创建默认管线状态 */
@@ -111,6 +113,7 @@ export function createPipelineStatus(round: number): PipelineStatus {
       memory_retrieve_finalize: { status: 'pending', label: STAGE_LABELS.memory_retrieve_finalize },
       memory_compile: { status: 'pending', label: STAGE_LABELS.memory_compile },
       variable: { status: 'pending', label: STAGE_LABELS.variable },
+      settlement: { status: 'pending', label: STAGE_LABELS.settlement },
     },
     startTime: Date.now(),
   };

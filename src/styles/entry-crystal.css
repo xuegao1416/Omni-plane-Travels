@@ -3465,7 +3465,9 @@ html[data-theme] .entry-default-theme.world-weave-editor-overlay .world-weave-ed
   max-width: calc(100vw - 16px);
   height: var(--entry-hall-nav-height);
   box-sizing: border-box;
-  transform: translate(-50%, -50%);
+  /* 运行时限位校正（WorldHallView 实测写入）：校准 clamp 只认固定像素宽度，
+     按钮流式缩放后实际内容可能更宽，这里把超出视口的部分拉回来。 */
+  transform: translate(calc(-50% + var(--entry-hall-nav-shift-x, 0px)), calc(-50% + var(--entry-hall-nav-shift-y, 0px)));
   border-color: rgba(183, 153, 96, var(--entry-hall-nav-border-opacity));
 }
 

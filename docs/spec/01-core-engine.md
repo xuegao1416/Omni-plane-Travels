@@ -3,7 +3,7 @@
 
 ## 1、核心引擎系统
 
-### 1.1 游戏引擎核心 — `src/engine/useGameEngine.ts` (1673行)
+### 1.1 游戏引擎核心 — `src/engine/useGameEngine.ts`
 
 **文件路径**: `src/engine/useGameEngine.ts`
 
@@ -51,15 +51,6 @@ interface GameEngine {
   DialogUI: ReactNode;                // 全局对话框(选项卡/骰子/战斗结算)
 }
 ```
-
-> **类型说明**（以 `src/engine/types.ts` 为准）:
->
-> - `worldBook: WorldBookManager` → `WorldBookManager | null`(可空)
-> - `pipelineStatus: PipelineStatus` → `PipelineStatus | null`(可空)
-> - `resendFromMessage` / `resendFromAssistantMessage` 返回 `Promise<void>`(文档原标 `void`)
-> - `rollbackToSnapshot(msgId: string)` → `rollbackToSnapshot(msgIndex: number)`(参数名 + 类型)
-> - `loadSave(save) => Promise<void>` → `loadSave(save) => void`(同步)
-> - `restoreCombatCheckpoint(saveId: string) => Promise<void>` → `restoreCombatCheckpoint(restore: CombatCheckpointRestore, saveId?: string) => void`(入参是 restore 对象,saveId 可选,同步)
 
 #### 1.1.1 状态定义
 
@@ -124,7 +115,7 @@ interface LatestPipelineContext {
 }
 ```
 
-#### 1.1.3 sendMessage 核心流程 (~522行，第926-1448行)
+#### 1.1.3 sendMessage 核心流程
 
 ```
 用户输入
@@ -308,8 +299,8 @@ optimizeSnapshots() — 清理冗余快照
 #### 1.1.4 回合终结后处理（内联于 sendMessage，无独立 finalizeNormalTurn 函数，等效 ~95行逻辑）
 
 ```typescript
-// 以下逻辑内联于 sendMessage，无独立的 finalizeNormalTurn 函数
-function finalizeNormalTurn( // 仅文档示意，实际内联
+// 以下逻辑在 sendMessage 内联执行
+function finalizeNormalTurn( // 内联于 sendMessage，无独立函数
   ctx: LatestPipelineContext,
   status: PipelineStatus,
   signal: AbortSignal
@@ -428,7 +419,7 @@ function saveSnapshot(
 #### 1.1.6 回滚机制
 
 ```typescript
-// rollbackAndTruncate（实际为 useCallback 闭包，非 async 函数）
+// rollbackAndTruncate（useCallback 闭包，同步执行）
 // 四层回滚：变量 → 记忆 → 演化 → 消息截断
 function rollbackAndTruncate(truncateAt: number): void {
   const messages = messagesRef.current;
@@ -459,7 +450,7 @@ function rollbackAndTruncate(truncateAt: number): void {
   setMessages(prev => prev.slice(0, truncateAt));
 }
 
-// rollbackToSnapshot（useCallback 闭包，同步执行）
+// rollbackToSnapshot（useCallback 闭包，同步）
 // 回滚到特定AI消息的快照，保留该消息本身
 function rollbackToSnapshot(msgIndex: number): void {
   const messages = messagesRef.current;
@@ -549,14 +540,14 @@ function loadSave(save: GameSave): void {
 
 ### 1.2 管线执行与上下文管理
 
-#### 1.2.1 管线执行器 — `src/engine/pipelineExecutor.ts` (315行)
+#### 1.2.1 管线执行器 — `src/engine/pipelineExecutor.ts`
 
 **文件路径**: `src/engine/pipelineExecutor.ts`
 
 **职责**: 11阶段管线的编排器，支持同层并行/层间串行执行。
 
 ```typescript
-// 核心类
+// 核心类（非 interface）
 export class PipelineExecutor {
   constructor(round: number, callbacks: PipelineCallbacks);   // callbacks.onUpdate: () => void
   getStatus(): PipelineStatus;
@@ -580,7 +571,7 @@ type PipelineTaskId =
   | 'memory_query_rewrite' | 'memory_retrieve_plan' | 'memory_multi_round'
   | 'memory_rerank' | 'memory_retrieve_finalize' | 'memory_compile' | 'variable';
 
-// PipelineStageResult — 单阶段结果（实际字段）
+// PipelineStageResult — 单阶段结果
 interface PipelineStageResult {
   status: 'pending' | 'running' | 'success' | 'warning' | 'error' | 'skipped';
   label: string;
@@ -641,7 +632,7 @@ execute()
 
 ---
 
-### 1.3 变量管理器 — `src/engine/variableManager.ts` (1626行)
+### 1.3 变量管理器 — `src/engine/variableManager.ts`
 
 **文件路径**: `src/engine/variableManager.ts`
 
@@ -663,9 +654,9 @@ class VariableManager {
   getVar(path: string, defaultValue?: unknown): unknown           // "玩家.生存状态.血量"
   setVar(path: string, value: unknown, forceReplace?: boolean): void
   
-  // Patch操作（RFC 6902风格，入参为轻量补丁数组，返回是否应用成功）
-  applyPatches(patches: Array<{ op: string; path: string; value?: unknown }>): boolean
-  // 仅提供 applyPatches 批量入口，无单条 applyPatch / createPatch
+  // 变量更新（解析 AI 文本 / 事务载荷并应用到状态）
+  applyUpdateVariable(updateText: string): boolean
+  applyAiUpdateVariable(updateText: string): boolean
   
   // 快照
   createSnapshot(): GameState
@@ -684,9 +675,6 @@ class VariableManager {
   
   // 存档持久化
   createModulePersistenceBundle(saveId: string): ModulePersistenceBundle
-  
-  // NPC感知路径解析
-  // NPC 名称到 ID 的解析在内部路径解析中完成，不单独暴露 resolveNpcPath
 }
 ```
 
@@ -812,60 +800,24 @@ interface NPCData {
 // 危险路径段（原型链污染防护）
 const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
-// AI 可写状态根、事务白名单与禁止字段
-const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);
+// AI 写入白名单相关常量
+const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);        // AI 可写入的状态根
 const AI_TRANSACTION_KEYS = new Set(['id', 'moduleId', 'source', 'label', 'conditions', 'costs', 'effects', 'rewards', 'events']);
-const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);
-
-// 安全数值转换 + 区间钳制，防止 NaN 传播
-function safeClamp(value: unknown, min: number, max: number, fallback: number): number {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(num)));
-}
-
-// 好感度为特殊路径（人物档案.*.关系数据.好感度），单次变化限制 ±15，结果钳制在 -100～100
-const isFavorabilityPath = (path: string): boolean => {
-  const parts = path.split('.');
-  return parts[0] === '人物档案' && parts[2] === '关系数据' && parts[3] === '好感度';
-};
+const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);              // 事务中禁止出现的字段
 ```
 
 #### 1.3.4 快照机制详解
 
 ```typescript
-// createSafeSnapshotForPrompt() — 供提示词使用的净化快照（variableManager.ts:576）
-// 人物档案整体替换为经 createPromptSafeNpcSnapshot 处理过的安全副本，
-// 并删除 人物已知资料 / playerKnowledge，防止 AI 通过{{getvar}}读到未公开情报
-createSafeSnapshotForPrompt(): GameState {
-  const snapshot = cloneDeep(this.state);
-  const safeNpcs: Record<string, unknown> = {};
-  for (const [id, npc] of Object.entries(selectPlayerKnownNPCs(snapshot))) {
-    safeNpcs[id] = createPromptSafeNpcSnapshot(npc, id);
-  }
-  (snapshot as any).人物档案 = safeNpcs;
-  delete (snapshot as any).人物已知资料;
-  delete snapshot.playerKnowledge;
-  return snapshot;
-}
+// createSafeSnapshotForPrompt() — 供提示词使用的净化快照
+// 复制 state 后，用 selectPlayerKnownNPCs + createPromptSafeNpcSnapshot 重建人物档案，
+// 并删除 人物已知资料 / playerKnowledge，避免 {{getvar}} 读到 NPC 内心想法。
 
-// createSnapshot() — 挂到每条 AI 消息上用于回滚（variableManager.ts:986）
-// 先 _slimForSnapshot 瘦身，再用 JSON 序列化替代 cloneDeep，避免超大对象导致 "Invalid string length"
-createSnapshot(): GameState {
-  const slim = this._slimForSnapshot(this.syncModuleRuntime());
-  try {
-    return JSON.parse(JSON.stringify(slim));
-  } catch {
-    return cloneDeep(slim);
-  }
-}
+// _slimForSnapshot() — 存档快照瘦身（私有）
+// 人物档案的长文本字段超过 200 字截断：
+//   背景 / 外貌 / 表性格 / 里性格 / 当前想法 / 当前穿着 / 当前状态 / 内心想法 / 备注；
+// 并移除 portraitUrl 等大型缓存字段。
 ```
-
-`_slimForSnapshot` 的瘦身规则（variableManager.ts:997）：遍历 `人物档案`，对 `背景` / `外貌` / `表性格` / `里性格` / `当前想法` / `当前穿着` / `当前状态` / `内心想法` / `备注` 等长文本字段超过 200 字截断并追加 `…`；`人物事迹` **全量保留**（仅发给 AI 时截取近期，存档不截断）；删除 `portraitUrl` 缓存字段。
-
-`createPromptSafeNpcSnapshot`（`src/utils/npcHelpers.ts:266`）对**离场** NPC 只保留 `姓名`、`人物分类: '离场'`、`人物事迹: chronicles.slice(-3)`、`个人信息.当前位置`；对**在场/重点** NPC 则 `cloneDeep` 全量后覆盖姓名与事迹。
-
-`restoreSnapshot`（variableManager.ts:1020）先用 `canRollbackCombat` 拦截战斗风险模式下的回滚，命中 `moduleRevisions` 时经 `moduleRegistry.restore` + `materializeModulePartitions` 重建模块分区，随后保留 `portraitBlobKey` 并从 IndexedDB 恢复画像，最后 `normalizeState()`。
 
 ---
 
@@ -897,9 +849,9 @@ sendMessage 内联后处理 → bumpVersion
 **`runVariableExtraction` 说明**:
 
 - 签名：`runVariableExtraction(params: { varMgr, parsed, round, userText, mainApiConfig, worldBook, worldId, delayMs, maxRetries, signal?, isCurrent? }): Promise<void>`
-- 行为：直接对 `varMgr` 做变量解析与 `applyPatches`，**返回 void**，不产出 patch 数组；源码中不存在 `VariableExtractionResult` 接口、`extractVariables` 函数或 `variableExtraction.run` 方法。
+- 行为：直接对 `varMgr` 做变量解析并调用 `applyUpdateVariable`，**返回 void**，不产出结果对象；源码中不存在 `VariableExtractionResult` 接口、`extractVariables` 函数或 `variableExtraction.run` 方法。
 
-### 1.5 宏引擎 — `src/engine/macroEngine.ts` (186行)
+### 1.5 宏引擎 — `src/engine/macroEngine.ts`
 
 **文件路径**: `src/engine/macroEngine.ts`
 
@@ -920,7 +872,7 @@ sendMessage 内联后处理 → bumpVersion
 
 ---
 
-### 1.6 提示词组装器 — `src/engine/promptAssembler.ts` (225行)
+### 1.6 提示词组装器 — `src/engine/promptAssembler.ts`
 
 **文件路径**: `src/engine/promptAssembler.ts`
 
@@ -952,7 +904,7 @@ sendMessage 内联后处理 → bumpVersion
 **职责**: 全局事件发布/订阅,解耦模块间直接调用。
 
 ```typescript
-// 事件常量(实际值用下划线/点号,非冒号)
+// 事件常量(命名用下划线/点号,非冒号)
 export const EVENTS = {
   MESSAGE_RECEIVED: 'message_received',
   MESSAGE_SENT: 'message_sent',

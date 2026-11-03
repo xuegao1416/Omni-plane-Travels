@@ -106,7 +106,7 @@ performSave() (saveStore.ts:204-345)
 
 **关键设计说明**:
 
-- `_saveQueued` **实际存在**(`saveStore.ts:68`),用于合并并发触发的自动存档
+- `_saveQueued`(`saveStore.ts:68`)用于合并并发触发的自动存档
 - 写入流程有 `_savePromise` 单飞 + `_saveQueued` 队列重合并两层防抖
 - `performSave` 失败时自动导出 JSON 备份(`save-backup-{timestamp}.json`),不阻塞主流程
 
@@ -171,4 +171,3 @@ useEffect(() => {
   return () => { cancelled = true; };
 }, []);
 ```
-

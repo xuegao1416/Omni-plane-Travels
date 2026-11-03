@@ -1,8 +1,9 @@
 // 预设管理 Store — 用户预设持久化 + 激活状态
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/config/storageKeys';
+import { safeSetItem } from '@/storage/safeStorage';
 import type { PresetPack } from '@/data/builtinPresets';
-import { getBuiltinPreset } from '@/data/builtinPresets';
+import { getBuiltinPreset, getBuiltinPresets } from '@/data/builtinPresets';
 
 const PRESETS_KEY = STORAGE_KEYS.PRESET_PACKS;
 const ACTIVE_KEY = STORAGE_KEYS.ACTIVE_PRESET_ID;
@@ -99,6 +100,8 @@ interface PresetStoreState {
   saveBuiltinOverride: (presetId: string, identifier: string, enabled: boolean) => void;
   /** 保存内置预设条目的内容覆盖 */
   saveBuiltinContentOverride: (presetId: string, identifier: string, content: string) => void;
+  /** 一次保存整个编辑结果，覆盖层始终相对于内置原件计算。 */
+  saveBuiltinEdits: (pack: PresetPack) => void;
   /** 恢复内置预设默认值（清除覆盖） */
   restoreBuiltinDefaults: (presetId: string) => void;
 
@@ -123,7 +126,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
       } else {
         updated = [...state.userPresets, pack];
       }
-      localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+      safeSetItem(PRESETS_KEY, JSON.stringify(updated));
       return { userPresets: updated };
     });
   },
@@ -131,7 +134,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
   deletePreset: (id) => {
     set((state) => {
       const updated = state.userPresets.filter(p => p.id !== id);
-      localStorage.setItem(PRESETS_KEY, JSON.stringify(updated));
+      safeSetItem(PRESETS_KEY, JSON.stringify(updated));
       const newActive = state.activePresetId === id ? null : state.activePresetId;
       if (newActive === null) localStorage.removeItem(ACTIVE_KEY);
       return { userPresets: updated, activePresetId: newActive };
@@ -141,7 +144,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
   setActivePreset: (id) => {
     const normalized = sanitizeActiveId(id);
     if (normalized) {
-      localStorage.setItem(ACTIVE_KEY, normalized);
+      safeSetItem(ACTIVE_KEY, normalized);
     } else {
       localStorage.removeItem(ACTIVE_KEY);
     }
@@ -160,7 +163,7 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
         ...state.builtinOverrides,
         [presetId]: { ...current, [identifier]: enabled },
       };
-      localStorage.setItem(OVERRIDES_KEY, JSON.stringify(updated));
+      safeSetItem(OVERRIDES_KEY, JSON.stringify(updated));
       return { builtinOverrides: updated };
     });
   },
@@ -172,21 +175,53 @@ export const usePresetStore = create<PresetStoreState>((set, get) => ({
         ...state.builtinContentOverrides,
         [presetId]: { ...current, [identifier]: content },
       };
-      localStorage.setItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updated));
+      safeSetItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updated));
       return { builtinContentOverrides: updated };
     });
   },
 
   restoreBuiltinDefaults: (presetId) => {
-    set((state) => {
-      const updated = { ...state.builtinOverrides };
-      delete updated[presetId];
-      localStorage.setItem(OVERRIDES_KEY, JSON.stringify(updated));
-      const updatedContent = { ...state.builtinContentOverrides };
-      delete updatedContent[presetId];
-      localStorage.setItem(CONTENT_OVERRIDES_KEY, JSON.stringify(updatedContent));
-      return { builtinOverrides: updated, builtinContentOverrides: updatedContent };
-    });
+    const original = getBuiltinPresets().find(p => p.id === presetId);
+    if (!original) throw new Error('内置预设不存在，请重新打开预设。');
+    get().saveBuiltinEdits(original);
+  },
+
+  saveBuiltinEdits: (pack) => {
+    const original = getBuiltinPresets().find(p => p.id === pack.id);
+    if (!original) throw new Error('内置预设不存在，请重新打开预设。');
+    const entries = new Map(pack.prompts.map(p => [p.identifier, p]));
+    const enabled: Record<string, boolean> = {};
+    const content: Record<string, string> = {};
+    for (const p of original.prompts) {
+      const edited = entries.get(p.identifier) ?? p;
+      if (edited.enabled !== p.enabled) enabled[p.identifier] = edited.enabled;
+      if (edited.content !== p.content) content[p.identifier] = edited.content;
+    }
+    const state = get();
+    const updated = { ...state.builtinOverrides };
+    const updatedContent = { ...state.builtinContentOverrides };
+    if (Object.keys(enabled).length) updated[pack.id] = enabled;
+    else delete updated[pack.id];
+    if (Object.keys(content).length) updatedContent[pack.id] = content;
+    else delete updatedContent[pack.id];
+    const writes = [
+      { key: OVERRIDES_KEY, value: JSON.stringify(updated), changed: JSON.stringify(updated) !== JSON.stringify(state.builtinOverrides) },
+      { key: CONTENT_OVERRIDES_KEY, value: JSON.stringify(updatedContent), changed: JSON.stringify(updatedContent) !== JSON.stringify(state.builtinContentOverrides) },
+    ].filter(write => write.changed);
+    const previous = writes.map(write => ({ key: write.key, value: localStorage.getItem(write.key) }));
+    try {
+      for (const write of writes) safeSetItem(write.key, write.value);
+    } catch (error) {
+      // 两个既有存储键全部成功后才发布状态；写失败时撤销已完成的写入。
+      for (const old of previous) {
+        try {
+          if (old.value === null) localStorage.removeItem(old.key);
+          else localStorage.setItem(old.key, old.value);
+        } catch { /* 保留原始保存错误供界面提示。 */ }
+      }
+      throw error;
+    }
+    set({ builtinOverrides: updated, builtinContentOverrides: updatedContent });
   },
 
   getActivePreset: () => {

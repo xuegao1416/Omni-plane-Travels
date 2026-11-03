@@ -16,6 +16,7 @@ import { migrateProfessionPack, normalizeAbilityProposal } from '../../gameplay/
 import { FANTASY_CORE_PROFESSION_PACK } from './fantasy-core';
 import { WUXIA_CORE_PROFESSION_PACK } from './wuxia-core';
 import { fallbackProfessionAccent, fallbackProfessionEmblem, isProfessionAccentKey, isProfessionEmblemKey } from './professionVisuals';
+import { safeSetItem } from '../../storage/safeStorage';
 
 const STORAGE_KEY = 'omni.profession-packs.v1';
 const ENVELOPE_TYPE = 'omni-plane-travels-profession-pack';
@@ -407,7 +408,7 @@ function readUserPacks(): ProfessionPack[] {
 
 function writeUserPacks(packs: ProfessionPack[]): void {
   if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(packs.map(pack => ({ ...pack, manifest: { ...pack.manifest, builtin: false } }))));
+  safeSetItem(STORAGE_KEY, JSON.stringify(packs.map(pack => ({ ...pack, manifest: { ...pack.manifest, builtin: false } }))));
 }
 
 export function listProfessionPacks(): ProfessionPack[] {
