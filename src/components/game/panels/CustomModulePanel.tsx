@@ -1,6 +1,6 @@
 import type { GameState } from '../../../schema/variables';
 import { CustomModuleView } from '../../../custom-modules/viewRenderer';
-import '../../../styles/custom-modules.css';
+import '../../../ui/screens/module-workshop.css';
 
 interface Props {
   gameState: GameState;

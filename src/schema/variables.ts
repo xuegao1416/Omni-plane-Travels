@@ -411,6 +411,14 @@ export interface GameState {
   v3?: V3GameStateRuntime;
   /** 六模块独立运行态的修订引用；快照只保存引用，不再复制模块正文。 */
   moduleRevisions?: import('../gameplay/moduleRuntime/types').ModuleRevisionCheckpoint;
+  /** 资源模块（生存物资、材料、商品库存）。存盘在 survival 分区 v2。 */
+  resources?: import('../domains/resources/state').ResourcesState;
+  /** 经营模块（产业、仓库、市场、订单）。存盘在 business 分区 v2。钱走主货币。 */
+  economy?: import('../domains/economy/state').EconomyState;
+  /** 旧事件卡、规则写入的自由标记。 */
+  flags?: Record<string, unknown>;
+  /** 事件导演：待处理的事件卡、触发记录、随机事件节奏。随叙事文档保存。 */
+  eventDirector?: import('../events/types').EventDirectorState;
 }
 
 // 默认空状态

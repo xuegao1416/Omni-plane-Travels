@@ -58,7 +58,7 @@ export function TutorialStepCard({
             transition: 'background 0.2s',
           }}
         >
-          <Icon size={16} color={isExpanded ? '#fff' : 'var(--text-muted)'} />
+          <Icon size={16} color={isExpanded ? '#2a1a04' : 'var(--text-muted)'} />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>

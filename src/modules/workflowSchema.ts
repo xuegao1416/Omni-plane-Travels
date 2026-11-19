@@ -20,16 +20,22 @@ export type SocketType =
 
 /** 端口颜色映射 */
 export const SOCKET_COLORS: Record<SocketType, string> = {
-  flow:     '#a78bfa',  // 紫色
-  number:   '#60a5fa',  // 蓝色
-  string:   '#34d399',  // 绿色
-  boolean:  '#fbbf24',  // 黄色
-  event:    '#f87171',  // 红色
-  resource: '#fb923c',  // 橙色
-  stat:     '#38bdf8',  // 天蓝
-  npc:      '#e879f9',  // 粉色
-  item:     '#a3e635',  // 黄绿
-  any:      '#94a3b8',  // 灰色
+  flow:     '#f2d48e',  // 黄铜（执行流）
+  number:   '#8fa8e6',  // 星蓝
+  string:   '#a9c98a',  // 苔绿
+  boolean:  '#e8c46a',  // 琥珀
+  event:    '#f08f86',  // 朱砂
+  resource: '#f2a76d',  // 赭橙
+  stat:     '#8fc4d6',  // 雾青
+  npc:      '#d6a0d8',  // 藕紫
+  item:     '#c9c978',  // 橄榄金
+  any:      '#a39c88',  // 旧纸灰
+};
+
+/** Card workflow sockets share the palette; `flag` reads as a toggle, so it takes the amber of boolean's sibling. */
+export const CARD_SOCKET_COLORS: Record<'flow' | 'number' | 'string' | 'boolean' | 'stat' | 'resource' | 'flag' | 'any', string> = {
+  flow: SOCKET_COLORS.flow, number: SOCKET_COLORS.number, string: SOCKET_COLORS.string, boolean: SOCKET_COLORS.boolean,
+  stat: SOCKET_COLORS.stat, resource: SOCKET_COLORS.resource, flag: SOCKET_COLORS.npc, any: SOCKET_COLORS.any,
 };
 
 /** 端口定义 */
@@ -182,7 +188,7 @@ export const DEFAULT_LIMITS: EvaluateLimits = {
 // ─── 执行结果 ───
 
 export interface PendingAction {
-  kind: 'set' | 'addEvent' | 'requestCombat' | 'modifyResource' | 'scheduleTick' | 'narrateHint';
+  kind: 'set' | 'addEvent' | 'requestCombat' | 'modifyResource' | 'scheduleTick' | 'narrateHint' | 'modifyStat' | 'modifyItem';
   payload: Record<string, unknown>;
 }
 

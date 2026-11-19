@@ -83,8 +83,8 @@ export class ModuleRuntimeRegistry {
   syncState<T>(moduleId: ModuleRuntimeId, state: T, schemaVersion = 1): ModuleStateRecord<T> {
     const current = this.current.get(moduleId);
     if (!current) return this.initialize(moduleId, state, schemaVersion);
-    if (statesEqual(current.state, state)) return cloneValue(current) as ModuleStateRecord<T>;
-    return this.update<T>(moduleId, () => state);
+    if (statesEqual(current.state, state) && current.schemaVersion === schemaVersion) return cloneValue(current) as ModuleStateRecord<T>;
+    return this.update<T>(moduleId, () => state, schemaVersion);
   }
 
   listCurrentRecords(): ModuleStateRecord[] {
@@ -102,12 +102,14 @@ export class ModuleRuntimeRegistry {
   update<T = Record<string, any>>(
     moduleId: ModuleRuntimeId,
     updater: (state: T) => T,
+    schemaVersion?: number,
   ): ModuleStateRecord<T> {
     const current = this.current.get(moduleId);
     if (!current) throw new Error(`Module partition is not initialized: ${moduleId}`);
     const nextState = updater(cloneValue(current.state as T));
     const next: ModuleStateRecord<T> = {
       ...current,
+      ...(schemaVersion === undefined ? {} : { schemaVersion }),
       revision: current.revision + 1,
       updatedAt: Date.now(),
       state: cloneValue(nextState),

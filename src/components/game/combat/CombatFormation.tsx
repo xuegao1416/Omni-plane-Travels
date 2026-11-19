@@ -1,11 +1,12 @@
-import { Play } from 'lucide-react';
 import type { CombatUnitCardModel } from '../../../gameplay/combatViewModel';
-import { thumbnailPortraitFor } from './CombatBattlefield';
+import { unitArtFor } from './combatArt';
+import type { BattleSceneId } from './battleScene';
 
 export default function CombatFormation({
-  units, selectedRoster, hasNoEnemies, readOnly, saving, onToggleRoster, onStart,
+  units, selectedRoster, hasNoEnemies, readOnly, saving, onToggleRoster, onStart, scene,
 }: {
   units: CombatUnitCardModel[];
+  scene?: BattleSceneId;
   selectedRoster: string[];
   hasNoEnemies: boolean;
   readOnly: boolean;
@@ -13,9 +14,34 @@ export default function CombatFormation({
   onToggleRoster: (id: string) => void;
   onStart: (selectedIds: string[]) => void;
 }) {
-  return <footer className="combat-wireframe__prepare">
-    <div className="combat-wireframe__prepare-copy"><strong>选择出战阵容</strong><p>玩家固定出战，再选择至多三名友方、宠物或召唤物。</p><span>已选择 {selectedRoster.length}/4</span></div>
-    <div className="combat-wireframe__prepare-roster" aria-label="可选出战成员">{units.map(unit => { const portrait = thumbnailPortraitFor(unit); const selected = selectedRoster.includes(unit.id); return <button key={unit.id} type="button" className={selected ? 'is-selected' : ''} onClick={() => onToggleRoster(unit.id)} disabled={readOnly || unit.id === 'player'} aria-pressed={selected}><img src={portrait.src} alt="" /><span><strong>{unit.name}</strong><small>{unit.id === 'player' ? '玩家 · 固定出战' : selected ? '已加入阵容' : '点击加入阵容'}</small></span><i>{selected ? '已选' : '待选'}</i></button>; })}</div>
-    <button type="button" className="combat-wireframe__primary" onClick={() => onStart(selectedRoster)} disabled={readOnly || saving || selectedRoster.length === 0 || hasNoEnemies}><Play size={17} aria-hidden="true" />开始战斗</button>
-  </footer>;
+  const full = selectedRoster.length >= 4;
+  return (
+    <footer className="cb-formation">
+      <div className="cb-formation__copy">
+        <small>布阵</small>
+        <strong>选择出战阵容</strong>
+        <p>你固定出战，可再带至多三名同伴、宠物或召唤物。</p>
+        <span className="cb-formation__pips" aria-label={`已选择 ${selectedRoster.length}/4`}>
+          {[0, 1, 2, 3].map(index => <i key={index} className={index < selectedRoster.length ? 'is-on' : ''} />)}
+          <b>{selectedRoster.length}/4</b>
+        </span>
+      </div>
+      <div className="cb-formation__roster" aria-label="可选出战成员">
+        {units.map(unit => {
+          const art = unitArtFor(unit, scene);
+          const selected = selectedRoster.includes(unit.id);
+          const locked = unit.id === 'player';
+          return (
+            <button key={unit.id} type="button" className={`cb-formation__member${selected ? ' is-selected' : ''}${locked ? ' is-locked' : ''}`} onClick={() => onToggleRoster(unit.id)} disabled={readOnly || locked || (!selected && full)} aria-pressed={selected}>
+              <span className="cb-formation__art"><img src={art.src} alt="" draggable={false} /></span>
+              <span className="cb-formation__name"><strong>{unit.name}</strong><small>{locked ? '固定出战' : selected ? '已入阵' : full ? '阵容已满' : '点击入阵'}</small></span>
+            </button>
+          );
+        })}
+      </div>
+      <button type="button" className="pk-btn pk-btn--primary cb-cta" onClick={() => onStart(selectedRoster)} disabled={readOnly || saving || selectedRoster.length === 0 || hasNoEnemies}>
+        <span>开战</span>
+      </button>
+    </footer>
+  );
 }

@@ -122,25 +122,13 @@ export function MermaidGraphPanel({
 
       <style>{`
         [data-mermaid-container] svg {
-          display: block; width: 100%; height: 100%;
-          max-width: none !important; max-height: none !important;
-          overflow: visible; shape-rendering: geometricPrecision;
-          text-rendering: geometricPrecision; image-rendering: optimizeQuality;
+          display: block; width: 100%; height: 100%; overflow: visible;
+          shape-rendering: geometricPrecision; text-rendering: geometricPrecision;
         }
-        [data-mermaid-container] .edgeLabel, [data-mermaid-container] .label,
-        [data-mermaid-container] foreignObject, [data-mermaid-container] text,
-        [data-mermaid-container] tspan {
-          font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif !important;
-        }
-        [data-mermaid-container] g.node.interactive-node {
-          cursor: pointer; pointer-events: auto; transition: filter 0.18s ease;
-        }
-        [data-mermaid-container] g.node.interactive-node:hover rect,
-        [data-mermaid-container] g.node.interactive-node:hover circle,
-        [data-mermaid-container] g.node.interactive-node:hover polygon,
-        [data-mermaid-container] g.node.interactive-node:hover path {
-          filter: drop-shadow(0 0 14px rgba(255, 220, 150, 0.2)) drop-shadow(0 0 22px rgba(212, 168, 83, 0.16));
-          stroke: #ffe2a0 !important; stroke-width: 2px !important;
+        [data-mermaid-container] .edgePath path, [data-mermaid-container] .flowchart-link { stroke-linecap: round; }
+        [data-mermaid-container] g.node.interactive-node { cursor: pointer; pointer-events: auto; transition: filter .2s ease; }
+        [data-mermaid-container] g.node.interactive-node:hover {
+          filter: brightness(1.25) drop-shadow(0 0 10px rgba(242, 212, 142, .35));
         }
       `}</style>
     </div>

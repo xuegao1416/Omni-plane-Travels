@@ -111,7 +111,7 @@ export default function CloudSaveSettingsTab() {
   };
 
   return (
-    <div className="registry-settings-page registry-cloud-page" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+    <div className="registry-settings-page registry-cloud-page">
       {DialogUI}
 
       {/* 标题 */}

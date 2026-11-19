@@ -1,9 +1,12 @@
 // 轻量宏引擎 —— 支持 {{variable}}, {{random::}}, {{#if::}}, {{roll}} 等宏语法
+import type { FactMacroAccess } from '../core/macroFacts';
 
 /** 宏引擎配置 */
 export interface MacroEngineOptions {
   /** 可选的随机数生成器（默认 Math.random） */
   rng?: () => number;
+  /** 游戏变量（只读）：getvar 读得到，setvar/incvar 写不进去（core/macroFacts）。 */
+  facts?: FactMacroAccess;
 }
 
 /**
@@ -17,20 +20,24 @@ export interface MacroEngineOptions {
  * - {{random::opt1::opt2::...}}  随机选择
  * - {{roll NdM+K}}               骰子投掷
  * - {{key}}                      通用变量查找（兜底）
+ * 变量名先找本次拼装里 setvar 的预设变量，再找上下文，最后找游戏变量（带点路径或变量表别名）。
  */
 export class MacroEngine {
   private variables = new Map<string, string>();
   private context: Record<string, string> = {};
   private rng: () => number;
+  private facts?: FactMacroAccess;
 
   constructor(options?: MacroEngineOptions) {
     this.rng = options?.rng ?? Math.random;
+    this.facts = options?.facts;
   }
 
   // ── 变量操作 ──
 
-  /** 设置变量 */
+  /** 设置变量（游戏变量只读，写入被忽略） */
   setVar(key: string, value: string): void {
+    if (this.facts?.isFact(key)) return;
     this.variables.set(key.toLowerCase(), String(value));
   }
 
@@ -45,7 +52,8 @@ export class MacroEngine {
     if (lower in this.context) {
       return this.context[lower];
     }
-    return '';
+    // 最后读游戏变量（变量表区分大小写，用原名）
+    return this.facts?.read(key) ?? '';
   }
 
   /** 批量更新上下文变量 */
@@ -177,7 +185,7 @@ export class MacroEngine {
         || trimmed.startsWith('#if')) {
         return match;
       }
-      const value = this.getVar(trimmed);
+      const value = this.getVar(key.trim());
       return value !== '' ? value : match; // 找不到就保留原文
     });
 

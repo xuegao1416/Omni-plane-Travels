@@ -5,8 +5,6 @@ import type { EntryCardProps } from './types';
 export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
   return (
     <div className="game-worldbook-entry" style={{
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-sm)',
       overflow: 'hidden',
       opacity: entry.enabled ? 1 : 0.5,
     }}>
@@ -50,7 +48,6 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
       {/* Expanded detail */}
       {expanded && (
         <div className="game-worldbook-entry__detail" style={{
-          padding: '10px',
           borderTop: '1px solid var(--border)',
           background: 'var(--bg-primary)',
         }}>
@@ -75,7 +72,7 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
 
           {/* Meta info */}
           <div className="game-worldbook-entry__meta" style={{
-            display: 'flex', gap: '12px', marginBottom: '8px',
+            display: 'flex', columnGap: '12px', marginBottom: '8px',
             fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)',
           }}>
             <span>位置: {entry.position === 'before_char' ? '角色定义前' : '角色定义后'}</span>
@@ -86,16 +83,12 @@ export function EntryCard({ entry, expanded, onToggle }: EntryCardProps) {
           {/* Content */}
           <div className="game-worldbook-entry__content" style={{
             fontSize: 'var(--font-size-sm)',
-            lineHeight: '1.6',
             color: 'var(--text-secondary)',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             maxHeight: '300px',
             overflow: 'auto',
-            padding: '8px',
-            background: 'var(--bg-secondary)',
             borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)',
           }}>
             {entry.content || '（空内容）'}
           </div>

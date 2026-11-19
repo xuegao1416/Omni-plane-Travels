@@ -10,7 +10,7 @@ export function InventoryGrid({ data }: { data: Record<string, unknown> | undefi
 
   return (
     <>
-      <div className="inventory-grid grid-fixed-6" style={{ gap: '4px' }}>
+      <div className="inventory-grid grid-fixed-6">
         {Array.from({ length: totalSlots }).map((_, i) => {
           const entry = entries[i];
           if (entry) {
@@ -24,7 +24,6 @@ export function InventoryGrid({ data }: { data: Record<string, unknown> | undefi
               <div key={name} onClick={() => { if (isObject) setSelected({ name, fields: extractFields(value as Record<string, unknown>) }); }} style={{
                 aspectRatio: '1', padding: '6px 4px',
                 border: `1px solid ${quality ? qColor + '40' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)',
                 background: quality ? `linear-gradient(135deg, ${qColor}08, ${qColor}03)` : 'var(--bg-primary)',
                 cursor: isObject ? 'pointer' : 'default', transition: 'all 0.12s',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -41,7 +40,7 @@ export function InventoryGrid({ data }: { data: Record<string, unknown> | undefi
               </div>
             );
           }
-          return <div key={`empty-${i}`} style={{ aspectRatio: '1', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }} />;
+          return <div key={`empty-${i}`} style={{ aspectRatio: '1', border: '1px dashed var(--border)', background: 'var(--bg-primary)' }} />;
         })}
       </div>
       {selected && <FieldDetailModal name={selected.name} fields={selected.fields} onClose={() => setSelected(null)} />}

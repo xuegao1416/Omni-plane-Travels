@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe,expect,test } from 'bun:test';
 
 const modal = readFileSync(new URL('./PipelineMonitorModal.tsx', import.meta.url), 'utf8');
+const styles = readFileSync(new URL('../../../ui/screens/pipeline-monitor.css', import.meta.url), 'utf8');
 
 describe('mobile pipeline monitor error display', () => {
   test('long stage errors are copyable and expandable instead of truncated', () => {
@@ -11,10 +12,12 @@ describe('mobile pipeline monitor error display', () => {
     // 可点开查看完整详情
     expect(modal).toContain('查看详情');
     // 完整错误以可换行、可滚动的块展示，而不是单行截断
-    expect(modal).toContain('pre-wrap');
-    expect(modal).toContain('wordBreak');
+    expect(modal).toContain('<pre>{stage.error}</pre>');
+    expect(styles).toMatch(/\.pm-row__error pre \{[^}]*white-space: pre-wrap[^}]*overflow-wrap: anywhere/);
+    expect(styles).toMatch(/\.pm-row__error pre \{[^}]*overflow: auto/);
     // 不再使用单行截断写法
     expect(modal).not.toContain("white-space: 'nowrap'");
     expect(modal).not.toContain("textOverflow: 'ellipsis'");
+    expect(styles).not.toMatch(/\.pm-row__error pre \{[^}]*text-overflow/);
   });
 });

@@ -539,20 +539,23 @@ test('installWorldEventPacks writes canonical card metadata and required workflo
   }
 });
 
-test('installWorldEventPacks pairs a shipped card pack with its trigger workflow', async () => {
+test('installWorldEventPacks 不再生成轮播工作流包，并清掉旧版自动生成的包（卡片改由事件导演调度）', async () => {
   const world = WORLDS.find((candidate) => candidate.id === 'japanese_school')!;
+  const staleId = `world:${world.id}:rules`;
+  await putWebEvent({
+    id: staleId,
+    manifest: { ...manifest, id: staleId, type: 'rule', worldId: world.id },
+    enabled: true,
+    status: 'enabled',
+    installedAt: new Date().toISOString(),
+    builtin: true,
+    files: { 'schema/workflow.json': JSON.stringify({ version: 1, id: 'wf', name: '旧轮播', nodes: [], connections: [] }) },
+  });
   await installWorldEventPacks(world);
 
   const cardPack = world.eventPacks!.find((pack) => pack.type === 'card')!;
-  const ruleRecord = await getWebEvent(`world:${world.id}:rules`);
-  expect(ruleRecord?.manifest.type).toBe('rule');
-  const workflow = JSON.parse(ruleRecord!.files['schema/workflow.json'] as string) as {
-    nodes: Array<{ typeId: string; widgetValues?: Record<string, unknown> }>;
-  };
-  expect(workflow.nodes.filter((node) => node.typeId === 'actions.add_event')).toHaveLength(cardPack.events!.length);
-  expect(workflow.nodes.filter((node) => node.typeId === 'actions.add_event').every(
-    (node) => node.widgetValues?.event_pack_id === cardPack.id,
-  )).toBe(true);
+  expect(await getWebEvent(staleId)).toBeUndefined();
+  expect((await getWebEvent(cardPack.id))?.manifest.type).toBe('card');
 });
 
 test('installWorldEventPacks rejects a card event without a workflow', async () => {

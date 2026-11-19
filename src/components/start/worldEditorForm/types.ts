@@ -9,10 +9,13 @@ import { generateWorldBookEntries } from '../../../modules/buildPipeline';
 import type { WorldClockConfig } from '../../../time/worldClock';
 import { inferWorldClockConfig } from '../../../time/worldClock';
 import { resolveProfessionBinding } from '../../../data/professions';
+import { DEFAULT_PACING, isPacingLevel } from '../../../events/state';
 
 export type FormState = {
   directorSource?: WorldDef['directorSource'];
   name: string; description: string; icon: string; coverColor: string; tags: string; difficulty: string;
+  /** 随机事件的默认节奏（off / low / normal / high）。 */
+  eventPacing: string;
   artwork?: WorldArtwork;
   overview: string; timePeriod: string; location: string; atmosphere: string;
   powerSystem: string; socialStructure: string; specialRules: string;
@@ -28,7 +31,7 @@ export type FormState = {
 };
 
 export const defaultForm: FormState = {
-  name: '', description: '', icon: '', coverColor: '#3b82f6', tags: '', difficulty: 'medium',
+  name: '', description: '', icon: '', coverColor: '#3b82f6', tags: '', difficulty: 'medium', eventPacing: DEFAULT_PACING,
   artwork: undefined,
   overview: '', timePeriod: '', location: '', atmosphere: '',
   powerSystem: '', socialStructure: '', specialRules: '',
@@ -75,7 +78,7 @@ export function worldToForm(w: WorldDef): FormState {
     name: w.name || '', description: w.description || '', icon: w.icon || '', coverColor: w.coverColor || '#3b82f6',
     artwork: w.artwork,
     directorSource: w.directorSource,
-    tags: w.tags?.join(', ') || '', difficulty: w.difficulty || 'medium',
+    tags: w.tags?.join(', ') || '', difficulty: w.difficulty || 'medium', eventPacing: w.eventPacing || DEFAULT_PACING,
     overview: entries?.find(e => e.entryType === 'setting')?.content || '',
     timePeriod: settingMeta?.timePeriod || '', location: settingMeta?.location || '', atmosphere: settingMeta?.atmosphere || '',
     powerSystem: rulesMeta?.powerSystem || '', socialStructure: rulesMeta?.socialStructure || '',
@@ -183,7 +186,8 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
       artwork: form.artwork ?? initialWorld?.artwork,
       directorSource: form.directorSource,
       tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
-      difficulty: (form.difficulty as any) || undefined, worldBookEntries: normalizedEntries, modules: form.modules,
+      difficulty: (form.difficulty as any) || undefined, eventPacing: isPacingLevel(form.eventPacing) ? form.eventPacing : undefined,
+      worldBookEntries: normalizedEntries, modules: form.modules,
       author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),
     };
   }
@@ -230,7 +234,8 @@ export function formToWorldDef(form: FormState, initialWorld: WorldDef | null, r
     artwork: form.artwork ?? initialWorld?.artwork,
     directorSource: form.directorSource,
     tags: form.tags ? form.tags.split(/[,，]/).map(s => s.trim()).filter(Boolean) : undefined,
-    difficulty: (form.difficulty as any) || undefined, worldBookEntries: [...entries, ...existingEntries], modules: form.modules,
+    difficulty: (form.difficulty as any) || undefined, eventPacing: isPacingLevel(form.eventPacing) ? form.eventPacing : undefined,
+    worldBookEntries: [...entries, ...existingEntries], modules: form.modules,
     author: initialWorld?.author, createdAt: initialWorld?.createdAt || new Date().toISOString(),
   };
 }

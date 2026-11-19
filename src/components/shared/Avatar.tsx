@@ -41,16 +41,17 @@ export default function Avatar({ name, size = 'md', className, imageSrc }: Avata
     return first;
   }, [name]);
 
-  const gradient = useMemo(() => GRADIENTS[hashCode(name) % GRADIENTS.length], [name]);
+  const tone = useMemo(() => hashCode(name) % GRADIENTS.length, [name]);
 
   const showImage = imageSrc && !imgFailed;
 
   return (
     <div
-      className={`${s.avatar}${className ? ` ${className}` : ''}`}
+      className={`${s.avatar} pl-avatar${className ? ` ${className}` : ''}`}
+      data-tone={showImage ? undefined : tone}
       style={{
         width: px, height: px, minWidth: px,
-        background: showImage ? 'none' : gradient,
+        background: showImage ? 'none' : `var(--pl-avatar-tone, ${GRADIENTS[tone]})`,
         fontSize: FONT_MAP[size],
       }}
     >

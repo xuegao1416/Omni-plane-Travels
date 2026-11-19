@@ -77,7 +77,9 @@ export function readTurnRecovery(value: unknown): TurnRecovery | null {
     || !Number.isFinite(data.config.variableDelayMs) || data.config.variableDelayMs < 0
     || !Number.isSafeInteger(data.config.variableMaxRetries) || data.config.variableMaxRetries < 0 || data.config.variableMaxRetries > 10
     || !data.settlement || typeof data.settlement.done !== 'boolean' || typeof data.settlement.internalContinuation !== 'boolean'
-    || !Number.isFinite(data.settlement.progressionBaseline?.tierIndex) || !Number.isFinite(data.settlement.progressionBaseline?.currentXP)
+    // 旧版恢复记录带成长基线（现已不用）；有就校验格式，没有也接受。
+    || (data.settlement.progressionBaseline !== undefined
+      && (!Number.isFinite(data.settlement.progressionBaseline?.tierIndex) || !Number.isFinite(data.settlement.progressionBaseline?.currentXP)))
     || typeof data.settlement.narrativeDecisionRequest?.saveId !== 'string' || !Array.isArray(data.settlement.narrativeDecisionRequest?.decisionIds)
     || !data.memory || typeof data.memory !== 'object') return null;
   try { return structuredClone(data); } catch { return null; }

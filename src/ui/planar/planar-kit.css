@@ -1,0 +1,332 @@
+/* ═══════════════════════════════════════════════
+   Planar kit — material primitives drawn in code.
+   Brass rails, woven night cloth, enamel seals, velvet ribbons.
+   Replaces the legacy dawn / temple / blue-white bases; no bitmap assets.
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* Woven cloth: two crossed thread layers plus a slub noise, tiled. */
+  --pk-weave:
+    repeating-linear-gradient(0deg, rgba(var(--d-cream, 255, 236, 196), .022) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(var(--d-shade, 0, 0, 0), calc(.18 * var(--d-shade-k, 1))) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(45deg, rgba(var(--d-white-fg, 255, 255, 255), .012) 0 2px, transparent 2px 7px);
+  --pk-cloth: rgb(var(--d-night-bg, 13, 18, 38));
+  --pk-cloth-deep: rgb(var(--d-night-bg, 7, 10, 23));
+  --pk-brass-rail: linear-gradient(180deg, rgb(var(--d-cream, 255, 241, 200)) 0%, rgb(var(--d-gold, 226, 187, 114)) 18%, rgb(var(--d-bronze, 138, 95, 36)) 46%, rgb(var(--d-gold, 233, 201, 131)) 62%, rgb(var(--d-brass, 165, 120, 55)) 82%, rgb(var(--d-bronze, 77, 51, 15)) 100%);
+  --pk-brass-face: linear-gradient(135deg, rgb(var(--d-cream-bg, 251, 231, 181)) 0%, rgb(var(--d-gold-bg, 227, 194, 126)) 38%, rgb(var(--d-brass-bg, 167, 122, 54)) 70%, rgb(var(--d-gold-bg, 233, 205, 142)) 100%);
+  --pk-shadow-deep: 0 30px 80px rgba(var(--d-shade, 0, 0, 0), calc(.65 * var(--d-shade-k, 1))), 0 8px 24px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)));
+  --pk-ease: cubic-bezier(.22, .8, .24, 1);
+  --pk-spring: cubic-bezier(.34, 1.4, .5, 1);
+  --pk-text: rgb(var(--d-ink, 241, 234, 216));
+  --pk-text-2: rgb(var(--d-ink2, 196, 187, 164));
+  --pk-text-3: rgb(var(--d-ink2, 138, 131, 112));
+  --pk-ink-label: rgb(var(--d-gold, 233, 207, 150));
+  --pk-danger: rgb(var(--d-red, 240, 143, 134));
+}
+
+/* ─── Frame ─── */
+.pk-frame {
+  --pk-rail: 7px;
+  --pk-corner: 76px;
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  border-radius: 10px;
+  color: var(--pk-text);
+  box-shadow: var(--pk-shadow-deep);
+}
+.pk-frame--plate { --pk-rail: 4px; --pk-corner: 40px; border-radius: 8px; box-shadow: 0 14px 34px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+
+/* Brass rail: a bevelled band with a lit top edge and a dark seat line. */
+.pk-frame__rail {
+  position: absolute; inset: 0; z-index: 0; border-radius: inherit;
+  background: var(--pk-brass-rail);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--d-ink, 255, 248, 225), .9),
+    inset 0 -1px 0 rgba(var(--d-shade, 40, 24, 4), calc(.9 * var(--d-shade-k, 1))),
+    inset 1px 0 0 rgba(var(--d-cream, 255, 240, 200), .5),
+    inset -1px 0 0 rgba(var(--d-bronze, 60, 36, 8), .7);
+}
+/* Engraved groove running inside the rail */
+.pk-frame__rail::after {
+  content: ''; position: absolute; inset: calc(var(--pk-rail) * .42); border-radius: inherit;
+  border: 1px solid rgba(var(--d-bronze, 60, 36, 8), .55);
+  box-shadow: 0 1px 0 rgba(var(--d-cream, 255, 240, 200), .35);
+}
+
+.pk-frame__field {
+  position: absolute; inset: var(--pk-rail); z-index: 1; border-radius: calc(10px - var(--pk-rail) / 2);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--d-shade, 20, 12, 2), calc(.9 * var(--d-shade-k, 1))),
+    inset 0 2px 0 rgba(var(--d-shade, 0, 0, 0), calc(.6 * var(--d-shade-k, 1))),
+    inset 0 0 40px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1)));
+}
+.pk-frame--cloth .pk-frame__field {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(var(--d-gold-bg, 227, 194, 126), .1), transparent 70%),
+    radial-gradient(ellipse 90% 70% at 50% 120%, rgba(var(--d-raise-bg, 60, 40, 110), .22), transparent 70%),
+    var(--pk-weave),
+    linear-gradient(180deg, var(--pk-cloth) 0%, var(--pk-cloth-deep) 100%);
+}
+/* Stitched hem a few px inside the field */
+.pk-frame--cloth .pk-frame__field::before {
+  content: ''; position: absolute; inset: 9px; border-radius: 4px; pointer-events: none;
+  border: 1px dashed rgba(var(--d-gold, 233, 207, 150), .2);
+}
+.pk-frame--glass .pk-frame__field {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, .06), transparent 38%),
+    radial-gradient(ellipse at 50% 0%, rgba(var(--d-aether-bg, 143, 227, 234), .07), transparent 60%),
+    rgba(var(--d-night-bg, 8, 12, 26), .88);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+.pk-frame--parchment .pk-frame__field {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(var(--d-ink-bg, 255, 250, 230), .5), transparent 60%),
+    radial-gradient(ellipse at 80% 90%, rgba(var(--d-bronze-bg, 120, 80, 30), .25), transparent 60%),
+    repeating-linear-gradient(8deg, rgba(var(--d-bronze-bg, 120, 80, 30), .03) 0 2px, transparent 2px 6px),
+    rgb(var(--d-gold-bg, 232, 216, 180));
+  color: rgba(var(--d-shade, 45, 32, 16), calc(1 * var(--d-shade-k, 1)));
+}
+
+.pk-frame__ornaments { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.pk-frame__corner { position: absolute; width: var(--pk-corner); height: var(--pk-corner); overflow: visible; }
+.pk-frame__corner--tl { top: -6px; left: -6px; }
+.pk-frame__corner--tr { top: -6px; right: -6px; transform: scaleX(-1); }
+.pk-frame__corner--bl { bottom: -6px; left: -6px; transform: scaleY(-1); }
+.pk-frame__corner--br { bottom: -6px; right: -6px; transform: scale(-1, -1); }
+.pk-frame__crest { position: absolute; top: -17px; left: 50%; width: 160px; height: 34px; transform: translateX(-50%); overflow: visible; }
+.pk-frame__stud { position: absolute; bottom: -7px; left: 50%; width: 40px; height: 14px; transform: translateX(-50%); }
+
+.pk-frame__content { position: relative; z-index: 2; padding: calc(var(--pk-rail) + 22px) calc(var(--pk-rail) + 26px); }
+.pk-frame--plate .pk-frame__content { padding: calc(var(--pk-rail) + 14px) calc(var(--pk-rail) + 16px); }
+
+/* ─── Seal ─── */
+.pk-seal { position: relative; display: inline-grid; place-items: center; flex-shrink: 0; width: var(--pk-seal-size, 64px); height: var(--pk-seal-size, 64px); }
+.pk-seal > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 4px 6px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1)))); }
+.pk-seal__glyph { position: absolute; inset: 0; display: grid; place-items: center; color: rgb(var(--d-gold, 246, 220, 156)); font-family: var(--pl-font-serif); font-size: 22px; font-weight: 700; text-shadow: 0 1px 0 rgb(var(--d-seat, 42, 26, 4)), 0 0 10px rgba(var(--d-gold, 246, 220, 156), calc(.45 * var(--d-ts-k, 1))); }
+.pk-seal__glyph svg { width: 40%; height: 40%; stroke-width: 1.8; filter: drop-shadow(0 1px 0 rgb(var(--d-seat, 42, 26, 4))); }
+.pk-seal--danger .pk-seal__glyph { color: rgb(var(--d-redpale, 255, 194, 184)); text-shadow: 0 1px 0 rgba(var(--d-redbg, 42, 4, 8), calc(1 * var(--d-ts-k, 1))), 0 0 10px rgba(var(--d-red, 255, 140, 120), calc(.45 * var(--d-ts-k, 1))); }
+
+/* ─── Ribbon ─── */
+.pk-ribbon { position: relative; display: inline-flex; align-items: stretch; height: 40px; filter: drop-shadow(0 6px 10px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)))); }
+.pk-ribbon__tail { width: 38px; height: 40px; flex-shrink: 0; }
+.pk-ribbon__tail--l { margin-right: -1px; }
+.pk-ribbon__tail--r { margin-left: -1px; }
+.pk-ribbon__band {
+  position: relative; display: flex; align-items: center; padding: 0 22px; height: 34px; margin-top: 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, rgb(var(--d-redbg-bg, 74, 18, 25)) 0%, rgb(var(--d-red-bg, 147, 50, 58)) 30%, rgb(var(--d-redbg-bg, 107, 30, 38)) 58%, rgb(var(--d-redbg-bg, 58, 10, 17)) 100%);
+  box-shadow: inset 0 1px 0 rgba(var(--d-red, 255, 180, 170), .25), inset 0 -1px 0 rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)));
+  font-family: var(--pl-font-serif); font-size: 15px; font-weight: 600; letter-spacing: .32em; color: rgb(var(--d-cream, 251, 231, 181));
+  text-shadow: 0 1px 0 rgba(var(--d-redbg, 42, 4, 8), calc(1 * var(--d-ts-k, 1)));
+  white-space: nowrap;
+}
+.pk-ribbon__band::before, .pk-ribbon__band::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, rgb(var(--d-brass-bg, 167, 122, 54)), rgb(var(--d-cream-bg, 251, 231, 181)) 50%, rgb(var(--d-brass-bg, 167, 122, 54)));
+}
+.pk-ribbon__band::before { top: 3px; }
+.pk-ribbon__band::after { bottom: 3px; }
+
+/* ─── Typography ─── */
+.pk-kicker { display: inline-flex; align-items: center; gap: 10px; font-family: var(--pl-font-display); font-size: 11px; letter-spacing: .34em; color: rgba(var(--d-gold, 233, 207, 150), .82); text-transform: uppercase; }
+.pk-kicker::before, .pk-kicker::after { content: ''; width: 26px; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .7)); }
+.pk-kicker::after { transform: scaleX(-1); }
+.pk-title {
+  margin: 0; font-family: var(--pl-font-serif); font-weight: 700; letter-spacing: .12em; line-height: 1.25;
+  background: linear-gradient(180deg, rgb(var(--d-ink-bg, 255, 250, 234)) 0%, rgb(var(--d-gold-bg, 242, 212, 142)) 46%, rgb(var(--d-brass-bg, 184, 141, 69)) 54%, rgb(var(--d-gold-bg, 240, 212, 149)) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(var(--d-shade, 30, 18, 2), calc(.9 * var(--d-shade-k, 1)))) drop-shadow(0 0 18px rgba(var(--d-gold, 242, 212, 142), .18));
+}
+.pk-rule { display: flex; align-items: center; gap: 10px; color: rgba(var(--d-gold, 233, 207, 150), .6); }
+.pk-rule::before, .pk-rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .45), transparent); }
+.pk-rule > i { width: 6px; height: 6px; transform: rotate(45deg); background: var(--pk-brass-face); box-shadow: 0 0 6px rgba(var(--d-gold, 242, 212, 142), .5); }
+
+/* ─── Buttons ─── */
+.pk-btn {
+  --pk-btn-h: 42px;
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--pk-btn-h); padding: 0 22px; box-sizing: border-box;
+  border: 0; border-radius: 4px; cursor: pointer;
+  font: 600 14px/1 var(--pl-font-serif); letter-spacing: .14em;
+  white-space: nowrap;
+  transition: transform .25s var(--pk-spring), filter .2s, box-shadow .25s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pk-btn:focus-visible { outline: 2px solid rgb(var(--d-gold, 242, 212, 142)); outline-offset: 3px; }
+.pk-btn:disabled { cursor: not-allowed; filter: grayscale(.55) brightness(.7); transform: none; }
+.pk-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* Primary: a struck brass ingot with chamfered ends. */
+.pk-btn--primary {
+  color: #2a1a04; text-shadow: 0 1px 0 rgba(var(--d-ink, 255, 245, 215), calc(.6 * var(--d-ts-k, 1)));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .45) 0%, rgba(255, 255, 255, 0) 48%, rgba(var(--d-shade-bg, 0, 0, 0), calc(.12 * var(--d-shade-k, 1))) 52%, rgba(var(--d-shade-bg, 0, 0, 0), calc(0 * var(--d-shade-k, 1))) 100%),
+    var(--pk-brass-face);
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+  box-shadow: none;
+  filter: drop-shadow(0 6px 10px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)))) drop-shadow(0 0 1px rgb(var(--d-bronze, 77, 51, 15)));
+}
+.pk-btn--primary::before {
+  content: ''; position: absolute; inset: 3px; pointer-events: none;
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0 50%);
+  box-shadow: inset 0 0 0 1px rgba(var(--d-bronze, 90, 58, 14), .55);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, .0) 40%, rgba(255, 255, 255, .55) 50%, rgba(255, 255, 255, 0) 60%, transparent 100%) -200% 0 / 200% 100% no-repeat;
+  transition: background-position .7s var(--pk-ease);
+}
+.pk-btn--primary:hover:not(:disabled) { transform: translateY(-1px); filter: drop-shadow(0 10px 16px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1)))) drop-shadow(0 0 10px rgba(var(--d-gold, 242, 212, 142), .35)) brightness(1.04); }
+.pk-btn--primary:hover:not(:disabled)::before { background-position: 200% 0; }
+.pk-btn--primary:active:not(:disabled) { transform: translateY(1px); filter: drop-shadow(0 3px 5px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)))) brightness(.96); }
+
+/* Secondary: a night-cloth tab inside a thin brass rim. */
+.pk-btn--secondary {
+  color: rgb(var(--d-cream, 242, 227, 189));
+  background:
+    var(--pk-weave),
+    linear-gradient(180deg, rgb(var(--d-raise-bg, 26, 33, 64)) 0%, rgb(var(--d-night-bg, 11, 16, 34)) 100%);
+  box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .45), inset 0 0 0 2px rgba(var(--d-shade, 10, 6, 0), calc(.8 * var(--d-shade-k, 1))), inset 0 1px 0 2px rgba(var(--d-cream, 255, 240, 200), .08), 0 4px 10px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1)));
+}
+.pk-btn--secondary:hover:not(:disabled) { transform: translateY(-1px); color: rgb(var(--d-cream, 255, 243, 207)); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .85), inset 0 0 0 2px rgba(var(--d-shade, 10, 6, 0), calc(.8 * var(--d-shade-k, 1))), inset 0 0 18px rgba(var(--d-gold, 242, 212, 142), .12), 0 8px 16px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1))); }
+
+/* Danger: garnet lacquer. */
+.pk-btn--danger {
+  color: rgb(var(--d-redpale, 255, 226, 220)); text-shadow: 0 1px 0 rgba(var(--d-redbg, 42, 4, 8), calc(1 * var(--d-ts-k, 1)));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, rgb(var(--d-red-bg, 154, 48, 56)) 0%, rgb(var(--d-redbg-bg, 94, 20, 28)) 100%);
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%);
+  filter: drop-shadow(0 6px 10px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)))) drop-shadow(0 0 1px rgb(var(--d-redbg, 42, 4, 8)));
+}
+.pk-btn--danger:hover:not(:disabled) { transform: translateY(-1px); filter: drop-shadow(0 10px 16px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1)))) drop-shadow(0 0 10px rgba(var(--d-red, 240, 120, 110), .35)); }
+
+.pk-btn--ghost { color: var(--pk-text-2); background: transparent; letter-spacing: .1em; }
+.pk-btn--ghost:hover:not(:disabled) { color: rgb(var(--d-gold, 242, 212, 142)); }
+.pk-btn--sm { --pk-btn-h: 34px; padding: 0 16px; font-size: 13px; }
+
+/* Icon button: a round brass bezel around an enamel face. */
+.pk-icon-btn {
+  position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; padding: 0; flex-shrink: 0;
+  border: 0; border-radius: 50%; cursor: pointer; color: rgb(var(--d-gold, 242, 212, 142));
+  background:
+    radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 34, 43, 78)) 0%, rgb(var(--d-night-bg, 11, 16, 34)) 70%) padding-box,
+    conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box;
+  border: 2px solid transparent;
+  box-shadow: 0 4px 10px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))), inset 0 1px 0 rgba(255, 255, 255, .08);
+  transition: transform .3s var(--pk-spring), color .2s, box-shadow .25s;
+}
+.pk-icon-btn svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 0 rgba(var(--d-shade, 0, 0, 0), calc(1 * var(--d-shade-k, 1)))); }
+.pk-icon-btn:hover:not(:disabled) { color: rgb(var(--d-ink, 255, 246, 223)); box-shadow: 0 6px 14px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1))), 0 0 12px rgba(var(--d-gold, 242, 212, 142), .3); }
+.pk-icon-btn--close:hover:not(:disabled) { transform: rotate(90deg); }
+.pk-icon-btn:focus-visible { outline: 2px solid rgb(var(--d-gold, 242, 212, 142)); outline-offset: 3px; }
+
+/* ─── Fields ─── */
+.pk-field { display: grid; gap: 7px; }
+.pk-field__label { font-family: var(--pl-font-serif); font-size: 13px; letter-spacing: .12em; color: var(--pk-ink-label); }
+.pk-input {
+  box-sizing: border-box; width: 100%; min-height: 42px; padding: 10px 14px;
+  border: 0; border-radius: 3px; color: var(--pk-text); font: 14px/1.6 var(--pl-font-ui);
+  background: linear-gradient(180deg, rgb(var(--d-deep-bg, 5, 7, 15)) 0%, rgb(var(--d-night-bg, 10, 14, 30)) 100%);
+  box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .26), inset 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.7 * var(--d-shade-k, 1))), 0 1px 0 rgba(var(--d-cream, 255, 240, 200), .06);
+  transition: box-shadow .2s;
+  resize: vertical;
+}
+.pk-input::placeholder { color: rgba(var(--d-ink2, 196, 187, 164), .45); }
+.pk-input:hover { box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .42), inset 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.7 * var(--d-shade-k, 1))), 0 1px 0 rgba(var(--d-cream, 255, 240, 200), .06); }
+.pk-input:focus { outline: none; box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .9), inset 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.7 * var(--d-shade-k, 1))), 0 0 0 3px rgba(var(--d-gold, 242, 212, 142), .14); }
+
+/* ─── Dialog ─── */
+.pk-dialog-overlay {
+  position: fixed; inset: 0; z-index: 9999; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: radial-gradient(ellipse at 50% 45%, rgba(var(--d-night-bg, 10, 14, 30), .55), rgba(var(--d-deep-bg, 1, 2, 6), .86));
+  backdrop-filter: blur(5px) saturate(.75);
+  animation: pk-fade .22s var(--pk-ease);
+}
+.pk-dialog { width: min(440px, 100%); max-height: calc(100dvh - 48px); animation: pk-dialog-in .38s var(--pk-spring); }
+.pk-dialog > .pk-frame__content { display: grid; justify-items: center; gap: 14px; padding: 46px 34px 30px; text-align: center; max-height: calc(100dvh - 48px); box-sizing: border-box; overflow: auto; }
+.pk-dialog__seal { margin-top: -4px; }
+.pk-dialog__title { font-size: 21px; }
+.pk-dialog__message { margin: 0; max-width: 34ch; color: var(--pk-text-2); font-size: 14px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pk-dialog__prompt { width: 100%; text-align: left; }
+.pk-dialog__actions { display: flex; justify-content: center; gap: 14px; width: 100%; margin-top: 8px; padding-top: 18px; position: relative; }
+.pk-dialog__actions::before { content: ''; position: absolute; top: 0; left: 8%; right: 8%; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .38), transparent); }
+.pk-dialog__actions > .pk-btn { min-width: 128px; }
+.pk-dialog__spinner { width: 56px; height: 56px; }
+
+@keyframes pk-fade { from { opacity: 0; } }
+@keyframes pk-dialog-in { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+
+@media (max-width: 520px) {
+  .pk-frame { --pk-corner: 48px; }
+  .pk-dialog > .pk-frame__content { padding: 42px 22px 24px; }
+  .pk-dialog__actions { flex-direction: column-reverse; align-items: stretch; }
+  .pk-dialog__actions > .pk-btn { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pk-dialog-overlay, .pk-dialog { animation: none; }
+  .pk-btn, .pk-icon-btn { transition: none; }
+}
+
+/* ─── DawnFrameV4 bridge ───
+   The historical frame keeps its __fill / __border / __content contract; the
+   kit paints it. Fill holds the brass rail and cloth field, border holds the
+   SVG ornaments, content stays a flex column owner for existing layouts. */
+.dawn-frame-v4 {
+  display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  overflow: visible; background: transparent;
+}
+.dawn-frame-v4__fill { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.dawn-frame-v4__border { position: absolute; inset: 0; pointer-events: none; }
+.dawn-frame-v4__content {
+  position: relative; display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; box-sizing: border-box;
+  padding: calc(var(--pk-rail) + 22px) calc(var(--pk-rail) + 26px);
+  overflow: hidden; border-radius: inherit;
+}
+.dawn-frame-v4--compact > .dawn-frame-v4__content { padding: calc(var(--pk-rail) + 10px) calc(var(--pk-rail) + 12px); }
+.dawn-frame-v4--with-underlay > .dawn-frame-v4__underlay {
+  position: absolute; inset: calc(var(--pk-rail) + 5px); z-index: 1; border: 1px solid rgba(var(--d-gold, 233, 207, 150), .14); border-radius: 4px; pointer-events: none;
+}
+
+/* Disabled primary stays legible as dulled brass rather than vanishing */
+.pk-btn--primary:disabled, .btn-primary:disabled { filter: saturate(.25) brightness(.62) drop-shadow(0 3px 6px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1)))); opacity: 1; }
+
+/* ReactFlow star-chart theme (workflow / card / profession tree canvases) */
+.react-flow.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke: rgba(var(--d-gold, 227, 194, 126), .55);
+  --xy-edge-stroke-selected: rgb(var(--d-gold, 242, 212, 142));
+  --xy-connectionline-stroke: rgb(var(--d-gold, 242, 212, 142));
+  --xy-handle-background-color: rgb(var(--d-gold, 227, 194, 126));
+  --xy-handle-border-color: rgb(var(--d-seat, 42, 26, 4));
+  --xy-selection-background-color: rgba(var(--d-gold, 227, 194, 126), .08);
+  --xy-selection-border: 1px dashed rgba(var(--d-gold, 242, 212, 142), .7);
+  --xy-minimap-background-color: rgb(var(--d-night, 10, 14, 32));
+  --xy-minimap-mask-background-color: rgba(4, 6, 14, .62);
+  --xy-minimap-mask-stroke-color: rgba(242, 212, 142, .6);
+  --xy-minimap-mask-stroke-width: 1;
+  --xy-controls-button-background-color: rgb(var(--d-raise, 18, 25, 53));
+  --xy-controls-button-background-color-hover: rgb(var(--d-raise, 27, 36, 72));
+  --xy-controls-button-color: rgb(var(--d-gold, 233, 207, 150));
+  --xy-controls-button-color-hover: rgb(var(--d-cream, 255, 243, 207));
+  --xy-controls-button-border-color: rgba(var(--d-gold, 233, 207, 150), .2);
+  --xy-controls-box-shadow: 0 6px 16px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)));
+  --xy-node-background-color: transparent;
+  --xy-node-border: 0;
+  --xy-node-boxshadow-selected: none;
+  --xy-attribution-background-color: transparent;
+}
+.pk-workbench .react-flow {
+  background: radial-gradient(ellipse 60% 50% at 50% 45%, rgba(var(--d-blue-bg, 58, 72, 130), .16), transparent 72%), radial-gradient(circle at 18% 82%, rgba(var(--d-gold-bg, 227, 194, 126), .05), transparent 30%), linear-gradient(180deg, rgb(var(--d-night-bg, 8, 12, 26)), rgb(var(--d-deep-bg, 5, 7, 15)));
+}
+.react-flow .react-flow__edge-path { stroke-width: 1.6; }
+.react-flow .react-flow__edge.selected .react-flow__edge-path, .react-flow .react-flow__edge:hover .react-flow__edge-path { filter: drop-shadow(0 0 4px rgba(var(--d-gold, 242, 212, 142), .7)); }
+.react-flow .react-flow__controls { overflow: hidden; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .38), var(--xy-controls-box-shadow); }
+.react-flow .react-flow__controls-button { width: 26px; height: 26px; border-bottom: 1px solid rgba(var(--d-gold, 233, 207, 150), .14); }
+.react-flow .react-flow__controls-button svg { fill: currentColor; }
+.react-flow .react-flow__minimap { overflow: hidden; border-radius: 4px; box-shadow: 0 0 0 1px rgb(var(--d-seat, 42, 26, 4)), 0 0 0 3px rgb(var(--d-rail, 184, 136, 63)), 0 0 0 4px rgb(var(--d-rail-lo, 77, 51, 15)), 0 10px 24px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1))); }
+.react-flow .react-flow__minimap svg { display: block; }
+.react-flow .react-flow__panel.react-flow__attribution { display: none; }
+.react-flow .react-flow__handle { width: 9px; height: 9px; border-width: 1.5px; box-shadow: 0 0 6px rgba(var(--d-gold, 242, 212, 142), .45); }
+@media (max-width: 640px) { .react-flow .react-flow__minimap { display: none; } }

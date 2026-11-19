@@ -66,7 +66,7 @@ export function ImageTutorialCard() {
                     height: '22px',
                     borderRadius: 'var(--radius-md)',
                     background: 'var(--accent)',
-                    color: '#fff',
+                    color: '#2a1a04',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',

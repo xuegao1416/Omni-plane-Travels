@@ -1,8 +1,7 @@
 // 游戏引擎 - 管线化消息发送、流式响应、变量更新
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { useDialog } from '../components/shared/Dialog';
-import type { ApiConfig, Message, RequestOptions } from '../api/types';
-import { buildSyntheticToolName, substituteToolName } from '../api/syntheticTool';
+import type { ApiConfig } from '../api/types';
 import { requestStreamWithRetry } from '../api/client';
 import { setRateLimitInterval } from '../api/rateLimiter';
 import { extractContentForPrompt } from './responseExtractor';
@@ -14,6 +13,7 @@ import {
 } from './deepSeekResponseGuard';
 import { getMessageContent } from './contextManager';
 import { VariableManager } from './variableManager';
+import { restoreGameplayManager } from './sessionRestore';
 import { resolveRollbackTarget } from './rollbackTarget';
 import { eventBus, EVENTS } from './eventBus';
 import { v4 as uuid } from 'uuid';
@@ -32,23 +32,23 @@ import { buildEncounterContext } from './encounterContext';
 import { prepareGameplayState } from '../gameplay/statePreparation';
 import { canRollbackCombat, normalizeGameStateV3, synchronizeV3FeatureFlagsForWorld } from '../gameplay/protocols';
 import { PipelineExecutor, type PipelineResult } from './pipelineExecutor';
-import { settleAcceptedTurn, type TurnSettlementInput } from './turnSettlement';
+import type { TurnSettlementInput } from './turnSettlement';
 import { readTurnRecovery, recoverableMemoryContext, recoveryVersion, needsTurnRecovery,
   memoryRecoveryVersion as fingerprintMemory, matchesRecoveryVersion, matchesMemoryRecoveryVersion, type TurnRecovery } from './turnRecovery';
 import { TurnOperations, guardTurnMemory, detachTurnMemoryValue } from './turnSafety';
 import { shareSnapshotHistory } from '../utils/snapshotSharing';
 import { loadPipelineConfig, type PipelineConfig, type PipelineStatus, type PipelineTaskId } from './pipelineTypes';
 import type { ChatMessage, GameEngine, SendMessageOptions, SendMessageOutcome } from './types';
-import { PROMPT_INLINE_IMAGE } from '../data/builtinPresets';
-import { DRC_FORMAT_REPAIR_PROMPT_ID } from '../data/presetDrcV12';
 import { getPlayerDecisionContext } from '../modules/playerDecisionLog';
 import { getNarrativeDecisionPromptSnapshot } from '../gameplay/narrativeDecision';
 import { usePresetStore } from '../stores/presetStore';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { useImageStore } from '../stores/imageStore';
-import { ROLE_COGNITION_FIREWALL_TITLE, ROLE_COGNITION_FIREWALL_CONTENT } from '../utils/roleCognitionFirewall';
-import { assembleSystemPrompt, injectAtDepthEntries } from './promptAssembler';
-import { MacroEngine } from './macroEngine';
+import { composeMainPrompt, formatSettledFacts, type WorldBookInjection } from './turn/prompt';
+import { beginTurn, settleTurnOnce } from './turn/lifecycle';
+import { announcePlayerCommand } from './turn/dispatch';
+import { runPlayerCommand, type PlayerCommandResult } from '../core/playerCommands';
+import { createFactMacroAccess } from '../core/macroFacts';
 import { useMemoryStore, slimMemoryRuntimeForSave } from '../memory/memoryStore';
 import { collectMemoryEntries } from '../memory/memoryCandidates';
 import { useSimulationStore } from '../stores/simulationStore';
@@ -65,7 +65,6 @@ import {
   formatWorldClock,
   getTimeSystemFromWorld,
 } from '../time/worldClock';
-import { prepareWorldMechanics, commitWorldMechanics } from '../gameplay/worldMechanics';
 import { isCombatFeatureEnabled, isCombatInteractionPaused, isCombatSaveEnded, preserveCombatOwnedState } from '../gameplay/combatRuntime';
 import type { CombatCheckpointRestore } from '../gameplay/combatV2';
 import { constrainPreCombatNarrative } from '../gameplay/combatNarrativeBoundary';
@@ -102,50 +101,6 @@ function withDegradationCheck(
       throw new Error(`[降级] ${label}失败，使用回退策略`);
     }
   };
-}
-
-/**
- * 格式化机械层效果摘要（供主 AI 上下文注入，避免双重叙事）
- * 只生成可读的文本描述，不暴露内部结构
- */
-function formatMechanicalEffectsSummary(effects: import('../modules/schema').ModuleEffects): string {
-  const lines: string[] = ['【世界演化 — 本轮已自动结算的确定性效果】'];
-
-  if (effects.survival?.resources) {
-    for (const [id, change] of Object.entries(effects.survival.resources)) {
-      if (change.delta !== undefined) {
-        lines.push(`- ${id} ${change.delta > 0 ? '+' : ''}${change.delta}`);
-      } else if (change.set !== undefined) {
-        lines.push(`- ${id} → ${change.set}`);
-      }
-    }
-  }
-
-  if (effects.business?.fundsDelta !== undefined) {
-    const d = effects.business.fundsDelta;
-    lines.push(`- 资金 ${d > 0 ? '+' : ''}${d}`);
-  }
-
-  if (effects.stats?.changes) {
-    for (const [id, change] of Object.entries(effects.stats.changes)) {
-      if (change.delta !== undefined) {
-        lines.push(`- ${id} ${change.delta > 0 ? '+' : ''}${change.delta}`);
-      } else if (change.set !== undefined) {
-        lines.push(`- ${id} → ${change.set}`);
-      }
-    }
-  }
-
-  if (effects.progression) {
-    if (effects.progression.xpDelta !== undefined) {
-      const d = effects.progression.xpDelta;
-      lines.push(`- 经验值 ${d > 0 ? '+' : ''}${d}`);
-    }
-  }
-
-  if (lines.length <= 1) return '';
-  lines.push('（这些变化已由系统自动处理，无需在正文中重复描述数值变化）');
-  return lines.join('\n');
 }
 
 /** 构建记忆管线任务对象（消除 sendMessage/retryPipeline/retrySingleStage 三处重复） */
@@ -241,6 +196,7 @@ export function useGameEngine(
     generationWaiters.current.clear();
   }, []);
   const varMgrRef = useRef(initialVarMgr || new VariableManager(undefined, undefined, getTimeSystemFromWorld(findWorldDef(selectedWorld))));
+  if (!varMgrRef.current.getBoundWorld()) varMgrRef.current.bindWorld(findWorldDef(selectedWorld));
   const cancelRef = useRef<AbortController | null>(null);
   const operationsRef = useRef(new TurnOperations());
   const roundRef = useRef(0);
@@ -270,6 +226,7 @@ export function useGameEngine(
   useEffect(() => {
     activeWorldDefRef.current = findWorldDef(selectedWorld);
     varMgrRef.current.setWorldClockConfig(getTimeSystemFromWorld(findWorldDef(selectedWorld)));
+    if (varMgrRef.current.getBoundWorld()?.id !== selectedWorld) varMgrRef.current.bindWorld(findWorldDef(selectedWorld));
   }, [selectedWorld]);
   // 存储最后一轮管线执行器实例（用于单步重试）
   const lastExecutorRef = useRef<PipelineExecutor | null>(null);
@@ -681,15 +638,7 @@ export function useGameEngine(
         ? { ...save.simulationState, snapshots: shareSnapshotHistory(save.simulationState.snapshots ?? []) } : save.simulationState,
     });
     const saveWorldDef = (save.customWorld as WorldDef | undefined) ?? findWorldDef(save.worldId);
-    const migratedClockState = ensureWorldClockOnGameState(save.gameState, saveWorldDef);
-    const saveClockConfig = getTimeSystemFromWorld(saveWorldDef);
-    const restoredManager = VariableManager.fromJSON({
-      state: migratedClockState,
-      saveId: save.id,
-      moduleStates: save.moduleStates,
-      moduleCheckpoints: save.moduleCheckpoints,
-    }, saveClockConfig);
-    const normalizedSaveState = ensureWorldClockOnGameState(restoredManager.getState(), saveWorldDef);
+    const restoredManager = restoreGameplayManager(save, saveWorldDef);
     if (save.customWorld) {
       try {
         const customs: Record<string, unknown>[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
@@ -699,16 +648,6 @@ export function useGameEngine(
         localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(customs));
       } catch { /* localStorage 不可用时仍保留本次存档内的迁移结果 */ }
     }
-    const preparedGameplayState = prepareGameplayState(normalizeGameStateV3(normalizedSaveState), saveWorldDef?.modules, { mode: 'load' }).state;
-    const preparedSaveState = synchronizeV3FeatureFlagsForWorld(preparedGameplayState, {
-      professionsEnabled: isProfessionModuleEnabled(saveWorldDef),
-      combatEnabled: saveWorldDef?.modules?.some(module => typeof module === 'string'
-        ? module === 'combat'
-        : module.moduleId === 'combat' && module.enabled) === true,
-      fallbackRiskMode: save.personalInfo?.combatRiskMode ?? 'normal',
-    });
-    restoredManager.setState(preparedSaveState);
-    restoredManager.setWorldClockConfig(saveClockConfig);
     clearTurnRecovery();
     saveLifecycleRef.current = save.lifecycle === 'ended' ? 'ended' : 'active';
     activeWorldDefRef.current = saveWorldDef;
@@ -795,6 +734,7 @@ export function useGameEngine(
         moduleStates: restore.moduleStates,
         moduleCheckpoints: restore.moduleCheckpoints,
       }, getTimeSystemFromWorld(getActiveWorldDef()));
+      varMgrRef.current.bindWorld(getActiveWorldDef());
     }
     if (restore.messages) {
       setMessages(restore.messages);
@@ -917,37 +857,13 @@ export function useGameEngine(
       // 保存管线上下文（用于重试管线）
       lastPipelineCtxRef.current = { round, userText, aiMsgId, batchText, recentContext, playerName, manager, worldId, saveId, memCtx, pipelineConfig, apiConfig: { ...apiConfig } };
 
-      // ── 世界演化机械层：确定性结算先于正文，AI 后台审查在正文成功提交后启动 ──
-      let mechanicalEffectsSummary = '';
+      // ── 回合开始结算（确定性，先于正文）：推进回合数、投放到期事件、触发监听回合开始的规则 ──
       let mechanicalTickSettled = false;
       if (!internalContinuation) try {
-        const simEngine = getSimulationEngine();
-        const activeWorldId = selectedWorldRef.current;
-        const currentWorldDef = getActiveWorldDef();
-        const gs = structuredClone(varMgrRef.current.getState());
-        const gameTime = { current: gs.世界?.时间系统?.当前时间 ?? '' };
-        const settlement = await prepareWorldMechanics(simEngine, {
-          gameState: gs, world: currentWorldDef, round, turnId: aiMsgId,
-        });
-        assertCurrent();
-        if (settlement.settled) {
-          mechanicalTickSettled = true;
-          varMgrRef.current.setState(settlement.gameState);
-          if (settlement.mechanicalEffects && Object.keys(settlement.mechanicalEffects).length > 0) {
-            const enabledModules = (currentWorldDef?.modules ?? []).filter(m => m.enabled).map(m => m.moduleId);
-            varMgrRef.current.applyModuleEffects(settlement.mechanicalEffects, 'periodic', enabledModules);
-            mechanicalEffectsSummary = formatMechanicalEffectsSummary(settlement.mechanicalEffects);
-          }
-          if (await commitWorldMechanics(simEngine, settlement, isCurrent)) {
-            assertCurrent();
-            useSimulationStore.getState().syncFromEngine(simEngine.state);
-          }
-          eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
-        }
-
+        mechanicalTickSettled = beginTurn(varMgrRef.current, { turnId: aiMsgId, round, userText }, { assertCurrent }) !== null;
       } catch (simErr) {
         assertCurrent();
-        console.warn('[世界演化] 本地机械结算失败（不影响正文管线）:', simErr);
+        console.warn('[玩法] 回合开始结算失败（不影响正文管线）:', simErr);
       }
 
       // 正文生成前按本轮输入刷新记忆上下文；不再使用上一轮的检索结果回答当前问题。
@@ -961,10 +877,6 @@ export function useGameEngine(
       }
       assertCurrent();
 
-      const progressionBaseline = {
-        tierIndex: varMgrRef.current.getState().玩家.当前段位索引 ?? 0,
-        currentXP: varMgrRef.current.getState().玩家.当前经验值 ?? 0,
-      };
       const combatWorld = getActiveWorldDef();
       const graphicalCombatEnabled = !internalContinuation
         && isCombatFeatureEnabled(varMgrRef.current.getState())
@@ -988,17 +900,11 @@ export function useGameEngine(
         if (lastPipelineCtxRef.current?.settlement) lastPipelineCtxRef.current.settlement.encounter = encounter;
         return bounded.text;
       };
-      const settlement: TurnSettlementInput = { world: structuredClone(getActiveWorldDef()), progressionBaseline, narrativeDecisionRequest,
+      const settlement: TurnSettlementInput = { world: structuredClone(getActiveWorldDef()), narrativeDecisionRequest,
         internalContinuation, protectedState: options.combatContinuation?.protectedState, mechanicalTickSettled, done: false };
       const settle = (pipelineResult: PipelineResult) => {
-        if (settlement.done || pipelineResult.status.stages.main.status !== 'success' || !pipelineResult.mainResult?.parsed.content?.trim()) return;
-        if (pipelineConfig.variableEnabled && !['success', 'skipped'].includes(pipelineResult.status.stages.variable.status)) return;
-        const accepted = settleAcceptedTurn(manager.getState(), settlement, pipelineResult, aiMsgId, round, userText);
-        manager.setState(accepted.state);
-        settlement.done = true;
-        eventBus.emit(EVENTS.TURN_SETTLED, manager, accepted.changeLog);
-        if (boundaryEncounter) eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, boundaryEncounter);
-        eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+        settleTurnOnce(manager, settlement, pipelineResult, { turnId: aiMsgId, round, userText },
+          { variableEnabled: pipelineConfig.variableEnabled, encounter: boundaryEncounter });
       };
       lastPipelineCtxRef.current!.settlement = settlement;
       lastPipelineCtxRef.current!.settle = settle;
@@ -1045,67 +951,10 @@ export function useGameEngine(
             : coreSnapshot;
 
           // 世界书注入（v2 扫描引擎：支持正则关键词、选择逻辑、递归扫描、分组互斥）
-          let wbInjection = '';
-          const atDepthEntries: Array<{ depth: number; content: string }> = [];
+          let worldBookInjection: WorldBookInjection | undefined;
           if (worldBookRef.current) {
-            // 构建聊天历史供扫描引擎使用
-            const scanHistory = messagesRef.current.map(m => ({
-              role: m.role,
-              content: getMessageContent(m),
-            }));
-            const scanResult = worldBookRef.current.scanAndBuildInjection(scanHistory, userText);
-            if (scanResult.beforeChar) wbInjection += scanResult.beforeChar + '\n\n';
-            if (scanResult.afterChar) wbInjection += scanResult.afterChar + '\n\n';
-            atDepthEntries.push(...scanResult.atDepthEntries);
-          }
-
-          // 玩家角色设定注入
-          let playerProfileBlock = '';
-          if (playerProfileRef.current?.name) {
-            const perspectiveMap: Record<string, string> = {
-              '第一人称': '请用第二人称"你"来称呼玩家，描写玩家的内心感受和第一视角体验。',
-              '第二人称': '请用第二人称"你"来称呼玩家。',
-              '第三人称': '请用第三人称称呼玩家角色。',
-            };
-            const perspectiveInstruction = perspectiveMap[playerProfileRef.current.perspective || '第三人称'] || perspectiveMap['第三人称'];
-
-            let customNpcsBlock = '';
-            if (playerProfileRef.current.customNpcs && playerProfileRef.current.customNpcs.length > 0) {
-              const npcLines = playerProfileRef.current.customNpcs.map(npc => {
-                const parts = [npc.name];
-                if (npc.gender) parts.push(`${npc.gender}`);
-                if (npc.age) parts.push(`${npc.age}岁`);
-                if (npc.race) parts.push(npc.race);
-                if (npc.relationshipType) parts.push(`关系：${npc.relationshipType}`);
-                if (npc.personality) parts.push(`性格：${npc.personality}`);
-                if (npc.appearance) parts.push(`外貌：${npc.appearance}`);
-                if (npc.background) parts.push(`背景：${npc.background}`);
-                return `- ${parts.join('，')}`;
-              }).join('\n');
-              customNpcsBlock = `
-自建NPC（玩家的初始关联角色，必须在游戏中以该身份登场）：
-${npcLines}
-人物档案中已预置这些NPC的完整数据，请直接使用。`;
-            }
-
-            playerProfileBlock = `
-<PlayerProfile>
-玩家角色设定（最高优先级，必须严格遵守）：
-- 姓名：${playerProfileRef.current.name}
-- 性别：${playerProfileRef.current.gender || '未设定'}
-- 年龄：${playerProfileRef.current.age || '未设定'}
-- 性格：${playerProfileRef.current.personality || '未设定'}
-- 外貌：${playerProfileRef.current.appearance || '未设定'}
-- 背景描述：${playerProfileRef.current.background || '无'}
-- 职业：${playerProfileRef.current.career || '未设定'}
-- 叙事视角：${playerProfileRef.current.perspective || '第三人称'}
-${characterHistoryRef.current ? `- 角色经历：\n${characterHistoryRef.current}` : ''}
-${customNpcsBlock}
-在故事开始时，玩家应以此身份登场。NPC 应以该角色的姓名和身份进行称呼和互动。
-使用技能时，必须严格遵循技能描述中的效果，不要自行编造技能功能。
-${perspectiveInstruction}
-</PlayerProfile>
-`;
+            const scanHistory = messagesRef.current.map(m => ({ role: m.role, content: getMessageContent(m) }));
+            worldBookInjection = worldBookRef.current.scanAndBuildInjection(scanHistory, userText);
           }
 
           // 获取上一次编译的记忆上下文（如果有）
@@ -1138,18 +987,15 @@ ${perspectiveInstruction}
             if (directiveText) parts.push(directiveText);
             const encounterContext = buildEncounterContext(directorState, [directive?.primary, ...(directive?.secondary ?? [])].flatMap(item => item?.participants ?? []));
             if (encounterContext) parts.push(encounterContext);
-            if (mechanicalEffectsSummary) {
-              parts.push(`【玩法机械 — 本轮已自动结算的确定性效果】\n${mechanicalEffectsSummary}`);
-            }
             directorBrief = parts.join('\n\n');
           } catch (error) {
             assertCurrent();
             useSimulationStore.getState().setLastError(`本轮导演指导未生成：${error instanceof Error ? error.message : String(error)}`);
           }
+          // 已结算事实与导演无关：导演关闭或失败时照样告诉正文。
+          const settledFacts = formatSettledFacts(varMgrRef.current.getState(), getActiveWorldDef());
           assertNarrativeCurrent();
 
-          // 使用结构化预设 + 宏引擎组装系统提示
-          // getActivePreset() 已处理：用户自定义预设 / 内置预设 + 覆盖层 / 默认回退
           // 注入玩家决策记录（选择卡路径 C）：取最近若干 aiNote 作为下一轮叙事上下文
           const decisionSnapshot = getNarrativeDecisionPromptSnapshot(
             varMgrRef.current.getState(),
@@ -1159,110 +1005,31 @@ ${perspectiveInstruction}
           const playerDecisionContext = [getPlayerDecisionContext(), decisionSnapshot.context]
             .filter(Boolean).join('\n\n');
 
-          let preset = usePresetStore.getState().getActivePreset();
-          // 叠加正文生图指令（独立于预设，当 inlineImageEnabled 时始终注入）
+          // getActivePreset() 已处理：用户自定义预设 / 内置预设 + 覆盖层 / 默认回退
           const imageConfig = useImageStore.getState().config;
-          if (imageConfig.inlineImageEnabled) {
-            const hasInlineImage = preset.prompts.some(p => p.identifier === 'inline_image_gen');
-            if (!hasInlineImage) {
-              const inlineImageContent = imageConfig.inlineImagePromptTemplate?.trim() || PROMPT_INLINE_IMAGE;
-              preset = {
-                ...preset,
-                prompts: [...preset.prompts, {
-                  identifier: 'inline_image_gen',
-                  name: '正文生图标签',
-                  role: 'system' as const,
-                  content: inlineImageContent,
-                  enabled: true,
-                  order: 1250,
-                }],
-              };
-            }
-          }
-          const useFormatRepairGuard = !internalContinuation && (preset.id === 'deepseek'
-            || (preset.id === 'drc_v12'
-              && preset.prompts.some(p => p.identifier === DRC_FORMAT_REPAIR_PROMPT_ID && p.enabled)));
-          const macroEngine = new MacroEngine();
-          const assembleResult = assembleSystemPrompt(preset, {
-            varSnapshot,
-            wbInjection,
-            playerProfileBlock,
-            firewallTitle: ROLE_COGNITION_FIREWALL_TITLE,
-            firewallContent: ROLE_COGNITION_FIREWALL_CONTENT,
+          const composed = composeMainPrompt({
+            preset: usePresetStore.getState().getActivePreset(),
+            imageConfig,
+            graphicalCombatEnabled,
+            internalContinuation,
             userText,
             round,
-            macroEngine,
-            compiledMemoryContext,  // ← 注入记忆上下文
-            directorBrief,  // ← 注入剧情导演未来意图与已结算机械事实
-            playerDecisionContext,  // ← 注入玩家决策记录（选择卡路径 C）
-            userPersonaName: playerProfileRef.current?.name || '',  // ← 供 {{user}} 宏（双人成行等第三方预设）
+            varSnapshot,
+            worldBook: worldBookInjection,
+            playerProfile: playerProfileRef.current,
+            characterHistory: characterHistoryRef.current,
+            compiledMemoryContext,
+            directorBrief,
+            settledFacts,
+            playerDecisionContext,
+            turnStartTimeText: internalContinuation ? undefined : formatWorldClock(turnStartClock, clockConfigForPrompt),
+            chatHistory: sanitizeForContext(messagesRef.current, round),
+            macroFacts: createFactMacroAccess(getActiveWorldDef(), varMgrRef.current.getState()),
           });
-          let systemPrompt = assembleResult.systemPrompt;
-
-          // 正文生图：在系统提示末尾追加格式提醒（提高 Gemini 等模型的遵循率）
-          if (imageConfig.inlineImageEnabled) {
-            systemPrompt += '\n\n【提醒】在 <contenttext> 正文中插入 image###英文提示词### 生图标签（1-2个）。';
-          }
-          if (graphicalCombatEnabled) {
-            systemPrompt += '\n\n【图形化战斗最高优先级边界】本世界已启用本地战斗模块。正文只允许写到敌人现身、伏击发生、攻击即将开始或双方进入对峙；到此必须立刻停止。严禁描写任何一次命中、闪避、格挡、反击、伤势、死亡、投降、胜负、奖励或成功逃脱，也不得用摘要跳过战斗。玩家随后会在独立战场完成机械结算，只有宿主再次提供 CombatResult 时，你才能依据该 JSON 一次性叙述完整战斗经过与结果。此规则高于预设中的篇幅、戏剧性和情节推进要求。';
-          }
-          if (!internalContinuation) {
-            systemPrompt += `\n\n【权威时间裁决】本轮起始时间是“${formatWorldClock(turnStartClock, clockConfigForPrompt)}”。完成正文与行动选项后，必须在整条回复最后单独追加 <TimeAdvance>{"minutes":本轮从起始到正文末尾实际经过的非负整数分钟,"reason":"简短原因","evidence":"正文中的时间依据"}</TimeAdvance>。请自然判断已完成的用餐、睡眠、旅行、工作和天色变化：整段正文只给出从起始到末尾的唯一总推进；多个线索只是同一终点的相互佐证，不能重复累计。targetPhase/dayOffset 只能描述同一个最终时间终点，不得与 minutes 叠加；没有可靠证据时写 0。计划、对白、回忆中的未来或过去时间不推进；跨两天以上必须有明确天数、绝对日期或连续场景证据。不得省略回执；TimeAdvance 内不得增加绝对日期字段；不得把标签放进正文。`;
-          }
-
-          const chatHistory = sanitizeForContext(messagesRef.current, round);
-          // 注入 atDepth 世界书条目 + 预设自带深度注入条目（双人成行 🔒丨文风 depth=2 等）到聊天历史
-          // 世界书 atDepth 条目内容走宏引擎解析（{{user}} 等），macroEngine 已在 assembleSystemPrompt 内完成变量绑定
-          const resolvedWbAtDepth = (atDepthEntries || []).map(e => ({
-            depth: e.depth,
-            content: macroEngine.resolve(e.content),
-          }));
-          const mergedAtDepth = [...resolvedWbAtDepth, ...(assembleResult.depthEntries || [])];
-          // depth is relative to the complete conversation sent for this turn,
-          // including the live user message. In particular, depth=0 must be the
-          // final user-context message immediately before generation.
-          const chatHistoryWithDepth = injectAtDepthEntries([
-            ...chatHistory,
-            { role: 'user' as const, content: userText },
-          ], mergedAtDepth);
-          let apiMessages: Message[] = [
-            { role: 'system', content: systemPrompt },
-            ...chatHistoryWithDepth,
-          ];
-          // 尾部 assistant 预填充（SillyTavern 兼容：仅第三方预设如双人成行有此条目；现有 4 预设为空，行为不变）
-          if (assembleResult.assistantPrefill) {
-            apiMessages.push({ role: 'assistant', content: assembleResult.assistantPrefill });
-          }
-          let syntheticTool: RequestOptions['syntheticTool'];
-          if (assembleResult.toolChannel) {
-            const channel = assembleResult.toolChannel;
-            const toolName = buildSyntheticToolName([], channel.toolNamePrefix);
-            apiMessages = apiMessages.map(message => ({
-              ...message,
-              content: substituteToolName(message.content, toolName),
-            }));
-            syntheticTool = {
-              name: toolName,
-              paramName: channel.paramName,
-              description: substituteToolName(channel.description, toolName),
-              fieldDescription: substituteToolName(channel.fieldDescription, toolName),
-              controlPrompt: channel.controlPrompt,
-              relocateContext: channel.relocateContext,
-              pipelineMessages: channel.pipelineMessages.map(message => ({
-                ...message,
-                content: substituteToolName(message.content, toolName),
-              })),
-            };
-          }
+          const { apiMessages, useFormatRepairGuard } = composed;
+          const presetRequestOpts = composed.requestOptions;
 
           let accumulated = '';
-
-          // 预设级模型参数覆盖全局 ApiConfig（temperature/top_p/max_tokens）
-          const presetRequestOpts: RequestOptions = {};
-          if (preset.temperature != null) presetRequestOpts.temperature = preset.temperature;
-          if (preset.top_p != null) presetRequestOpts.topP = preset.top_p;
-          if (preset.max_tokens != null) presetRequestOpts.maxTokens = preset.max_tokens;
-          if (syntheticTool) presetRequestOpts.syntheticTool = syntheticTool;
 
           // Narrative is committed as a whole; keep retries and format repair on the same non-streaming contract.
           const narrativeApiConfig = { ...apiConfig, stream: false };
@@ -1499,14 +1266,8 @@ ${perspectiveInstruction}
       memoryVersion: recovery.memoryVersion, pipelineConfig: recovery.config, apiConfig, settlement,
       recoveryRawText: recovery.rawText,
       settle: result => {
-        if (settlement.done || result.status.stages.main.status !== 'success' || !result.mainResult?.parsed.content?.trim()) return;
-        if (recovery.config.variableEnabled && !['success', 'skipped'].includes(result.status.stages.variable.status)) return;
-        const accepted = settleAcceptedTurn(manager.getState(), settlement, result, recovery.aiMsgId, recovery.round, recovery.userText);
-        manager.setState(accepted.state);
-        settlement.done = true;
-        eventBus.emit(EVENTS.TURN_SETTLED, manager, accepted.changeLog);
-        if (settlement.encounter) eventBus.emit(EVENTS.COMBAT_ENCOUNTER_REQUESTED, settlement.encounter);
-        eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
+        settleTurnOnce(manager, settlement, result, { turnId: recovery.aiMsgId, round: recovery.round, userText: recovery.userText },
+          { variableEnabled: recovery.config.variableEnabled });
       },
     };
   };
@@ -1524,12 +1285,23 @@ ${perspectiveInstruction}
     onAutoSaveRef.current?.();
     return true;
   }, []);
+  const dispatch = useCallback((command: string, args: Record<string, unknown> = {}, label?: string): PlayerCommandResult => {
+    const result = runPlayerCommand({
+      variableManager: varMgrRef.current,
+      isGenerating: generatingRef.current,
+      isReadOnly: isSaveReadOnly(),
+      commitPlayerState,
+    }, getActiveWorldDef(), command, args, label);
+    announcePlayerCommand(result);
+    return result;
+  }, [commitPlayerState]);
   const preparePlayerStateJSON = useCallback((json: string): GameState | null => {
     try {
       const parsed: unknown = JSON.parse(json);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !('玩家' in parsed) || !('世界' in parsed)) return null;
       delete (parsed as Record<string, unknown>).moduleRevisions;
       const draft = new VariableManager(varMgrRef.current.getState(), undefined, getTimeSystemFromWorld(getActiveWorldDef()));
+      draft.bindWorld(getActiveWorldDef());
       return draft.setStateFromJSON(JSON.stringify(parsed)) ? draft.getState() : null;
     } catch { return null; }
   }, []);
@@ -1731,6 +1503,7 @@ ${perspectiveInstruction}
     setIsGenerating(false);
     setMessages([]);
     varMgrRef.current = new VariableManager(undefined, undefined, getTimeSystemFromWorld(worldDef));
+    varMgrRef.current.bindWorld(worldDef ?? findWorldDef(selectedWorldRef.current));
     varMgrRef.current.initializeWorldAndNotebook();
     const initialClockState = varMgrRef.current.getState();
     ensureWorldClockOnGameState(initialClockState, worldDef);
@@ -1764,7 +1537,7 @@ ${perspectiveInstruction}
   // 使用 getter 确保 variableManager 总是返回最新的 ref 值
   // （reset 会创建新的 VariableManager 实例，旧的 engine 对象仍需能访问到新实例）
   return {
-    sendMessage, cancel, cancelAndWait, commitPlayerState, preparePlayerStateJSON, prepareSaveCapture,
+    sendMessage, cancel, cancelAndWait, commitPlayerState, dispatch, preparePlayerStateJSON, prepareSaveCapture,
     get isGenerating() { return generatingRef.current; },
     get messages() { return messagesRef.current; },
     get isReadOnly() { return isSaveReadOnly(); },

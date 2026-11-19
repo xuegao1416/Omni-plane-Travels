@@ -1,4 +1,5 @@
-import { useEffect,useRef,useMemo,useState,useCallback,useLayoutEffect } from 'react';
+import { useEffect,useRef,useMemo,useState,useCallback,useLayoutEffect,Fragment } from 'react';
+import type { DiceRollRequest } from '../../../gameplay/modules/dice';
 import { useUISettings } from '../../../context/UISettingsContext';
 import type { ChatMessage } from '../../../engine/types';
 import type { PipelineStatus as PipelineStatusType,PipelineTaskId } from '../../../engine/pipelineTypes';
@@ -23,7 +24,8 @@ interface Props {
   /** 世界系统数据（用于内联骰子卡片） */
   worldSystem?: WorldSystemData | null;
   /** 骰子掷骰结果回调 */
-  onDiceRoll?: (roll: DiceRoll) => void;
+  /** 正文里的检定请求交给本地骰子模块结算，返回已提交的结果（暂时不能结算时返回 null）。 */
+  onDiceRoll?: (request: DiceRollRequest) => DiceRoll | null;
   /** 单步重试回调 */
   onRetrySingleStage?: (taskId: PipelineTaskId) => void;
   onRetryPipeline?: () => void;
@@ -120,6 +122,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
 
   return (
     <div className="game-journey__chat-panel">
+      {worldSceneUrl && <span className="game-journey__scene-backdrop" style={{ backgroundImage: `url("${worldSceneUrl}")` }} aria-hidden="true" />}
       <div className="game-journey__narrative-banner">
         {worldSceneUrl && <span className="game-journey__narrative-banner-scene" style={{ backgroundImage: `url("${worldSceneUrl}")` }} aria-hidden="true" />}
         <span className="game-journey__narrative-banner-glass" aria-hidden="true" />
@@ -138,8 +141,17 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
             {t('chat.empty')}
           </div>
         )}
-        {visibleMessages.map(msg => (
-          <ErrorBoundary key={msg.id} fallback={
+        {messages.length > 0 && (
+          <header className="game-journey__chapter" aria-hidden="true">
+            <span className="game-journey__chapter-kicker">旅程开卷</span>
+            <span className="game-journey__chapter-title">{worldName || '世界漫游指南'}</span>
+            <span className="game-journey__chapter-rule"><i /></span>
+          </header>
+        )}
+        {visibleMessages.map((msg, index) => (
+          <Fragment key={msg.id}>
+          {msg.role === 'user' && index > 0 && <div className="game-journey__turn-mark" aria-hidden="true"><i /></div>}
+          <ErrorBoundary fallback={
             <div className="game-journey__message-error">
               ⚠ 消息渲染失败 (ID: {msg.id.slice(0, 8)}…)
             </div>
@@ -157,6 +169,7 @@ export default function ChatPanel({ messages, isGenerating, onSend, onCancel, on
               readOnly={readOnly}
             />
           </ErrorBoundary>
+          </Fragment>
         ))}
       </div>
 

@@ -26,7 +26,7 @@ export function StepIndicator({ currentDimIndex, selections, onJump }: StepIndic
               onClick={() => (isCompleted || i < currentDimIndex) && onJump(i)}
             >
               <span className="guided-choice-step__badge">
-                <img src={dim.emblem} alt="" aria-hidden="true" />
+                <dim.icon className="guided-choice-step__glyph" aria-hidden="true" />
                 {isCompleted && <Check className="guided-choice-step__check" size={11} />}
                 {isSkipped && <span className="guided-choice-step__skip">–</span>}
               </span>

@@ -348,26 +348,46 @@ ${npcInfo.length > 0 ? npcInfo.join('\n') : '- （暂无）'}
 }`;
 }
 
+/** 玩法宿主给变量 AI 的上下文：各模块的变量说明与可用命令（由本地模块生成，和实际规则一致）。 */
+export interface ExtractionGameplayContext {
+  /** 模块 id → 提取用说明（host.summarize(state, 'extraction')）。 */
+  summaries: Array<{ moduleId: string; label: string; text: string }>;
+  /** 可用命令说明（formatAiCommands）。 */
+  commands: string;
+}
+
+/** 由玩法宿主模块接管的旧规则块（有宿主说明时不再输出旧写法）。 */
+const HOST_OWNED_RULES: Record<string, string> = { stats: '数值属性', progression: '成长体系', resources: '生存资源', economy: '经营资产', dice: '骰子检定' };
+
 /** 根据当前世界系统数据，生成具体的模块更新规则 */
-function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progressionConfig?: Record<string, unknown>): string {
-  if (!worldSystem && !progressionConfig) return '';
+function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progressionConfig?: Record<string, unknown>, gameplay?: ExtractionGameplayContext): string {
+  if (!worldSystem && !progressionConfig && !gameplay?.summaries.length) return '';
 
   const data = worldSystem ? extractWorldSystemData(worldSystem) : ({} as WorldSystemData);
   const rules: string[] = [];
+  const owned = new Set((gameplay?.summaries ?? []).map(item => HOST_OWNED_RULES[item.moduleId]).filter(Boolean));
+  if (gameplay?.summaries.length) {
+    rules.push(`   【玩法模块变量（本地规则结算，数值会按范围钳制）】
+${gameplay.summaries.map(item => `   - ${item.label}：${item.text}`).join('\n')}${gameplay.commands ? `\n   ${gameplay.commands.split('\n').join('\n   ')}` : ''}`);
+  }
+  if (owned.has('经营资产')) delete (data as Record<string, unknown>).经营资产;
+  if (owned.has('生存资源')) delete (data as Record<string, unknown>).生存资源;
+  if (owned.has('骰子检定')) delete (data as Record<string, unknown>).骰子检定;
+  if (owned.has('成长体系')) progressionConfig = undefined;
 
   // ── 数值属性 → 玩家.生存状态 ──
-  if (data.数值属性) {
+  if (data.数值属性 && !owned.has('数值属性')) {
     const s = data.数值属性 as StatModuleSchema;
     const dims = [s.dim1, s.dim2, s.dim3, s.dim4, s.dim5, s.dim6].filter(Boolean);
     const dimKeys = ['dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'];
     rules.push(`   【数值属性更新规则】
-   - 生命类（${s.attrA.name}）：使用 {"set":{"path":"玩家.生存状态.血量","value":新值}}
-   - 能量类（${s.attrB.name}）：使用 {"set":{"path":"玩家.生存状态.体力值","value":新值}}
+   - 生命类（${s.attrA.name}）：使用 {"set":"玩家.生存状态.血量","value":新值}
+   - 能量类（${s.attrB.name}）：使用 {"set":"玩家.生存状态.体力值","value":新值}
    - 六维属性：${dims.map((d, i) => `${d!.name}(${dimKeys[i]})`).join('、')}
-     示例：使用 {"set":{"path":"玩家.生存状态.dim1","value":新值}}
+     示例：使用 {"set":"玩家.生存状态.dim1","value":新值}
    - 属性值不能超过range[1]，不能低于range[0]
    ${s.special.length > 0 ? `  - 特色属性：${s.special.map(sp => `${sp.name}(${sp.id})`).join('、')}
-     示例：使用 {"set":{"path":"玩家.生存状态.${s.special[0]?.id}","value":新值}}` : ''}`);
+     示例：使用 {"set":"玩家.生存状态.${s.special[0]?.id}","value":新值}` : ''}`);
   }
 
   // ── 成长体系 → 玩家 ──
@@ -378,17 +398,13 @@ function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progre
       const maxLevel = p.levelData.maxLevel;
       rules.push(`   【成长体系更新规则】
    - 模式：等级制（0~${maxLevel}级）
-   - 战斗、训练、探索产生的经验由本地机械系统自动结算，禁止更新当前经验值或当前段位索引
-   - 只有任务奖励、事件奖励等正文明确给出具体经验数值的来源，才可更新：使用 {"add":{"path":"玩家.当前经验值","delta":经验变化,"min":0}}
-   - 当前经验值不能为负，当前段位索引不能超过${maxLevel}`);
+   - 经验与等级全部由本地成长规则结算（行动、检定、任务完成、事件），禁止更新当前经验值或当前段位索引`);
     } else if (p.tiers?.length) {
       const tierList = p.tiers.map((t: any, i: number) => `${i + 1}.${t.name}`).join('、');
       rules.push(`   【成长体系更新规则】
    - 模式：段位制
    - 阶段列表：${tierList}
-   - 战斗、训练、探索产生的经验由本地机械系统自动结算，禁止更新当前经验值或当前段位索引
-   - 只有任务奖励、事件奖励等正文明确给出具体经验数值的来源，才可更新：使用 {"add":{"path":"玩家.当前经验值","delta":经验变化,"min":0}}
-   - 当前经验值不能为负，当前段位索引不能超过${p.tiers.length - 1}`);
+   - 经验与段位全部由本地成长规则结算（行动、检定、任务完成、事件），禁止更新当前经验值或当前段位索引`);
     }
   }
 
@@ -400,7 +416,7 @@ function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progre
     ).join('、') : '';
     rules.push(`   【生存资源更新规则】
    - 当前资源：${resList}
-   - 数量变化：使用 {"set":{"path":"玩家.生存资源.资源id.数量","value":新数量}}
+   - 数量变化：使用 {"set":"玩家.生存资源.资源id.数量","value":新数量}
    - 数量不能为负数`);
   }
 
@@ -413,11 +429,11 @@ function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progre
     rules.push(`   【经营资产更新规则】
    - 经营数据通过 UpdateVariable 更新到 玩家.经营资产
    - 当前资产：${assetList || '无'}
-   - 资金变化：使用 add effect 写入 玩家.经营资产.资金，并在同一 transaction 的 costs 中声明扣款
-   - 收购新资产（同时扣除资金）：使用 append effect 写入 玩家.经营资产.资产列表；资产字段全部必填：id、名称、类型、等级、最高等级、描述、状态、基础收益、每级收益、维护费
+   - 资金变化：使用 add 意图 写入 玩家.经营资产.资金
+   - 收购新资产（同时扣除资金）：使用 append 意图 写入 玩家.经营资产.资产列表；资产字段全部必填：id、名称、类型、等级、最高等级、描述、状态、基础收益、每级收益、维护费
      ★ 收购新资产时，以下字段全部必填，不可省略：id、名称、类型、等级、最高等级、描述、状态、基础收益、每级收益、维护费
-   - 升级资产（扣除升级费用，提升等级）：使用 set effect 写入对应资产路径，并在同一 transaction 的 costs 中声明升级费用
-   - 出售资产（从列表移除，增加资金）：使用 remove effect 删除对应资产路径
+   - 升级资产（扣除升级费用，提升等级）：使用 set 意图 写入对应资产路径
+   - 出售资产（从列表移除，增加资金）：使用 remove 意图 删除对应资产路径
    - 资产状态变化：受损时状态改为 "damaged"（收入减半），被毁时改为 "destroyed"（收入归零）
    - 经营日志：重大事件添加到交易日志数组
    - 资金不能为负数
@@ -461,7 +477,7 @@ function generateModuleUpdateRules(worldSystem?: Record<string, unknown>, progre
  * @param worldSystem 当前世界系统运行时数据（用于生成具体的模块更新规则）
  * @param progressionConfig 成长体系配置（从世界定义读取，不存入 GameState）
  */
-export function buildVariableExtractionPrompt(worldSystem?: Record<string, unknown>, progressionConfig?: Record<string, unknown>): string {
+export function buildVariableExtractionPrompt(worldSystem?: Record<string, unknown>, progressionConfig?: Record<string, unknown>, gameplay?: ExtractionGameplayContext): string {
   // 提取模块数据，判断是否有数值属性模块
   const moduleData = worldSystem ? extractWorldSystemData(worldSystem) : {};
   const hasStatModule = !!moduleData.数值属性;
@@ -484,22 +500,22 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
 6. ★ 没发生的事不更新 ★：正文里没有发生影响某变量的事件，该变量就保持原样，不要"觉得应该变一变"
 
 【输出格式】
-用 <UpdateVariable></UpdateVariable> 标签包裹JSON输出。
-输出必须是唯一的 GameplayTransaction 对象；只写需要更新的效果，未变化的字段不要输出。
+用 <UpdateVariable></UpdateVariable> 标签包裹一个 JSON 对象：{"intents":[…]}。
+每条意图一个扁平对象，只有一个动词，外加 because（正文里的依据，一句话）；只写这一轮正文里真的发生了变化的东西。
 
-【唯一允许的顶层结构】
-{"id":"本轮唯一标识","source":"ai","label":"变量裁定","effects":[
-  {"set":{"path":"玩家.当前目标","value":"新值"}},
-  {"add":{"path":"玩家.当前经验值","delta":10,"min":0}},
-  {"append":{"path":"玩家.纪事系统.纪事.线索.详情","value":"新信息"}},
-  {"remove":{"path":"玩家.任务系统.活跃任务.已完成任务"}},
-  {"emit":{"type":"narrative.state.changed","payload":{"reason":"剧情事实"}}}
+【意图写法】
+{"intents":[
+  {"set":"玩家.当前目标","value":"新值","because":"依据"},
+  {"add":"人物档案.人物规范ID.关系数据.好感度","delta":5,"because":"依据"},
+  {"append":"玩家.纪事系统.纪事.线索.详情","value":"新信息","because":"依据"},
+  {"remove":"玩家.任务系统.活跃任务.已完成的任务名","because":"依据"}${gameplay?.commands ? ',\n  {"command":"命令名","args":{…},"because":"依据"}' : ''}
 ]}
-- 所有写入都必须放在 effects（或 rewards[].effects）中，路径使用点号路径。
-- 允许使用 conditions、costs、rewards、events；它们也必须遵守 GameplayTransaction 结构。
-- 好感度优先使用 add；单次变化必须控制在 -15 到 +15，系统还会进行最终钳制。
-- 人物事迹追加使用 append，系统会自动去重；不要输出 chronicleOperations。
-- 下面的旧对象示例仅用于说明字段语义，绝对不能照抄为输出格式；禁止输出 RFC 6902 数组或“设置/世界/玩家/人物档案”顶层对象。
+- 动词：set 写入、add 增减数字、append 往数组末尾追加、remove 删除${gameplay?.commands ? '、command 调用本地规则（买卖、订单、物资增减、状态，可用命令见下方模块规则）' : ''}。
+- 路径用点号：世界/玩家/人物档案下的路径，或下方模块说明里给出的变量（如 player.stats.<id>）。本地规则结算的变量（经验、段位等）不要写。
+- 好感度优先用 add；单次变化必须控制在 -15 到 +15，系统还会进行最终钳制。
+- 人物事迹追加用 append，系统会自动去重；不要输出 chronicleOperations。
+- 这一轮没有任何变化时输出 {"intents":[]}。
+- 下面的规则里用对象展示字段含义，只是说明语义，输出时都要写成上面的意图。
 
 ═══════════════════════════════════════
 【人物档案规则】（★ 每轮必须更新，不可跳过 ★）
@@ -520,7 +536,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
 4. 用角色姓名作key即可，系统自动匹配
 
 【创建新NPC - 必须包含以下全部字段】
-创建时使用 set effect，路径为 人物档案.角色名，value 为完整 NPC 对象。value 必须包含姓名、种族、性别、年龄、人物分类、背景（2~3 句出身经历与动机）、社会身份（职业与社会地位都要填）、关系数据、个人信息、人物事迹、当前行动、短期目标和长期目标；并按角色身份填入 技能列表（1~3 项）与 物品列表（随身物品，确实一无所有时填空对象）、装备列表；启用数值/成长模块时再填入对应模块字段。这些字段即使玩家当下看不全也必须生成，系统只对玩家侧做隐藏。
+创建时使用 set 意图，路径为 人物档案.角色名，value 为完整 NPC 对象。value 必须包含姓名、种族、性别、年龄、人物分类、背景（2~3 句出身经历与动机）、社会身份（职业与社会地位都要填）、关系数据、个人信息、人物事迹、当前行动、短期目标和长期目标；并按角色身份填入 技能列表（1~3 项）与 物品列表（随身物品，确实一无所有时填空对象）、装备列表；启用数值/成长模块时再填入对应模块字段。这些字段即使玩家当下看不全也必须生成，系统只对玩家侧做隐藏。
 ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 生存状态；字段路径为 人物档案.角色名.生存状态。按角色特点在世界范围内填写，结构示例：${npcStatExample}` : ''}
 
 【更新已有NPC - ★ 每轮必须输出，不可省略 ★】
@@ -529,12 +545,12 @@ ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 
 ★ 好感度仅在发生关系事件时才输出，没发生就不写。
 
 示例（无关系事件时，不输出好感度）：
-更新已有 NPC 使用 set effect，路径为 人物档案.角色名.字段路径；例如人物分类写入 人物档案.角色名.人物分类，当前状态写入 人物档案.角色名.个人信息.当前状态。好感度只在关系事件发生时使用 add effect。
+更新已有 NPC 使用 set 意图，路径为 人物档案.角色名.字段路径；例如人物分类写入 人物档案.角色名.人物分类，当前状态写入 人物档案.角色名.个人信息.当前状态。好感度只在关系事件发生时使用 add 意图。
 
 【NPC 物品栏规则】（变量快照中携带该 NPC 的 物品栏 时适用）
-- NPC 使用/消耗/损坏自己携带的道具：add effect 写 人物档案.角色名.物品栏.物品名.数量（delta 为负，min:0）；整件失去时用 remove effect 删除 人物档案.角色名.物品栏.物品名
-- NPC 获得新道具（拾取/被赠予/抢夺）：set effect 写入 人物档案.角色名.物品栏.物品名，value 为完整物品对象
-- NPC 把道具交给玩家：NPC 侧扣减/删除 + 玩家侧获得，两个 effect 同轮输出，保持物物守恒
+- NPC 使用/消耗/损坏自己携带的道具：add 意图 写 人物档案.角色名.物品栏.物品名.数量（delta 为负，min:0）；整件失去时用 remove 意图 删除 人物档案.角色名.物品栏.物品名
+- NPC 获得新道具（拾取/被赠予/抢夺）：set 意图 写入 人物档案.角色名.物品栏.物品名，value 为完整物品对象
+- NPC 把道具交给玩家：NPC 侧扣减/删除 + 玩家侧获得，两条意图同轮输出，保持物物守恒
 - 快照未携带该 NPC 的 物品栏 说明其为空，确有剧情事实时可用 set 创建首个条目
 
 【离场规则】
@@ -546,10 +562,10 @@ ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 
 你有两种更新方式：
 
 方式1 - 追加（简单场景，NPC有新事件发生）：
-使用 {"append":{"path":"人物档案.角色名.人物事迹","value":"新事件摘要"}}，系统会自动去重追加到末尾。
+使用 {"append":"人物档案.角色名.人物事迹","value":"新事件摘要"}，系统会自动去重追加到末尾。
 
 方式2 - 精细操作（需要合并/替换/删除旧条目时）：
-使用 set effect 写回去重后的完整人物事迹数组；删除单条时使用 remove effect 删除对应数组路径。不要输出 chronicleOperations。
+使用 set 意图 写回去重后的完整人物事迹数组；删除单条时使用 remove 意图 删除对应数组路径。不要输出 chronicleOperations。
 
 ★ 指导原则：
 - 一般情况下每轮为在场NPC记录1条新事迹即可
@@ -567,27 +583,27 @@ ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 
 【其他变量规则】
 
 1. 玩家变量
-   使用 set effect 写入 玩家.当前目标、玩家.物品栏、玩家.当前位置 或玩家.外貌等具体点号路径；货币变化使用对应路径的 add effect。
+   使用 set 意图 写入 玩家.当前目标、玩家.物品栏、玩家.当前位置 或玩家.外貌等具体点号路径；货币变化使用对应路径的 add 意图。
    - 外貌：仅在玩家外貌发生永久性变化时更新（如受伤留疤、获得纹身、年龄增长等），不要写入当前动作或临时状态
    【★ 物品栏增减规则 ★】
-   - 玩家获得新物品：set effect 写入 玩家.物品栏.物品名，value 为完整物品对象（含 数量/类型/品质/备注）
-   - 玩家消耗/使用/失去若干数量：add effect 写 玩家.物品栏.物品名.数量，delta 为负数并带 min:0
-   - 玩家彻底失去整件物品（丢弃/损毁/赠出最后一件/任务物品被收走）：remove effect 删除 玩家.物品栏.物品名，不要只写 数量:0 留空壳
+   - 玩家获得新物品：set 意图 写入 玩家.物品栏.物品名，value 为完整物品对象（含 数量/类型/品质/备注）
+   - 玩家消耗/使用/失去若干数量：add 意图 写 玩家.物品栏.物品名.数量，delta 为负数并带 min:0
+   - 玩家彻底失去整件物品（丢弃/损毁/赠出最后一件/任务物品被收走）：remove 意图 删除 玩家.物品栏.物品名，不要只写 数量:0 留空壳
    - 数量被扣到 0 的条目系统会自动清理，但优先用 remove 表达"彻底消失"语义
-   ${hasBusinessModule
-    ? '- ★ 当前世界启用了经营资产模块，所有金钱变化只写入 玩家.经营资产.资金；禁止更新 玩家.货币资源，禁止同时写两套资金。'
+   ${hasBusinessModule || gameplay?.summaries.some(item => item.moduleId === 'economy')
+    ? '- ★ 钱只有一处：玩家.货币资源.主货币.数量（经营收支也在这里）；不要写 玩家.经营资产.资金。买卖货物用 economy.sell / economy.buy 命令，不要自己算钱。'
     : '- 货币资源：玩家获得/花费货币时更新数量，名称仅在首次或变化时设置'}
 
 2. 玩家生存状态
 ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过 玩家.生存状态 更新（见下方模块规则）。` : `   无数值属性模块时，更新生存状态：
-   使用 set effect 写入 玩家.生存状态.血量 或 玩家.生存状态.体力值
+   使用 set 意图 写入 玩家.生存状态.血量 或 玩家.生存状态.体力值
    血量范围0~100，体力值范围0~100`}
 
 3. 世界变量（★ 首轮设置位置，后续有变化时更新 ★）
    - 时间系统.时钟 是系统维护的权威时间；禁止创建、修改、删除 时间系统.时钟 或 时间系统.当前时间
    - 首轮必须输出 空间定位.当前位置；天气明确时可同时输出 当前天气
    - 后续轮次只在地点或天气变化时更新，时间流逝由系统自动处理
-   使用 set effect 写入 世界.时间系统.当前天气 或 世界.空间定位.当前位置；禁止写入权威时钟路径
+   使用 set 意图 写入 世界.时间系统.当前天气 或 世界.空间定位.当前位置；禁止写入权威时钟路径
 
 4. 纪事系统（统一情报板 — 记录玩家已知的所有重要信息）
    - 游戏开始时纪事为空，由 AI 根据剧情动态创建
@@ -603,7 +619,7 @@ ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过
    - 物品：重要物品的信息/线索/特殊道具
 
    【创建纪事】
-   使用 set effect 写入 玩家.纪事系统.纪事.纪事名，value 为完整纪事对象；不要手动写入权威时间字段
+   使用 set 意图 写入 玩家.纪事系统.纪事.纪事名，value 为完整纪事对象；不要手动写入权威时间字段
 
    【详情字段说明】（不同类型用不同字段，灵活组合）
    - 风险：严重程度、预计影响时间、应对措施
@@ -614,9 +630,9 @@ ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过
    - 物品：物品名、品质、用途
 
    【更新纪事】
-   使用 set effect 写入 玩家.纪事系统.纪事.纪事名.状态 或对应的具体字段
+   使用 set 意图 写入 玩家.纪事系统.纪事.纪事名.状态 或对应的具体字段
 
-   【删除纪事】使用 remove effect 删除 玩家.纪事系统.纪事.纪事名
+   【删除纪事】使用 remove 意图 删除 玩家.纪事系统.纪事.纪事名
 
    【注意事项】
    - 纪事仅记录玩家已知晓的信息，禁止剧透
@@ -634,7 +650,7 @@ ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过
    - 发现新目标/线索/秘密 → 创建任务
    - 世界事件触发 → 创建任务
 
-   创建格式（基础）：使用 set effect 写入 玩家.任务系统.活跃任务.任务名，value 为完整任务对象；系统负责时间字段
+   创建格式（基础）：使用 set 意图 写入 玩家.任务系统.活跃任务.任务名，value 为完整任务对象；系统负责时间字段
 
    【任务类型说明】
    - 主线：推动剧情发展的核心任务，通常由重要NPC发布
@@ -715,16 +731,16 @@ ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过
    - 用 奖励.解锁任务 来建立链式关系
 
    【更新任务进度】
-   - 进度变化：使用 set effect 写入 玩家.任务系统.活跃任务.任务名.进度 和对应的目标路径
-   - 阶段推进：使用 set effect 写入 玩家.任务系统.活跃任务.任务名.阶段
+   - 进度变化：使用 set 意图 写入 玩家.任务系统.活跃任务.任务名.进度 和对应的目标路径
+   - 阶段推进：使用 set 意图 写入 玩家.任务系统.活跃任务.任务名.阶段
    - 满足条件后更新，不要等玩家手动操作
 
    【完成任务】
    将任务从活跃移到已完成，并应用奖励：
-   [{"op":"remove","path":"/玩家/任务系统/活跃任务/任务名"},{"op":"add","path":"/玩家/任务系统/已完成任务/任务名","value":{"任务名":"...","状态":"已完成",...}}]
+   {"remove":"玩家.任务系统.活跃任务.任务名","because":"…"},{"set":"玩家.任务系统.已完成任务.任务名","value":{"任务名":"...","状态":"已完成",...},"because":"…"}
 
    【失败任务】
-   [{"op":"remove","path":"/玩家/任务系统/活跃任务/任务名"},{"op":"add","path":"/玩家/任务系统/已失败任务/任务名","value":{"任务名":"...","状态":"已失败",...}}]
+   {"remove":"玩家.任务系统.活跃任务.任务名","because":"…"},{"set":"玩家.任务系统.已失败任务.任务名","value":{"任务名":"...","状态":"已失败",...},"because":"…"}
 
    【★ 每轮检查时机 ★】
    每轮回复时必须检查：
@@ -746,10 +762,10 @@ ${hasStatModule ? `   ★ 数值属性模块已启用，所有属性变化通过
 
 6. 模块数据（如果世界启用了模块）
    - 数值属性通过 玩家.生存状态 更新（见下方规则）
-   - 成长体系通过 玩家.当前段位索引/当前经验值 更新
-   - 生存资源通过 玩家.生存资源 更新
+   - 经验与段位由本地成长规则结算，不要写 玩家.当前经验值 / 玩家.当前段位索引；任务完成时把任务移入已完成任务即可，经验会自动发放
+   - 物资、商号等模块按下方规则写变量或发命令
    - 只更新发生变化的字段，未变化的不要输出
-${generateModuleUpdateRules(worldSystem, progressionConfig)}
+${generateModuleUpdateRules(worldSystem, progressionConfig, gameplay)}
 
 ═══════════════════════════════════════
 【禁止事项】
@@ -761,7 +777,7 @@ ${generateModuleUpdateRules(worldSystem, progressionConfig)}
 6. ★ 禁止混淆角色口吻 ★：每个NPC的当前想法必须是该角色独有的视角、语气和对主角的称呼。角色A的想法里不能出现角色B的称呼方式或视角
 
 【示例输出】（注意：创建新NPC时才设置初始好感度，更新已有NPC时仅在发生关系事件后才更新好感度）
-<UpdateVariable>{"id":"npc-arrival-1","source":"ai","label":"记录神秘老者登场","effects":[{"set":{"path":"人物档案.神秘老者","value":{"姓名":"神秘老者","种族":"人类","性别":"男","年龄":80,"人物分类":"在场","社会身份":{"职业":"智者"},"关系数据":{"好感度":0,"关系类型":"初次见面"}${npcStatExample ? `,"生存状态":${npcStatExample}` : ''},"个人信息":{"外貌":"白发苍苍的老者，银丝般的胡须垂至胸前","表性格":"温和、睿智","当前想法":"终于等到了预言中的勇者，不知他是否真能拯救这片大陆……","当前状态":"微笑着注视着你","当前穿着":"深蓝色长袍，上面绣着银色星辰图案"},"当前行动":"向勇者走来","人物事迹":["在城门口与玩家初次相遇"]}}}]}</UpdateVariable>
+<UpdateVariable>{"intents":[{"set":"人物档案.神秘老者","because":"老者在城门口现身","value":{"姓名":"神秘老者","种族":"人类","性别":"男","年龄":80,"人物分类":"在场","社会身份":{"职业":"智者"},"关系数据":{"好感度":0,"关系类型":"初次见面"}${npcStatExample ? `,"生存状态":${npcStatExample}` : ''},"个人信息":{"外貌":"白发苍苍的老者，银丝般的胡须垂至胸前","表性格":"温和、睿智","当前想法":"终于等到了预言中的勇者，不知他是否真能拯救这片大陆……","当前状态":"微笑着注视着你","当前穿着":"深蓝色长袍，上面绣着银色星辰图案"},"当前行动":"向勇者走来","人物事迹":["在城门口与玩家初次相遇"]}}]}</UpdateVariable>
 【最终输出门禁】
-再次确认：输出只能是上面的 GameplayTransaction。不要输出旧的“设置/世界/玩家/人物档案”对象、RFC 6902 数组、chronicleOperations 或任何裸字段合并。即使上方规则用旧字段展示业务语义，也必须把它们翻译成 effects 中的点号路径后再输出。`;
+再次确认：输出只能是 {"intents":[…]}，每条意图一个动词（set / add / append / remove${gameplay?.commands ? ' / command' : ''}）加 because。不要输出“设置/世界/玩家/人物档案”对象、RFC 6902 数组、chronicleOperations 或任何裸字段合并。`;
 }

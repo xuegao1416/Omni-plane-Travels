@@ -50,7 +50,7 @@ export default function ConnectionTest({ testing, testResult, testSuccess, onTes
           style={{
             padding: '8px 28px', fontSize: 'var(--font-size-md)', fontWeight: '600', whiteSpace: 'nowrap',
             border: 'none', borderRadius: '8px', cursor: 'pointer',
-            background: 'var(--accent)', color: '#fff',
+            background: 'var(--accent)', color: '#2a1a04',
           }}
         >
           保存配置

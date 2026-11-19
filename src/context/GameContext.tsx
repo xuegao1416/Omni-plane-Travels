@@ -1,4 +1,5 @@
 import { createContext,useContext,useReducer,useCallback,useEffect,useRef,useMemo,type ReactNode } from 'react';
+import { getDevScreenshotTarget } from '../dev/screenshotPreset';
 import { useGameEngine } from '../engine/useGameEngine';
 import type { GameEngine } from '../engine/types';
 import type { GameSave,PlayerProfile } from '../storage/db';
@@ -42,8 +43,9 @@ type Action =
   | { type: 'LOAD_SAVE'; save: GameSave }
   | { type: 'CLEAR_SAVE_DATA' };
 
+const DEV_SCREENS: Record<string, Screen> = { settings: 'settings', events: 'events', user: 'user-center' };
 const initialState: AppState = {
-  currentScreen: 'start',
+  currentScreen: DEV_SCREENS[getDevScreenshotTarget() ?? ''] ?? 'start',
   screenHistory: [],
   selectedWorld: 'default',
   personalInfo: null,

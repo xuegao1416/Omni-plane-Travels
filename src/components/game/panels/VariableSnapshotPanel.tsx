@@ -10,7 +10,7 @@ import { RollbackConfirm } from './variableSnapshot/RollbackConfirm';
 import { importCurrentVariableJSON, prepareCurrentVariableJSON, resolveCurrentRollbackIndex } from './variableSnapshot/currentVariableActions';
 import { STORAGE_KEYS } from '../../../config/storageKeys';
 import type { GameplayLogEntry } from '../../../gameplay/types';
-import { revertGameplayTransaction } from '../../../gameplay/kernel';
+import { revertTransaction } from '../../../core/transaction';
 
 const GAMEPLAY_LOG_LIMIT = 20;
 
@@ -99,10 +99,10 @@ function GameplayLogSection({
     if (!accepted || !alive.current || onIsCurrent && !onIsCurrent()) return;
 
     const state = varMgr.getState();
-    const result = revertGameplayTransaction(state, log.transactionId, {
+    const result = revertTransaction(state, log.transactionId, {
       tick: state.simulationRuntime?.tick ?? 0,
     });
-    // 即使撤销被阻止，也保留内核产生的审计日志，让玩家能看到原因。
+    // 即使撤销被阻止，也保留这次尝试的审计日志，让玩家能看到原因。
     try {
       if (!await onCommitState(result.state as GameState)) { await alert('当前行动仍在处理或旅程已变化，撤销未应用。', { title: '撤销未完成' }); return; }
     } catch {

@@ -1,6 +1,8 @@
 import type { GameState } from '../schema/variables';
-import { createGameplayStateDiff, executeGameplayTransaction, getGameplayPath } from '../gameplay/kernel';
-import type { GameplayCost, GameplayEffect, GameplayValue } from '../gameplay/types';
+import { getGameplayPath, stateDiffOps } from '../core/state';
+import { commitTransaction } from '../core/transaction';
+import type { Op } from '../core/ops';
+import type { GameplayCost } from '../gameplay/types';
 import { executeCustomModuleActions } from './actionExecutor';
 import { buildCustomModuleHostContext, type CustomModuleHostContext } from './context';
 import { buildV2Operands, evaluateV2Condition, type CustomModuleLifecycle } from './runtime';
@@ -17,7 +19,7 @@ export interface CustomModuleGameExecutionOptions {
 }
 export interface CustomModuleGameExecutionResult { gameState: GameState; applied: number; warnings: string[] }
 
-/** Host capabilities are lowered here; model-provided paths never enter the gameplay kernel. */
+/** 宿主能力在这里落成效果；模型给出的路径不会直接进入事务。 */
 export function executeCustomModuleInGame(
   source: GameState, definition: CustomGameplayModuleDefinition, lifecycle: CustomModuleLifecycle,
   options: CustomModuleGameExecutionOptions,
@@ -61,7 +63,7 @@ export function executeCustomModuleInGame(
     if (changed.warnings.length) { warnings.push(...changed.warnings); continue; }
     const costs = new Map<string, GameplayCost>();
     const grants = new Map<string, { amount: number; max?: number }>();
-    const effects: GameplayEffect[] = [];
+    const effects: Op[] = [];
     const initializedItems = new Set<string>();
     let invalid: string | undefined;
     for (const action of rule.actions.filter((action): action is CustomModuleHostAction => 'amount' in action)) {
@@ -71,17 +73,25 @@ export function executeCustomModuleInGame(
         const item = module.items[action.itemId];
         path = `玩家.物品栏.${item.name}.数量`;
         if (action.type === 'item.grant' && !gameState.玩家.物品栏[item.name] && !initializedItems.has(item.name)) {
-          effects.push({ set: { path: `玩家.物品栏.${item.name}`, value: {
+          effects.push({ op: 'set', path: `玩家.物品栏.${item.name}`, value: {
             数量: 0, 类型: item.category ?? '物品', 品质: '普通', 备注: item.description ?? '',
             ...(item.weight === undefined ? {} : { 重量: item.weight }),
-          } } });
+          } });
           initializedItems.add(item.name);
         }
       } else if ('resourceId' in action) {
-        path = `玩家.生存资源.${action.resourceId}.数量`;
-        const resource = gameState.玩家.生存资源?.[action.resourceId];
-        if (!resource) { invalid = `生存资源不存在：${action.resourceId}`; break; }
-        max = resource.最大值;
+        if (gameState.resources) {
+          // 资源模块：库存在 resources.stocks，上限在 resources.capacity。
+          const ledger = gameState.resources;
+          if (!(action.resourceId in ledger.stocks) || ledger.retired?.includes(action.resourceId)) { invalid = `生存资源不存在：${action.resourceId}`; break; }
+          path = `resources.stocks.${action.resourceId}`;
+          max = ledger.capacity?.[action.resourceId];
+        } else {
+          path = `玩家.生存资源.${action.resourceId}.数量`;
+          const resource = gameState.玩家.生存资源?.[action.resourceId];
+          if (!resource) { invalid = `生存资源不存在：${action.resourceId}`; break; }
+          max = resource.最大值;
+        }
       } else path = '玩家.货币资源.主货币.数量';
       if (action.type.endsWith('.consume')) {
         const cost = costs.get(path) ?? { path, amount: 0 };
@@ -97,7 +107,7 @@ export function executeCustomModuleInGame(
     for (const [path, grant] of grants) {
       const current = Number(getGameplayPath(gameState, path) ?? 0);
       if (!Number.isFinite(current + grant.amount)) { invalid = `资源数量溢出：${path}`; break; }
-      effects.push({ add: { path, delta: grant.amount, ...(grant.max === undefined ? {} : { max: grant.max }) } });
+      effects.push({ op: 'add', path, value: grant.amount, ...(grant.max === undefined ? {} : { max: grant.max }) });
     }
     if (invalid) { warnings.push(invalid); continue; }
     changed.nextState.runtime.lastLifecycle = lifecycle;
@@ -107,11 +117,11 @@ export function executeCustomModuleInGame(
     // after entry makes long director histories grow by megabytes per turn.
     const beforeModule: Pick<GameState, 'customModules'> = { customModules: { [module.id]: runtimeState } };
     const afterModule: Pick<GameState, 'customModules'> = { customModules: { [module.id]: changed.nextState } };
-    effects.push(...createGameplayStateDiff(beforeModule, afterModule));
-    const transaction = executeGameplayTransaction(gameState, {
+    effects.push(...stateDiffOps(beforeModule, afterModule));
+    const transaction = commitTransaction(gameState, {
       id: `custom:${module.id}:${key}`, moduleId: module.id, source: 'custom-module',
-      costs: [...costs.values()], effects,
-    }, { tick: gameState.simulationRuntime?.tick ?? 0, bestEffort: false });
+      costs: [...costs.values()], ops: effects,
+    });
     if (transaction.status !== 'applied') { warnings.push(transaction.reason ?? '模块规则执行失败'); continue; }
     gameState = transaction.state;
     applied += rule.actions.length;

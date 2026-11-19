@@ -322,20 +322,6 @@ export interface BackgroundProposalOptions {
   signal?: AbortSignal;
 }
 
-export interface MechanicsSettlement {
-  nextMechanics?: NonNullable<SimulationState['mechanics']>;
-  gameState: import('../schema/variables').GameState;
-  mechanicalEffects: import('../modules/schema').ModuleEffects;
-  effectLog: import('../modules/schema').EffectLogEntry[];
-  settled: boolean;
-  notifications: MechanicalNotifications;
-}
-
-export interface MechanicalNotifications {
-  eventCards: Array<{ eventId: string; eventPackId: string }>;
-  combatRequests: import('../gameplay/protocols').CombatEncounterRequest[];
-}
-
 /** NPC 摘要（全量角色名录，供演化 AI 参考） */
 export interface OffscreenNpcSummary {
   npcId: string;

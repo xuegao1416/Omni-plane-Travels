@@ -1,5 +1,6 @@
 // IndexedDB 存储层
 import { openDB, type IDBPDatabase } from 'idb';
+import { ENGINE_VERSION, isNewerEngine, newerEngineMessage } from '../config/version';
 import { cloneSnapshotWithSharing } from '../utils/snapshotSharing';
 import { mapStorageBatch } from './mapStorageBatch';
 import { encodeStorageValue, decodeStorageValue, type StorageEncoding } from './storageCodec';
@@ -720,6 +721,8 @@ export interface CompactSaveRecord {
   name: string;
   timestamp: number;
   schemaVersion: number;
+  /** 玩法数据版本（见 config/version.ts 的 ENGINE_VERSION）；旧存档没有这个字段。 */
+  engineVersion?: number;
   round: number;
   gameState: GameState;
   worldId: string;
@@ -754,6 +757,7 @@ export async function loadSaveWithMigration(saveId: string): Promise<GameSave | 
   const db = await getDB();
   let record = await db.get(SAVES_STORE, saveId);
   if (!record) return null;
+  if (isNewerEngine(record.engineVersion)) throw new Error(newerEngineMessage(record.engineVersion));
   const schemaVersion = record.schemaVersion ?? 0;
   if (schemaVersion !== SAVE_SCHEMA_VERSION && schemaVersion !== SAVE_SCHEMA_VERSION - 1) return null;
   if ('messages' in record) return null;
@@ -857,6 +861,7 @@ export async function saveGameIncremental(
     const fullHead: CompactSaveRecord = {
       ...encodedHead,
       schemaVersion: SAVE_SCHEMA_VERSION,
+      engineVersion: ENGINE_VERSION,
       messageCount: await messageStore.index('saveId').count(saveId),
       lastMessageSeq: last?.value.seq ?? -1,
     };
@@ -1058,9 +1063,12 @@ export async function exportSaveCapture(capture: GameSave): Promise<Blob> {
   const exportData = {
     type: SAVE_EXPORT_TYPE,
     version: SAVE_EXPORT_VERSION,
+    // 外壳格式仍是 2.0；玩法数据版本单独标注，旧客户端不认识这个字段时照常导入，新版本据此拒绝读更新的存档。
+    engineVersion: ENGINE_VERSION,
     exportedAt: Date.now(),
     save: {
       ...record,
+      engineVersion: ENGINE_VERSION,
       memoryRuntime: record.memoryRuntime ? slimMemoryRuntimeForSave(record.memoryRuntime) : undefined,
       directorDefinitions: await (await import('../director/dependencies')).collectDirectorDependencies(record),
       lifecycle: record.lifecycle === 'ended' ? 'ended' : 'active',
@@ -1130,6 +1138,8 @@ async function performSaveImport(rawData: any): Promise<SaveMeta> {
   if (exportVersion !== SAVE_EXPORT_VERSION && exportVersion !== PREVIOUS_SAVE_EXPORT_VERSION) {
     throw new Error(`不支持的导出存档版本 ${exportVersion || '(missing)'}；当前仅支持 ${SAVE_EXPORT_VERSION} 与直接上一代 ${PREVIOUS_SAVE_EXPORT_VERSION}`);
   }
+  const engineVersion = rawData.engineVersion ?? rawData.save.engineVersion;
+  if (isNewerEngine(engineVersion)) throw new Error(newerEngineMessage(engineVersion));
 
   const save = rawData.save;
   if (!save.messages && !save.gameState) {

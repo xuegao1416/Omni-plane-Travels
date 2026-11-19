@@ -4,6 +4,7 @@ import type { ProfessionDef } from '../../../modules/schema';
 import OverlayPortal from '../../shared/OverlayPortal';
 import { EntrySlicedButton } from '../EntrySurface';
 import TarotCard from './TarotCard';
+import '../../../ui/screens/ritual-overlays.css';
 
 interface ProfessionTarotOverlayProps {
   professions: ProfessionDef[];

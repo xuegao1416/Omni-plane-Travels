@@ -4,6 +4,7 @@ import { Collapsible } from '../../../shared/Collapsible';
 import { ExcelRow } from '../../../shared/ExcelRow';
 import { getDefaultPortraitSource } from '../../../start/PortraitEditor';
 import { useSaveStore } from '../../../../stores/saveStore';
+import { useUITheme } from '../../../../hooks/useUITheme';
 import type { GameState } from './types';
 import type { PlayerProfile } from '../../../../storage/db';
 
@@ -15,6 +16,7 @@ interface Props {
 export function IdentitySection({ player, hasBusinessModule }: Props) {
   const [portraitUrl, setPortraitUrl] = useState<string>('');
   const currentSaveId = useSaveStore(s => s.currentSaveId);
+  const uiTheme = useUITheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +43,7 @@ export function IdentitySection({ player, hasBusinessModule }: Props) {
     }
 
     return () => { cancelled = true; };
-  }, [player.性别, currentSaveId]);
+  }, [player.性别, currentSaveId, uiTheme]);
 
   return (
     <>

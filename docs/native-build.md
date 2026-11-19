@@ -66,9 +66,13 @@ bun run tauri:android:dev
 
 ## 自动构建
 
-推送 `v*` 标签或手动触发 `.github/workflows/release.yml` 时：
+`scripts/release-metadata.ts` 会检测 `src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 是否同时存在：两者都在时输出 `native=true`，缺失时输出 `native=false` 并跳过原生任务（只存在其中一个会直接抛错）。原生任务通过 `if: needs.prepare-release.outputs.native == 'true'` 门控。
 
-- Windows job 创建 Tauri NSIS 发布草稿。
-- Android job 生成可安装的 ARM64 debug APK，并作为 GitHub Actions artifact 上传。
+`publish` 工作流（`.github/workflows/release.yml`）目前只声明了 `workflow_dispatch` 手动触发——**没有 `push: tags: v*` 触发器**；如需推标签自动发版需先补上该 trigger。工作流包含四个 job：
+
+- `prepare-release`：跑 `bun scripts/release-metadata.ts` 校验版本号与 CHANGELOG 一致性，输出 `version` / `native`。
+- `build-web`：typecheck → `bun test` → `bun run build`，把 Web 产物打 zip 上传为 artifact，并创建/更新 draft release。
+- `publish-tauri`（`windows-latest`）：用 `tauri-apps/tauri-action@v0` 构建 NSIS 安装包，`releaseDraft: true` 发布为草稿。
+- `build-android`（`ubuntu-latest`）：安装 JDK 17 + `platforms;android-36` + `build-tools;36.0.0` + `ndk;27.2.12479018`，跑 `tauri:android:init` 与 `tauri:android:build:debug`，把 `src-tauri/gen/android/app/build/outputs/apk/**/*.apk` 作为 artifact `omni-plane-travels-android-arm64-debug` 上传。
 
 正式商店分发前仍需配置 Android release keystore；调试 APK 不用于商店上架。

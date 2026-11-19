@@ -174,6 +174,17 @@ export function deleteNpcTemplate(id: string) {
   writeJSON(NPC_KEY, templates);
 }
 
+/** 按 id 写入模板（存在则原地替换）。创意工坊更新已安装的模板时用，避免重复。返回之前的模板。 */
+export function putNpcTemplate(template: NpcTemplate): NpcTemplate | undefined {
+  const templates = getNpcTemplates();
+  const index = templates.findIndex(t => t.id === template.id);
+  const previous = index >= 0 ? templates[index] : undefined;
+  if (index >= 0) templates[index] = template;
+  else templates.push(template);
+  writeJSON(NPC_KEY, templates);
+  return previous;
+}
+
 /** 从模板导入NPC（重新生成 id） */
 export function importNpcFromTemplate(template: NpcTemplate): CustomNpc {
   return { ...template.npc, id: uuid() };

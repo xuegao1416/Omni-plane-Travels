@@ -91,9 +91,16 @@ function planApplication(head: CompactSaveRecord, input: CustomGameplayModuleDef
     const delta = item.数量 - (before.玩家.物品栏[name]?.数量 ?? 0);
     if (delta) changes.push(`物品「${name}」：${delta > 0 ? '+' : ''}${delta}`);
   }
-  for (const [id, resource] of Object.entries(nextGameState.玩家.生存资源 ?? {})) {
-    const delta = resource.数量 - (before.玩家.生存资源?.[id]?.数量 ?? 0);
-    if (delta) changes.push(`资源「${id}」：${delta > 0 ? '+' : ''}${delta}`);
+  if (nextGameState.resources) {
+    for (const [id, amount] of Object.entries(nextGameState.resources.stocks ?? {})) {
+      const delta = Number(amount) - Number(before.resources?.stocks?.[id] ?? 0);
+      if (delta) changes.push(`资源「${id}」：${delta > 0 ? '+' : ''}${delta}`);
+    }
+  } else {
+    for (const [id, resource] of Object.entries(nextGameState.玩家.生存资源 ?? {})) {
+      const delta = resource.数量 - (before.玩家.生存资源?.[id]?.数量 ?? 0);
+      if (delta) changes.push(`资源「${id}」：${delta > 0 ? '+' : ''}${delta}`);
+    }
   }
   return { saveId: head.id, saveName: head.name, worldId: head.worldId, module, baseRevision: revision(head), baseModuleRevision: moduleRevision(records), changes, conflicts, nextGameState };
 }

@@ -10,7 +10,13 @@ export interface EntrySlicedButtonProps extends ButtonHTMLAttributes<HTMLButtonE
   children: ReactNode;
 }
 
-/** Entrance controls use the current responsive Dawn V4 frame. */
+/** Map the historical tone / legacy btn-* class onto a planar kit button variant. */
+function kitVariant(tone: 'primary' | 'quiet', className: string) {
+  if (/btn-primary/.test(className) || (tone === 'primary' && !/btn-secondary/.test(className))) return 'pk-btn--primary';
+  return 'pk-btn--secondary';
+}
+
+/** Entrance controls are planar kit buttons; the class contract stays for layout hooks. */
 export function EntrySlicedButton({
   icon: Icon,
   emblemSrc,
@@ -33,7 +39,7 @@ export function EntrySlicedButton({
     <button
       {...buttonProps}
       type={type}
-      className={`entry-sliced-button entry-sliced-button--${tone} entry-sliced-button--dawn entry-sliced-button--dawn-v4${isCompactFrame ? ' entry-sliced-button--compact' : ''}${className ? ` ${className}` : ''}`}
+      className={`entry-sliced-button entry-sliced-button--${tone}${isCompactFrame ? ' entry-sliced-button--compact' : ''} pk-btn ${kitVariant(tone, className)}${className ? ` ${className}` : ''}`}
     >
       {isCompactFrame ? content : (
         <DawnFrameV4
@@ -44,29 +50,5 @@ export function EntrySlicedButton({
         </DawnFrameV4>
       )}
     </button>
-  );
-}
-
-export function EntrySlicedProgress({ value }: { value: number }) {
-  const safeValue = Math.max(0, Math.min(1, value));
-  return (
-    <div
-      className="entry-sliced-progress"
-      role="progressbar"
-      aria-label="晶界接入进度"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(safeValue * 100)}
-    >
-      <span className="entry-sliced-progress__track entry-sliced-progress__track--left" aria-hidden="true" />
-      <span className="entry-sliced-progress__track entry-sliced-progress__track--middle" aria-hidden="true" />
-      <span className="entry-sliced-progress__track entry-sliced-progress__track--right" aria-hidden="true" />
-      <span className="entry-sliced-progress__fill" style={{ width: `${safeValue * 100}%` }}>
-        <span className="entry-sliced-progress__fill-piece entry-sliced-progress__fill-piece--left" aria-hidden="true" />
-        <span className="entry-sliced-progress__fill-piece entry-sliced-progress__fill-piece--middle" aria-hidden="true" />
-        <span className="entry-sliced-progress__fill-piece entry-sliced-progress__fill-piece--right" aria-hidden="true" />
-        <span className="entry-sliced-progress__sweep" aria-hidden="true" />
-      </span>
-    </div>
   );
 }

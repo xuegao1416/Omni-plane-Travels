@@ -1,5 +1,34 @@
 import { describe, expect, test } from 'bun:test';
-import { normalizeProgressionConfig } from './buildPipeline';
+import { generateModuleData, normalizeProgressionConfig, parseModuleJSON } from './buildPipeline';
+
+describe('模块初始数据：生成 → 校验 → 修复', () => {
+  const island = (resources: unknown[]) => JSON.stringify({ description: '荒岛', resources, rules: { cycleName: '一天', consumePerCycle: '每天 1 水', criticalThreshold: 2 } });
+  const water = { id: 'water', name: '淡水', symbol: '💧', amount: 3, max: 10, scarce: true, description: '' };
+
+  test('校验错误交回 AI 修一次，采用修好的版本', async () => {
+    const calls: Array<Array<{ role: string; content: string }>> = [];
+    const replies = [island([water, { ...water, name: '雨水' }]), island([water, { ...water, id: 'rain', name: '雨水' }])];
+    const progress: string[] = [];
+    const result = await generateModuleData<{ resources: Array<{ id: string }> }>('survival', '生成生存资源', async messages => { calls.push(messages); return replies.shift()!; }, (_stage, detail) => progress.push(detail));
+    expect(result?.value.resources.map(item => item.id)).toEqual(['water', 'rain']);
+    expect(result?.repaired).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(calls[1].at(-1)?.content).toContain('resources[1].id：id「water」重复');
+    expect(progress.some(line => line.includes('正在请 AI 修正'))).toBe(true);
+  });
+
+  test('格式两次都坏时返回空（调用方用默认值）；合格数据没有错误', async () => {
+    expect(await generateModuleData('stat', '生成', async () => '抱歉，我无法生成')).toBeNull();
+    const broken = JSON.stringify({ attrA: { name: '生命', max: 100 }, attrB: { name: '能量', max: 100 }, special: [] });
+    const result = await generateModuleData('stat', '生成', async () => broken);
+    expect(result?.issues.filter(issue => issue.level === 'error')).toEqual([]);
+  });
+
+  test('解析容忍代码块、尾逗号与全角结构引号；正文里的“”引用保持原样', () => {
+    expect(parseModuleJSON('好的：\n```json\n{“a”: 1,}\n```')).toEqual({ a: 1 });
+    expect(parseModuleJSON('{"description": "他说“快跑”。",}')).toEqual({ description: '他说“快跑”。' });
+  });
+});
 import { normalizeModule } from './normalizeModule';
 import type { ProgressionModuleSchema } from './schema';
 

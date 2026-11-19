@@ -8,7 +8,9 @@ import type { CombatEncounterRequest } from '../gameplay/protocols';
 export async function runTurnVariableExtraction(params: Parameters<typeof runVariableExtraction>[0]): Promise<void> {
   const state = params.varMgr.getState();
   const version = JSON.stringify(state);
-  const draft = new VariableManager(state, undefined, getTimeSystemFromWorld(findWorldDef(params.worldId)));
+  const world = params.varMgr.getBoundWorld() ?? findWorldDef(params.worldId);
+  const draft = new VariableManager(state, undefined, getTimeSystemFromWorld(world));
+  draft.bindWorld(world);
   const encounters: CombatEncounterRequest[] = [];
   const isCurrent = () => params.isCurrent?.() !== false && JSON.stringify(params.varMgr.getState()) === version;
   try {

@@ -2,6 +2,7 @@
 //  AI 合集生成器 — 选世界后一键生成事件+规则合集
 // ============================================================
 import { useCallback,useEffect,useRef,useState,useMemo } from 'react';
+import '../../ui/screens/event-workbench.css';
 import {
 ArrowLeft,Sparkles,Loader2,Check,AlertTriangle,
 RefreshCw,Wand2,BookOpen,ChevronDown,
@@ -9,12 +10,14 @@ RefreshCw,Wand2,BookOpen,ChevronDown,
 import { useIsPhone } from '../../hooks/useIsMobile';
 import { useConfigStore } from '../../stores/configStore';
 import { requestStreamWithRetry } from '../../api/client';
+import { generateWithRepair, parseJsonObject } from '../../api/generateWithRepair';
 import { getAllWorlds,findWorldDef } from '../../data/worldLoader';
 import type { WorldDef } from '../../data/worlds-schema';
 import type { EventIndexEntry,Manifest,CardWorkflowDefinition } from '../../modules/schema';
 import { putWebEvent } from '../../modules/eventDb';
 import type { WebEventRecord } from '../../modules/eventDb';
-import { buildCanonicalCardPackFiles,type CanonicalCardPackEvent } from '../../modules/webEventStore';
+import { buildGeneratedBundle, buildRepairMessage, generatorReference, validateGeneratedBundle, type GeneratedBundle } from '../../events/generatedBundle';
+import type { EventIssue } from '../../events/validate';
 import {
 buildEventGeneratorPrompt,
 buildEventGeneratorUserMessage,
@@ -27,6 +30,8 @@ interface GeneratedPreview {
   eventCount: number;
   ruleCount: number;
   nodeCount: number;
+  /** 修复后仍未解决的校验问题。 */
+  issues: string[];
 }
 
 export interface AiEventGeneratorProps {
@@ -170,7 +175,14 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
       }
     }
 
+    const reference = generatorReference(world);
+    for (const special of ((world.modules ?? []).find(item => item.moduleId === 'stat' && item.enabled)?.moduleConfig as { special?: Array<{ id?: string; name?: string }> } | undefined)?.special ?? []) {
+      if (special?.id && !statKeys.includes(special.id)) { statKeys.push(special.id); statNames[special.id] = special.name || special.id; }
+    }
     const options = {
+      variables: reference.variables,
+      commands: reference.commands,
+      domainEvents: reference.domainEvents,
       worldName: world.name,
       worldDescription: world.description,
       worldBookEntries: wbEntries,
@@ -188,30 +200,26 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
     const userMessage = buildEventGeneratorUserMessage(options);
 
     try {
-      const result = await requestStreamWithRetry(
-        apiConfig,
-        [
+      const stamp = Date.now();
+      const ids = { card: `ai-card-${stamp}`, rule: `ai-rule-${stamp}` };
+      // 生成 → 校验 → 修复：格式坏了或引用了本世界没有的东西，就把原因交回 AI 修一次，取错误更少的版本。
+      const { value: bundle, issues } = await generateWithRepair({
+        messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        {
+        request: async messages => (await requestStreamWithRetry(apiConfig, messages, {
           signal: controller.signal,
-          onDelta: (_delta, accumulated) => {
-            setStreamText(accumulated);
-          },
+          onDelta: (_delta, accumulated) => setStreamText(accumulated),
           maxTokens: 32768,
           responseFormat: 'json',
-        },
-      );
-
-      const text = result.text;
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('AI 未返回有效的 JSON 格式，请重试');
-      }
-
-      const data = JSON.parse(jsonMatch[0]);
-      await saveBundle(data, world);
+        })).text,
+        parse: text => buildGeneratedBundle(parseJsonObject(text), world, ids),
+        validate: candidate => validateGeneratedBundle(candidate, world),
+        repairPrompt: buildRepairMessage,
+        onRepair: ({ reason, detail }) => setStreamText(previous => `${previous}\n\n——${reason === 'format' ? `格式无法解析（${detail}）` : `校验发现 ${detail}`}，正在请 AI 修正……`),
+      });
+      await saveBundle(bundle, issues);
 
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -226,158 +234,28 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
   }, [apiConfig, selectedWorldId, extraRequest]);
 
   // ── 保存合集（事件包 + 规则包各一个） ──
-  const saveBundle = useCallback(async (data: Record<string, unknown>, world: WorldDef) => {
+  const saveBundle = useCallback(async (bundle: GeneratedBundle, issues: EventIssue[]) => {
     try {
-      const bundleName = (data.bundleName as string) || `${world.name} 内容合集`;
-      const events = (data.events as Array<Record<string, unknown>>) || [];
-      const rules = (data.rules as Array<Record<string, unknown>>) || [];
-      let totalNodes = 0;
-
-      // ── 1. 保存事件包 ──
-      const cardEvents: CanonicalCardPackEvent[] = events.map((event) => {
-        const entry: EventIndexEntry = {
-          id: (event.id as string) || `evt-${Math.random().toString(36).slice(2, 8)}`,
-          name: (event.name as string) || '未命名事件',
-        };
-        const generated = event.workflow as Record<string, unknown> | undefined;
-        if (!generated) {
-          throw new Error(`AI event ${entry.id} is missing workflow`);
-        }
-        const nodes = (generated.nodes as unknown[]) || [];
-        totalNodes += nodes.length;
-        const workflow: CardWorkflowDefinition = {
-          version: 1,
-          id: entry.id,
-          name: entry.name,
-          nodes: nodes as CardWorkflowDefinition['nodes'],
-          connections: (generated.connections as CardWorkflowDefinition['connections']) || [],
-        };
-        return { entry, workflow };
-      });
-
-      const cardPackId = `ai-card-${Date.now()}`;
-      const cardManifest: Manifest = {
-        id: cardPackId,
-        name: `${bundleName} - 事件`,
-        version: '1.0.0',
-        author: 'AI 生成',
-        description: `基于「${world.name}」由 AI 生成的事件合集`,
-        engine: 'opt-event',
-        schemaVersion: 1,
-        minAppVersion: '2.6.1',
-        type: 'card',
-        coverColor: '#8b5cf6',
-        icon: 'Sparkles',
-        enabledByDefault: false,
-        loadOrder: 100,
-        permissions: ['add_card'],
-        worldId: world.id,
-      };
-
-      const cardFiles: Record<string, string> = {
-        'manifest.json': JSON.stringify(cardManifest, null, 2),
-        ...buildCanonicalCardPackFiles(cardManifest.name, cardEvents),
-      };
-
       await putWebEvent({
-        id: cardPackId,
-        manifest: cardManifest,
-        enabled: false,
-        status: 'installed',
-        installedAt: new Date().toISOString(),
-        files: cardFiles,
+        id: bundle.card.id, manifest: bundle.card.manifest, enabled: false, status: 'installed',
+        installedAt: new Date().toISOString(), files: bundle.card.files,
       } as WebEventRecord);
-
-      setSavedCardPackId(cardPackId);
-
-      // ── 2. 保存规则包（合并为单个 workflow.json） ──
-      let rulePackId: string | null = null;
-      if (rules.length > 0) {
-        // 合并所有规则节点到一个工作流
-        const mergedNodes: Array<Record<string, unknown>> = [];
-        const mergedConnections: Array<Record<string, unknown>> = [];
-        let yOffset = 0;
-
-        for (let i = 0; i < rules.length; i++) {
-          const rule = rules[i];
-          const wf = rule.workflow as Record<string, unknown> | undefined;
-          if (wf) {
-            const nodes = (wf.nodes as Array<Record<string, unknown>>) || [];
-            const conns = (wf.connections as Array<Record<string, unknown>>) || [];
-            // 偏移每组节点的 y 坐标，避免重叠
-            const offsetNodes = nodes.map(n => {
-              const pos = n.position as { x: number; y: number } | undefined;
-              return {
-                ...n,
-                position: { x: pos?.x ?? 100, y: (pos?.y ?? 0) + yOffset },
-              };
-            });
-            mergedNodes.push(...offsetNodes);
-            mergedConnections.push(...conns);
-            totalNodes += nodes.length;
-            // 计算下一组的 y 偏移
-            const maxY = nodes.reduce((max, n) => {
-              const pos = n.position as { x: number; y: number } | undefined;
-              return Math.max(max, (pos?.y ?? 0) + 150);
-            }, 300);
-            yOffset += maxY;
-          }
-        }
-
-        const mergedWorkflow = {
-          version: 1,
-          id: `rule-wf-${Date.now().toString(36)}`,
-          name: bundleName,
-          nodes: mergedNodes,
-          connections: mergedConnections,
-        };
-
-        rulePackId = `ai-rule-${Date.now()}`;
-        const ruleManifest: Manifest = {
-          id: rulePackId,
-          name: `${bundleName} - 规则`,
-          version: '1.0.0',
-          author: 'AI 生成',
-          description: `基于「${world.name}」由 AI 生成的规则合集`,
-          engine: 'opt-event',
-          schemaVersion: 1,
-          minAppVersion: '2.6.1',
-          type: 'rule',
-          coverColor: '#f59e0b',
-          icon: 'Zap',
-          enabledByDefault: false,
-          loadOrder: 100,
-          permissions: ['read_world_state', 'modify_world_state'],
-          rules: [],
-          worldId: world.id,
-        };
-
-        const ruleFiles: Record<string, string> = {
-          'manifest.json': JSON.stringify(ruleManifest, null, 2),
-          'schema/rules.json': JSON.stringify({ version: 1, rules: [], periodicRules: [] }, null, 2),
-          'schema/workflow.json': JSON.stringify(mergedWorkflow, null, 2),
-        };
-
+      setSavedCardPackId(bundle.card.id);
+      if (bundle.rule) {
         await putWebEvent({
-          id: rulePackId,
-          manifest: ruleManifest,
-          enabled: false,
-          status: 'installed',
-          installedAt: new Date().toISOString(),
-          files: ruleFiles,
+          id: bundle.rule.id, manifest: bundle.rule.manifest, enabled: false, status: 'installed',
+          installedAt: new Date().toISOString(), files: bundle.rule.files,
         } as WebEventRecord);
-
-        setSavedRulePackId(rulePackId);
+        setSavedRulePackId(bundle.rule.id);
       }
-
       setPreview({
-        bundleName,
-        eventCount: events.length,
-        ruleCount: rules.length,
-        nodeCount: totalNodes,
+        bundleName: bundle.bundleName,
+        eventCount: bundle.eventCount,
+        ruleCount: bundle.ruleCount,
+        nodeCount: bundle.nodeCount,
+        issues: issues.slice(0, 12).map(issue => `${issue.level === 'error' ? '错误' : '提示'}：${issue.key.split('/').pop()}${issue.option !== undefined ? ` 第${issue.option + 1}个选项` : ''} ${issue.message}`),
       });
       setGenState('preview');
-
     } catch (err) {
       console.error('[AI生成] 保存失败:', err);
       setErrorMsg('保存失败：' + (err instanceof Error ? err.message : String(err)));
@@ -406,20 +284,18 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
 
   // ── 渲染 ──
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
+    <div className="pk-workbench" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 顶部栏 */}
-      <div style={{
+      <div className="pk-workbench__bar" style={{
         padding: isPhone ? 'var(--space-2) var(--space-3)' : 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        background: 'var(--bg-secondary)',
         flexShrink: 0,
       }}>
         <button onClick={onBack} className="btn-ghost btn-sm" title="返回">
           <ArrowLeft size={16} />
         </button>
         <Sparkles size={18} style={{ color: 'var(--accent)' }} />
-        <span style={{ fontWeight: 600, fontSize: isPhone ? 'var(--font-size-md)' : 'var(--font-size-lg)', fontFamily: 'var(--font-display)' }}>
+        <span className="pk-workbench__title" style={{ fontWeight: 600, fontSize: isPhone ? 'var(--font-size-md)' : 'var(--font-size-lg)' }}>
           AI 合集生成器
         </span>
       </div>
@@ -430,16 +306,13 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
         {genState === 'input' && (
           <div className="event-fade-in" style={{ maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {/* 说明 */}
-            <div style={{
-              background: 'var(--accent-dim)',
-              border: '1px solid var(--accent)',
-              borderRadius: 'var(--radius-md)',
+            <div className="pk-workbench__intro" style={{
               padding: 'var(--space-3) var(--space-4)',
               fontSize: 'var(--font-size-sm)',
               color: 'var(--text-secondary)',
               lineHeight: 1.6,
             }}>
-              <div style={{ fontWeight: 600, color: 'var(--accent)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Wand2 size={14} /> AI 合集生成器
               </div>
               选择一个世界，AI 会根据世界书自动生成一套包含事件和规则的完整内容合集。生成后可以直接导入使用，也可以在编辑器中修改。
@@ -459,8 +332,6 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
                     padding: '10px 12px',
                     paddingRight: 36,
                     borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-secondary)',
                     color: 'var(--text-primary)',
                     fontSize: 'var(--font-size-base)',
                     appearance: 'none',
@@ -608,6 +479,13 @@ export default function AiEventGenerator({ onBack, onSaved }: AiEventGeneratorPr
                 <span>⚡ 规则 <b>{preview.ruleCount}</b> 条</span>
                 <span>🔧 节点 <b>{preview.nodeCount}</b> 个</span>
               </div>
+              {preview.issues.length > 0 ? (
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', lineHeight: 1.6 }} aria-label="校验问题">
+                  {preview.issues.map(issue => <li key={issue}>{issue}</li>)}
+                </ul>
+              ) : (
+                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--success)' }}>已通过校验：属性、物资、命令与后续事件都能在这个世界找到。</div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>

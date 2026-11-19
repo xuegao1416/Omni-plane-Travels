@@ -1,32 +1,35 @@
-.btn {
-  width: var(--space-8);
-  height: var(--space-8);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .controls {
   display: flex;
-  gap: var(--space-1);
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--pk-well);
+  box-shadow: var(--pk-well-edge);
 }
 
+.btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(var(--d-gold, 233, 207, 150), .7);
+  cursor: pointer;
+  transition: color .2s, background .2s, transform .25s var(--pk-spring);
+}
+
+.btn:hover { color: rgb(var(--d-gold, 242, 212, 142)); background: rgba(var(--d-gold-bg, 233, 207, 150), .08); }
+.btn:active { transform: scale(.9); }
+.btn:focus-visible { outline: 2px solid rgba(var(--d-gold, 242, 212, 142), .8); outline-offset: 1px; }
+
 .scaleLabel {
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  padding: 0 6px;
-  line-height: 24px;
-  min-width: 36px;
+  min-width: 42px;
+  color: rgb(var(--d-gold, 227, 194, 126));
+  font: 600 11px/28px var(--pl-font-display, var(--pl-font-ui));
+  letter-spacing: .06em;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }

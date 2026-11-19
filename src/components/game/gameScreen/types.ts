@@ -7,5 +7,4 @@ export interface NavButton {
   id: OverlayPanel | 'home';
   icon: LucideIcon;
   labelKey: string;
-  emblemSrc?: string;
 }

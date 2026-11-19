@@ -80,7 +80,6 @@ export function DeedsModal({ npcId, chronicles: initialChronicles, onClose, onUp
       zIndex: 1100, animation: 'fadeIn 0.15s ease',
     }} onClick={close}>
       <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
-        borderRadius: 'var(--radius-lg)',
         width: '90%', maxWidth: '520px', maxHeight: '75vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>

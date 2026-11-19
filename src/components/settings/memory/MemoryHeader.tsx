@@ -51,7 +51,7 @@ export function MemoryHeader({ modeLabel, onToggleMode, compact }: Props) {
           color: 'var(--accent)', fontSize: compact ? 'var(--font-size-xs)' : 'var(--font-size-sm)', fontWeight: '600',
           cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = '#fff'; }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = '#2a1a04'; }}
         onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-dim)'; e.currentTarget.style.color = 'var(--accent)'; }}
       >
         <Repeat size={compact ? 11 : 13} /><span>{modeLabel}</span>

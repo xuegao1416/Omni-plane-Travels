@@ -11,8 +11,7 @@ Package,FileText,Zap,BookOpen,Boxes,Upload,Download,Eye,
 } from 'lucide-react';
 import * as eventApi from '../../modules/eventApi';
 import { useSaveStore } from '../../stores/saveStore';
-import { getWebEvent,allWebEvents } from '../../modules/eventDb';
-import { eventWorldEvolution } from '../../modules/eventIntegration';
+import { allWebEvents } from '../../modules/eventDb';
 import type { EventPackType,EventRegistryEntry,Collection } from '../../modules/schema';
 import EventPackPreview from './EventPackPreview';
 import type { WorldDef } from '../../data/worlds-schema';
@@ -140,38 +139,7 @@ export default function EventConfigPanel({
         setSessionActivePacks(sessionActivePacks.filter(x => x !== id));
       }
     }
-    // 立即注册/注销到 eventWorldEvolution（本局即时生效）
-    if (on) {
-      // 注册：读包内容并注册（异步，但不阻塞 UI）
-      getWebEvent(id).then(rec => {
-        if (!rec) return;
-        const rules: any[] = [];
-        const periodicRules: any[] = [];
-        let workflow: import('../../modules/workflowSchema').WorkflowDefinition | undefined;
-        // 优先读工作流格式
-        const wfRaw = rec.files['schema/workflow.json'];
-        if (typeof wfRaw === 'string') {
-          try { workflow = JSON.parse(wfRaw); } catch { /* 损坏 */ }
-        }
-        // 回退读规则格式
-        if (!workflow) {
-          const raw = rec.files['schema/rules.json'];
-          if (typeof raw === 'string') {
-            const rf = JSON.parse(raw);
-            if (rf.rules) rules.push(...rf.rules);
-            if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
-          }
-        }
-        eventWorldEvolution.registerPack({
-          eventPackId: id, rules, periodicRules, workflow,
-          permissions: rec.manifest.permissions ?? [],
-          runtime: { onceFired: {}, cooldownRemaining: {} },
-          source: rec.builtin ? 'world' : 'user',
-        });
-      }).catch(() => {});
-    } else {
-      eventWorldEvolution.unregisterPack(id);
-    }
+    // 游戏界面监听 sessionActivePacks，变化后重新加载事件目录，本局立即生效。
   };
 
   // 合集总开关：批量开关成员的 sessionActivePacks

@@ -18,7 +18,6 @@ import {
   stripTimeAdvanceTags,
   writeWorldClock,
 } from './worldClock';
-import { getBusinessSettlementPeriodKey } from './businessPeriod';
 
 describe('authoritative world clock v2', () => {
   test('stores only minimal runtime state and handles Gregorian leap days', () => {
@@ -264,6 +263,5 @@ describe('authoritative world clock v2', () => {
     const keys = getWorldClockPeriodKeys(clock, config);
     expect(keys.monthKey).toBe('month:3-4');
     expect(keys.weekKey).not.toBe(getWorldClockPeriodKeys(createWorldClock(config), config).weekKey);
-    expect(getBusinessSettlementPeriodKey('月', 'garbage', undefined, clock, config)).toBe('month:3-4');
   });
 });

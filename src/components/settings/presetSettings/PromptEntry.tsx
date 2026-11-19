@@ -36,7 +36,7 @@ export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onTog
           background: p.triggerMode === 'green' ? 'var(--success-dim)' : 'var(--accent-dim)',
           color: p.triggerMode === 'green' ? 'var(--success)' : 'var(--accent)',
         }}>
-          {p.triggerMode === 'green' ? '🟢 关键词' : '🔵 常驻'}
+          {p.triggerMode === 'green' ? '关键词' : '常驻'}
         </span>
 
         {/* 启用/禁用 */}
@@ -71,7 +71,7 @@ export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onTog
                 style={{
                   ...chipStyle,
                   background: p.role === r ? 'var(--accent)' : 'var(--bg-tertiary)',
-                  color: p.role === r ? '#fff' : 'var(--text-secondary)',
+                  color: p.role === r ? '#2a1a04' : 'var(--text-secondary)',
                 }}
               >{r}</button>
             ))}
@@ -86,18 +86,18 @@ export function PromptEntry({ entry: p, expanded, builtin, onToggleExpand, onTog
               style={{
                 ...chipStyle,
                 background: p.triggerMode !== 'green' ? 'var(--accent)' : 'var(--bg-tertiary)',
-                color: p.triggerMode !== 'green' ? '#fff' : 'var(--text-secondary)',
+                color: p.triggerMode !== 'green' ? '#2a1a04' : 'var(--text-secondary)',
               }}
-            >🔵 常驻</button>
+            >常驻</button>
             <button
               disabled={builtin}
               onClick={() => onUpdate({ triggerMode: 'green' })}
               style={{
                 ...chipStyle,
                 background: p.triggerMode === 'green' ? 'var(--success)' : 'var(--bg-tertiary)',
-                color: p.triggerMode === 'green' ? '#fff' : 'var(--text-secondary)',
+                color: p.triggerMode === 'green' ? '#0a0e1e' : 'var(--text-secondary)',
               }}
-            >🟢 关键词</button>
+            >关键词</button>
           </div>
 
           {/* 排序权重 */}

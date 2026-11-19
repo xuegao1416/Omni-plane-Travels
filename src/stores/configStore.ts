@@ -5,15 +5,15 @@ import { sealResult, unsealResult, isSealed } from '@/security/keyVault';
 
 // ─── 类型 ───
 
-export type Theme = 'light' | 'dark' | 'metal' | 'green';
 export type FontFamily = 'yahei' | 'source';
 export type FontSize = '小' | '中' | '大';
 export type LineHeight = '紧凑' | '舒适' | '宽松';
 export type Language = 'zh-CN' | 'en';
+/** 界面主题：night = 星仪夜色（默认），dawn = 晨雾琉璃（亮色）。字段名刻意不用已退役的 `theme`。 */
+export type UITheme = 'night' | 'dawn';
 
 export interface UISettings {
   language: Language;
-  theme: Theme;
   font: FontFamily;
   uiFontSize: FontSize;
   bodyFontSize: FontSize;
@@ -21,6 +21,7 @@ export interface UISettings {
   centeredNarrative: boolean;
   autoScroll: boolean;
   disableEffects: boolean;
+  uiTheme: UITheme;
 }
 
 // ─── 常量 ───
@@ -30,7 +31,6 @@ const API_STORAGE_KEY = STORAGE_KEYS.API_CONFIG;
 
 const DEFAULT_SETTINGS: UISettings = {
   language: 'zh-CN',
-  theme: 'light',
   font: 'yahei',
   uiFontSize: '中',
   bodyFontSize: '中',
@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: UISettings = {
   centeredNarrative: false,
   autoScroll: true,
   disableEffects: false,
+  uiTheme: 'night',
 };
 
 const FONT_MAP: Record<FontFamily, string> = {
@@ -61,7 +62,7 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.lineHeight': '正文行距', 'settings.centeredNarrative': '居中行文',
     'settings.centeredNarrative.desc': '将对话收拢到屏幕中央，减少宽屏阅读时的视线偏移', 'settings.autoScroll': '正文自动滚动',
     'settings.disableEffects': '关闭动态特效', 'settings.disableEffects.desc': '停用动画、模糊等 GPU 特效，显著降低手机发热与耗电',
-    'theme.light': '拂晓', 'theme.dark': '玄夜', 'theme.metal': '银灰', 'theme.green': '翠林',
+    'theme.night': '星仪夜色', 'theme.dawn': '晨雾琉璃', 'theme.desc': '夜色为深蓝夜空与黄铜，晨雾为雾青底、石板绿字与旧金点缀。',
     'font.yahei': '雅黑', 'font.source': '思源黑体',
     'settings.provider': 'Provider', 'settings.baseUrl': 'Base URL', 'settings.baseUrl.desc': 'API 端点地址',
     'settings.apiKey': 'API Key', 'settings.apiKey.desc': '密钥',
@@ -100,7 +101,7 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.lineHeight': 'Line Height', 'settings.centeredNarrative': 'Centered Reading',
     'settings.centeredNarrative.desc': 'Center the conversation in a comfortable reading column on wide screens', 'settings.autoScroll': 'Auto Scroll',
     'settings.disableEffects': 'Disable Visual Effects', 'settings.disableEffects.desc': 'Turn off animations and blur effects to reduce heat and battery drain on mobile',
-    'theme.light': 'Dawn', 'theme.dark': 'Nocturne', 'theme.metal': 'Silver', 'theme.green': 'Forest',
+    'theme.night': 'Planar Night', 'theme.dawn': 'Morning Mist', 'theme.desc': 'Night: deep sky and brass. Mist: fog-green paper, slate ink and old gold.',
     'font.yahei': 'YaHei', 'font.source': 'Source Han',
     'settings.provider': 'Provider', 'settings.baseUrl': 'Base URL', 'settings.baseUrl.desc': 'API endpoint URL',
     'settings.apiKey': 'API Key', 'settings.apiKey.desc': 'Secret key',
@@ -137,9 +138,6 @@ const translations: Record<Language, Record<string, string>> = {
 function applySettings(settings: UISettings) {
   const root = document.documentElement;
 
-  // 主题切换：设置 data-theme 属性，由 tokens.css [data-theme] 选择器驱动
-  root.dataset.theme = settings.theme;
-
   // 字体 & 排版（JS-only，CSS 无法用 CSS 变量引用另一个变量）
   root.style.setProperty('--font-family', FONT_MAP[settings.font]);
   root.style.setProperty('--font-display', "'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif");
@@ -152,6 +150,10 @@ function applySettings(settings: UISettings) {
   if (settings.disableEffects) root.dataset.effects = 'off';
   else delete root.dataset.effects;
 
+  // 界面主题：夜色为默认不写属性；亮色由 :root[data-ui-theme='dawn'] 覆盖变量
+  if (settings.uiTheme === 'dawn') root.dataset.uiTheme = 'dawn';
+  else delete root.dataset.uiTheme;
+
   root.lang = settings.language;
 }
 
@@ -160,7 +162,11 @@ function applySettings(settings: UISettings) {
 function loadUISettings(): UISettings {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+    if (saved) {
+      // Older saves carry a retired `theme` field; drop it so it never comes back.
+      const { theme: _retiredTheme, ...rest } = JSON.parse(saved) as Partial<UISettings> & { theme?: unknown };
+      return { ...DEFAULT_SETTINGS, ...rest };
+    }
   } catch (e) {
     console.warn('[configStore] loadUISettings 解析失败，使用默认值:', e);
   }

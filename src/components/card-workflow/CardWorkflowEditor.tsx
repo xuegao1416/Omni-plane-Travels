@@ -4,6 +4,8 @@
 //  用 isUserEditRef 标记区分「用户编辑」和「外部重置」，避免无限循环
 // ============================================================
 import { useCallback,useEffect,useMemo,useRef } from 'react';
+import { CARD_SOCKET_COLORS } from '../../modules/workflowSchema';
+import '../../ui/screens/event-workbench.css';
 import {
 ReactFlow,Background,Controls,MiniMap,ReactFlowProvider,
 useNodesState,useEdgesState,addEdge,
@@ -42,14 +44,10 @@ function getEdgeColor(socketKey: string, wf: CardWorkflowDefinition): string {
     if (!def) continue;
     const socket = def.outputs.find((s) => s.key === socketKey);
     if (socket) {
-      const colors: Record<string, string> = {
-        flow: '#a78bfa', number: '#60a5fa', string: '#34d399', boolean: '#fbbf24',
-        stat: '#38bdf8', resource: '#fb923c', flag: '#e879f9', any: '#94a3b8',
-      };
-      return colors[socket.type] ?? '#94a3b8';
+      return CARD_SOCKET_COLORS[socket.type as keyof typeof CARD_SOCKET_COLORS] ?? CARD_SOCKET_COLORS.any;
     }
   }
-  return '#94a3b8';
+  return CARD_SOCKET_COLORS.any;
 }
 
 function reactFlowToWorkflow(nodes: CardFlowNode[], edges: CardFlowEdge[], existing: CardWorkflowDefinition): CardWorkflowDefinition {
@@ -235,16 +233,15 @@ function CardWorkflowEditorInner({ workflow, onChange }: InnerProps) {
       fitView
       snapToGrid
       snapGrid={[16, 16]}
-      style={{ background: 'var(--bg-primary)' }}
     >
-      <Background gap={16} size={1} color="var(--border)" />
+      <Background gap={16} size={1} color="rgba(233, 207, 150, 0.14)" />
       <Controls />
       <MiniMap
         nodeColor={(n) => {
           const def = getCardNodeDefinition((n.data as unknown as CardNodeInstance).typeId);
-          return def?.color ?? '#94a3b8';
+          return def?.color ?? '#e3c27e';
         }}
-        style={{ background: 'var(--bg-secondary)' }}
+        maskColor="rgba(4, 6, 14, 0.62)"
       />
     </ReactFlow>
   );

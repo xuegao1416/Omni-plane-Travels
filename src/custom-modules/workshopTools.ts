@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { customGameplayModuleV3Schema } from './manifestSchema';
 import { buildCustomModuleCapabilityCatalog } from './capabilities';
 import { validateCustomGameplayModule } from './validator';
+import { checkCustomModuleWorldFit } from './worldFit';
 import { createDefaultGameState } from '../schema/variables';
 import { buildCustomModuleHostContext } from './context';
 import { simulateCustomModule } from './preview';
@@ -111,7 +112,10 @@ export function executeWorkshopTool(session: WorkshopSession, name: WorkshopTool
       workshopToolSchemas.validateDraft.parse(rawInput);
       if (!current) throw new Error('还没有模块草稿');
       const result = validateCustomGameplayModule(current);
-      return { session, output: { valid: result.valid, errors: result.errors, warnings: result.warnings, revision: session.currentRevision } };
+      const fit = result.normalized ? checkCustomModuleWorldFit(result.normalized, session.world) : [];
+      const errors = [...result.errors, ...fit.filter(issue => issue.severity === 'error')];
+      const warnings = [...result.warnings, ...fit.filter(issue => issue.severity === 'warning')];
+      return { session, output: { valid: errors.length === 0, errors, warnings, revision: session.currentRevision } };
     }
     case 'simulate': {
       const input = workshopToolSchemas.simulate.parse(rawInput);

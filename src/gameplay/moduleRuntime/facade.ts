@@ -18,14 +18,20 @@ export interface ProgressionPartitionState {
 }
 
 export interface SurvivalPartitionState {
+  /** v1：旧版生存资源原样保存。 */
   resources?: GameState['玩家']['生存资源'];
   recipes?: GameState['玩家']['生存配方'];
   runtime?: GameplaySurvivalRuntime;
+  /** v2：资源模块状态（gameState.resources）。 */
+  ledger?: GameState['resources'];
 }
 
 export interface BusinessPartitionState {
+  /** v1：旧版经营资产原样保存。 */
   assets?: GameState['玩家']['经营资产'];
   runtime?: GameplayBusinessRuntime;
+  /** v2：经营模块状态（gameState.economy）。 */
+  economy?: GameState['economy'];
 }
 
 export interface DicePartitionState {
@@ -59,12 +65,13 @@ function makeRecord<T extends ModulePartitionState>(
   saveId: string,
   moduleId: ModuleRuntimeId,
   state: T,
+  schemaVersion = 1,
 ): ModuleStateRecord<T> {
   return {
     saveId,
     moduleId,
     revision: 0,
-    schemaVersion: 1,
+    schemaVersion,
     updatedAt: Date.now(),
     state,
   };
@@ -73,8 +80,10 @@ function makeRecord<T extends ModulePartitionState>(
 export function moduleIdForGameplayPath(path: string): ModuleRuntimeId | undefined {
   if (path === '玩家.生存状态' || path.startsWith('玩家.生存状态.') || path === 'gameplay.stat' || path.startsWith('gameplay.stat.')) return 'stat';
   if (path === '玩家.当前段位索引' || path === '玩家.当前经验值' || path === '玩家.可用属性点') return 'progression';
-  if (path === '玩家.生存资源' || path.startsWith('玩家.生存资源.') || path === '玩家.生存配方' || path.startsWith('玩家.生存配方.') || path === 'gameplay.survival' || path.startsWith('gameplay.survival.')) return 'survival';
-  if (path === '玩家.经营资产' || path.startsWith('玩家.经营资产.') || path === 'gameplay.business' || path.startsWith('gameplay.business.')) return 'business';
+  if (path === '玩家.生存资源' || path.startsWith('玩家.生存资源.') || path === '玩家.生存配方' || path.startsWith('玩家.生存配方.') || path === 'gameplay.survival' || path.startsWith('gameplay.survival.')
+    || path === 'resources' || path.startsWith('resources.')) return 'survival';
+  if (path === '玩家.经营资产' || path.startsWith('玩家.经营资产.') || path === 'gameplay.business' || path.startsWith('gameplay.business.')
+    || path === 'economy' || path.startsWith('economy.')) return 'business';
   if (path === 'dice' || path.startsWith('dice.')) return 'dice';
   if (path === '玩家.能力系统' || path.startsWith('玩家.能力系统.') || path === '玩家.技能系统' || path.startsWith('玩家.技能系统.')) return 'profession';
   return undefined;
@@ -109,7 +118,14 @@ export function extractModulePartitions(state: GameState, saveId: string): Extra
     revisions.progression = 0;
   }
 
-  if (source.玩家.生存资源 !== undefined || source.玩家.生存配方 !== undefined || source.gameplay?.survival !== undefined) {
+  if (source.resources !== undefined) {
+    records.push(makeRecord(saveId, 'survival', { ledger: clone(source.resources) }, 2));
+    delete core.resources;
+    delete core.玩家.生存资源;
+    delete core.玩家.生存配方;
+    if (core.gameplay) delete core.gameplay.survival;
+    revisions.survival = 0;
+  } else if (source.玩家.生存资源 !== undefined || source.玩家.生存配方 !== undefined || source.gameplay?.survival !== undefined) {
     records.push(makeRecord(saveId, 'survival', {
       ...(source.玩家.生存资源 === undefined ? {} : { resources: clone(source.玩家.生存资源) }),
       ...(source.玩家.生存配方 === undefined ? {} : { recipes: clone(source.玩家.生存配方) }),
@@ -121,7 +137,13 @@ export function extractModulePartitions(state: GameState, saveId: string): Extra
     revisions.survival = 0;
   }
 
-  if (source.玩家.经营资产 !== undefined || source.gameplay?.business !== undefined) {
+  if (source.economy !== undefined) {
+    records.push(makeRecord(saveId, 'business', { economy: clone(source.economy) }, 2));
+    delete core.economy;
+    delete core.玩家.经营资产;
+    if (core.gameplay) delete core.gameplay.business;
+    revisions.business = 0;
+  } else if (source.玩家.经营资产 !== undefined || source.gameplay?.business !== undefined) {
     records.push(makeRecord(saveId, 'business', {
       ...(source.玩家.经营资产 === undefined ? {} : { assets: clone(source.玩家.经营资产) }),
       ...(source.gameplay?.business === undefined ? {} : { runtime: clone(source.gameplay.business) }),
@@ -174,11 +196,19 @@ export function materializeModulePartitions(
         if (partition.availableStatPoints !== undefined) state.玩家.可用属性点 = partition.availableStatPoints;
         break;
       case 'survival':
+        if (partition.ledger && partition.ledger.version === 2) {
+          state.resources = partition.ledger;
+          break;
+        }
         if (partition.resources !== undefined) state.玩家.生存资源 = partition.resources;
         if (partition.recipes !== undefined) state.玩家.生存配方 = partition.recipes;
         if (partition.runtime) (state.gameplay ??= {}).survival = partition.runtime;
         break;
       case 'business':
+        if (partition.economy && partition.economy.version === 2) {
+          state.economy = partition.economy;
+          break;
+        }
         if (partition.assets !== undefined) state.玩家.经营资产 = partition.assets;
         if (partition.runtime) (state.gameplay ??= {}).business = partition.runtime;
         break;

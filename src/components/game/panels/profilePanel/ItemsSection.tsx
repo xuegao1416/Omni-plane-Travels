@@ -38,7 +38,6 @@ export function ItemsSection({ items, variableManager }: Props) {
                     aspectRatio: '1',
                     padding: '6px 4px',
                     border: `1px solid ${qColor}40`,
-                    borderRadius: 'var(--radius-sm)',
                     background: `linear-gradient(135deg, ${qColor}08, ${qColor}03)`,
                     cursor: 'pointer',
                     transition: 'all 0.12s',
@@ -74,7 +73,6 @@ export function ItemsSection({ items, variableManager }: Props) {
                 style={{
                   aspectRatio: '1',
                   border: '1px dashed var(--border)',
-                  borderRadius: 'var(--radius-sm)',
                   background: 'var(--bg-primary)',
                 }}
               />

@@ -9,7 +9,7 @@
 ## 1. 行为准则（Code of Conduct）
 
 - 以尊重、建设性的方式交流；不接受骚扰、歧视、人身攻击。
-- 分享内容须遵守 [docs/content-policy.md](docs/content-policy.md)（NSFW 边界、合规要求）。
+- 分享内容须遵守 [docs/content-policy.md](docs/content-policy.md)（分享边界、合规要求）。
 - 争议以 Issue / Discussion 公开讨论解决，避免私下升级。
 
 ## 2. 提交流程

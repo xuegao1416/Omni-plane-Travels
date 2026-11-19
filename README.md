@@ -12,7 +12,7 @@
 [![Zustand](https://img.shields.io/badge/Zustand-5-3B3B3B)](https://zustand-demo.pmnd.rs/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-`v2.8.4` · Web / PWA · BYOK
+`v3.0.0` · Web / PWA · BYOK
 
 </div>
 
@@ -53,7 +53,7 @@
 - 独立卡片战场支持最多 4v4、每单位每轮一次行动、本地策略 AI、完整战前检查点和普通/困难/炼狱风险；整场机械结算结束后才调用一次主模型承接正文。
 - 自定义模块代理可根据世界需求生成、校验、保存、导出并发布受约束的玩法模块。
 - 事件包由事件卡、规则、周期规则和世界书组成，可导入、导出和按局启用。
-- 创意工坊支持世界包、玩法模块、事件/工作流包、冒险包和视觉主题，并提供分类、精选、热门、兼容版本与依赖检查。
+- 创意工坊支持世界包、NPC 模板、玩法模块、事件/工作流包、冒险包和视觉主题：搜索与六种排序、评分收藏、举报与管理员复核、版本历史、按依赖顺序安装并可回滚、更新提示与卸载（部署见 docs/workshop-ops.md）。
 - 基于 React Flow 的类型化工作流编辑器与确定性规则解释器。
 - AI 合集生成器可按世界生成事件、规则与世界书合集。
 
@@ -161,13 +161,11 @@ public/art/             世界、UI、图标与大厅视觉素材
 ### 安装与启动
 
 ```bash
-git clone https://github.com/xuegao1416/Omni-plane-Travels.git
-cd Omni-plane-Travels
 bun install
 bun run dev
 ```
 
-开发服务默认运行在 `http://localhost:3456/`。
+开发服务默认运行在 `http://localhost:3457/`。
 
 ### 常用命令
 

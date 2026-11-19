@@ -31,7 +31,12 @@ import {
 deleteWorkshopRuntimeAsset,
 listWorkshopRuntimeAssets,
 updateWorkshopRuntimeAsset,
-} from '../../workshopRuntime';
+} from '../../workshop/runtimeAssets';
+import { adventureEventPackId } from '../../workshop/adventure';
+import { forgetLocalTarget, type InstallTargetKind } from '../../workshop/installs';
+import { localAssetKey, publishLocalAsset } from '../../workshop/publish';
+import { describeWorkshopError } from '../../workshop/api';
+import { adventureCompiledPackIds, isWorkflowRecord, portableAssetData } from '../../workshop/localAssets';
 import StructuredAssetEditor from './StructuredAssetEditor';
 
 const WorldEditorForm = lazy(() => import('../start/WorldEditorForm'));
@@ -112,10 +117,6 @@ function readLocalStorageAssets(type: WorkshopAssetType): LocalAsset[] {
   }
 }
 
-function isWorkflowRecord(record: WebEventRecord): boolean {
-  return record.manifest.type === 'rule' || typeof record.files['schema/workflow.json'] === 'string';
-}
-
 function normalizeNpcTemplate(template: NpcTemplate): CustomNpc {
   const npc = template.npc;
   return {
@@ -134,27 +135,15 @@ function normalizeNpcTemplate(template: NpcTemplate): CustomNpc {
   };
 }
 
-async function eventRecordData(record: WebEventRecord): Promise<Record<string, unknown>> {
-  const files: Record<string, string> = {};
-  for (const [path, content] of Object.entries(record.files)) {
-    if (typeof content === 'string') files[path] = content;
-    else if (!content.type.startsWith('image/')) files[path] = await content.text();
-  }
-  if (!files['manifest.json']) files['manifest.json'] = JSON.stringify(record.manifest, null, 2);
-  return { manifest: record.manifest, files };
-}
-
-async function portableAssetData(type: WorkshopAssetType, asset: LocalAsset): Promise<unknown> {
-  if (type === 'event_pack') return eventRecordData(asset.raw as WebEventRecord);
-  if (type === 'workflow_pack') {
-    const source = (asset.raw as WebEventRecord).files['schema/workflow.json'];
-    if (typeof source !== 'string') throw new Error('工作流包缺少 workflow.json');
-    return JSON.parse(source);
-  }
-  if (type === 'gameplay_module') return asset.raw.module;
-  if (type === 'adventure_pack' || type === 'visual_theme') return asset.raw.data;
-  return asset.raw;
-}
+const LOCAL_TARGET_KINDS: Partial<Record<WorkshopAssetType, InstallTargetKind>> = {
+  world_package: 'world',
+  npc_template: 'npc',
+  gameplay_module: 'module',
+  event_pack: 'event',
+  workflow_pack: 'event',
+  adventure_pack: 'asset',
+  visual_theme: 'asset',
+};
 
 export default function LocalAssetsTab() {
   const { isAuthenticated } = useAuthStore();
@@ -188,7 +177,9 @@ export default function LocalAssetsTab() {
       } catch { next.gameplay_module = []; }
 
       try {
-        const records = (await allWebEvents()).filter(record => !record.builtin);
+        // 冒险包编译出的事件卡包跟着冒险包原件走，不单独列出。
+        const compiled = await adventureCompiledPackIds();
+        const records = (await allWebEvents()).filter(record => !record.builtin && !compiled.has(record.id));
         for (const record of records) {
           const type = isWorkflowRecord(record) ? 'workflow_pack' : 'event_pack';
           next[type].push({
@@ -226,7 +217,7 @@ export default function LocalAssetsTab() {
     try {
       const rawData = activeType === 'event_pack' || activeType === 'workflow_pack'
         ? {}
-        : await portableAssetData(activeType, asset);
+        : await portableAssetData(activeType as Parameters<typeof portableAssetData>[0], asset.raw);
       if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) throw new Error('该资产缺少可编辑的结构化数据');
       const editableData = JSON.parse(JSON.stringify(rawData)) as Record<string, any>;
       setEditor({
@@ -305,26 +296,22 @@ export default function LocalAssetsTab() {
   const handleUpload = async (asset: LocalAsset) => {
     if (!isPublicWorkshopType(activeType)) return;
     if (!isAuthenticated) {
-      await showAlert('请先登录后再上传到创意工坊', { title: '需要登录' });
+      await showAlert('请先登录后再发布到创意工坊', { title: '需要登录' });
       return;
     }
     setUploadingId(asset.id);
     try {
-      const data = await portableAssetData(activeType, asset);
-      const res = await fetch('/api/workshop', {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: asset.name, description: asset.desc || null, type: activeType,
-          category: ASSET_TYPES[activeType].category, tags: [], data,
-        }),
+      const data = await portableAssetData(activeType as Parameters<typeof portableAssetData>[0], asset.raw);
+      // 同一个本地资产再次发布时作为新版本更新原条目，不会产生重复条目。
+      const outcome = await publishLocalAsset(localAssetKey(activeType, asset.id), {
+        type: activeType, title: asset.name, description: asset.desc || null,
+        category: ASSET_TYPES[activeType].category, data,
       });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: '上传失败' }));
-        throw new Error(error.message || '上传失败');
-      }
-      await showAlert(`「${asset.name}」已上传到创意工坊！`, { title: '上传成功' });
+      await showAlert(outcome.created
+        ? `「${asset.name}」已发布到创意工坊（v${outcome.version}）。可以在「创意工坊 · 我的发布」里补充说明、截图和依赖。`
+        : `「${asset.name}」已作为新版本 v${outcome.version} 更新到创意工坊。`, { title: outcome.created ? '发布成功' : '更新成功' });
     } catch (error) {
-      await showAlert(`上传失败：${(error as Error).message}`, { title: '上传失败', danger: true });
+      await showAlert(`发布失败：${describeWorkshopError(error)}`, { title: '发布失败', danger: true });
     } finally {
       setUploadingId(null);
     }
@@ -341,6 +328,7 @@ export default function LocalAssetsTab() {
         await deleteWebEvent(asset.id);
       } else if (activeType === 'adventure_pack' || activeType === 'visual_theme') {
         await deleteWorkshopRuntimeAsset(asset.id);
+        if (activeType === 'adventure_pack') await forgetLocalTarget('event', adventureEventPackId(asset.raw?.data));
       } else {
         const info = ASSET_TYPES[activeType];
         const list: any[] = JSON.parse(localStorage.getItem(info.storageKey!) || '[]');
@@ -348,6 +336,9 @@ export default function LocalAssetsTab() {
         if (index >= 0) list.splice(index, 1);
         safeSetItem(info.storageKey!, JSON.stringify(list));
       }
+      // 手动删掉的工坊资产不再算“已安装”。
+      const kind = LOCAL_TARGET_KINDS[activeType];
+      if (kind) await forgetLocalTarget(kind, asset.id);
       refresh();
     } catch {
       await showAlert('删除失败', { title: '删除失败', danger: true });
@@ -356,7 +347,7 @@ export default function LocalAssetsTab() {
 
   const handleExport = async (asset: LocalAsset) => {
     try {
-      const data = await portableAssetData(activeType, asset);
+      const data = await portableAssetData(activeType as Parameters<typeof portableAssetData>[0], asset.raw);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -376,25 +367,20 @@ export default function LocalAssetsTab() {
   };
 
   return (
-    <div className="registry-settings-page registry-local-assets-page" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
+    <div className="registry-settings-page registry-local-assets-page">
       {DialogUI}
       <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600' }}>本地资产</h3>
       <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: 'calc(-1 * var(--space-2))' }}>
         管理本地世界、NPC、玩法与事件资产；人物预设和人生经历仅保存在本地
       </p>
 
-      <div className="registry-type-tabs registry-local-type-tabs" style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <div className="registry-type-tabs registry-local-type-tabs">
         {LOCAL_ASSET_TYPES.map(type => {
           const info = ASSET_TYPES[type];
           const Icon = info.icon;
           return (
-            <button key={type} onClick={() => setActiveType(type)} style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)', padding: '6px 12px',
-              background: activeType === type ? 'var(--accent-dim)' : 'var(--bg-tertiary)',
-              color: activeType === type ? 'var(--accent)' : 'var(--text-secondary)',
-              border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
-            }}>
-              <Icon size={14} />{info.label}<span style={{ fontSize: 'var(--font-size-xs)', opacity: .7 }}>({assetGroups[type].length})</span>
+            <button type="button" key={type} aria-pressed={activeType === type} onClick={() => setActiveType(type)}>
+              <Icon size={14} />{info.label}<span className="registry-type-tabs__count">({assetGroups[type].length})</span>
             </button>
           );
         })}
@@ -415,7 +401,7 @@ export default function LocalAssetsTab() {
                 <strong>{asset.name}</strong>
                 {asset.desc && <p>{asset.desc}</p>}
                 <div className="registry-card-actions">
-                  {info.publishable !== false && <button onClick={() => void handleUpload(asset)} disabled={uploadingId === asset.id} className="registry-action-primary">{uploadingId === asset.id ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}上传到工坊</button>}
+                  {info.publishable !== false && <button onClick={() => void handleUpload(asset)} disabled={uploadingId === asset.id} className="registry-action-primary">{uploadingId === asset.id ? <Loader size={14} className="animate-spin" /> : <Upload size={14} />}发布到工坊</button>}
                   {activeType === 'character_preset' && <button onClick={() => void handleAnonymize(asset)} className="registry-action-primary"><User size={14} />匿名化为 NPC</button>}
                   <button onClick={() => void handleEdit(asset)}><Pencil size={14} />编辑</button>
                   <button onClick={() => void handleExport(asset)}><Download size={14} />导出</button>

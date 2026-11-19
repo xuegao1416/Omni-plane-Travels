@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../../engine/types';
+import type { DiceRollRequest } from '../../../../gameplay/modules/dice';
 import { useUISettings } from '../../../../context/UISettingsContext';
 import { createIframeSrcDoc } from '../../../../utils/markdown';
 import type { RenderedContent } from './renderPipeline';
@@ -12,7 +13,7 @@ interface BubbleContentProps {
   renderedContent: RenderedContent;
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
   worldSystem?: WorldSystemData | null;
-  onDiceRoll?: (roll: DiceRoll) => void;
+  onDiceRoll?: (request: DiceRollRequest) => DiceRoll | null;
   onOptionClick?: (optionText: string) => void;
 }
 

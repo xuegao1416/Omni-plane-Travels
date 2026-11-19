@@ -135,7 +135,7 @@ export function PortraitHeader({ npc, npcId, onClose, onDelete }: {
             background: 'var(--accent)', border: '2px solid var(--bg-secondary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
           }}>
-            <ImageIcon size={10} color="#fff" />
+            <ImageIcon size={10} color="#2a1a04" />
           </button>
           <button onClick={() => fileInputRef.current?.click()} title="上传自定义头像" style={{
             position: 'absolute', top: -2, right: -2, width: '20px', height: '20px', borderRadius: 'var(--radius-md)',

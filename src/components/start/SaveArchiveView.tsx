@@ -1,13 +1,12 @@
 import { useEffect,useMemo,useRef,useState } from 'react';
-import { Archive,ArrowLeft,ArrowRight,Clock3,Download,MessageSquare,MoreHorizontal,Plus,RotateCcw,Trash2,Upload } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { ArrowLeft,ArrowRight,Clock3,Download,Eye,Lock,MessageSquare,Plus,Trash2,Upload } from 'lucide-react';
 import type { SaveMeta } from '../../storage/db';
+import type { WorldDef } from '../../data/worldLoader';
 import { SAVE_FILE_ACCEPT } from '../../storage/saveFileCodec';
-import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
-import { EntrySlicedButton } from './EntrySurface';
-
-type ShardVariant = 'a' | 'b' | 'c';
-
-const SHARD_VARIANTS: ShardVariant[] = ['a', 'b', 'c'];
+import OverlayPortal from '../shared/OverlayPortal';
+import { getWorldVisual } from './orrery/worldVisuals';
+import { useEntryLexicon } from '../../ui/dawn/entryLexicon';
 
 function worldLabel(preview: string) {
   const parts = preview.split(' · ').filter(Boolean);
@@ -15,13 +14,22 @@ function worldLabel(preview: string) {
 }
 
 function formatSaveTime(timestamp: number) {
-  return new Date(timestamp).toLocaleString('zh-CN', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  return new Date(timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function relativeTime(timestamp: number) {
+  const minutes = Math.round((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.round(hours / 24);
+  return days < 30 ? `${days} 天前` : formatSaveTime(timestamp);
 }
 
 interface SaveArchiveViewProps {
   allSaves: SaveMeta[];
+  allWorlds?: WorldDef[];
   currentSaveId: string | null;
   onClose: () => void;
   onLoadSave: (saveId: string) => Promise<void>;
@@ -31,8 +39,10 @@ interface SaveArchiveViewProps {
   onExportSave: (id: string) => void | Promise<void>;
 }
 
+/** Voyage log: every save is an entry on a timeline; the selected one is shown as a page. */
 export default function SaveArchiveView({
   allSaves,
+  allWorlds = [],
   currentSaveId,
   onClose,
   onLoadSave,
@@ -41,239 +51,141 @@ export default function SaveArchiveView({
   onImportSave,
   onExportSave,
 }: SaveArchiveViewProps) {
-  const firstId = currentSaveId && allSaves.some(save => save.id === currentSaveId)
-    ? currentSaveId
-    : allSaves[0]?.id ?? null;
-  const [selectedId, setSelectedId] = useState<string | null>(firstId);
+  const lex = useEntryLexicon();
+  const sortedSaves = useMemo(() => [...allSaves].sort((a, b) => b.timestamp - a.timestamp), [allSaves]);
+  const pickDefault = () => (currentSaveId && allSaves.some(save => save.id === currentSaveId) ? currentSaveId : sortedSaves[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(pickDefault);
   const [loading, setLoading] = useState(false);
   const [transfer, setTransfer] = useState<'import' | 'export' | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
-  const mobileActionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setSelectedId(previous => {
-      if (previous && allSaves.some(save => save.id === previous)) return previous;
-      return currentSaveId && allSaves.some(save => save.id === currentSaveId)
-        ? currentSaveId
-        : allSaves[0]?.id ?? null;
-    });
+    setSelectedId(previous => (previous && allSaves.some(save => save.id === previous) ? previous : pickDefault()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allSaves, currentSaveId]);
 
-  useEffect(() => {
-    if (!mobileMenuOpen) return;
+  const selectedSave = useMemo(() => allSaves.find(save => save.id === selectedId) ?? null, [allSaves, selectedId]);
+  const busy = loading || transfer !== null;
+  const ended = selectedSave?.lifecycle === 'ended';
 
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!mobileActionsRef.current?.contains(event.target as Node)) {
-        setMobileMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setMobileMenuOpen(false);
-      mobileActionsRef.current?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.focus();
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [mobileMenuOpen]);
-
-  const selectedSave = useMemo(
-    () => allSaves.find(save => save.id === selectedId) ?? null,
-    [allSaves, selectedId],
-  );
-  const handleContinue = async () => {
-    if (!selectedSave || loading || transfer || selectedSave.lifecycle === 'ended') return;
-    setLoading(true);
-    try {
-      await onLoadSave(selectedSave.id);
-    } finally {
-      setLoading(false);
-    }
+  const worldForSave = (save: SaveMeta) => {
+    const label = worldLabel(save.preview);
+    return allWorlds.find(world => world.name === label || save.preview.includes(world.name));
   };
-  const handleReview = async () => {
-    if (!selectedSave || loading || transfer || selectedSave.lifecycle !== 'ended') return;
+  const selectedWorld = selectedSave ? worldForSave(selectedSave) : undefined;
+  const selectedVisual = selectedWorld ? getWorldVisual(selectedWorld) : null;
+
+  const handleOpen = async () => {
+    if (!selectedSave || busy) return;
     setLoading(true);
-    try {
-      await onLoadSave(selectedSave.id);
-    } finally {
-      setLoading(false);
-    }
+    try { await onLoadSave(selectedSave.id); } finally { setLoading(false); }
   };
 
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || transfer || loading) return;
+    if (!file || busy) return;
     setTransfer('import');
     try { await onImportSave(file); } finally { setTransfer(null); }
   };
 
-  const openImportPicker = () => {
-    if (transfer || loading) return;
-    setMobileMenuOpen(false);
-    importInputRef.current?.click();
-  };
+  const openImportPicker = () => { if (!busy) importInputRef.current?.click(); };
 
   const handleExport = async () => {
-    if (!selectedSave || transfer || loading) return;
-    setMobileMenuOpen(false);
+    if (!selectedSave || busy) return;
     setTransfer('export');
     try { await onExportSave(selectedSave.id); } finally { setTransfer(null); }
   };
 
-  const handleMobileDelete = () => {
-    if (!selectedSave) return;
-    setMobileMenuOpen(false);
-    void onDeleteSave(selectedSave.id);
-  };
-
-  const renderShard = (save: SaveMeta) => {
-    const displayIndex = allSaves.indexOf(save);
-    const variant = SHARD_VARIANTS[displayIndex % SHARD_VARIANTS.length];
-    const selected = save.id === selectedId;
-    return (
-      <button
-        key={save.id}
-        type="button"
-        className={`entry-save-shard-card${selected ? ' is-selected' : ''}`}
-        aria-pressed={selected}
-        onClick={() => setSelectedId(save.id)}
-        data-layout-id={`save.card.${save.id}`}
-        data-layout-label={`${displayIndex % 2 === 0 ? '左' : '右'}侧存档卡 · ${save.name || '未命名旅程'}`}
-        data-layout-editable="true"
-        data-layout-container="save.body"
-        data-layout-kind="frame"
-      >
-        <DawnFrameV4 mode="panel" withFill className="entry-save-shard-card__frame">
-        <span className="entry-save-shard-card__art-wrap" aria-hidden="true">
-          <img src={`/art/theme/saves/save-shard-${variant}.png`} alt="" className="entry-save-shard-card__art" />
-          <span className="entry-save-shard-card__glow" />
-        </span>
-        <span className="entry-save-shard-card__copy">
-          <span className="entry-save-shard-card__eyebrow">档案碎片 / {String(displayIndex + 1).padStart(2, '0')}</span>
-          <strong>{save.name || '未命名旅程'}</strong>
-          <span className="entry-save-shard-card__world">{worldLabel(save.preview)}</span>
-          <span className="entry-save-shard-card__meta"><MessageSquare size={12} /> {save.messageCount ?? 0} 条记录</span>
-           <span className="entry-save-shard-card__meta"><Clock3 size={12} /> {formatSaveTime(save.timestamp)}</span>
-           {save.lifecycle === 'ended' && <span className="entry-save-shard-card__meta" role="status">已封存 · {save.endReason || '不可继续'}</span>}
-        </span>
-        </DawnFrameV4>
-      </button>
-    );
-  };
+  const status = transfer === 'import' ? '正在导入存档…' : transfer === 'export' ? '正在压缩导出完整存档…' : '支持旧 JSON 和压缩存档 ZIP，导出包含自建世界和存档历史。';
 
   return (
-    <div className="entry-default-theme entry-archive-layer" role="presentation">
-      <main className="entry-archive-space" aria-labelledby="entry-archive-title" data-layout-id="save.screen">
-        <div className="entry-archive-space__backdrop" aria-hidden="true" data-layout-id="save.background" />
-        <div className="entry-archive-space__veil" aria-hidden="true" data-layout-id="save.veil" />
-        <header className="entry-archive-space__header">
-          <div data-layout-id="save.title" data-layout-label="SAVE 标题区" data-layout-editable="true" data-layout-container="save.screen">
-            <span className="entry-archive-space__kicker"><Archive size={14} /> 旅程档案 · SAVE INDEX</span>
-            <h2 id="entry-archive-title">存档档案空间</h2>
-            <p>{allSaves.length ? `已找到 ${allSaves.length} 个旅程切片` : '尚未记录可读取的旅程'}</p>
-            <p role="status">{transfer === 'import' ? '正在导入存档…' : transfer === 'export' ? '正在压缩导出完整存档…' : '支持旧 JSON 和压缩存档 ZIP，可直接导入，无需解压；导出包含自建世界和存档历史。'}</p>
-          </div>
-          <div className="entry-archive-space__header-actions entry-archive-space__header-actions--desktop" aria-label="存档管理">
-            {allSaves.length > 0 && <>
-              <EntrySlicedButton frame="dawn-v4-compact" icon={Upload} onClick={openImportPicker} disabled={transfer !== null || loading} aria-label="导入存档" data-layout-id="save.import" data-layout-label="导入存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">{transfer === 'import' ? '导入中…' : '导入存档'}</EntrySlicedButton>
-              {selectedSave && <>
-                <EntrySlicedButton frame="dawn-v4-compact" icon={Download} onClick={handleExport} disabled={transfer !== null || loading} title="完整压缩存档（.save.zip）" aria-label="导出存档" data-layout-id="save.export" data-layout-label="导出存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">{transfer === 'export' ? '压缩导出中…' : '导出存档'}</EntrySlicedButton>
-                <EntrySlicedButton frame="dawn-v4-compact" icon={Trash2} onClick={() => void onDeleteSave(selectedSave.id)} aria-label="删除存档" className="entry-sliced-button--danger" data-layout-id="save.delete" data-layout-label="删除存档" data-layout-editable="true" data-layout-container="save.screen" data-layout-kind="compact">删除存档</EntrySlicedButton>
-              </>}
-            </>}
-          </div>
-          <div ref={mobileActionsRef} className="entry-archive-space__mobile-actions" aria-label="移动端存档操作">
-            {allSaves.length > 0 && (
-              <div className="entry-archive-space__mobile-menu-wrap">
-                <EntrySlicedButton
-                  frame="dawn-v4-compact"
-                  icon={MoreHorizontal}
-                  className="entry-archive-space__mobile-icon-button"
-                  onClick={() => setMobileMenuOpen(open => !open)}
-                  aria-label="更多存档操作"
-                  aria-haspopup="menu"
-                  aria-expanded={mobileMenuOpen}
-                  title="更多存档操作"
-                >
-                  更多存档操作
-                </EntrySlicedButton>
-                {mobileMenuOpen && (
-                  <div className="entry-archive-space__mobile-menu" role="menu" aria-label="存档工具">
-                    <button type="button" role="menuitem" onClick={openImportPicker} disabled={transfer !== null || loading}>
-                      <Upload size={18} aria-hidden="true" />
-                      <span>导入存档</span>
-                    </button>
-                    {selectedSave && (
-                      <>
-                        <button type="button" role="menuitem" onClick={handleExport} disabled={transfer !== null || loading}>
-                          <Download size={18} aria-hidden="true" />
-                          <span>导出存档</span>
-                        </button>
-                        <button type="button" role="menuitem" className="is-danger" onClick={handleMobileDelete}>
-                          <Trash2 size={18} aria-hidden="true" />
-                          <span>删除存档</span>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </header>
+    <OverlayPortal className="pl-log" ariaLabelledBy="pl-log-title" onClose={onClose} closeOnBackdrop={false}>
+      <div className="pl-log__sky" aria-hidden="true">
+        {selectedVisual && <img key={selectedVisual.scene} src={selectedVisual.scene} alt="" />}
+      </div>
+      <header className="pl-log__top">
+        <button type="button" className="pl-chip pl-back" aria-label={lex.back} onClick={onClose}><ArrowLeft size={14} aria-hidden="true" /><span className="pl-back__text">{lex.back}</span></button>
+        <div className="pl-log__title">
+          <span className="pl-kicker">{lex.logKicker}</span>
+          <h2 id="pl-log-title">{lex.log}</h2>
+          <p>{allSaves.length ? `共 ${allSaves.length} 段旅程` : '尚未记录任何旅程'}</p>
+        </div>
+        <div className="pl-log__tools">
+          <button type="button" className="pl-chip" onClick={openImportPicker} disabled={busy} aria-label="导入存档"><Upload size={14} aria-hidden="true" />{transfer === 'import' ? '导入中…' : '导入存档'}</button>
+        </div>
+      </header>
+      <p className="pl-log__status" role="status">{status}</p>
 
-        {allSaves.length ? (
-          <section className="entry-archive-space__body" aria-label="存档列表" data-layout-id="save.body">
-            <div className="entry-save-rail entry-save-rail--all">{allSaves.map(renderShard)}</div>
-            <div className="entry-archive-space__center">
-              <div className="entry-archive-space__orbits" aria-hidden="true" />
-              <button type="button" className="entry-hall-portal entry-archive-gate" aria-label="存档裂隙" onClick={onClose} data-layout-id="save.gate" data-layout-label="中央返回大厅 Gate" data-layout-editable="true" data-layout-container="save.screen">
-                <span className="entry-hall-portal__halo" aria-hidden="true" />
-                <span className="entry-hall-portal__core" aria-hidden="true"><Archive size={23} strokeWidth={1.2} /></span>
-                <span className="entry-hall-portal__label">返回大厅</span>
-              </button>
-              <div className="entry-save-details" aria-live="polite" data-layout-id="save.details" data-layout-label="底部续程状态带" data-layout-editable="true" data-layout-container="save.body" data-layout-kind="frame">
-                <DawnFrameV4 mode="panel" withFill className="entry-save-details__frame">
-                {selectedSave ? (
-                  <>
-                     <span className="entry-save-details__eyebrow">已选旅程 · {selectedSave.lifecycle === 'ended' ? '只读封存' : 'READY'}</span>
-                    <strong>{selectedSave.name || '未命名旅程'}</strong>
-                    <span>{worldLabel(selectedSave.preview)} · {selectedSave.messageCount ?? 0} 条记录</span>
-                     {selectedSave.lifecycle === 'ended' && <span role="status">{selectedSave.endReason || '炼狱战斗中玩家死亡，存档已封存为只读。可查看或导出。'}</span>}
-                     {selectedSave.lifecycle === 'ended' && <EntrySlicedButton frame="dawn-v4-compact" icon={ArrowRight} onClick={handleReview} disabled={loading || transfer !== null}>查看回顾</EntrySlicedButton>}
-                     <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={ArrowRight} onClick={handleContinue} aria-label={selectedSave.lifecycle === 'ended' ? '封存存档不可继续' : '继续旅程'} disabled={loading || transfer !== null || selectedSave.lifecycle === 'ended'} title={selectedSave.lifecycle === 'ended' ? (selectedSave.endReason || '此存档已封存，只可查看或导出') : undefined}>
-                       {loading ? '读取中…' : selectedSave.lifecycle === 'ended' ? '已封存（不可继续）' : '继续旅程'}
-                     </EntrySlicedButton>
-                  </>
-                ) : (
-                  <span>选择一枚存档晶片继续</span>
-                )}
-                </DawnFrameV4>
-              </div>
-            </div>
+      {sortedSaves.length ? (
+        <div className="pl-log__body">
+          <ol className="pl-log__track" aria-label="存档列表">
+            {sortedSaves.map((save, index) => {
+              const world = worldForSave(save);
+              const visual = world ? getWorldVisual(world) : null;
+              const selected = save.id === selectedId;
+              return (
+                <li key={save.id} style={{ '--i': index, '--accent': visual?.accent ?? '#c9a86a' } as CSSProperties}>
+                  <button type="button" className={`pl-entry${selected ? ' is-selected' : ''}${save.lifecycle === 'ended' ? ' is-ended' : ''}`} aria-pressed={selected} onClick={() => setSelectedId(save.id)}>
+                    <span className="pl-entry__node" aria-hidden="true">
+                      {visual ? <img src={visual.scene} alt="" loading="lazy" /> : <span />}
+                    </span>
+                    <span className="pl-entry__text">
+                      <strong>{save.name || '未命名旅程'}</strong>
+                      <span>{worldLabel(save.preview)}</span>
+                    </span>
+                    <span className="pl-entry__meta">
+                      {save.lifecycle === 'ended' && <Lock size={12} aria-label="已封存" />}
+                      {save.id === currentSaveId && <span className="pl-tag is-accent">当前</span>}
+                      <time dateTime={new Date(save.timestamp).toISOString()}>{relativeTime(save.timestamp)}</time>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
+          <section className="pl-log__page" aria-live="polite" style={{ '--accent': selectedVisual?.accent ?? '#c9a86a' } as CSSProperties}>
+            {selectedSave ? (
+              <>
+                <span className="pl-kicker">{ended ? '只读封存' : '已选旅程 · READY'}</span>
+                <h3>{selectedSave.name || '未命名旅程'}</h3>
+                <p className="pl-log__world">{worldLabel(selectedSave.preview)}</p>
+                <dl className="pl-stats">
+                  <div><dt><MessageSquare size={13} aria-hidden="true" />记录</dt><dd>{selectedSave.messageCount ?? 0} 条</dd></div>
+                  <div><dt><Clock3 size={13} aria-hidden="true" />最后停泊</dt><dd>{formatSaveTime(selectedSave.timestamp)}</dd></div>
+                </dl>
+                {ended && <p className="pl-note" role="status">{selectedSave.endReason || '炼狱战斗中玩家死亡，存档已封存为只读。可查看或导出。'}</p>}
+                <div className="pl-log__actions">
+                  <button
+                    type="button"
+                    className="pl-button pl-button--primary pl-button--lg"
+                    onClick={handleOpen}
+                    disabled={busy}
+                    aria-label={ended ? '查看回顾' : '继续旅程'}
+                  >
+                    {loading ? '读取中…' : ended ? <><Eye size={17} aria-hidden="true" />查看回顾</> : <>继续旅程<ArrowRight size={17} aria-hidden="true" /></>}
+                  </button>
+                  <button type="button" className="pl-button" onClick={handleExport} disabled={busy} title="完整压缩存档（.save.zip）" aria-label="导出存档"><Download size={15} aria-hidden="true" />{transfer === 'export' ? '导出中…' : '导出'}</button>
+                  <button type="button" className="pl-button pl-button--danger" onClick={() => void onDeleteSave(selectedSave.id)} disabled={busy} aria-label="删除存档"><Trash2 size={15} aria-hidden="true" />删除</button>
+                </div>
+              </>
+            ) : <p className="pl-lead">选择一段旅程继续。</p>}
           </section>
-        ) : (
-          <section className="entry-archive-empty" aria-label="空存档状态">
-            <div className="entry-archive-empty__mark"><RotateCcw size={34} strokeWidth={1.1} /></div>
-            <span className="entry-archive-space__kicker">NO JOURNEY RECORDED</span>
-            <h3>这里还没有存档晶片</h3>
-            <p>返回大厅选择一个世界，开启你的第一段旅程。</p>
-            <div className="entry-archive-empty__actions">
-              <EntrySlicedButton frame="dawn-v4-compact" emblemSrc="/art/theme/emblems/emblem-27-v2.png" icon={ArrowLeft} onClick={onClose}>返回大厅</EntrySlicedButton>
-              <EntrySlicedButton frame="dawn-v4-compact" icon={Upload} onClick={openImportPicker} disabled={transfer !== null || loading}>{transfer === 'import' ? '导入中…' : '导入存档'}</EntrySlicedButton>
-              <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-20-v2.png" icon={Plus} onClick={onCreateSave}>创建新旅程</EntrySlicedButton>
-            </div>
-            <input ref={importInputRef} type="file" accept={SAVE_FILE_ACCEPT} onChange={handleImport} disabled={transfer !== null || loading} hidden />
-          </section>
-        )}
-        {allSaves.length > 0 && <input ref={importInputRef} type="file" accept={SAVE_FILE_ACCEPT} onChange={handleImport} disabled={transfer !== null || loading} hidden />}
-      </main>
-    </div>
+        </div>
+      ) : (
+        <section className="pl-log__empty" aria-label="空存档状态">
+          <span className="pl-log__empty-mark" aria-hidden="true" />
+          <h3>日志还是空白的</h3>
+          <p>{lex.logEmpty}</p>
+          <div className="pl-log__actions">
+            <button type="button" className="pl-button" onClick={onClose}><ArrowLeft size={15} aria-hidden="true" />{lex.back}</button>
+            <button type="button" className="pl-button" onClick={openImportPicker} disabled={busy}><Upload size={15} aria-hidden="true" />{transfer === 'import' ? '导入中…' : '导入存档'}</button>
+            <button type="button" className="pl-button pl-button--primary" onClick={onCreateSave}><Plus size={15} aria-hidden="true" />创建新旅程</button>
+          </div>
+        </section>
+      )}
+      <input ref={importInputRef} type="file" accept={SAVE_FILE_ACCEPT} onChange={handleImport} disabled={busy} hidden />
+    </OverlayPortal>
   );
 }

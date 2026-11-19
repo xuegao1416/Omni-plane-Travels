@@ -31,6 +31,8 @@ import {
   GAMEPLAY_TEXT_FALLBACK_PROMPT,
 } from './prompts';
 import { waitForRateLimit } from '../api/rateLimiter';
+import { countErrors, generateWithRepair } from '../api/generateWithRepair';
+import { GENERATED_MODULE_LABELS, buildModuleRepairPrompt, validateGeneratedModule, type ModuleIssue } from './moduleValidation';
 import { buildSpecialConfig } from './normalizeModule';
 import { normalizeProgressionConfig } from './xpAlgorithm';
 export { normalizeProgressionConfig } from './xpAlgorithm';
@@ -42,11 +44,67 @@ export interface PipelineConfig {
   onProgress?: (stage: string, detail: string) => void;
 }
 
+export interface GeneratedModuleData<T> {
+  value: T;
+  /** 修复后仍剩下的问题（警告与可在第 3 步手改的错误）。 */
+  issues: ModuleIssue[];
+  repaired: boolean;
+}
+
+/**
+ * 解析模型返回的模块 JSON（容忍代码块、尾逗号、截断）。
+ * 有的接口把 JSON 的结构引号写成全角“”：原文解析失败时再换成半角试一次
+ * （不能一上来就换，正文里用“”引用的中文会被换坏）。
+ */
+export function parseModuleJSON(text: string): unknown {
+  try {
+    return JSON.parse(extractJSON(text));
+  } catch (error) {
+    const halfWidth = text.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    if (halfWidth === text) throw error;
+    try { return JSON.parse(extractJSON(halfWidth)); } catch { throw error; }
+  }
+}
+
+/**
+ * 生成一个模块的初始数据：解析 → 校验 → 有错误交回 AI 修一次。
+ * 修复后仍放不进世界（开局报错）或格式无法解析时返回 null，由调用方用默认值。
+ */
+export async function generateModuleData<T>(
+  moduleId: string,
+  prompt: string,
+  callAI: PipelineConfig['callAI'],
+  onProgress?: PipelineConfig['onProgress'],
+): Promise<GeneratedModuleData<T> | null> {
+  const label = GENERATED_MODULE_LABELS[moduleId] ?? moduleId;
+  try {
+    const result = await generateWithRepair({
+      messages: [{ role: 'user', content: prompt }],
+      request: messages => callAI(messages),
+      parse: text => parseModuleJSON(text) as T,
+      validate: value => validateGeneratedModule(moduleId, value),
+      repairPrompt: issues => buildModuleRepairPrompt(moduleId, issues),
+      onRepair: ({ reason, detail }) => onProgress?.('阶段2', `${label}${reason === 'format' ? '格式有误' : `校验发现 ${detail}`}，正在请 AI 修正...`),
+    });
+    if (result.issues.some(issue => issue.level === 'error' && issue.path === '(整体)')) {
+      onProgress?.('阶段2', `⚠ ${label}放进世界后无法开局，将使用默认值`);
+      return null;
+    }
+    const remaining = countErrors(result.issues);
+    if (remaining > 0) onProgress?.('阶段2', `⚠ ${label}仍有 ${remaining} 处问题，可在第 3 步手动调整`);
+    return { value: result.value, issues: result.issues, repaired: result.repaired };
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') throw err;
+    console.error(`[BuildPipeline] ${label}生成失败:`, err instanceof Error ? err.message : String(err));
+    return null;
+  }
+}
+
 /**
  * 执行世界创建管线
  *
  * 阶段1: 主题提取 → WorldTheme
- * 阶段2: 顺序生成（属性 → 成长 → 资源），避免并发触发429
+ * 阶段2: 顺序生成（属性 → 成长 → 资源），避免并发触发429；每个模块「生成 → 校验 → 修复一次」
  * 阶段3: 世界书条目生成（蓝灯/绿灯）
  * 阶段4: 合成验证（分离配置和状态）
  */
@@ -68,7 +126,7 @@ export async function executeBuildPipeline(
     const themePrompt = buildStatThemePrompt(ctx.description);
     try {
       const themeRaw = await callAI([{ role: 'user', content: themePrompt }]);
-      const themeData = JSON.parse(extractJSON(themeRaw));
+      const themeData = parseModuleJSON(themeRaw) as Record<string, string>;
       ctx.theme = {
         theme: themeData.theme || '',
         tone: themeData.tone || '中等',
@@ -115,15 +173,12 @@ export async function executeBuildPipeline(
       dim5Name: ctx.theme.dim5Name,
       dim6Name: ctx.theme.dim6Name,
     });
-    try {
-      const statRaw = await callAI([{ role: 'user', content: statPrompt }]);
-      ctx.statData = JSON.parse(extractJSON(statRaw)) as StatModuleSchema;
-      if (ctx.statData) {
-        ctx.statConfig = extractStatConfig(ctx.statData);
-        ctx.statState = extractStatState(ctx.statData);
-      }
-    } catch (err: unknown) {
-      console.error('[BuildPipeline] 属性系统生成失败:', err instanceof Error ? err.message : String(err));
+    const generated = await generateModuleData<StatModuleSchema>('stat', statPrompt, callAI, onProgress);
+    if (generated) {
+      ctx.statData = generated.value;
+      ctx.statConfig = extractStatConfig(ctx.statData);
+      ctx.statState = extractStatState(ctx.statData);
+    } else {
       onProgress?.('阶段2', '⚠ 属性系统生成失败，将使用默认值');
     }
   }
@@ -137,14 +192,11 @@ export async function executeBuildPipeline(
       tone: ctx.theme.tone,
       era: ctx.theme.era,
     });
-    try {
-      const progRaw = await callAI([{ role: 'user', content: progPrompt }]);
-      ctx.progressionData = JSON.parse(extractJSON(progRaw)) as ProgressionModuleSchema;
-      if (ctx.progressionData) {
-        ctx.progressionConfig = normalizeProgressionConfig(ctx.progressionData);
-      }
-    } catch (err: unknown) {
-      console.error('[BuildPipeline] 成长体系生成失败:', err instanceof Error ? err.message : String(err));
+    const generated = await generateModuleData<ProgressionModuleSchema>('progression', progPrompt, callAI, onProgress);
+    if (generated) {
+      ctx.progressionData = generated.value;
+      ctx.progressionConfig = normalizeProgressionConfig(ctx.progressionData);
+    } else {
       onProgress?.('阶段2', '⚠ 成长体系生成失败，将使用默认值');
     }
   }
@@ -157,16 +209,12 @@ export async function executeBuildPipeline(
     const survivalTone = ctx.theme?.tone || '中等';
     const userDesc = ctx.survivalUserDesc ? `\n\n用户对生存资源的具体要求：${ctx.survivalUserDesc}` : '';
     const survPrompt = buildSurvivalGenPrompt({ theme: survivalTheme, tone: survivalTone }) + userDesc;
-    try {
-      const survRaw = await callAI([{ role: 'user', content: survPrompt }]);
-      ctx.survivalData = JSON.parse(extractJSON(survRaw)) as SurvivalModuleSchema;
-      if (ctx.survivalData) {
-        // 创建世界时不生成任何静态配方：配方只能由玩家在游戏中点击"创建配方"触发 AI 动态生成
-        delete ctx.survivalData.recipes;
-        ctx.survivalConfig = extractSurvivalConfig(ctx.survivalData);
-      }
-    } catch (err: unknown) {
-      console.error('[BuildPipeline] 生存资源系统生成失败:', err instanceof Error ? err.message : String(err));
+    const generated = await generateModuleData<SurvivalModuleSchema>('survival', survPrompt, callAI, onProgress);
+    if (generated) {
+      ctx.survivalData = generated.value;
+      // 创建世界时不生成任何静态配方：配方只能由玩家在游戏中点击"创建配方"触发 AI 动态生成
+      delete ctx.survivalData.recipes;
+      ctx.survivalConfig = extractSurvivalConfig(ctx.survivalData);
     }
   }
 
@@ -177,14 +225,10 @@ export async function executeBuildPipeline(
     const businessTheme = ctx.theme?.theme || ctx.description.substring(0, 100);
     const businessTone = ctx.theme?.tone || '中等';
     const bizPrompt = buildBusinessGenPrompt({ theme: businessTheme, tone: businessTone, userDesc: ctx.businessUserDesc });
-    try {
-      const bizRaw = await callAI([{ role: 'user', content: bizPrompt }]);
-      ctx.businessData = JSON.parse(extractJSON(bizRaw)) as BusinessModuleSchema;
-      if (ctx.businessData) {
-        ctx.businessConfig = extractBusinessConfig(ctx.businessData);
-      }
-    } catch (err: unknown) {
-      console.error('[BuildPipeline] 经营资产系统生成失败:', err instanceof Error ? err.message : String(err));
+    const generated = await generateModuleData<BusinessModuleSchema>('business', bizPrompt, callAI, onProgress);
+    if (generated) {
+      ctx.businessData = generated.value;
+      ctx.businessConfig = extractBusinessConfig(ctx.businessData);
     }
   }
 
@@ -202,9 +246,9 @@ export async function executeBuildPipeline(
       existingCategories: [],
       count: 5,
     });
-    try {
-      const talentRaw = await callAI([{ role: 'user', content: talentPrompt }]);
-      ctx.talentData = JSON.parse(extractJSON(talentRaw)) as TalentModuleSchema;
+    const generated = await generateModuleData<TalentModuleSchema>('talent', talentPrompt, callAI, onProgress);
+    if (generated) {
+      ctx.talentData = generated.value;
       if (ctx.progressionData && ctx.talentData?.pointRules) {
         ctx.progressionData.pointsPerTier = {
           ...ctx.progressionData.pointsPerTier,
@@ -212,8 +256,6 @@ export async function executeBuildPipeline(
           skill: Math.max(0, Number(ctx.talentData.pointRules.skillPointsPerTier) || 0),
         };
       }
-    } catch (err: unknown) {
-      console.error('[BuildPipeline] 天赋体系生成失败:', err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -233,8 +275,7 @@ export async function executeBuildPipeline(
 
 /** 从AI回复中提取JSON字符串 */
 function extractJSON(text: string): string {
-  // 修复中文引号（某些 API 会返回全角引号）
-  const fixed = text.replace(/[""]/g, '"').replace(/['']/g, "'");
+  const fixed = text;
 
   // 1. 优先匹配 markdown code block
   const codeBlockMatch = fixed.match(/```(?:json)?\s*([\s\S]*?)```/);

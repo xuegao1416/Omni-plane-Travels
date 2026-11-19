@@ -219,7 +219,8 @@ registerNodeExecutor('actions.modify_stat', (inputs, _ctx, wv) => {
   if (!key) return { outputs: { flow_out: true } };
   return {
     outputs: { flow_out: true },
-    actions: [{ kind: 'set', payload: { path: `玩家.生存状态.${key}`, value: delta } }],
+    // 增减属性（旧实现误用 set 把增量直接写成了属性值）。
+    actions: [{ kind: 'modifyStat', payload: { key, delta } }],
   };
 });
 
@@ -305,7 +306,8 @@ registerNodeExecutor('actions.modify_inventory', (inputs, _ctx, wv) => {
   if (!itemName) return { outputs: { flow_out: true } };
   return {
     outputs: { flow_out: true },
-    actions: [{ kind: 'set', payload: { path: `玩家.物品栏`, value: { name: itemName, 数量: count } } }],
+    // 增减单件物品（旧实现会把整个物品栏替换成这一件）。
+    actions: [{ kind: 'modifyItem', payload: { name: itemName, delta: count } }],
   };
 });
 

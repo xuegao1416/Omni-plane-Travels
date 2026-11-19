@@ -48,7 +48,7 @@ export function ProxyInput({
           style={{
             padding: '10px 20px',
             background: proxyUrl.trim() ? 'var(--accent)' : 'var(--bg-tertiary)',
-            color: proxyUrl.trim() ? '#fff' : 'var(--text-muted)',
+            color: proxyUrl.trim() ? '#2a1a04' : 'var(--text-muted)',
             border: 'none',
             borderRadius: '8px',
             fontSize: 'var(--font-size-sm)',

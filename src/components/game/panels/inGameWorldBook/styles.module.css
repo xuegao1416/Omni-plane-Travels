@@ -15,8 +15,6 @@
   margin: 20px auto;
   display: flex;
   flex-direction: column;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
   overflow: hidden;
 }
 
@@ -99,6 +97,8 @@
 }
 .header { min-width: 0; }
 .header > h2 { flex: 0 0 auto; }
+.title { margin: 0; font-size: var(--font-size-xl); font-weight: 700; }
+.meta { font-size: var(--font-size-xs); color: var(--text-muted); }
 .header > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toolbar { min-width: 0; }
 .entryList { min-width: 0; min-height: 0; }
@@ -109,15 +109,14 @@
     max-width: calc(100vw - 16px);
     max-height: calc(100dvh - 16px);
     margin: 8px auto;
-    border-radius: var(--radius-md);
   }
   .header {
     padding: 10px 12px;
     gap: 6px;
     flex-wrap: wrap;
   }
-  .header > h2 { font-size: var(--font-size-lg) !important; }
-  .header > span { order: 3; width: 100%; font-size: 10px !important; }
+  .header > h2 { font-size: var(--font-size-lg); }
+  .header > span { order: 3; width: 100%; font-size: 10px; }
   .infoBar { padding: 8px 12px; gap: 6px; }
   .infoHint { flex: 1 0 100%; text-align: left; }
   .toolbar {
@@ -165,7 +164,7 @@
   white-space: nowrap;
 }
 :global(.wbe-btn:hover) { border-color: var(--accent); }
-:global(.wbe-btn-primary) { background: var(--accent); border-color: var(--accent); color: var(--color-on-accent, #fff); }
+:global(.wbe-btn-primary) { background: var(--accent); border-color: var(--accent); color: var(--color-on-accent, rgb(var(--d-white-fg, 255, 255, 255))); }
 :global(.wbe-btn-ghost) { background: transparent; }
 
 :global(.wbe-entry) {

@@ -1,0 +1,1986 @@
+{
+  "handoff/01-japanese_school.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "藤原澄",
+        "age": "17",
+        "gender": "女",
+        "job": "高二学生",
+        "goal": ""
+      },
+      "world": {
+        "time": "2025年·四月·第7日 08:00·星期一·上午",
+        "elapsedMinutes": 0,
+        "location": ""
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 500
+      },
+      "items": [],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [],
+      "tasks": {
+        "active": [],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 0
+    }
+  },
+  "midgame/01-japanese_school.midgame.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "藤原澄",
+        "age": "17",
+        "gender": "女",
+        "job": "高二学生",
+        "goal": "站稳脚跟"
+      },
+      "world": {
+        "time": "2025年·四月·第8日 13:20·星期二·下午",
+        "elapsedMinutes": 1760,
+        "location": "东市"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 485
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ],
+        [
+          "桂花糕",
+          2
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          40,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [],
+        "done": [
+          "寻找落脚处"
+        ],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 8
+    },
+    "rollback:fixture-japanese_school-turn-2": {
+      "player": {
+        "name": "藤原澄",
+        "age": "17",
+        "gender": "女",
+        "job": "高二学生",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "2025年·四月·第7日 13:00·星期一·下午",
+        "elapsedMinutes": 300,
+        "location": "镇口茶棚"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          20,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 2
+    },
+    "rollback:fixture-japanese_school-turn-5": {
+      "player": {
+        "name": "藤原澄",
+        "age": "17",
+        "gender": "女",
+        "job": "高二学生",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "2025年·四月·第8日 02:30·星期二·深夜",
+        "elapsedMinutes": 1110,
+        "location": "城西旧屋"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          32,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 5
+    }
+  },
+  "handoff/02-desire_metropolis.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "陆昭",
+        "age": "28",
+        "gender": "男",
+        "job": "独立广告导演",
+        "goal": ""
+      },
+      "world": {
+        "time": "2025年·十月·第1日 08:00·星期三·上午",
+        "elapsedMinutes": 0,
+        "location": ""
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [
+        [
+          "dim1",
+          60
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          50
+        ],
+        [
+          "dim4",
+          30
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          40
+        ],
+        [
+          "happiness",
+          50
+        ],
+        [
+          "romance",
+          0
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 500
+      },
+      "items": [],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [],
+      "tasks": {
+        "active": [],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 0
+    }
+  },
+  "midgame/02-desire_metropolis.midgame.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "陆昭",
+        "age": "28",
+        "gender": "男",
+        "job": "独立广告导演",
+        "goal": "站稳脚跟"
+      },
+      "world": {
+        "time": "2025年·十月·第2日 13:20·星期四·下午",
+        "elapsedMinutes": 1760,
+        "location": "东市"
+      },
+      "vitals": {
+        "hp": 88,
+        "stamina": 85
+      },
+      "stats": [
+        [
+          "dim1",
+          60
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          50
+        ],
+        [
+          "dim4",
+          30
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          40
+        ],
+        [
+          "happiness",
+          50
+        ],
+        [
+          "romance",
+          0
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 485
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ],
+        [
+          "桂花糕",
+          2
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          40,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [],
+        "done": [
+          "寻找落脚处"
+        ],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 8
+    },
+    "rollback:fixture-desire_metropolis-turn-2": {
+      "player": {
+        "name": "陆昭",
+        "age": "28",
+        "gender": "男",
+        "job": "独立广告导演",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "2025年·十月·第1日 13:00·星期三·下午",
+        "elapsedMinutes": 300,
+        "location": "镇口茶棚"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [
+        [
+          "dim1",
+          60
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          50
+        ],
+        [
+          "dim4",
+          30
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          40
+        ],
+        [
+          "happiness",
+          50
+        ],
+        [
+          "romance",
+          0
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          20,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 2
+    },
+    "rollback:fixture-desire_metropolis-turn-5": {
+      "player": {
+        "name": "陆昭",
+        "age": "28",
+        "gender": "男",
+        "job": "独立广告导演",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "2025年·十月·第2日 02:30·星期四·深夜",
+        "elapsedMinutes": 1110,
+        "location": "城西旧屋"
+      },
+      "vitals": {
+        "hp": 88,
+        "stamina": 85
+      },
+      "stats": [
+        [
+          "dim1",
+          60
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          50
+        ],
+        [
+          "dim4",
+          30
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          40
+        ],
+        [
+          "happiness",
+          50
+        ],
+        [
+          "romance",
+          0
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          32,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 5
+    }
+  },
+  "handoff/03-wuxia_world.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "沈砚秋",
+        "age": "23",
+        "gender": "女",
+        "job": "",
+        "goal": ""
+      },
+      "world": {
+        "time": "江湖纪年 1年·1月·第1日 08:00·星期日·上午",
+        "elapsedMinutes": 0,
+        "location": ""
+      },
+      "vitals": {
+        "hp": 120,
+        "stamina": 50
+      },
+      "stats": [
+        [
+          "dim1",
+          45
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          55
+        ],
+        [
+          "dim4",
+          65
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          60
+        ],
+        [
+          "melancholy",
+          20
+        ],
+        [
+          "reputation",
+          10
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 500
+      },
+      "items": [],
+      "skills": [],
+      "abilities": {
+        "talentPoints": 0,
+        "skillPoints": 0,
+        "professionId": null,
+        "professionLevel": 1,
+        "abilityPoints": 2,
+        "unlocked": [],
+        "innate": []
+      },
+      "progression": {
+        "tier": 0,
+        "xp": 0,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [],
+      "tasks": {
+        "active": [],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 0
+    }
+  },
+  "midgame/03-wuxia_world.midgame.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "沈砚秋",
+        "age": "23",
+        "gender": "女",
+        "job": "",
+        "goal": "站稳脚跟"
+      },
+      "world": {
+        "time": "江湖纪年 1年·1月·第2日 13:20·星期一·下午",
+        "elapsedMinutes": 1760,
+        "location": "东市"
+      },
+      "vitals": {
+        "hp": 108,
+        "stamina": 35
+      },
+      "stats": [
+        [
+          "dim1",
+          45
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          55
+        ],
+        [
+          "dim4",
+          65
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          60
+        ],
+        [
+          "melancholy",
+          20
+        ],
+        [
+          "reputation",
+          10
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 485
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ],
+        [
+          "桂花糕",
+          2
+        ]
+      ],
+      "skills": [],
+      "abilities": {
+        "talentPoints": 0,
+        "skillPoints": 0,
+        "professionId": null,
+        "professionLevel": 1,
+        "abilityPoints": 2,
+        "unlocked": [],
+        "innate": []
+      },
+      "progression": {
+        "tier": 0,
+        "xp": 32,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 1,
+        "lastTotal": 16
+      },
+      "npcs": [
+        [
+          "柳青禾",
+          40,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [],
+        "done": [
+          "寻找落脚处"
+        ],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 8
+    },
+    "rollback:fixture-wuxia_world-turn-2": {
+      "player": {
+        "name": "沈砚秋",
+        "age": "23",
+        "gender": "女",
+        "job": "",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "江湖纪年 1年·1月·第1日 13:00·星期日·下午",
+        "elapsedMinutes": 300,
+        "location": "镇口茶棚"
+      },
+      "vitals": {
+        "hp": 120,
+        "stamina": 50
+      },
+      "stats": [
+        [
+          "dim1",
+          45
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          55
+        ],
+        [
+          "dim4",
+          65
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          60
+        ],
+        [
+          "melancholy",
+          20
+        ],
+        [
+          "reputation",
+          10
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": {
+        "talentPoints": 0,
+        "skillPoints": 0,
+        "professionId": null,
+        "professionLevel": 1,
+        "abilityPoints": 2,
+        "unlocked": [],
+        "innate": []
+      },
+      "progression": {
+        "tier": 0,
+        "xp": 0,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "柳青禾",
+          20,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 2
+    },
+    "rollback:fixture-wuxia_world-turn-5": {
+      "player": {
+        "name": "沈砚秋",
+        "age": "23",
+        "gender": "女",
+        "job": "",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "江湖纪年 1年·1月·第2日 02:30·星期一·深夜",
+        "elapsedMinutes": 1110,
+        "location": "城西旧屋"
+      },
+      "vitals": {
+        "hp": 108,
+        "stamina": 35
+      },
+      "stats": [
+        [
+          "dim1",
+          45
+        ],
+        [
+          "dim2",
+          50
+        ],
+        [
+          "dim3",
+          55
+        ],
+        [
+          "dim4",
+          65
+        ],
+        [
+          "dim5",
+          40
+        ],
+        [
+          "dim6",
+          60
+        ],
+        [
+          "melancholy",
+          20
+        ],
+        [
+          "reputation",
+          10
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": {
+        "talentPoints": 0,
+        "skillPoints": 0,
+        "professionId": null,
+        "professionLevel": 1,
+        "abilityPoints": 2,
+        "unlocked": [],
+        "innate": []
+      },
+      "progression": {
+        "tier": 0,
+        "xp": 14,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 1,
+        "lastTotal": 16
+      },
+      "npcs": [
+        [
+          "柳青禾",
+          32,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 5
+    }
+  },
+  "handoff/04-wasteland_apocalypse.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "秦九",
+        "age": "34",
+        "gender": "男",
+        "job": "拾荒者",
+        "goal": ""
+      },
+      "world": {
+        "time": "余烬纪年 207年·9月·第1日 06:00·星期四·清晨",
+        "elapsedMinutes": 0,
+        "location": ""
+      },
+      "vitals": {
+        "hp": 80,
+        "stamina": 60
+      },
+      "stats": [
+        [
+          "dim1",
+          7
+        ],
+        [
+          "dim2",
+          8
+        ],
+        [
+          "dim3",
+          6
+        ],
+        [
+          "dim4",
+          5
+        ],
+        [
+          "dim5",
+          4
+        ],
+        [
+          "dim6",
+          6
+        ],
+        [
+          "psychic_power",
+          0
+        ],
+        [
+          "radiation_res",
+          2
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 500
+      },
+      "items": [],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": 0,
+        "xp": 0,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [],
+      "tasks": {
+        "active": [],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 0
+    }
+  },
+  "midgame/04-wasteland_apocalypse.midgame.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "秦九",
+        "age": "34",
+        "gender": "男",
+        "job": "拾荒者",
+        "goal": "站稳脚跟"
+      },
+      "world": {
+        "time": "余烬纪年 207年·9月·第2日 11:20·星期五·上午",
+        "elapsedMinutes": 1760,
+        "location": "东市"
+      },
+      "vitals": {
+        "hp": 68,
+        "stamina": 45
+      },
+      "stats": [
+        [
+          "dim1",
+          7
+        ],
+        [
+          "dim2",
+          8
+        ],
+        [
+          "dim3",
+          6
+        ],
+        [
+          "dim4",
+          5
+        ],
+        [
+          "dim5",
+          4
+        ],
+        [
+          "dim6",
+          6
+        ],
+        [
+          "psychic_power",
+          0
+        ],
+        [
+          "radiation_res",
+          2
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 485
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ],
+        [
+          "桂花糕",
+          2
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": 0,
+        "xp": 36,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          40,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [],
+        "done": [
+          "寻找落脚处"
+        ],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 8
+    },
+    "rollback:fixture-wasteland_apocalypse-turn-2": {
+      "player": {
+        "name": "秦九",
+        "age": "34",
+        "gender": "男",
+        "job": "拾荒者",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "余烬纪年 207年·9月·第1日 11:00·星期四·上午",
+        "elapsedMinutes": 300,
+        "location": "镇口茶棚"
+      },
+      "vitals": {
+        "hp": 80,
+        "stamina": 60
+      },
+      "stats": [
+        [
+          "dim1",
+          7
+        ],
+        [
+          "dim2",
+          8
+        ],
+        [
+          "dim3",
+          6
+        ],
+        [
+          "dim4",
+          5
+        ],
+        [
+          "dim5",
+          4
+        ],
+        [
+          "dim6",
+          6
+        ],
+        [
+          "psychic_power",
+          0
+        ],
+        [
+          "radiation_res",
+          2
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": 0,
+        "xp": 0,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          20,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 2
+    },
+    "rollback:fixture-wasteland_apocalypse-turn-5": {
+      "player": {
+        "name": "秦九",
+        "age": "34",
+        "gender": "男",
+        "job": "拾荒者",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "余烬纪年 207年·9月·第2日 00:30·星期五·深夜",
+        "elapsedMinutes": 1110,
+        "location": "城西旧屋"
+      },
+      "vitals": {
+        "hp": 68,
+        "stamina": 45
+      },
+      "stats": [
+        [
+          "dim1",
+          7
+        ],
+        [
+          "dim2",
+          8
+        ],
+        [
+          "dim3",
+          6
+        ],
+        [
+          "dim4",
+          5
+        ],
+        [
+          "dim5",
+          4
+        ],
+        [
+          "dim6",
+          6
+        ],
+        [
+          "psychic_power",
+          0
+        ],
+        [
+          "radiation_res",
+          2
+        ]
+      ],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": 0,
+        "xp": 16,
+        "statPoints": 0
+      },
+      "survival": [],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          32,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 5
+    }
+  },
+  "handoff/05-stranded_island.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "海因",
+        "age": "26",
+        "gender": "女",
+        "job": "远洋水手",
+        "goal": ""
+      },
+      "world": {
+        "time": "生存日数·第1日 06:00·星期日·清晨",
+        "elapsedMinutes": 0,
+        "location": ""
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 500
+      },
+      "items": [],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [
+        [
+          "cloth",
+          0,
+          8
+        ],
+        [
+          "food",
+          2,
+          10
+        ],
+        [
+          "herb",
+          0,
+          8
+        ],
+        [
+          "stone",
+          0,
+          15
+        ],
+        [
+          "water",
+          3,
+          10
+        ],
+        [
+          "wood",
+          0,
+          20
+        ]
+      ],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [],
+      "tasks": {
+        "active": [],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 0
+    }
+  },
+  "midgame/05-stranded_island.midgame.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "海因",
+        "age": "26",
+        "gender": "女",
+        "job": "远洋水手",
+        "goal": "站稳脚跟"
+      },
+      "world": {
+        "time": "生存日数·第2日 11:20·星期一·上午",
+        "elapsedMinutes": 1760,
+        "location": "东市"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 85
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 485
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ],
+        [
+          "桂花糕",
+          2
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [
+        [
+          "cloth",
+          0,
+          8
+        ],
+        [
+          "food",
+          2,
+          10
+        ],
+        [
+          "herb",
+          0,
+          8
+        ],
+        [
+          "stone",
+          3,
+          15
+        ],
+        [
+          "water",
+          3,
+          10
+        ],
+        [
+          "wood",
+          1,
+          20
+        ]
+      ],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          40,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [],
+        "done": [
+          "寻找落脚处"
+        ],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 8
+    },
+    "rollback:fixture-stranded_island-turn-2": {
+      "player": {
+        "name": "海因",
+        "age": "26",
+        "gender": "女",
+        "job": "远洋水手",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "生存日数·第1日 11:00·星期日·上午",
+        "elapsedMinutes": 300,
+        "location": "镇口茶棚"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 95
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [
+        [
+          "cloth",
+          0,
+          8
+        ],
+        [
+          "food",
+          2,
+          10
+        ],
+        [
+          "herb",
+          0,
+          8
+        ],
+        [
+          "stone",
+          0,
+          15
+        ],
+        [
+          "water",
+          4,
+          10
+        ],
+        [
+          "wood",
+          0,
+          20
+        ]
+      ],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          20,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 2
+    },
+    "rollback:fixture-stranded_island-turn-5": {
+      "player": {
+        "name": "海因",
+        "age": "26",
+        "gender": "女",
+        "job": "远洋水手",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "生存日数·第2日 00:30·星期一·深夜",
+        "elapsedMinutes": 1110,
+        "location": "城西旧屋"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 90
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [
+        [
+          "cloth",
+          0,
+          8
+        ],
+        [
+          "food",
+          1,
+          10
+        ],
+        [
+          "herb",
+          0,
+          8
+        ],
+        [
+          "stone",
+          3,
+          15
+        ],
+        [
+          "water",
+          3,
+          10
+        ],
+        [
+          "wood",
+          1,
+          20
+        ]
+      ],
+      "business": null,
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "林晚",
+          32,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 5
+    }
+  },
+  "handoff/06-border_trade.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "宋知舟",
+        "age": "31",
+        "gender": "男",
+        "job": "边贸行商",
+        "goal": ""
+      },
+      "world": {
+        "time": "1993年·十二月·第1日 08:00·星期三·上午",
+        "elapsedMinutes": 0,
+        "location": ""
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 500
+      },
+      "items": [],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": {
+        "funds": 500,
+        "assets": [],
+        "inventory": []
+      },
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [],
+      "tasks": {
+        "active": [],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 0
+    }
+  },
+  "midgame/06-border_trade.midgame.save.zip": {
+    "loaded": {
+      "player": {
+        "name": "宋知舟",
+        "age": "31",
+        "gender": "男",
+        "job": "边贸行商",
+        "goal": "站稳脚跟"
+      },
+      "world": {
+        "time": "1993年·十二月·第2日 13:20·星期四·下午",
+        "elapsedMinutes": 1760,
+        "location": "东市"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 485
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ],
+        [
+          "桂花糕",
+          2
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": {
+        "funds": 765,
+        "assets": [
+          [
+            "stall",
+            1,
+            "active"
+          ]
+        ],
+        "inventory": []
+      },
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "娜塔莎",
+          40,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [],
+        "done": [
+          "寻找落脚处"
+        ],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 8
+    },
+    "rollback:fixture-border_trade-turn-2": {
+      "player": {
+        "name": "宋知舟",
+        "age": "31",
+        "gender": "男",
+        "job": "边贸行商",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "1993年·十二月·第1日 13:00·星期三·下午",
+        "elapsedMinutes": 300,
+        "location": "镇口茶棚"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": {
+        "funds": 800,
+        "assets": [
+          [
+            "stall",
+            1,
+            "active"
+          ]
+        ],
+        "inventory": []
+      },
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "娜塔莎",
+          20,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [],
+      "tick": 2
+    },
+    "rollback:fixture-border_trade-turn-5": {
+      "player": {
+        "name": "宋知舟",
+        "age": "31",
+        "gender": "男",
+        "job": "边贸行商",
+        "goal": "摸清当地的门路"
+      },
+      "world": {
+        "time": "1993年·十二月·第2日 02:30·星期四·深夜",
+        "elapsedMinutes": 1110,
+        "location": "城西旧屋"
+      },
+      "vitals": {
+        "hp": 100,
+        "stamina": 100
+      },
+      "stats": [],
+      "currency": {
+        "name": "",
+        "amount": 460
+      },
+      "items": [
+        [
+          "旧地图",
+          1
+        ]
+      ],
+      "skills": [],
+      "abilities": null,
+      "progression": {
+        "tier": null,
+        "xp": null,
+        "statPoints": null
+      },
+      "survival": [],
+      "business": {
+        "funds": 845,
+        "assets": [
+          [
+            "stall",
+            1,
+            "active"
+          ]
+        ],
+        "inventory": []
+      },
+      "dice": {
+        "count": 0,
+        "lastTotal": null
+      },
+      "npcs": [
+        [
+          "娜塔莎",
+          32,
+          "熟人"
+        ]
+      ],
+      "tasks": {
+        "active": [
+          "寻找落脚处"
+        ],
+        "done": [],
+        "failed": []
+      },
+      "chronicle": [
+        "夜里的脚步声",
+        "茶棚闲谈"
+      ],
+      "tick": 5
+    }
+  }
+}

@@ -1,0 +1,246 @@
+/* ═══════════════════════════════════════════════
+   晨雾琉璃 · entry screens (title + hall) under :root[data-ui-theme='dawn'].
+   The world behind them is the 3D rotunda (dawn-backdrop.css, DawnScene.tsx);
+   this sheet draws the HTML layer on top: the gilded title (DawnTitle.tsx),
+   the crystal start plaque (DawnStartPlaque.tsx) and the brand prism.
+   Light source: upper left, everywhere.
+   Motion: transform / opacity only. The global reduced-motion and
+   data-effects='off' resets in base.css / planar-base.css stop it all.
+   ═══════════════════════════════════════════════ */
+
+:root[data-ui-theme='dawn'] .pl-entry-root { background: #e7f0eb; }
+:root[data-ui-theme='dawn'] .pl-entry-flash {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 250, 1) 0%, rgba(240, 226, 172, .6) 22%, rgba(237, 245, 240, .3) 48%, transparent 72%);
+}
+
+/* ─── Prism (hall brand mark) ─── */
+.dw-prism { width: 100%; height: 100%; overflow: visible; }
+.dw-prism__ring { fill: none; stroke: rgba(41, 66, 74, .32); stroke-width: 1; }
+.dw-prism__ring--faint { stroke: rgba(41, 66, 74, .14); }
+.dw-prism__ring--gold { stroke: rgba(179, 148, 83, .55); stroke-width: 1.2; stroke-dasharray: 2 6; }
+.dw-prism__tick { stroke: rgba(41, 66, 74, .24); stroke-width: 1; }
+.dw-prism__tick.is-long { stroke: rgba(143, 115, 56, .6); stroke-width: 1.3; }
+.dw-prism__dial { transform-box: view-box; transform-origin: 0 0; animation: pl-spin 300s linear infinite; }
+.dw-prism__edges { fill: none; stroke: #29424a; stroke-width: 1.3; stroke-linejoin: round; }
+.dw-prism__edges line, .dw-prism__edges polyline + polyline { stroke-width: .7; stroke-opacity: .7; }
+.dw-prism__inlay { fill: none; stroke-width: 2.4; }
+.dw-prism__glint { fill: #fff; opacity: 0; animation: dw-glint 7s 1.5s ease-in-out infinite; }
+@keyframes dw-glint { 0%, 70%, 100% { opacity: 0; } 82% { opacity: .9; } }
+.dw-prism__body { transform-box: view-box; transform-origin: 0 0; animation: dw-hover 9s ease-in-out infinite; }
+@keyframes dw-hover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.dw-prism__pool { animation: dw-prism-pool 9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes dw-prism-pool { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .7; transform: scale(.94); } }
+.dw-prism--mark .dw-prism__dial, .dw-prism--mark .dw-prism__pool { display: none; }
+.dw-prism--mark .dw-prism__edges { stroke-width: 10; }
+.dw-prism--mark .dw-prism__body { animation: none; }
+
+/* ─── Title screen ─── */
+:root[data-ui-theme='dawn'] .pl-home__nebula { display: none; }
+/* Morning haze behind the lockup: lifts the letters off the drum without hiding the hall. */
+:root[data-ui-theme='dawn'] .pl-home__veil {
+  width: min(1180px, 98vw); height: min(460px, 60vh); top: 43.5%;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255, 253, 246, .62) 0%, rgba(250, 252, 247, .34) 46%, transparent 76%);
+}
+/* The lockup sits a little high so the flames keep the lower third; its parts
+   assemble one after another (see the delays below), so the block itself does not fade. */
+:root[data-ui-theme='dawn'] .pl-home__title { gap: 12px; margin-top: -13vh; opacity: 1; transform: none; transition: none; }
+
+/* Small gold caps over the sunlit drum: a darker gold and a wide white halo keep them legible. */
+:root[data-ui-theme='dawn'] .pl-home__eyebrow {
+  display: inline-flex; align-items: center; gap: 16px;
+  color: #6f5823; font-family: var(--pl-font-num); font-size: 12px; font-weight: 700; letter-spacing: .5em;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 9px rgba(255, 255, 255, .95), 0 0 18px rgba(255, 255, 255, .85);
+}
+/* Gold rules ending in a crystal gem on both sides of the eyebrow. */
+.dw-title__eyebrow::before, .dw-title__eyebrow::after {
+  content: ''; flex: 0 0 auto; width: 54px; height: 9px;
+  background:
+    linear-gradient(135deg, #ffffff 20%, #9fdcd3 60%, #5fb2ab) 100% 0 / 16% 100% no-repeat,
+    linear-gradient(90deg, rgba(179, 148, 83, 0), #b39453);
+  clip-path: polygon(0 44%, 84% 44%, 92% 0, 100% 50%, 92% 100%, 84% 56%, 0 56%);
+}
+.dw-title__eyebrow::after { transform: scaleX(-1); }
+.dw-title__eyebrow { animation: dw-rise 1s .15s var(--pl-ease) both; }
+/* Phones: one line of caps with short rules instead of a wrap inside the Chinese name. */
+@media (max-width: 480px) {
+  :root[data-ui-theme='dawn'] .pl-home__eyebrow { gap: 8px; font-size: 11px; letter-spacing: .26em; text-indent: .26em; white-space: nowrap; }
+  .dw-title__eyebrow::before, .dw-title__eyebrow::after { width: 22px; }
+}
+
+/* Logo: gilded glyphs (gold layer) under a transparent copy that carries the light. */
+:root[data-ui-theme='dawn'] .pl-home__latin { font-weight: 400; }
+.dw-title__h1 { position: relative; }
+.dw-logo { position: relative; display: block; }
+.dw-logo .pl-home__latin { display: block; white-space: nowrap; }
+/* The serif caps run ~8.8em wide: below 490px the shared 44px floor would push the logo off screen. */
+:root[data-ui-theme='dawn'] .dw-logo .pl-home__latin { font-size: clamp(28px, 9vw, 120px); }
+:root[data-ui-theme='dawn'] .dw-logo .pl-home__latin { background: none; -webkit-background-clip: border-box; background-clip: border-box; }
+:root[data-ui-theme='dawn'] .dw-logo__light { position: absolute; inset: 0; filter: none; pointer-events: none; }
+.dw-logo__ch {
+  display: inline-block;
+  background: linear-gradient(176deg, #fdf6dc 0%, #e9d6a0 22%, #b8975a 48%, #8a6c34 62%, #c9ac6c 80%, #f2e3b4 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.dw-logo__gold .dw-logo__ch { animation: dw-ch-in 1.15s calc(.3s + var(--i) * 60ms) var(--pl-ease) both; }
+@keyframes dw-ch-in { from { opacity: 0; transform: translateY(.34em) scale(1.14); } }
+.dw-logo__gold .dw-logo__gem { transform-origin: 50% 58%; animation: dw-gem-in 1.3s .5s var(--pl-ease) both; }
+@keyframes dw-gem-in { from { opacity: 0; transform: rotate(-180deg) scale(.2); } }
+/* Light: every 9 s a sheen runs across the letters (each glyph flashes in turn)
+   and star glints pop on the polished edges of O, I and A. */
+.dw-logo__light .dw-logo__ch {
+  position: relative;
+  background: linear-gradient(158deg, #ffffff 12%, #fff6d8 36%, rgba(255, 246, 216, 0) 64%);
+  -webkit-background-clip: text; background-clip: text;
+  opacity: 0;
+  animation: dw-sheen 9s calc(3.4s + var(--i) * 75ms) ease-in-out infinite;
+}
+@keyframes dw-sheen { 0%, 100% { opacity: 0; } 4% { opacity: .92; } 11% { opacity: 0; } }
+.dw-logo__light .has-glint::after {
+  content: ''; position: absolute; left: var(--gx, 20%); top: var(--gy, 10%); width: .5em; height: .5em;
+  margin: -.25em 0 0 -.25em;
+  background:
+    radial-gradient(circle, #ffffff 0 7%, rgba(255, 255, 255, .55) 13%, transparent 32%),
+    linear-gradient(90deg, transparent 47%, rgba(255, 255, 255, .95) 50%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, rgba(255, 255, 255, .95) 50%, transparent 53%);
+  -webkit-mask: radial-gradient(circle closest-side, #000 25%, transparent);
+  mask: radial-gradient(circle closest-side, #000 25%, transparent);
+  transform: scale(0) rotate(0deg);
+  animation: dw-star 9s calc(3.45s + var(--i) * 75ms) ease-out infinite;
+}
+.dw-logo__light .has-glint:nth-child(1) { --gx: 22%; --gy: 16%; }
+.dw-logo__light .has-glint:nth-child(4) { --gx: 34%; --gy: 9%; }
+.dw-logo__light .has-glint:nth-child(8) { --gx: 42%; --gy: 6%; }
+@keyframes dw-star { 0%, 100% { transform: scale(0) rotate(0deg); } 5% { transform: scale(1) rotate(45deg); } 10% { transform: scale(0) rotate(90deg); } }
+/* The gem between OMNI and PLANE catches light on its own beat. */
+.dw-logo__gem--light::after { display: none; }
+.dw-logo__gem--light::before {
+  content: ''; position: absolute; left: 50%; top: 58%; width: .62em; height: .62em; margin: -.31em 0 0 -.31em;
+  background:
+    radial-gradient(circle, #ffffff 0 8%, rgba(223, 250, 244, .7) 16%, transparent 36%),
+    linear-gradient(90deg, transparent 47%, #ffffff 50%, transparent 53%),
+    linear-gradient(0deg, transparent 47%, #ffffff 50%, transparent 53%);
+  -webkit-mask: radial-gradient(circle closest-side, #000 25%, transparent);
+  mask: radial-gradient(circle closest-side, #000 25%, transparent);
+  opacity: 0; transform: scale(.2);
+  animation: dw-gem-star 6s 2.4s ease-out infinite;
+}
+@keyframes dw-gem-star { 0%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); } 6% { opacity: 1; transform: scale(1) rotate(45deg); } 16% { opacity: 0; transform: scale(.4) rotate(90deg); } }
+:root[data-ui-theme='dawn'] .dw-logo__gold {
+  filter: drop-shadow(0 1px 0 #fff) drop-shadow(1px 2px 0 rgba(110, 86, 40, .45)) drop-shadow(3px 8px 16px rgba(41, 66, 74, .22));
+}
+
+:root[data-ui-theme='dawn'] .pl-home__latin--sub { background: linear-gradient(180deg, #4b6c6c, #29424a); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 1px 0 #fff); opacity: 1; font-size: clamp(14px, 2vw, 22px); letter-spacing: 1.1em; text-indent: 1.1em; }
+.dw-title__sub { animation: dw-rise 1.1s .95s var(--pl-ease) both; }
+:root[data-ui-theme='dawn'] .pl-home__latin i::after { width: .2em; height: .2em; background: linear-gradient(135deg, #ffffff 0%, #bfeee5 45%, #5fb2ab 100%); box-shadow: 0 0 0 1px #b39453, 0 0 .4em rgba(255, 255, 255, .9); }
+
+:root[data-ui-theme='dawn'] .pl-home__rule { color: #b39453; }
+:root[data-ui-theme='dawn'] .pl-home__rule::before, :root[data-ui-theme='dawn'] .pl-home__rule::after { height: 1px; background: linear-gradient(90deg, transparent, #b39453 70%, #e9d6a0); }
+:root[data-ui-theme='dawn'] .pl-home__rule::after { background: linear-gradient(270deg, transparent, #b39453 70%, #e9d6a0); }
+:root[data-ui-theme='dawn'] .pl-home__rule span { width: 9px; height: 9px; border: 1px solid #b39453; background: linear-gradient(135deg, #fff, #9fdcd3); }
+/* The rule draws outward from its gem. */
+.dw-title__rule::before { transform-origin: 100% 50%; animation: dw-rule 1.3s 1.05s var(--pl-ease) both; }
+.dw-title__rule::after { transform-origin: 0 50%; animation: dw-rule 1.3s 1.05s var(--pl-ease) both; }
+@keyframes dw-rule { from { opacity: 0; transform: scaleX(0); } }
+.dw-title__rule span { animation: dw-rule-gem 1.1s .95s var(--pl-ease) both; }
+@keyframes dw-rule-gem { from { opacity: 0; transform: rotate(-135deg) scale(.2); } }
+
+:root[data-ui-theme='dawn'] .pl-home__cn { color: #29424a; font-weight: 600; text-shadow: 0 1px 0 #fff, 0 0 18px rgba(255, 255, 255, .95), 0 0 3px #fff; }
+.dw-title__cn > span[aria-hidden] { display: inline-block; animation: dw-cn-in .9s calc(1.25s + var(--i) * 85ms) var(--pl-ease) both; }
+@keyframes dw-cn-in { from { opacity: 0; transform: translateY(12px) scale(.94); } }
+:root[data-ui-theme='dawn'] .pl-home__motto { color: #4f6a68; text-shadow: 0 0 12px rgba(255, 255, 255, .95), 0 0 3px #fff; }
+.dw-title__motto { animation: dw-rise 1.2s 1.8s var(--pl-ease) both; }
+@keyframes dw-rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* Start: a frosted crystal plaque in front of the hearth; the flames glow through it.
+   It stays above the footer chips: the footer's bottom padding (18px or the safe-area
+   inset), a 36px chip and a 12px gap. */
+:root[data-ui-theme='dawn'] .pl-home__actions { bottom: max(7vh, calc(max(18px, env(safe-area-inset-bottom)) + 48px)); }
+/* Wide screens use the low title-screen camera (rig.ts homePose, aspect ≥ 5/4): the plaque
+   sits on the face of the bowl, under the rim, so the logs and the base of the flames stay clear. */
+@media (min-aspect-ratio: 5/4) { :root[data-ui-theme='dawn'] .pl-home__actions { bottom: max(4vh, 24px); } }
+:root[data-ui-theme='dawn'] .dw-start {
+  width: 260px; height: 52px; padding: 0;
+  color: #1f363c; font-weight: 700; white-space: nowrap; text-indent: 0; letter-spacing: 0;
+  animation: dw-rise 1.2s 1.5s var(--pl-ease) both;
+  transition: transform .45s var(--pl-ease);
+}
+.dw-start__glass {
+  position: absolute; inset: 0; overflow: hidden;
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(228, 244, 240, .36));
+  -webkit-backdrop-filter: blur(9px) saturate(1.35);
+  backdrop-filter: blur(9px) saturate(1.35);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, .65);
+  transition: opacity .4s;
+}
+.dw-start__glass::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .5), transparent 46%), linear-gradient(0deg, rgba(95, 178, 171, .16), transparent 60%);
+  opacity: 0; transition: opacity .4s;
+}
+.dw-start__sweep {
+  position: absolute; top: -30%; bottom: -30%; left: 0; width: 30%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .9) 50%, rgba(255, 255, 255, 0));
+  transform: translateX(-130%) skewX(-20deg);
+  animation: dw-sweep 6s 2.9s ease-in-out infinite;
+}
+@keyframes dw-sweep { 0% { transform: translateX(-130%) skewX(-20deg); } 26%, 100% { transform: translateX(400%) skewX(-20deg); } }
+.dw-start__frame { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.dw-start__edge { fill: none; stroke: #b39453; stroke-width: 1.3; transition: stroke .3s; }
+.dw-start__edge--inner { stroke: rgba(255, 255, 255, .9); stroke-width: 1; }
+.dw-start__label {
+  position: relative; padding-left: .5em;
+  font: 700 14px/1 var(--pl-font-ui); letter-spacing: .5em;
+  text-shadow: 0 1px 0 #fff, 0 0 10px rgba(255, 255, 255, .9);
+  animation: dw-blink 3.2s ease-in-out infinite;
+}
+@keyframes dw-blink { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
+/* Gold rules with crystal gems reach out from both chamfers. */
+.dw-start::before, .dw-start::after {
+  content: ''; position: absolute; top: 50%; width: 66px; height: 9px; margin-top: -4.5px;
+  background:
+    linear-gradient(135deg, #ffffff 20%, #9fdcd3 60%, #5fb2ab) 100% 0 / 14% 100% no-repeat,
+    linear-gradient(90deg, rgba(179, 148, 83, 0), #b39453);
+  clip-path: polygon(0 44%, 86% 44%, 93% 0, 100% 50%, 93% 100%, 86% 56%, 0 56%);
+  transition: transform .5s var(--pl-ease);
+}
+.dw-start::before { right: calc(100% + 6px); }
+.dw-start::after { left: calc(100% + 6px); transform: scaleX(-1); }
+.dw-start:hover::before { transform: translateX(-7px); }
+.dw-start:hover::after { transform: translateX(7px) scaleX(-1); }
+.dw-start:hover { transform: translateY(-2px); }
+.dw-start:hover .dw-start__glass::after, .dw-start:focus-visible .dw-start__glass::after { opacity: 1; }
+.dw-start:hover .dw-start__edge:not(.dw-start__edge--inner) { stroke: #c9a95f; }
+.dw-start:active { transform: scale(.98); }
+:root[data-ui-theme='dawn'] .dw-start:focus-visible { outline: none; }
+.dw-start:focus-visible .dw-start__edge:not(.dw-start__edge--inner) { stroke: #8f7338; stroke-width: 2.2; }
+@media (max-width: 420px) {
+  .dw-start::before, .dw-start::after { width: 34px; }
+}
+
+:root[data-ui-theme='dawn'] .pl-home__version { color: #4f6a68; font-family: var(--pl-font-num); text-shadow: 0 0 8px #fff; }
+
+/* Warp: the camera cranes up through the light; the lockup scatters upward past it. */
+:root[data-ui-theme='dawn'] .pl-home.is-departing .pl-home__title { opacity: 1; transform: none; filter: none; }
+.pl-home.is-departing .dw-logo__gold > * { animation: dw-ch-out .85s calc(var(--i) * 30ms) var(--pl-ease-io) forwards; }
+@keyframes dw-ch-out { to { opacity: 0; transform: translateY(-1.1em) scale(1.3); } }
+.pl-home.is-departing .dw-logo__light { opacity: 0; }
+.pl-home.is-departing .dw-title__eyebrow,
+.pl-home.is-departing .dw-title__sub,
+.pl-home.is-departing .dw-title__rule,
+.pl-home.is-departing .dw-title__motto { animation: dw-lift-out .55s var(--pl-ease-io) forwards; }
+.pl-home.is-departing .dw-title__cn > span[aria-hidden] { animation: dw-lift-out .6s calc(var(--i) * 25ms) var(--pl-ease-io) forwards; }
+@keyframes dw-lift-out { to { opacity: 0; transform: translateY(-22px); } }
+.pl-home.is-departing .dw-start { animation: dw-plaque-out .4s var(--pl-ease-io) forwards; }
+@keyframes dw-plaque-out { to { opacity: 0; transform: scale(1.14); } }
+
+/* Reduced motion: the lockup and plaque stand still from the first frame (no delayed
+   pop-in) and vanish at once on the warp, which then cuts straight to the hall. */
+@media (prefers-reduced-motion: reduce) {
+  .pl-home .dw-title :is(.dw-logo__ch, .dw-logo__gem, .dw-title__eyebrow, .dw-title__sub, .dw-title__motto, .dw-title__rule span),
+  .pl-home .dw-title :is(.dw-title__rule, .dw-logo__gem)::before,
+  .pl-home .dw-title :is(.dw-title__rule, .dw-logo__ch)::after,
+  .pl-home .dw-title__cn > span,
+  .pl-home .dw-start, .pl-home .dw-start * { animation: none; }
+  :root[data-ui-theme='dawn'] .pl-home.is-departing .dw-title { opacity: 0; }
+}

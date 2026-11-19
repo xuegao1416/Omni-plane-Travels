@@ -9,6 +9,9 @@ interface UsePanZoomParams {
   onPointerTap?: (clientX: number, clientY: number, target: HTMLElement) => void;
 }
 
+const FIT_MIN_SCALE = 0.55;
+const FIT_MAX_SCALE = 1.6;
+
 export function usePanZoom({ viewportRef, graphSize, onPointerTap }: UsePanZoomParams) {
   const [scale, setScale] = useState(1);
   const [translateX, setTranslateX] = useState(0);
@@ -44,14 +47,15 @@ export function usePanZoom({ viewportRef, graphSize, onPointerTap }: UsePanZoomP
 
     const widthRatio = (viewportRect.width - SURFACE_PADDING * 2) / size.width;
     const heightRatio = (viewportRect.height - SURFACE_PADDING * 2) / size.height;
-    const fitScale = Math.max(widthRatio, heightRatio);
-    const nextScale = Math.max(1.0, Math.min(MAX_SCALE, fitScale));
+    // Show the whole graph, but never shrink labels past legibility or blow small graphs up.
+    const nextScale = Math.max(FIT_MIN_SCALE, Math.min(FIT_MAX_SCALE, Math.min(widthRatio, heightRatio)));
 
     const totalWidth = size.width * nextScale + SURFACE_PADDING * 2;
     const totalHeight = size.height * nextScale + SURFACE_PADDING * 2;
     setScale(nextScale);
-    setTranslateX((viewportRect.width - totalWidth) / 2);
-    setTranslateY((viewportRect.height - totalHeight) / 2);
+    // Centre when it fits; otherwise start from the top-left so the root is in view.
+    setTranslateX(totalWidth <= viewportRect.width ? (viewportRect.width - totalWidth) / 2 : 0);
+    setTranslateY(totalHeight <= viewportRect.height ? (viewportRect.height - totalHeight) / 2 : 0);
   }, [viewportRef, graphSize]);
 
   const zoomBy = useCallback((factor: number, originX?: number, originY?: number) => {

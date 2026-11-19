@@ -147,11 +147,19 @@ function summaryFor(state: GameState, enabled: Set<ModuleRuntimeId>): string {
   }
   if (enabled.has('progression')) parts.push(`成长:Lv.${player.当前段位索引 ?? 0}/${player.当前经验值 ?? 0}XP`);
   if (enabled.has('survival')) {
-    const resources = Object.entries(player.生存资源 ?? {}).slice(0, 2)
-      .map(([id, value]) => `${value.name ?? id}${value.数量}`);
+    // 资源模块（state.resources）优先；旧存档迁移前仍读旧字段。
+    const ledger = state.resources;
+    const resources = ledger
+      ? Object.entries(ledger.stocks ?? {}).slice(0, 2).map(([id, amount]) => `${ledger.discovered?.[id]?.name ?? id}${amount}`)
+      : Object.entries(player.生存资源 ?? {}).slice(0, 2).map(([id, value]) => `${value.name ?? id}${value.数量}`);
     parts.push(`生存:${resources.join('、') || '无记录'}`);
   }
-  if (enabled.has('business')) parts.push(`经营:${player.经营资产?.资金 ?? 0}资金/${player.经营资产?.资产列表?.length ?? 0}资产`);
+  if (enabled.has('business')) {
+    const money = Number(player.货币资源?.主货币?.数量 ?? 0);
+    parts.push(state.economy
+      ? `经营:钱袋${money}/${Object.keys(state.economy.holdings ?? {}).length}产业`
+      : `经营:${player.经营资产?.资金 ?? 0}资金/${player.经营资产?.资产列表?.length ?? 0}资产`);
+  }
   if (enabled.has('dice')) parts.push(`骰子:${state.dice?.lastRoll ? `${state.dice.lastRoll.total}/${state.dice.lastRoll.dc}` : '无待承接结果'}`);
   if (enabled.has('profession')) {
     const ability = player.能力系统;

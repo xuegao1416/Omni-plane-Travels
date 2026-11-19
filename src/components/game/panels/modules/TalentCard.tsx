@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { BookOpen,CircleCheck,LockKeyhole,Play,Sparkles,Star,RotateCcw,Zap,X } from 'lucide-react';
 import type { TalentModuleSchema } from '../../../../modules/schema';
 import type { GameState } from '../../../../schema/variables';
-import { canLearnSkill,canUnlockTalent } from '../../../../gameplay/modules/talent';
+import { canLearnSkill,canUnlockTalent } from '../../../../domains/abilities/rules';
 import { Collapsible } from '../../../shared/Collapsible';
 import { getQualityColor } from '../../../shared/qualityUtils';
 

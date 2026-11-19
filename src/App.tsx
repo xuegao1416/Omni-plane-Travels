@@ -8,7 +8,6 @@ import GameScreen from './components/game/GameScreen';
 import EventsScreen from './components/event/EventsScreen';
 import UserCenterPage from './components/UserCenterPage';
 import { useAuthStore } from './stores/authStore';
-import { useAdaptiveTheme } from './theme/useAdaptiveTheme';
 import { reportDepth } from './modules/playTracker';
 import TelemetryConsentBanner from './components/TelemetryConsentBanner';
 
@@ -16,7 +15,6 @@ function AppContent() {
   const { state } = useGame();
   const checkAuth = useAuthStore(s => s.checkAuth);
 
-  useAdaptiveTheme();
 
   useEffect(() => { checkAuth(); }, [checkAuth]);
 

@@ -22,6 +22,7 @@ type TrackStyle = CSSProperties & {
   '--fill': number;
   '--gain-start': number;
   '--gain-width': number;
+  '--step': number;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -131,13 +132,14 @@ export default function StepAbilityAlloc({
             '--fill': Math.max(0, Math.min(1, (current - row.min) / span)),
             '--gain-start': Math.max(0, Math.min(1, (row.base - row.min) / span)),
             '--gain-width': Math.max(0, Math.min(1, (current - row.base) / span)),
+            '--step': Math.max(0.02, Math.min(1, row.gain / span)),
           };
           return (
             <div className="alloc-row" key={row.key}>
               <span className="alloc-row__name">{row.name}</span>
-              <span className="alloc-row__value">{displayValue(current)}<i>/{displayValue(row.cap)}</i></span>
+              <span className="alloc-row__value" key={`v${current}`}>{displayValue(current)}<i>/{displayValue(row.cap)}</i></span>
               <div
-                className="alloc-track"
+                className={`alloc-track${allocation > 0 ? ' is-gained' : ''}`}
                 style={style}
                 role="progressbar"
                 aria-label={`${row.name}当前值`}
@@ -145,9 +147,9 @@ export default function StepAbilityAlloc({
                 aria-valuemax={row.cap}
                 aria-valuenow={current}
               >
-                <span className="alloc-track__mid" aria-hidden="true" />
                 <span className="alloc-track__fill" aria-hidden="true" />
                 <span className="alloc-track__gain" aria-hidden="true" />
+                <span className="alloc-track__mid" key={`g${allocation}`} aria-hidden="true" />
               </div>
               <div className="alloc-stepper">
                 <button
@@ -157,7 +159,7 @@ export default function StepAbilityAlloc({
                   disabled={allocation <= 0}
                   onClick={() => step(row.key, -1)}
                 ><Minus size={15} /></button>
-                <b className="alloc-stepper__count" aria-label={`${row.name}已分配 ${allocation} 点`}>
+                <b className="alloc-stepper__count" key={`c${allocation}`} aria-label={`${row.name}已分配 ${allocation} 点`}>
                   {allocation > 0 ? `+${allocation}` : '·'}
                 </b>
                 <button

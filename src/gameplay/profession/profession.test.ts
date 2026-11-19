@@ -1,13 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { ProfessionModuleSchema } from '../../modules/schema';
 import { createDefaultGameState } from '../../schema/variables';
-import {
-  initializeProfessionSelection,
-  resolveProfessionBonuses,
-  resolveOwnedAbility,
-  unlockProfessionAbility,
-  validateProfessionSelection,
-} from './profession';
+import { initializeProfessionSelection, validateProfessionSelection } from './profession';
 
 const config: ProfessionModuleSchema = {
   creationTalentBudget: 3,
@@ -86,30 +80,5 @@ describe('profession domain', () => {
     expect(initialized.玩家.技能系统.烹饪).toBeDefined();
   });
 
-  test('unlocks only the selected profession tree with prerequisites and level gates', () => {
-    let state = initializeProfessionSelection(createDefaultGameState(), config, 'warrior', []);
-    expect(unlockProfessionAbility(state, config, 'slash', { tick: 1, enabledModules: ['profession'] }).status).toBe('blocked');
-    state = unlockProfessionAbility(state, config, 'guard', { tick: 2, enabledModules: ['profession'] }).state;
-    state = unlockProfessionAbility(state, config, 'slash', { tick: 3, enabledModules: ['profession'] }).state;
-    expect(state.玩家.能力系统?.职业状态?.已解锁能力.slash.等级).toBe(1);
-    expect(unlockProfessionAbility(state, config, 'last_stand', { tick: 4, enabledModules: ['profession'] }).status).toBe('blocked');
-  });
-
-  test('resolves task abilities by stable id or compatible display name', () => {
-    let state = initializeProfessionSelection(createDefaultGameState(), config, 'warrior', []);
-    state = unlockProfessionAbility(state, config, 'guard', { tick: 1, enabledModules: ['profession'] }).state;
-    expect(resolveOwnedAbility(state, config, 'guard')?.id).toBe('guard');
-    expect(resolveOwnedAbility(state, config, '守势')?.id).toBe('guard');
-    expect(resolveOwnedAbility(state, config, '重斩')).toBeUndefined();
-  });
-
-  test('applies only selected innate talents and actually unlocked profession nodes', () => {
-    let state = initializeProfessionSelection(createDefaultGameState(), config, 'warrior', ['brave']);
-    expect(resolveProfessionBonuses(state, config).combat.armor).toBe(0);
-    state = unlockProfessionAbility(state, config, 'guard', { tick: 1, enabledModules: ['profession'] }).state;
-    const bonuses = resolveProfessionBonuses(state, config);
-    expect(bonuses.combat.armor).toBe(2);
-    expect(bonuses.checks.map(item => item.source)).toEqual(expect.arrayContaining(['无畏', '守势']));
-    expect(bonuses.checks.some(item => item.source === '重斩')).toBe(false);
-  });
+  // 解锁三项（能力树前置与等级、按 id/显示名识别、加成只算已解锁节点）已迁移到 src/domains/abilities/abilities.test.ts。
 });

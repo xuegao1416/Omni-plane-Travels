@@ -24,11 +24,10 @@ function CardNodeComponent({ id, data, selected }: NodeProps) {
 
   return (
     <div
+      className={`pk-flow-node pk-flow-node--card${selected ? ' is-selected' : ''}`}
       style={{
         minWidth: 180,
-        background: 'var(--bg-elevated)',
-        border: `2px solid ${selected ? def.color : 'var(--border)'}`,
-        borderRadius: 'var(--radius-md)',
+        ['--node-color' as string]: def.color,
         overflow: 'hidden',
         fontFamily: 'var(--font-sans)',
       }}
@@ -37,8 +36,11 @@ function CardNodeComponent({ id, data, selected }: NodeProps) {
       <div
         style={{
           padding: '6px 10px',
-          background: def.color,
-          color: '#fff',
+          background: `linear-gradient(180deg, ${def.color}3d, ${def.color}12)`,
+          color: 'rgb(var(--d-ink, 242, 227, 189))',
+          fontFamily: 'var(--pl-font-serif)',
+          letterSpacing: '0.06em',
+          borderBottom: '1px solid rgba(var(--d-gold, 233, 207, 150), 0.16)',
           fontSize: 'var(--font-size-sm)',
           fontWeight: 600,
           display: 'flex',

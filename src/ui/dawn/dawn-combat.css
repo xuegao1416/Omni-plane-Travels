@@ -1,0 +1,74 @@
+/* ═══════════════════════════════════════════════
+   晨雾琉璃 · combat. The battlefield art is a night scene, so the paper-white
+   chrome glared against it. Here the combat roles drop to a dimmer mist
+   (slate-blue glass, pale ice text), and the portrait plates become pale
+   sky-blue enamel. Enemies keep a muted rose plate.
+   ═══════════════════════════════════════════════ */
+
+:root[data-ui-theme='dawn'] .cb-root {
+  --d-ink: 233, 241, 240;
+  --d-cream: 233, 241, 240;
+  --d-white-fg: 240, 246, 245;
+  --d-ink2: 192, 210, 210;
+  --d-ink3: 150, 172, 174;
+  --d-gold: 214, 188, 128;
+  --d-brass: 196, 168, 108;
+  --d-night-bg: 46, 70, 82;
+  --d-raise-bg: 62, 90, 102;
+  --d-deep-bg: 30, 48, 58;
+  --d-ink-bg: 236, 244, 243;
+  --d-shade-k: .6;
+  --d-ts-k: .8;
+  --pk-text: #e9f1f0;
+  --pk-text-2: #c0d2d2;
+  --pk-text-3: #96acae;
+  --pk-ink-label: #d6bc80;
+  --pk-plate: linear-gradient(160deg, rgba(70, 100, 112, .9) 0%, rgba(48, 74, 86, .9) 60%, rgba(38, 60, 72, .92) 100%);
+  --pk-plate-edge: inset 1px 1px 0 rgba(255, 255, 255, .22), inset -1px -1px 0 rgba(0, 0, 0, .18), 0 0 0 1px rgba(214, 188, 128, .35), 4px 8px 22px rgba(10, 22, 30, .3);
+  --pk-well: linear-gradient(180deg, rgba(24, 40, 50, .82), rgba(36, 56, 68, .82));
+  --pk-well-edge: inset 0 2px 0 rgba(0, 0, 0, .25), inset 0 0 0 1px rgba(214, 188, 128, .22), 0 1px 0 rgba(255, 255, 255, .12);
+  --pk-weave: none;
+  --pk-cloth: #4d7180;
+  --pk-cloth-deep: #2f4c5a;
+  --d-cloth-bg: 47, 76, 90;
+  color: #e9f1f0;
+}
+:root[data-ui-theme='dawn'] .cb-root .cb-header,
+:root[data-ui-theme='dawn'] .cb-root .cb-formation,
+:root[data-ui-theme='dawn'] .cb-root .cb-command { color: #e9f1f0; }
+
+/* Ally portrait plate: sky-blue enamel lit from the upper left */
+:root[data-ui-theme='dawn'] .cb-unit {
+  --plate-a: #d7ecf6; --plate-b: #8fbfd6;
+  --rim: rgba(203, 178, 118, .7); --rim-hot: #f0dc9e;
+}
+:root[data-ui-theme='dawn'] .cb-unit.is-enemy { --plate-a: #ecd6d6; --plate-b: #b88a8e; --rim: rgba(196, 120, 112, .7); --rim-hot: #f2b4a8; }
+:root[data-ui-theme='dawn'] .cb-unit__card {
+  background:
+    radial-gradient(ellipse 80% 50% at 30% 18%, rgba(255, 255, 255, .7), transparent 70%),
+    linear-gradient(180deg, var(--plate-a), var(--plate-b) 80%);
+  box-shadow: 0 calc(var(--s) * .08) calc(var(--s) * .18) rgba(8, 18, 26, .45);
+}
+:root[data-ui-theme='dawn'] .cb-unit.is-enemy .cb-unit__card {
+  background:
+    radial-gradient(ellipse 80% 50% at 70% 18%, rgba(255, 255, 255, .6), transparent 70%),
+    linear-gradient(180deg, var(--plate-a), var(--plate-b) 80%);
+}
+:root[data-ui-theme='dawn'] .cb-unit__card::before { opacity: 0; }
+:root[data-ui-theme='dawn'] .cb-unit__card::after { box-shadow: inset 0 -26px 24px -14px rgba(30, 56, 72, .35), inset 0 0 0 1px rgba(255, 255, 255, .5); }
+:root[data-ui-theme='dawn'] .cb-unit__frame { filter: saturate(.7) brightness(1.05); }
+:root[data-ui-theme='dawn'] .cb-unit.is-active .cb-unit__frame { filter: saturate(.8) brightness(1.2) drop-shadow(0 0 5px var(--rim-hot)); }
+
+/* Titles: the theme-wide slate ink would vanish on the dark chrome, so use ice text with an old-gold edge */
+:root[data-ui-theme='dawn'] .cb-root .cb-header__title h1,
+:root[data-ui-theme='dawn'] .cb-root .cb-formation__copy strong,
+:root[data-ui-theme='dawn'] .cb-root .cb-result__card h2,
+:root[data-ui-theme='dawn'] .cb-root .combat-decision h2 {
+  background: linear-gradient(176deg, #ffffff 0%, #e6f1f0 50%, #c9dcdc 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(10, 22, 30, .6)) drop-shadow(0 0 1px rgba(214, 188, 128, .6));
+}
+:root[data-ui-theme='dawn'] .cb-root .pk-btn--secondary,
+:root[data-ui-theme='dawn'] .cb-root .btn-secondary { color: #e9f1f0; background: rgba(36, 58, 70, .9); box-shadow: inset 0 0 0 1px rgba(214, 188, 128, .5), inset 1px 1px 0 2px rgba(255, 255, 255, .08); }
+:root[data-ui-theme='dawn'] .cb-root .pk-btn--secondary:hover:not(:disabled),
+:root[data-ui-theme='dawn'] .cb-root .btn-secondary:hover:not(:disabled) { color: #fff; box-shadow: inset 0 0 0 1px #d6bc80, inset 1px 1px 0 2px rgba(255, 255, 255, .1); }

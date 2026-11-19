@@ -3,7 +3,8 @@ import { Check, Download, History, Loader2, MessageSquare, Pencil, Plus, RotateC
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { useConfigStore } from '../../stores/configStore';
-import { useWorkshopStore } from '../../stores/workshopStore';
+import { useAuthStore } from '../../stores/authStore';
+import { localAssetKey, publishLocalAsset } from '../../workshop/publish';
 import { findWorldDef, getAllWorlds } from '../../data/worldLoader';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import { WorldIcon } from '../shared/worldIcons';
@@ -12,7 +13,8 @@ import { useModuleWorkshopStore } from '../../custom-modules/workshopStore';
 import type { WorkshopMessage } from '../../custom-modules/workshopSession';
 import { bindCustomGameplayModule, saveCustomGameplayModule } from '../../custom-modules/storage';
 import { WorkshopModulePanel } from './WorkshopModulePanel';
-import '../../styles/custom-modules.css';
+import { Seal } from '../../ui/planar/Ornaments';
+import '../../ui/screens/module-workshop.css';
 
 interface Props { onClose: () => void }
 
@@ -35,7 +37,7 @@ const toolLabels: Record<string, string> = {
 
 export default function CustomModuleAgentWorkspace({ onClose }: Props) {
   const apiConfig = useConfigStore((state) => state.apiConfig);
-  const publish = useWorkshopStore((state) => state.createItem);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const workshop = useModuleWorkshopStore();
   const worlds = useMemo(() => getAllWorlds(), []);
   const [worldId, setWorldId] = useState(() => worlds[0]?.id ?? '');
@@ -124,20 +126,29 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
   const publishModule = () => {
     if (!revision) return;
     const module = revision.module;
-    void runAction(() => publish({
-      type: 'gameplay_module', contentType: 'gameplay_module', title: module.name,
-      description: module.description || '通过玩法模块工坊创作的模块。', tags: ['玩法模块'], data: module,
-      version: module.version, category: 'gameplay', dependencies: module.dependencies ?? [], compatibility: { moduleSchema: module.schemaVersion },
-    }), '模块已发布到创意工坊。');
+    if (!isAuthenticated) {
+      setActionError('请先在旅者登记所登录，再发布到创意工坊。');
+      return;
+    }
+    // 模块自己的依赖是模块 id（如 core），不是工坊条目，放进兼容信息里而不是工坊依赖。
+    void runAction(async () => {
+      const outcome = await publishLocalAsset(localAssetKey('gameplay_module', module.id), {
+        type: 'gameplay_module', title: module.name,
+        description: module.description || '通过玩法模块工坊创作的模块。', tags: ['玩法模块'], data: module,
+        version: module.version, category: 'gameplay',
+        compatibility: { moduleSchema: module.schemaVersion, ...(module.dependencies?.length ? { moduleDependencies: module.dependencies } : {}) },
+      });
+      setNotice(outcome.created ? `模块已发布到创意工坊（v${outcome.version}）。` : `已作为新版本 v${outcome.version} 更新到创意工坊。`);
+    });
   };
 
-  return <div className="entry-default-theme custom-module-workspace" role="dialog" aria-modal="true" aria-labelledby="module-workshop-title" ref={dialogRef}>
+  return <div className="custom-module-workspace" role="dialog" aria-modal="true" aria-labelledby="module-workshop-title" ref={dialogRef}>
     <div className="custom-module-workspace-backdrop" />
     <div className="custom-module-workspace-shell">
       <DawnFrameV4 mode="panel" withFill className="custom-module-workspace-frame" ariaLabel="玩法模块工坊">
         <div className="custom-module-workspace-inner">
           <header className="mws-header">
-            <div className="mws-title"><Sparkles size={23} /><div><span>DAWN · GAMEPLAY WORKSHOP</span><h2 id="module-workshop-title">玩法模块工坊</h2><p>聊出想法，修改规则，亲手试玩。</p></div></div>
+            <div className="mws-title"><Seal size={54}><Sparkles size={22} /></Seal><div><span>玩法工坊 · GAMEPLAY WORKSHOP</span><h2 id="module-workshop-title">玩法模块工坊</h2><p>聊出想法，修改规则，亲手试玩。</p></div></div>
             <div className="mws-header-actions"><label className="mws-world"><WorldIcon name={world?.icon || 'Globe'} size={17} /><span className="mws-sr-only">创作世界</span><select aria-label="创作世界" value={worldId} onChange={(event) => { workshop.stop(); setWorldId(event.target.value); }} disabled={workshop.loading || actionBusy && !workshop.busy}>{worlds.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button ref={closeRef} type="button" className="mws-icon" onClick={() => { workshop.stop(); onClose(); }} aria-label="关闭玩法模块工坊"><X size={20} /></button></div>
           </header>
           <nav className="mws-mobile-nav" aria-label="工坊区域">{([['sessions', '会话'], ['chat', '对话'], ['module', '模块']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={mobilePane === id} onClick={() => setMobilePane(id)}>{label}</button>)}</nav>
@@ -155,7 +166,7 @@ export default function CustomModuleAgentWorkspace({ onClose }: Props) {
               <div className="mws-section-heading"><h3>{session?.title || '开始创作'}</h3><span className="mws-status" role="status">{workshop.busy ? <><Loader2 size={13} className="spin" /> 正在创作</> : revision ? `草稿 v${revision.number}` : '准备就绪'}</span></div>
               {importOpen && <section className="mws-import" aria-label="导入模块 JSON"><div className="mws-section-heading"><h4>导入模块</h4><button className="mws-icon" type="button" aria-label="关闭导入" onClick={() => setImportOpen(false)}><X size={16} /></button></div><label>选择 JSON 文件<input type="file" accept=".json,application/json" disabled={disabled} onChange={(event) => { const file = event.target.files?.[0]; if (file) { if (file.size > 1024 * 1024) { setActionError('模块文件不能超过 1 MB。'); return; } void file.text().then(setImportText).catch((error: unknown) => setActionError(String(error))); } }} /></label><textarea aria-label="模块 JSON" value={importText} onChange={(event) => setImportText(event.target.value)} rows={5} placeholder="或在这里粘贴模块 JSON" /><button type="button" className="mws-button" disabled={disabled || !importText.trim()} onClick={() => void runAction(async () => { await workshop.importModule(importText); setImportOpen(false); setImportText(''); }, '模块已导入为新草稿版本。')}>校验并导入</button></section>}
               <div className="mws-chat-history" ref={historyRef} onScroll={() => { const element = historyRef.current; if (element) stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; }}>
-                {!session?.messages.length && <div className="mws-empty-chat"><Sparkles size={30} /><h3>把一个玩法想法变成现实</h3><p>描述玩家要做什么、需要付出什么，以及会获得什么。Agent 会逐步创建和校验模块；不支持工具调用的接口会自动尝试文本兼容模式。</p><button type="button" className="mws-suggestion" onClick={() => setInput('帮我做一个制作台：消耗金币和材料获得物品，显示资源和制作按钮。')}>制作台：消耗金币和材料，获得物品 <Send size={14} /></button></div>}
+                {!session?.messages.length && <div className="mws-empty-chat"><Seal size={72}><Sparkles size={28} /></Seal><h3>把一个玩法想法变成现实</h3><p>描述玩家要做什么、需要付出什么，以及会获得什么。Agent 会逐步创建和校验模块；不支持工具调用的接口会自动尝试文本兼容模式。</p><button type="button" className="mws-suggestion" onClick={() => setInput('帮我做一个制作台：消耗金币和材料获得物品，显示资源和制作按钮。')}>制作台：消耗金币和材料，获得物品 <Send size={14} /></button></div>}
                 {session?.messages.map((message) => <article className={`mws-message ${message.role}`} key={message.id}>
                   <header><span>{message.role === 'user' ? '你' : '共创 Agent'}</span><small>{message.status === 'stopped' ? '已停止' : message.status === 'failed' ? '未完成' : message.status === 'running' ? '进行中' : ''}</small></header>
                   {editId === message.id ? <div className="mws-edit-message"><textarea aria-label="编辑消息" autoFocus rows={4} value={editText} onChange={(event) => setEditText(event.target.value)} /><p className="mws-footnote">从这条消息重建后续对话，现有模块版本会保留。</p><div className="mws-actions"><button className="mws-button" type="button" disabled={disabled || workshop.busy || !editText.trim() || !apiConfig} onClick={() => { if (apiConfig) { setEditId(undefined); void runAction(() => workshop.editMessage(message.id, editText.trim(), apiConfig)); } }}>编辑并重发</button><button className="mws-button" type="button" onClick={() => setEditId(undefined)}>取消</button></div></div> : message.parts.map((part, index) => part.type === 'text' ? <Markdown key={index} text={part.text} /> : <details className={`mws-tool ${part.status}`} key={part.toolCallId}><summary>{part.status === 'running' ? <Loader2 size={14} className="spin" /> : part.status === 'failed' ? <X size={14} /> : <Check size={14} />}<span>{toolLabels[part.name] ?? part.name}</span><small>{part.status === 'running' ? '执行中' : part.status === 'failed' ? '失败' : '完成'}</small></summary><h5>参数</h5><pre>{JSON.stringify(part.input, null, 2)}</pre>{part.output !== undefined && <><h5>结果</h5><pre>{JSON.stringify(part.output, null, 2)}</pre></>}</details>)}

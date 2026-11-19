@@ -7,16 +7,13 @@ import type {
   StatModuleSchema,
 } from '../../modules/schema';
 import type { GameState } from '../../schema/variables';
-import { abilityDefinitionFromInnateTalent, abilityDefinitionFromProfessionAbility, abilityDefinitionFromSkill, abilityRankCost, createAbilityInstance } from '../abilitySystem';
+import { abilityDefinitionFromInnateTalent, abilityDefinitionFromProfessionAbility, abilityDefinitionFromSkill, createAbilityInstance } from '../abilitySystem';
 import { combatStatLabel, describeCombatActionFormula } from '../combatMath';
-import {
-  executeGameplayTransaction,
-  type GameplayExecutionContext,
-  type GameplayExecutionResult,
-} from '../kernel';
+import { FactRegistry } from '../../core/facts';
+import { gameplayEffectToOp } from '../../core/legacy';
+import { applyOps, type Op } from '../../core/ops';
+import { Rng, createRngState } from '../../core/rng';
 import { DIVINE_TALENT_COST } from '../creation/creationPoints';
-
-export type ProfessionActionResult = GameplayExecutionResult<GameState>;
 
 export interface ResolvedProfessionBonuses {
   combat: Required<ProfessionCombatModifiers>;
@@ -108,13 +105,11 @@ export function initializeProfessionSelection(
     const talent = config.innateTalents.find(item => item.id === id);
     return talent ? abilityDefinitionFromInnateTalent(talent).mechanics?.effects ?? [] : [];
   });
-  const initialized = effects.length === 0 ? state : executeGameplayTransaction(state, {
-    id: 'profession:creation',
-    moduleId: 'profession',
-    source: 'system',
-    label: '应用创建角色先天天赋',
-    effects,
-  }, { tick: 0, enabledModules: ['profession'] }).state;
+  // 先天天赋的开局效果：整体生效或整体不生效（与旧事务一致）。
+  const ops = effects.flatMap(effect => { const op = gameplayEffectToOp(effect); return op ? [op] : [] as Op[]; });
+  const initialized = ops.length === 0 ? state : applyOps(state, ops, {
+    facts: new FactRegistry(), source: 'system', turn: 0, rng: new Rng(createRngState('profession:creation')), sourceLabel: '应用创建角色先天天赋',
+  }).state;
   return synchronizeProfessionAbilities(initialized, config);
 }
 
@@ -179,17 +174,6 @@ export function synchronizeProfessionAbilities(source: GameState, config: Profes
   state.v3.abilityDefinitions = definitions;
   state.v3.abilityInstances = instances;
   return state;
-}
-
-function blocked(state: GameState, context: GameplayExecutionContext, id: string, reason: string): ProfessionActionResult {
-  const result = executeGameplayTransaction(state, {
-    id,
-    moduleId: 'profession',
-    source: 'player',
-    label: reason,
-    conditions: [{ state: { path: '__profession.allowed', op: '==', value: true } }],
-  }, context);
-  return { ...result, reason };
 }
 
 function selectedProfession(state: GameState, config: ProfessionModuleSchema) {
@@ -267,121 +251,6 @@ export function describeProfessionAbilityMechanics(
     ability.activation?.combatAction ? describeCombatActionFormula(ability.activation.combatAction, statConfig, state) : '',
     describeProfessionMechanics(ability.mechanics, statConfig),
   ].filter(Boolean).join(' · ');
-}
-
-export function findProfessionAbility(
-  state: GameState,
-  config: ProfessionModuleSchema,
-  abilityId: string,
-): ProfessionAbilityDef | undefined {
-  return selectedProfession(state, config)?.abilities.find(item => item.id === abilityId);
-}
-
-export function canUnlockProfessionAbility(
-  state: GameState,
-  config: ProfessionModuleSchema,
-  abilityId: string,
-): { ok: boolean; reason?: string } {
-  const runtime = state.玩家.能力系统?.职业状态;
-  const profession = selectedProfession(state, config);
-  const ability = profession?.abilities.find(item => item.id === abilityId);
-  if (!runtime || !profession) return { ok: false, reason: '尚未选择职业' };
-  if (!ability) return { ok: false, reason: '能力不属于当前职业' };
-  const definition = abilityDefinitionFromProfessionAbility(ability, profession.id);
-  const currentRank = runtime.已解锁能力[abilityId]?.等级 ?? 0;
-  if (currentRank >= Math.max(1, definition.maxRank)) return { ok: false, reason: '已达到最高等级' };
-  const prerequisites = definition.prerequisites;
-  const prerequisitesMet = definition.prerequisiteMode === 'any'
-    ? (prerequisites.length === 0 || prerequisites.some(id => Boolean(runtime.已解锁能力[id])))
-    : prerequisites.every(id => Boolean(runtime.已解锁能力[id]));
-  if (!prerequisitesMet) return { ok: false, reason: '前置能力尚未解锁' };
-  if ((definition.requiredProfessionLevel ?? 1) > runtime.职业等级) return { ok: false, reason: '职业等级不足' };
-  if (definition.exclusiveGroup && profession.abilities.some(item => (
-    item.id !== definition.id && item.exclusiveGroup === definition.exclusiveGroup && runtime.已解锁能力[item.id]
-  ))) return { ok: false, reason: '互斥专精已经选择' };
-  if (runtime.能力点 < abilityRankCost(definition, currentRank + 1)) return { ok: false, reason: '能力点不足' };
-  return { ok: true };
-}
-
-export function unlockProfessionAbility(
-  state: GameState,
-  config: ProfessionModuleSchema,
-  abilityId: string,
-  context: GameplayExecutionContext,
-): ProfessionActionResult {
-  const check = canUnlockProfessionAbility(state, config, abilityId);
-  const ability = findProfessionAbility(state, config, abilityId);
-  const runtime = state.玩家.能力系统?.职业状态;
-  if (!check.ok || !ability || !runtime) {
-    return blocked(state, context, `profession:unlock:blocked:${abilityId}:${context.tick}`, check.reason ?? '无法解锁能力');
-  }
-  const definition = abilityDefinitionFromProfessionAbility(ability, runtime.职业ID ?? undefined);
-  const cost = abilityRankCost(definition, (runtime.已解锁能力[abilityId]?.等级 ?? 0) + 1);
-  const current = runtime.已解锁能力[abilityId];
-  const next = {
-    ...runtime.已解锁能力,
-    [abilityId]: {
-      名称: ability.name,
-      类型: ability.type,
-      等级: (current?.等级 ?? 0) + 1,
-      解锁轮次: current?.解锁轮次 ?? context.tick,
-      使用次数: current?.使用次数 ?? 0,
-      ...(current?.冷却至轮次 === undefined ? {} : { 冷却至轮次: current.冷却至轮次 }),
-    },
-  };
-  const result = executeGameplayTransaction(state, {
-    id: `profession:unlock:${abilityId}:${context.tick}`,
-    moduleId: 'profession',
-    source: 'player',
-    label: `解锁职业能力「${ability.name}」`,
-    costs: [{ path: '玩家.能力系统.职业状态.能力点', amount: cost, label: '能力点' }],
-    effects: [
-      { set: { path: '玩家.能力系统.职业状态.已解锁能力', value: next } },
-      ...(definition.abilityType === 'passive' ? definition.mechanics?.passiveEffects ?? [] : []),
-    ],
-    events: [{ type: 'profession.ability.unlocked', payload: { professionId: runtime.职业ID, abilityId, name: ability.name } }],
-  }, context);
-  return result.status === 'applied' ? { ...result, state: synchronizeProfessionAbilities(result.state, config) } : result;
-}
-
-export function useProfessionAbility(
-  state: GameState,
-  config: ProfessionModuleSchema,
-  abilityId: string,
-  context: GameplayExecutionContext,
-): ProfessionActionResult {
-  const ability = findProfessionAbility(state, config, abilityId);
-  const runtime = state.玩家.能力系统?.职业状态;
-  const owned = runtime?.已解锁能力[abilityId];
-  if (!ability || !runtime || !owned || (ability.type !== 'active' && ability.type !== 'ultimate')) {
-    return blocked(state, context, `profession:use:blocked:${abilityId}:${context.tick}`, '该能力当前不可主动使用');
-  }
-  const definition = abilityDefinitionFromProfessionAbility(ability, runtime.职业ID ?? undefined);
-  if ((owned.冷却至轮次 ?? 0) > context.tick) {
-    return blocked(state, context, `profession:use:cooldown:${abilityId}:${context.tick}`, '能力仍在冷却');
-  }
-  const next = {
-    ...runtime.已解锁能力,
-    [abilityId]: {
-      ...owned,
-      使用次数: (owned.使用次数 ?? 0) + 1,
-      ...(definition.mechanics?.cooldownRounds ? { 冷却至轮次: context.tick + definition.mechanics.cooldownRounds } : {}),
-    },
-  };
-  const result = executeGameplayTransaction(state, {
-    id: `profession:use:${abilityId}:${context.tick}`,
-    moduleId: 'profession',
-    source: 'player',
-    label: `使用职业能力「${ability.name}」`,
-    costs: definition.mechanics?.costs,
-    effects: [
-      { set: { path: '玩家.能力系统.职业状态.已解锁能力', value: next } },
-      ...(definition.mechanics?.effects ?? []),
-    ],
-    rewards: definition.mechanics?.rewards,
-    events: [{ type: 'profession.ability.used', payload: { abilityId, name: ability.name } }],
-  }, context);
-  return result.status === 'applied' ? { ...result, state: synchronizeProfessionAbilities(result.state, config) } : result;
 }
 
 export function resolveOwnedAbility(

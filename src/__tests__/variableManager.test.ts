@@ -1,7 +1,6 @@
 import { describe,it,expect } from 'bun:test';
 import { VariableManager } from '../engine/variableManager';
 import { createDefaultGameState } from '../schema/variables';
-import type { ModuleEffects } from '../modules/schema';
 import { createWorldClock,formatWorldClock,normalizeTimeSystemConfig } from '../time/worldClock';
 
 function freshVM() {
@@ -14,103 +13,8 @@ function freshVM() {
   return vm;
 }
 
-describe('VariableManager.applyModuleEffects — 资源更新与元数据', () => {
-  it('把同一次跨模块机械结算作为一个玩法事务提交', () => {
-    const vm = freshVM();
-    const state = vm.getState();
-    state.玩家.经营资产 = { 资金: 20, 资产列表: [] };
-    state.玩家.当前经验值 = 4;
-    vm.setState(state);
-
-    vm.applyModuleEffects({
-      survival: { resources: { water: { delta: -2, min: 0 } } },
-      business: { fundsDelta: 5 },
-      progression: { xpDelta: 3 },
-    }, 'periodic', ['survival', 'business', 'progression']);
-
-    const next = vm.getState();
-    expect(next.玩家.生存资源?.water.数量).toBe(8);
-    expect(next.玩家.经营资产?.资金).toBe(25);
-    expect(next.玩家.当前经验值).toBe(7);
-    expect(next.gameplay?.logs.at(-1)?.moduleId).toBe('system');
-    expect(next.gameplay?.logs.at(-1)?.changes).toHaveLength(3);
-  });
-
-  it('应用 delta 并在下限钳制，保留已有元数据', () => {
-    const vm = freshVM();
-    const effects = { survival: { resources: { water: { delta: -3, min: 0 } } } } as any as ModuleEffects;
-    const log = vm.applyModuleEffects(effects, 'rule', ['survival']);
-    expect(log.length).toBe(1);
-    const r = vm.getState().玩家.生存资源!['water'];
-    expect(r.数量).toBe(7);
-    expect(r.name).toBe('清水'); // 元数据保留
-    expect(r.symbol).toBe('💧');
-  });
-
-  it('数量不低于 0 且不低于 min', () => {
-    const vm = freshVM();
-    const effects = { survival: { resources: { hp: { delta: -10, min: 0 } } } } as any as ModuleEffects;
-    vm.applyModuleEffects(effects, 'rule', ['survival']);
-    expect(vm.getState().玩家.生存资源!['hp'].数量).toBe(0);
-  });
-
-  it('跳过未知资源 id，不创建幽灵资源', () => {
-    const vm = freshVM();
-    const effects = { survival: { resources: { ghost: { delta: 5 } } } } as any as ModuleEffects;
-    const log = vm.applyModuleEffects(effects, 'rule', ['survival']);
-    expect(log.some((l) => l.variable === 'ghost')).toBe(true);
-    expect(vm.getState().玩家.生存资源!['ghost']).toBeUndefined();
-  });
-
-  it('动态新增资源时写入完整元数据', () => {
-    const vm = freshVM();
-    const effects = {
-      survival: {
-        addResources: [
-          { id: 'crystal', amount: 3, name: '水晶', symbol: '🔷', max: 50, scarce: false },
-        ],
-      },
-    } as any as ModuleEffects;
-    vm.applyModuleEffects(effects, 'rule', ['survival']);
-    const r = vm.getState().玩家.生存资源!['crystal'];
-    expect(r).toBeDefined();
-    expect(r.数量).toBe(3);
-    expect(r.name).toBe('水晶');
-    expect(r.symbol).toBe('🔷');
-  });
-
-  it('addResources 保留全部可选元数据字段', () => {
-    const vm = freshVM();
-    const effects = {
-      survival: {
-        addResources: [
-          { id: 'ore', amount: 1, name: '矿石', symbol: '⛏️', max: 99, scarce: true, description: '罕见', gatherRate: 2, usage: '锻造' },
-        ],
-      },
-    } as any as ModuleEffects;
-    vm.applyModuleEffects(effects, 'rule', ['survival']);
-    const r = vm.getState().玩家.生存资源!['ore'] as any;
-    expect(r.description).toBe('罕见');
-    expect(r.gatherRate).toBe(2);
-    expect(r.usage).toBe('锻造');
-    expect(r.scarce).toBe(true);
-  });
-});
-
-describe('VariableManager.addResources 元数据', () => {
-  it('合并路径也保留资源元数据', () => {
-    const vm = freshVM();
-    const effects = {
-      survival: {
-        addResources: [
-          { id: 'gold', amount: 5, name: '金币', symbol: '🪙', max: 9999, scarce: false },
-        ],
-      },
-    } as any as ModuleEffects;
-    vm.applyModuleEffects(effects, 'rule', ['survival']);
-    expect(vm.getState().玩家.生存资源!['gold'].name).toBe('金币');
-  });
-});
+// applyModuleEffects 的七条用例（跨模块一笔事务、钳制、未知物资、新物资元数据）随旧入口删除，
+// 已按现行写入路径移植到 src/domains/resources/resources.test.ts「AI 写入物资」。
 
 describe('VariableManager module partitions', () => {
   it('stores only module revision references in message snapshots and restores them', () => {

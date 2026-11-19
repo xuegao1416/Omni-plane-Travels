@@ -110,9 +110,9 @@ export default function AuthSettingsTab() {
 
   if (effectiveAuthenticated) {
     return (
-      <div className="traveler-registry-auth" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
+      <div className="traveler-registry-auth">
         {DialogUI}
-        <div style={{
+        <div className="traveler-registry-auth__decor" style={{
           display: 'flex', alignItems: 'center', gap: '16px',
           padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
         }}>
@@ -128,7 +128,7 @@ export default function AuthSettingsTab() {
           </div>
         </div>
 
-        <div style={{
+        <div className="traveler-registry-auth__decor" style={{
           padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
         }}>
           <h4 style={{ fontSize: 'var(--font-size-base)', fontWeight: '600', marginBottom: '12px' }}>已解锁功能</h4>
@@ -149,7 +149,7 @@ export default function AuthSettingsTab() {
             borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', fontWeight: '600',
             cursor: 'pointer', transition: 'all 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger)'; e.currentTarget.style.color = '#fff'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger)'; e.currentTarget.style.color = '#ffe8e2'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--danger)'; }}
         >
           <LogOut size={18} />登出
@@ -160,17 +160,17 @@ export default function AuthSettingsTab() {
 
   // 未登录
   return (
-    <div className="traveler-registry-auth" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '40px 20px', maxWidth: '400px', margin: '0 auto' }}>
+    <div className="traveler-registry-auth">
       {DialogUI}
 
-      <div style={{
+      <div className="traveler-registry-auth__decor" style={{
         width: '64px', height: '64px', borderRadius: '50%', background: 'var(--bg-tertiary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <User size={32} color="var(--text-muted)" />
       </div>
 
-      <div style={{ textAlign: 'center' }}>
+      <div className="traveler-registry-auth__decor" style={{ textAlign: 'center' }}>
         <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: '600', marginBottom: '8px' }}>
           {view === 'login' ? '登录' : view === 'register' ? '注册' : '重置密码'}
         </h3>

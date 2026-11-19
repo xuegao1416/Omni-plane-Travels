@@ -76,7 +76,7 @@ export default memo(function ProgressionCard({ config, state, title, statNames, 
                 <span style={{ color: 'var(--text-secondary)' }}>{currentXP} / {xpNeeded}</span>
               </div>
               <div style={{ height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: '#a78bfa', borderRadius: '4px', transition: 'width 0.3s' }} />
+                <div style={{ width: `${pct}%`, height: '100%', background: 'var(--pk-brass-face)', borderRadius: '4px', boxShadow: '0 0 8px rgba(242, 212, 142, .45)', transition: 'width .5s var(--pk-ease)' }} />
               </div>
             </div>
           )}
@@ -155,7 +155,7 @@ export default memo(function ProgressionCard({ config, state, title, statNames, 
               <span style={{ color: 'var(--text-secondary)' }}>{currentXP} / {xpNeeded}</span>
             </div>
             <div style={{ height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${pct}%`, height: '100%', background: '#a78bfa', borderRadius: '4px', transition: 'width 0.3s' }} />
+              <div style={{ width: `${pct}%`, height: '100%', background: 'var(--pk-brass-face)', borderRadius: '4px', boxShadow: '0 0 8px rgba(242, 212, 142, .45)', transition: 'width .5s var(--pk-ease)' }} />
             </div>
           </div>
         )}

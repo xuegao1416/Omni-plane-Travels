@@ -25,10 +25,10 @@ export function Toolbar({
     <>
       {/* 头部 */}
       <div className={s.header}>
-        <h2 style={{ margin: 0, fontSize: 'var(--font-size-xl)', fontWeight: 700 }}>
+        <h2 className={s.title}>
           编辑世界书
         </h2>
-        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+        <span className={s.meta}>
           {worldId} · {entries.length} 条
         </span>
         <div style={{ flex: 1 }} />

@@ -44,23 +44,15 @@ function TypedNodeComponent({ data, selected }: NodeProps) {
   const connectedInputs = new Set<string>();
 
   return (
-    <div style={{
-      minWidth: 135,
-      maxWidth: 195,
-      background: 'var(--bg-secondary)',
-      border: `1px solid ${selected ? def.color : 'var(--node-border)'}`,
-      borderRadius: 'var(--radius-sm)',
-      boxShadow: selected ? `0 0 0 1px ${def.color}, var(--shadow-md)` : 'var(--shadow-sm)',
-      overflow: 'hidden',
-    }}>
+    <div className={`pk-flow-node${selected ? ' is-selected' : ''}`} style={{ minWidth: 135, maxWidth: 195, ['--node-color' as string]: def.color }}>
       {/* 头部 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 4,
         padding: '4px 8px',
-        background: `${def.color}11`,
-        borderBottom: '1px solid var(--border)',
+        background: `linear-gradient(180deg, ${def.color}30, ${def.color}0d)`,
+        borderBottom: '1px solid rgba(233, 207, 150, 0.16)',
       }}>
         <Icon size={10} style={{ color: def.color, flexShrink: 0 }} />
         <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

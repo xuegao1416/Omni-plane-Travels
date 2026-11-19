@@ -45,8 +45,10 @@ export const EVENTS = {
   CHAT_CHANGED: 'chat_changed',
   AUTO_SAVE: 'auto_save',
   PIPELINE_UPDATE: 'pipeline_update',
-  /** addEvent 触发：携带 { cardId, eventPackId }（CardOverlay 订阅并弹卡） */
+  /** 请求弹出事件卡：携带 { cardId, eventPackId }。卡片进入事件导演的待处理队列，由 CardOverlay 展示。 */
   EVENT_CARD: 'mod:card',
+  /** 重新打开被收起的待处理事件卡（无载荷）。 */
+  EVENT_CARD_OPEN: 'mod:card:open',
   /** addEvent 触发的覆盖卡片：携带 { cardId, patch, eventPackId } */
   EVENT_CARD_OVERRIDE: 'mod:card:override',
   /** Typed event-card action requesting the local combat domain to start an encounter. */

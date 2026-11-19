@@ -1,0 +1,64 @@
+/* ═══════════════════════════════════════════════
+   晨雾琉璃 · code-drawn entry backdrop (DawnScene.tsx → ui/dawn/scene).
+   The WebGL canvas fades in over a CSS painting of the same morning light,
+   which also stays as the fallback when WebGL 2 is unavailable.
+   ═══════════════════════════════════════════════ */
+
+.dw-scene {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  background: #e8f1ee;
+}
+.dw-scene__canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  opacity: 0; transition: opacity 1.4s var(--pl-ease);
+}
+.dw-scene.is-ready .dw-scene__canvas { opacity: 1; }
+
+/* CSS painting: sky, light fan from the upper left, warm hearth glow, polished floor.
+   It covers the first frames, and stays when WebGL 2 is missing or the context is lost. */
+.dw-scene__fallback {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 60% 42% at 50% 104%, rgba(255, 252, 244, .9), transparent 70%),
+    linear-gradient(180deg, #b9dae3 0%, #dcebea 38%, #f4f1e6 62%, #ebf2ee 63%, #e3ece8 100%);
+  transition: opacity 1.6s var(--pl-ease) .2s;
+}
+.dw-scene.is-ready .dw-scene__fallback { opacity: 0; }
+.dw-scene__fallback i { position: absolute; display: block; }
+.dw-scene__rays {
+  inset: -30% -10% 0 -30%;
+  background: repeating-conic-gradient(from 104deg at 12% 4%, rgba(255, 250, 232, 0) 0deg, rgba(255, 250, 232, .42) 1.6deg, rgba(255, 250, 232, 0) 3.4deg, rgba(255, 250, 232, 0) 7deg);
+  -webkit-mask: radial-gradient(ellipse 80% 90% at 12% 4%, #000 20%, transparent 75%);
+  mask: radial-gradient(ellipse 80% 90% at 12% 4%, #000 20%, transparent 75%);
+  animation: dw-rays 14s ease-in-out infinite alternate;
+  transform-origin: 12% 4%;
+}
+@keyframes dw-rays { from { opacity: .75; transform: rotate(-1deg); } to { opacity: 1; transform: rotate(1.2deg); } }
+.dw-scene__glow {
+  left: 50%; top: 62%; width: min(70vmin, 640px); aspect-ratio: 1; transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 214, 150, .75) 0%, rgba(255, 176, 96, .28) 26%, rgba(255, 240, 210, 0) 62%);
+  animation: dw-hearth 3.2s ease-in-out infinite;
+}
+@keyframes dw-hearth { 0%, 100% { opacity: .82; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); } }
+/* In the hall the hearth sits under the journal core, in the middle of the stage. */
+.dw-scene.is-hall .dw-scene__glow { top: 52%; width: min(56vmin, 520px); }
+.dw-scene__floor {
+  left: -10%; right: -10%; bottom: 0; height: 37%;
+  background:
+    radial-gradient(ellipse 46% 30% at 50% 6%, transparent 60%, rgba(179, 148, 83, .38) 61%, transparent 63%),
+    radial-gradient(ellipse 70% 52% at 50% 6%, transparent 60%, rgba(179, 148, 83, .3) 60.6%, transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, .45), rgba(222, 234, 229, .2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw-scene__rays, .dw-scene__glow { animation: none; }
+}
+:root[data-effects='off'] .dw-scene__rays, :root[data-effects='off'] .dw-scene__glow { animation: none; }
+
+/* ?dwhud=1: on-device performance readout (scene/hud.ts), above everything and never in the way. */
+.dw-hud {
+  position: fixed; left: max(8px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom)); z-index: 2147483000;
+  padding: 6px 8px; border-radius: 4px; pointer-events: none;
+  background: rgba(16, 28, 32, .78); color: #c8f3e8;
+  font: 500 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre;
+}

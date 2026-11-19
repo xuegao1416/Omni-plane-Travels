@@ -18,8 +18,6 @@ export function DetailModal({ title, quality, onClose, children, icon }: {
         className="game-journey__nested-panel"
         onClick={e => e.stopPropagation()}
         style={{
-          border: `1px solid ${qColor}30`,
-          borderRadius: '16px',
           maxWidth: '340px',
           width: '92%', maxHeight: 'calc(100dvh - 24px)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',

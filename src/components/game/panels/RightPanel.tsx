@@ -1,10 +1,15 @@
 import { Clock,MapPin,Cloud,Heart,Zap,Swords } from 'lucide-react';
 import type { GameState } from '../../../schema/variables';
-import type { WorldSystemData,ProgressionConfig,SurvivalRecipe,SurvivalModuleSchema,BusinessModuleSchema } from '../../../modules/schema';
-import type { ResourceChangeLog } from '../gameScreen/hooks/useSurvivalSettlement';
-import { BaseStatsCard,SixDimCard,ProgressionCard,SurvivalCard,BusinessCard,TalentCard } from './modules';
+import type { WorldSystemData,ProgressionConfig } from '../../../modules/schema';
+import type { EconomyViewModel } from '../../../domains/economy/viewModel';
+import EconomyCard from './modules/EconomyCard';
+import type { ResourcesViewModel } from '../../../domains/resources/viewModel';
+import { BaseStatsCard,SixDimCard,ProgressionCard,TalentCard } from './modules';
+import ResourcesCard from './modules/ResourcesCard';
+import EventsCard from './modules/EventsCard';
+import type { EventsPanelView } from '../../../events/viewModel';
+import type { PacingLevel } from '../../../events/types';
 import { findWorldDef } from '../../../data/worldLoader';
-import { normalizeAssetStatus } from './businessOverlay/utils';
 import { CustomModulePanel } from './CustomModulePanel';
 import { formatWorldClock,getTimeSystemFromWorld } from '../../../time/worldClock';
 import { toDisplayText } from '../../../utils/displayText';
@@ -14,31 +19,22 @@ const COMBAT_RISK_LABELS = { easy: '简单', normal: '普通', hard: '困难', i
 interface Props {
   gameState: GameState;
   worldId?: string;
-  /** 生存资源：生成配方回调 */
-  onSurvivalGenerateRecipe?: (request: string) => Promise<boolean | void>;
-  onSurvivalCancelRecipeGeneration?: () => void;
-  /** 生存资源：制作回调 */
-  onSurvivalCraft?: (recipe: SurvivalRecipe) => void;
-  /** 生存资源：解锁配方回调 */
-  onSurvivalUnlock?: (recipe: SurvivalRecipe) => void;
-  /** 已解锁配方 ID */
-  unlockedRecipeIds?: string[];
-  /** 生存资源：手动采集回调 */
-  onSurvivalGather?: (resourceId: string) => void;
-  /** 生存资源：删除配方回调 */
-  onSurvivalDeleteRecipe?: (recipeId: string) => void;
+  /** 物资：资源模块给出的界面数据（未启用时为空） */
+  resourcesView?: ResourcesViewModel | null;
+  onResourceGather?: (resourceId: string) => void;
+  onResourceGenerateRecipe?: (request: string) => Promise<boolean>;
+  onResourceCancelRecipeGeneration?: () => void;
   /** 是否正在生成配方 */
   isGeneratingRecipe?: boolean;
-  /** 运行时配方（AI 生成，不持久化到世界定义） */
-  runtimeRecipes?: SurvivalRecipe[];
-  /** 经营资产：打开覆盖层 */
-  onOpenBusinessOverlay?: () => void;
-  /** 生存资源：打开详情覆盖层 */
-  onOpenSurvivalOverlay?: () => void;
-  /** 生存资源变更日志 */
-  survivalChangeLog?: ResourceChangeLog[];
-  /** 预计算的经营资产数据（来自 GameScreen，保证资金同步） */
-  businessData?: BusinessModuleSchema;
+  /** 商号：经营模块给出的界面数据（未启用时为空） */
+  economyView?: EconomyViewModel | null;
+  onOpenEconomyLedger?: () => void;
+  /** 事件：节奏、待处理与最近结果（世界没有任何事件时为空） */
+  eventsView?: EventsPanelView | null;
+  onSetEventPacing?: (level: PacingLevel) => void;
+  onOpenEventCard?: () => void;
+  /** 物资：打开账本抽屉 */
+  onOpenResourcesLedger?: () => void;
   onAllocateStat?: (statId: string) => void;
   onBreakthrough?: (targetTier: number) => void;
   onUnlockTalent?: (talentId: string) => void;
@@ -72,15 +68,15 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0' }}>
       <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>{icon}</span>
       <span style={{ width: '32px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{label}</span>
-      <div className="game-status-meter" style={{ background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '999px', transition: 'width 0.3s' }} />
+      <div className="game-status-meter">
+        <div style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: '999px', transition: 'width 0.3s' }} />
       </div>
       <span style={{ width: '50px', fontSize: 'var(--font-size-xs)', textAlign: 'right', color: 'var(--text-secondary)' }}>{safeValue}/{safeMax}</span>
     </div>
   );
 }
 
-export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecipe, onSurvivalCancelRecipeGeneration, onSurvivalCraft, onSurvivalUnlock, unlockedRecipeIds, onSurvivalGather, onSurvivalDeleteRecipe, isGeneratingRecipe, runtimeRecipes, onOpenBusinessOverlay, onOpenSurvivalOverlay, survivalChangeLog, businessData, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
+export default function RightPanel({ gameState, worldId, resourcesView, onResourceGather, onResourceGenerateRecipe, onResourceCancelRecipeGeneration, isGeneratingRecipe, economyView, onOpenEconomyLedger, eventsView, onSetEventPacing, onOpenEventCard, onOpenResourcesLedger, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
   const worldDef = worldId ? findWorldDef(worldId) : null;
@@ -110,47 +106,12 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
       if (!mod.enabled) continue;
       const key = keyMap[mod.moduleId];
       if (key && (mod.moduleConfig)) {
-        if (mod.moduleId === 'survival' && runtimeRecipes?.length) {
-          // 合并运行时配方（AI 生成）与静态配方（世界定义）
-          const survData = (mod.moduleConfig) as SurvivalModuleSchema;
-          const staticRecipes = Array.isArray(survData.recipes) ? survData.recipes : [];
-          (worldSystem as any)[key] = { ...survData, recipes: [...staticRecipes, ...runtimeRecipes] };
+        if (mod.moduleId === 'survival') {
+          // 物资卡由资源模块的界面数据驱动，这里不再合并配置与存档。
+          continue;
         } else if (mod.moduleId === 'business') {
-          // 合并运行时经营数据（AI 通过 UpdateVariable 更新）与静态配置
-          const bizConfig = (mod.moduleConfig) as BusinessModuleSchema;
-          const runtimeBiz = player.经营资产;
-          if (runtimeBiz) {
-            (worldSystem as any)[key] = {
-              ...bizConfig,
-              funds: runtimeBiz.资金,
-              assets: (runtimeBiz.资产列表 ?? []).map(a => {
-                return {
-                  id: a.id || `asset-${a.名称 || a.类型 || 'runtime'}`,
-                  name: a.名称 || a.类型 || a.id || '未命名资产',
-                  type: a.类型 || '',
-                  level: a.等级 ?? 1,
-                  maxLevel: a.最高等级 ?? 3,
-                  description: a.描述 || '',
-                  status: normalizeAssetStatus(a.状态),
-                  income: {
-                    base: a.基础收益 ?? 0,
-                    perLevel: a.每级收益 ?? 0,
-                    cycle: bizConfig.cycleName || '天',
-                  },
-                  maintenance: a.维护费 ?? 0,
-                  staff: a.员工效率 !== undefined ? { current: 1, max: 1, efficiency: a.员工效率 } : undefined,
-                  marketTags: a.市场标签,
-                  risk: a.风险等级 ? { level: a.风险等级, description: '' } : undefined,
-                  upgradeCost: a.升级费用,
-                };
-              }),
-              transactionLog: (runtimeBiz.交易日志 || []).map((t, i) => ({
-                cycle: i + 1, type: t.类型, description: t.描述, amount: t.金额,
-              })),
-            };
-          } else {
-            (worldSystem as any)[key] = bizConfig;
-          }
+          // 商号卡由经营模块的界面数据驱动。
+          continue;
         } else {
           (worldSystem as any)[key] = mod.moduleConfig;
         }
@@ -181,18 +142,11 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
   const statModifiers = Object.values(statRuntime?.modifiers ?? {}).filter(modifier => modifier.expiresAtTick === undefined || modifier.expiresAtTick > currentTick);
 
   return (
-    <div className="game-journey__status-panel" style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1rem',
-      padding: '1rem',
-      overflowY: 'auto',
-      height: '100%',
-    }}>
+    <div className="game-journey__status-panel">
       <CustomModulePanel gameState={gameState} worldId={worldId} onButton={onCustomModuleButton} />
       {/* 世界状态 */}
-      <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
-        <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+      <div className="surface-card game-journey__status-card">
+        <h4>
           世界状态
         </h4>
         <div style={{ fontSize: 'var(--font-size-sm)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -213,8 +167,8 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
 
       {/* 当前目标 */}
       {toDisplayText(player.当前目标) && (
-        <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
-          <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <div className="surface-card game-journey__status-card">
+          <h4>
             当前目标
           </h4>
           <div style={{ fontSize: 'var(--font-size-md)', color: 'var(--accent)' }}>
@@ -225,8 +179,8 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
 
       {/* 生存状态（无数值属性模块时显示默认血量/体力） */}
       {!hasStatModule && (
-        <div className="surface-card game-journey__status-card" style={{ padding: '1rem' }}>
-          <h4 style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <div className="surface-card game-journey__status-card">
+          <h4>
             生存状态
           </h4>
           <GaugeBar icon={<Heart size={11} color="var(--danger)" />} label="血量" value={player.生存状态?.血量 ?? 100} max={100} color="var(--danger)" />
@@ -305,44 +259,18 @@ export default function RightPanel({ gameState, worldId, onSurvivalGenerateRecip
           onUnequipAbility={onUnequipAbility}
         />
       )}
-      {worldSystem.生存资源 && (() => {
-        // 合并运行时资源数据（从 GameState 读取）
-        const runtimeResources = player.生存资源;
-        const mergedData = { ...worldSystem.生存资源 };
-        if (runtimeResources && mergedData.resources) {
-          mergedData.resources = mergedData.resources.map(res => {
-            const runtime = runtimeResources[res.id];
-            if (runtime) {
-              return { ...res, amount: runtime.数量 ?? res.amount, max: runtime.最大值 ?? res.max };
-            }
-            return res;
-          });
-        }
-        return (
-          <SurvivalCard
-            data={mergedData}
-            title={moduleNames?.['生存资源']}
-            runtimeResources={runtimeResources as any}
-            onGenerateRecipe={onSurvivalGenerateRecipe}
-            onCancelRecipeGeneration={onSurvivalCancelRecipeGeneration}
-            onCraft={onSurvivalCraft}
-            onUnlock={onSurvivalUnlock}
-            unlockedRecipeIds={unlockedRecipeIds}
-            onGather={onSurvivalGather}
-            onDeleteRecipe={onSurvivalDeleteRecipe}
-            isGeneratingRecipe={isGeneratingRecipe}
-            onOpenOverlay={onOpenSurvivalOverlay}
-            recentChanges={survivalChangeLog}
-          />
-        );
-      })()}
-      {(businessData || worldSystem.经营资产) && (
-        <BusinessCard
-          data={(businessData || worldSystem.经营资产) as BusinessModuleSchema}
-          title={moduleNames?.['经营资产']}
-          onOpenOverlay={onOpenBusinessOverlay ?? (() => {})}
+      {resourcesView && (
+        <ResourcesCard
+          view={resourcesView}
+          onGather={onResourceGather}
+          onGenerateRecipe={onResourceGenerateRecipe}
+          onCancelRecipeGeneration={onResourceCancelRecipeGeneration}
+          isGeneratingRecipe={isGeneratingRecipe}
+          onOpenLedger={onOpenResourcesLedger}
         />
       )}
+      {economyView && <EconomyCard view={economyView} onOpenLedger={onOpenEconomyLedger} />}
+      {eventsView && <EventsCard view={eventsView} onSetPacing={onSetEventPacing} onOpenPending={onOpenEventCard} />}
     </div>
   );
 }

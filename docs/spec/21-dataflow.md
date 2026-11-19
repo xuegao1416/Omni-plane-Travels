@@ -1,5 +1,5 @@
 > 本文档是 `PROJECT_FUNCTIONAL_SPEC.md` 的拆分子文件（21、数据流联动总图）。
-> 总索引见 `../PROJECT_FUNCTIONAL_SPEC.md`。
+> 总索引见仓库根目录的 `PROJECT_FUNCTIONAL_SPEC.md`（相对本文件为 `../../PROJECT_FUNCTIONAL_SPEC.md`）。
 
 ## 21、数据流联动总图
 
@@ -19,7 +19,13 @@ engine.sendMessage(userText, options)
   ├─ eventBus.emit(MESSAGE_SENT / GENERATION_STARTED)
   └─ executor.execute({ mainTask, memoryTasks, variableTask })
        │
-       ├─ (管线开始前)后台 fire-and-forget: simEngine.tick() — 后台世界演化,不阻塞管线
+       ├─ (管线开始前)本地机械结算(确定性,非后台 tick):
+       │    prepareWorldMechanics(simEngine, {...}) → settlement
+       │    → varMgrRef.setState(settlement.gameState)(若 settlement.settled)
+       │    → applyModuleEffects(..., 'periodic', enabledModules)
+       │    → commitWorldMechanics(simEngine, settlement, isCurrent)
+       │    → useSimulationStore.syncFromEngine() → eventBus.emit(VARIABLE_UPDATE_ENDED)
+       │    (失败只 console.warn,不影响正文管线)
        │
        ├─ 正文发送前:executeMemoryPrepareForMain(memStore, memCtx) — 刷新本轮记忆上下文
        │
@@ -32,7 +38,7 @@ engine.sendMessage(userText, options)
        │    ├─ playerProfileBlock 拼接
        │    ├─ assembleSystemPrompt(preset, { varSnapshot, wbInjection, ... })
        │    │    └─ assembleResult.depthEntries 由 assembler 内部计算
-       │    ├─ requestStreamWithRetry() — 流式实现位于 src/api/client.ts:165-235
+       │    ├─ requestStreamWithRetry() — 流式实现在 src/api/client.ts:545(重试包装);底层 requestCompletionStream 在 :448、非流式 requestCompletion 在 :381
        │    │    └─ onDelta 中实时调用 applyCombatBoundary() = constrainPreCombatNarrative()(图形化战斗时),而非单一线性步骤
        │    ├─ DeepSeek 格式修复(useFormatRepairGuard)
        │    └─ StatusPlaceHolderImpl 处理
@@ -42,22 +48,29 @@ engine.sendMessage(userText, options)
        │    └─ query_rewrite → retrieve_plan → multi_round → rerank → finalize → compile(串行)
        │         └─ memoryStore.lastCompiledContext.fullText
        │
-       └─ variableTask(独立 API 调用)
-            └─ applyModuleEffects() → 提取的 patch 应用到 varMgr
+       ├─ variableTask(独立 API 调用) — pipelineExecutor 的 case 'variable' → runTurnVariableExtraction
+       │    └─ applyModuleEffects() → 提取的 patch 应用到 varMgr
+       │
+       └─ settlement(executionOrder 循环结束后单独执行,不在 DEFAULT_EXECUTION_ORDER 内)
+            └─ completeTurnSettlement → settleAcceptedTurn → settleNarrativeResponse /
+               preserveCombatOwnedState / 世界时钟推进 / settleProgressionAction / settleTurnCycles,
+               再跑 runCustomModuleTurnLifecycles()
   ↓
-(无独立 finalizeNormalTurn 函数 — 逻辑全部内联在 sendMessage 主流程中)
+(无独立 finalizeNormalTurn 函数 — 逻辑全部内联在 sendMessage 主流程中;
+ 下面的结算顺序实际发生在 settlement 阶段的 settleAcceptedTurn 内,src/engine/turnSettlement.ts:27)
   ├─ 正文成功后(顺序):
-  │    ├─ settleNarrativeResponse() → 叙事决策结算 → setState → eventBus.emit(VARIABLE_UPDATE_ENDED) → onAutoSaveRef.current?.()(事件决策后立即存档)
-  │    ├─ resolveTurnTimeAdvance() + advanceWorldClockForTurn() → 世界时钟推进
-  │    ├─ settleProgressionAction() → 成长结算(若发生)→ eventBus.emit(VARIABLE_UPDATE_ENDED)
-  │    └─ (已无独立 evolutionReviews.run() 调用 — 评审已迁移或废弃)
-  ├─ saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTimeStr)
+  │    ├─ settleNarrativeResponse() → 叙事决策结算 → setState
+  │    ├─ preserveCombatOwnedState()(若有 protectedState)
+  │    ├─ ensureWorldClockOnGameState() + resolveTurnTimeAdvance() + advanceWorldClockForTurn() → 世界时钟推进
+  │    ├─ settleProgressionAction() → 成长结算(若发生)
+  │    └─ settleTurnCycles(...) → 返回 { state, changeLog }
+  ├─ (finally 块,useGameEngine.ts:1413) saveSnapshot(varMgrRef, updateMessage, aiMsgId, round, gameTime, messagesRef.current)  // :1419
   │    ├─ varMgrRef.current.createSnapshot()
   │    ├─ memStore.createCheckpoint() — **可能为 undefined**(异常隔离)
-  │    └─ simEngine.createSnapshot(...) — **可能为 undefined**(异常隔离)
+  │    ├─ simEngine.createSnapshot(...) — **可能为 undefined**(异常隔离)
   │    └─ updateMessage(aiMsgId, { snapshot, snapshotTime, memoryCheckpointId, simulationSnapshotId })
-  ├─ setMessages(prev => optimizeSnapshots(prev)) → 清理冗余快照
-  └─ (finally 块) onAutoSaveRef.current?.() → handleAutoSave() → scheduleAutoSaveRef.current()(500ms debounce)
+  ├─ setMessages(prev => optimizeSnapshots(prev)) → 清理冗余快照  // :1420
+  └─ (finally 块末尾) onAutoSaveRef.current?.() → handleAutoSave() → scheduleAutoSaveRef.current()(500ms debounce)  // :1433
   ↓
 GameScreen bumpVersion()(监听 VARIABLE_UPDATE_ENDED) → 全组件重渲染
 ```
@@ -65,8 +78,9 @@ GameScreen bumpVersion()(监听 VARIABLE_UPDATE_ENDED) → 全组件重渲染
 **关键设计说明**:
 
 - `navigate('game')` 只切换 `currentScreen`,不调用 `sendMessage`;发送动作由用户交互触发
-- `simEngine.settleMechanics()` / `evolutionReviews.run()` 不在 sendMessage 中显式调用;演化走 `simEngine.tick()` 的 fire-and-forget,效果在下一轮正文时已可见
-- `saveSnapshot()` 由 try 块末尾调用,自动存档由 finally 块的 `onAutoSaveRef.current?.()` 触发
+- `simEngine.tick()` 在 `sendMessage` 中**不存在**(全仓库无该调用);世界演化走正文前的确定性本地机械结算 `prepareWorldMechanics` + `commitWorldMechanics`(`src/engine/useGameEngine.ts:929-951`)。该路径刻意独立于 Director/后台 AI 开关:关掉 Director 不会关掉时间/资源/事件机制
+- `evolutionReviews.run()` 也不在 `sendMessage` 中显式调用
+- `saveSnapshot()` 在 `finally` 块内调用(`src/engine/useGameEngine.ts:1419`,条件是 `executor.getMainResult()` 为真),紧随其后 `optimizeSnapshots`;自动存档由 `finally` 块末尾的 `onAutoSaveRef.current?.()`(`:1433`)触发,另有 `:880` 在 `main` 阶段成功时提前触发一次
 - 三重快照中任一项失败都会 catch 并 warn,不阻塞主线(`memoryCheckpointId` / `simulationSnapshotId` 可能为 undefined)
 
 ### 21.2 事件卡触发 → 卡片弹出 → 选择 → 效果应用
@@ -74,14 +88,16 @@ GameScreen bumpVersion()(监听 VARIABLE_UPDATE_ENDED) → 全组件重渲染
 ```
 事件触发(AI 响应 / 周期规则 / 按钮)
   ↓
-(可能走 simEngine.tick 后台 tick,也可能在 evaluateTick 子流程中)
+(emitCanonicalEventCard 由 mechanicalRuntime 在机械结算中触发:src/gameplay/mechanicalRuntime.ts:13 定义、:96 调用;
+ 另经 src/simulation/engine.ts:21 re-export。不存在后台 simEngine.tick)
   ↓
 emitCanonicalEventCard(eventId, eventPackIds, isCurrent)  // 3 参数,返回 Promise<boolean>
   ↓
 CardOverlay(React 函数组件,工作流执行在 openCard 回调中)
-  ├─ eventBus.on(EVENTS.EVENT_CARD) → openCard(evt)  // CardOverlay.tsx:39
-  └─ openCard(CardEvent)  // CardOverlay.tsx:44-72
-       ├─ 调用 executeCardWorkflow(workflow, ctx)  // 内部走 src/modules/cardWorkflowEngine.ts
+  ├─ eventBus.on(EVENTS.EVENT_CARD, evt => void openCard(evt))  // CardOverlay.tsx:96-100
+  └─ openCard(CardEvent)  // CardOverlay.tsx:39 起
+       ├─ getRuntimePack(evt.eventPackId) → readCanonicalEventPack(rec.files) → 取 workflowByEventId
+       ├─ 调用 executeCardWorkflow(workflow, ctx)  // CardOverlay.tsx:58,内部走 src/modules/cardWorkflowEngine.ts
        │    ├─ narrative 节点 → renderData 收集
        │    ├─ choice 节点 → choices 输出(static / conditional / weighted / dynamic)
        │    └─ effect 节点 → pendingEffects 收集
@@ -89,10 +105,10 @@ CardOverlay(React 函数组件,工作流执行在 openCard 回调中)
        ├─ 用户选择选项
        └─ 用户点击选项
             ↓
-       createNarrativeDecisionRecord({ ... }) → record  // CardOverlay.tsx:110-118
+       createNarrativeDecisionRecord({ ... }) → record  // CardOverlay.tsx:138
             ↓
-       applyNarrativeDecision(gameState, record)  // CardOverlay.tsx:121-124
-            ├─ 内部对 effect 调用 applyEffectTarget(state, effect.effect) (src/modules/eventChoiceState.ts:135)
+       applyNarrativeDecision(gameState, record)  // CardOverlay.tsx:149
+            ├─ 内部对 effect 调用 applyEffectTarget(state, effect.effect) (src/modules/eventChoiceState.ts:133,调用点 :152)
             │    ├─ effect.stat → state 数值属性 delta
             │    ├─ effect.resource → state 资源 delta
             │    └─ effect.flag → state 标志位 set
@@ -103,9 +119,9 @@ CardOverlay(React 函数组件,工作流执行在 openCard 回调中)
 
 **关键设计说明**:
 
-- `emitCanonicalEventCard(eventId: string, eventPackIds: string[], isCurrent: boolean)` 返回 `Promise<boolean>`(成功/失败/过期)
-- `CardOverlay` 是 React 函数组件,工作流执行在 `openCard` 回调中
-- 选项点击后通过 `createNarrativeDecisionRecord` + `applyNarrativeDecision` 链路应用效果(`applyEffectTarget` 在 `eventChoiceState.ts` 中,是 `applyNarrativeDecision` 的内部实现细节)
+- `emitCanonicalEventCard(eventId: string, eventPackIds: readonly string[], isCurrent: (() => boolean) = () => true)` 定义在 `src/gameplay/mechanicalRuntime.ts:13`,返回 `Promise<boolean>`(成功/失败/过期);`src/simulation/engine.ts:21` 只是 re-export
+- `CardOverlay` 是 React 函数组件,工作流执行在 `openCard` 回调(`:39`)中;`eventBus.on(EVENTS.EVENT_CARD, ...)` 在 `:96`
+- 选项点击后通过 `createNarrativeDecisionRecord`(`:138`)+ `applyNarrativeDecision`(`:149`)链路应用效果(`applyEffectTarget` 在 `eventChoiceState.ts:133`,是 `applyNarrativeDecision` 的内部实现细节)
 - `bumpVersion` 仅存在于 `GameScreen`,通过 `EVENTS.VARIABLE_UPDATE_ENDED` 事件链路触发
 
 ### 21.3 世界书扫描 → 提示词注入
@@ -113,7 +129,7 @@ CardOverlay(React 函数组件,工作流执行在 openCard 回调中)
 ```
 用户输入 + chatHistory
   ↓
-worldBookRef.scanAndBuildInjection(chatHistory, userText)  // src/worldbook/index.ts:344-397
+worldBookRef.scanAndBuildInjection(chatHistory, userText)  // 接口声明 src/worldbook/index.ts:163,实现 :351
   ├─ entries.filter(e => e.enabled) → toWorldInfoEntry 映射
   ├─ mergedOptions 合并(注入默认 NPC 抑制回调)
   │    └─ suppressCharacterEntry = options.suppressCharacterEntry ?? shouldSuppressCharacterWorldBookEntry
@@ -129,9 +145,9 @@ worldBookRef.scanAndBuildInjection(chatHistory, userText)  // src/worldbook/inde
   ↓
 返回 { beforeChar, afterChar, atDepthEntries[], activatedEntries }
   ↓
-(useGameEngine.ts:1087-1092):
-  resolvedWbAtDepth = atDepthEntries.map(e => macroEngine.resolve(e.content))
-  mergedAtDepth = [...resolvedWbAtDepth, ...assembleResult.depthEntries]
+(useGameEngine.ts:1216-1227):
+  resolvedWbAtDepth = atDepthEntries.map(e => macroEngine.resolve(e.content))   // :1216
+  mergedAtDepth = [...resolvedWbAtDepth, ...assembleResult.depthEntries]       // :1220
   ↓
 injectAtDepthEntries(chatHistory, mergedAtDepth)
   ↓
@@ -157,4 +173,4 @@ assembleSystemPrompt(preset, {
 
 ### 21.4 Canonical ingress 原则
 
-跨系统数据进入运行时前先在边界规范化：世界模块由 `worldLoader.ts` + `normalizeModule.ts` 统一成 `moduleConfig + initialState`；卡片事件包由 `eventPackFormat.ts` 统一成 v2；内部存档只允许 v3→v4。运行时组件和引擎不再各自维护更早格式的 fallback。
+跨系统数据进入运行时前先在边界规范化：世界模块由 `worldLoader.ts` + `normalizeModule.ts` 统一成 `moduleConfig + initialState`；卡片事件包由 `eventPackFormat.ts` 统一成 v2；内部存档只允许 v4→v5（`SAVE_SCHEMA_VERSION = 5`，见 `src/storage/db.ts:715` / `planV4ToV5Migration` `:745`）。运行时组件和引擎不再各自维护更早格式的 fallback。

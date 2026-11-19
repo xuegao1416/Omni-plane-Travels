@@ -4,7 +4,7 @@ import { resolveWorldArtwork } from '../../data/worldArtwork';
 import type { WorldBookEntry } from '../../worldbook/index';
 import type { PlayerProfile } from '../../storage/db';
 import type { HistoryPreset } from '../../storage/templateStore';
-import { Check,Sunrise } from 'lucide-react';
+import { ArrowLeft,Check,Sunrise } from 'lucide-react';
 import { getAgeStages } from '../../utils/ageStages';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import AmbientParticleLayer from '../shared/dawn/AmbientParticleLayer';
@@ -12,6 +12,8 @@ import StepPersonalInfo from './StepPersonalInfo';
 import StepCharacterHistory,{ buildSegmentDefs } from './StepCharacterHistory';
 import StepConfirm from './StepConfirm';
 import { EntrySlicedButton } from './EntrySurface';
+import Astrolabe from './orrery/Astrolabe';
+import { useDialog } from '../shared/Dialog';
 import PortraitEditor,{ getPortraitSource } from './PortraitEditor';
 import StepProfessionTalents from './StepProfessionTalents';
 import type { ProfessionModuleSchema,ProfessionWorldBinding } from '../../modules/schema';
@@ -27,12 +29,8 @@ resolveWorldPointScale,
 } from '../../gameplay/creation/creationPoints';
 import DifficultySelector from './DifficultySelector';
 import ProfessionLibraryWorkspace from '../profession/ProfessionLibraryWorkspace';
-
-const RITUAL_ANCHORS: Record<number, string> = {
-  1: '/art/theme/ui-kit/dawn-v4/ritual/identity-mirror-v1.png',
-  2: '/art/theme/ui-kit/dawn-v4/ritual/talent-astrolabe-v1.png',
-  4: '/art/theme/ui-kit/dawn-v4/ritual/departure-gate-v1.png',
-};
+import '../../ui/screens/wizard.css';
+import '../../ui/screens/wizard-steps.css';
 
 const EMPTY_PROFESSION_CONFIG: ProfessionModuleSchema = {
   professions: [],
@@ -93,6 +91,7 @@ export default function WizardShell({
   apiConfig,
   isCreatingJourney = false, onCancelCreation, onCancelGeneration, draftWarning, onRetryDraftSave,
 }: WizardShellProps) {
+  const dialog = useDialog();
   // 动态计算年龄阶段（根据开关决定是否包含）
   const segmentDefs = useMemo(
     () => includeAgeStages
@@ -103,7 +102,7 @@ export default function WizardShell({
 
   const [modalOpen, setModalOpen] = useState(false);
   const [professionLibraryOpen, setProfessionLibraryOpen] = useState(false);
-  const selectedWorldName = allWorlds.find(world => world.id === selectedWorld)?.name || selectedWorld || '未选择世界';
+  const selectedWorldName = allWorlds.find(world => world.id === selectedWorld)?.name || '未选择世界';
   const selectedWorldDef = allWorlds.find(world => world.id === selectedWorld);
   const professionModule = isProfessionModuleEnabled(selectedWorldDef) ? selectedWorldDef?.modules?.find(module => module.moduleId === 'profession' && module.enabled) : undefined;
   const combatModule = selectedWorldDef?.modules?.find(module => module.moduleId === 'combat' && module.enabled);
@@ -190,9 +189,9 @@ export default function WizardShell({
     onSaveWorld?.(updatedWorld);
   };
 
-  const openProfessionLibrary = () => {
+  const openProfessionLibrary = async () => {
     const isBuiltin = !createdWorlds.some(world => world.id === selectedWorld);
-    if (isBuiltin && typeof window !== 'undefined' && !window.confirm('修改内置世界的职业绑定将保存为该世界的自定义副本。继续吗？')) return;
+    if (isBuiltin && !await dialog.confirm('修改内置世界的职业绑定将保存为该世界的自定义副本。继续吗？', { title: '编辑内置世界' })) return;
     setProfessionLibraryOpen(true);
   };
 
@@ -217,9 +216,11 @@ export default function WizardShell({
 
   return (
     <div className="creation-ritual-shell" aria-label="世界降临仪式">
+      {dialog.DialogUI}
       <header className="creation-ritual-shell__header">
-        <div>
-          <div>{selectedWorldName}</div>
+        <button type="button" className="creation-ritual-shell__exit" onClick={() => { if (!navigationBlocked) onBackToMenu(); }} disabled={navigationBlocked} aria-label="退出降临仪式"><ArrowLeft size={16} aria-hidden="true" /></button>
+        <div className="creation-ritual-shell__heading">
+          <div className="creation-ritual-shell__kicker">DESCENT RITE · {selectedWorldName}</div>
           <h1>世界降临仪式</h1>
           <p>{subtitle || title}</p>
           {draftWarning && <p role="alert">{draftWarning} <button type="button" onClick={onRetryDraftSave}>重试保存创建资料</button></p>}
@@ -251,12 +252,12 @@ export default function WizardShell({
             {currentStep === 1 ? null : currentStep === historyStep ? null : currentStep === confirmStep ? (
               <div className="departure-gate-preview">
                 <div className="departure-gate-preview__scene" style={selectedWorldScene ? { backgroundImage: `url("${selectedWorldScene}")` } : undefined} aria-hidden="true" />
-                <img src={RITUAL_ANCHORS[4]} alt="启程门" draggable={false} />
+                <span className="pl-gate" aria-hidden="true"><i className="pl-gate__arch" /><i className="pl-gate__keystone" /><i className="pl-gate__sill" /></span>
                 <span>{selectedWorldName}</span>
               </div>
             ) : (
               <>
-                <img className="is-astrolabe" src={RITUAL_ANCHORS[2]} alt="" draggable={false} />
+                <span className="pl-ritual-astro" aria-hidden="true"><Astrolabe variant="ritual" /></span>
                 <span>{selectedWorldName}</span>
               </>
             )}

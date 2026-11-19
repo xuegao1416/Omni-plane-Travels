@@ -17,7 +17,7 @@ export function NodeDetailPopup({ detail, onClose }: {
           )}
           <div className={s.title}>{detail.title}</div>
         </div>
-        <button className={s.closeBtn} onClick={onClose}>
+        <button type="button" className={s.closeBtn} onClick={onClose} aria-label="关闭节点详情">
           <X size={14} />
         </button>
       </div>
@@ -33,7 +33,6 @@ export function NodeDetailPopup({ detail, onClose }: {
               <div
                 key={i}
                 className={`${s.fieldRow}${i % 2 === 0 ? ` ${s.fieldRowEven}` : ''}`}
-                style={{ borderBottom: i < fields.length - 1 ? '1px dashed var(--border, #e5e7eb)' : 'none' }}
               >
                 <span className={s.fieldLabel}>{field.label}</span>
                 <span className={s.fieldValue}>{field.value}</span>

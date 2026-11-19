@@ -1,227 +1,185 @@
 > 本文档是 `PROJECT_FUNCTIONAL_SPEC.md` 的拆分子文件（2、记忆系统）。
-> 总索引见 `../PROJECT_FUNCTIONAL_SPEC.md`。
+> 总索引见仓库根目录的 `PROJECT_FUNCTIONAL_SPEC.md`（相对本文件为 `../../PROJECT_FUNCTIONAL_SPEC.md`）。
 
 ## 2、记忆系统
 
 #### 2.0 记忆系统文件清单
 
-`src/memory/` 共 24 个文件（含 8 个测试）：
+`src/memory/` 共 24 个文件 = **16 个源文件 + 8 个测试**。
 
-- `embeddingRuntime.ts` — 嵌入运行时(向量化任务调度)
-- `embeddingRuntime.test.ts` — 嵌入运行时测试
-- `externalFacts.ts` / `externalFacts.test.ts` — 外部事实抽取
-- `memoryVisibility.ts` / `memoryVisibility.test.ts` — 可见性过滤
-- `memoryPipeline.regression.test.ts` — 记忆管线回归测试
-- `memoryStore.checkpoint.test.ts` — 记忆 store 检查点测试
-- `memoryCancellation.test.ts` — 取消路径测试
-- `memoryVersionChain.test.ts` — 版本链测试
-- `narrativeGraph.test.ts` — 叙事图测试
+**源文件（16）**：编译侧 `compileFormatter.ts`、候选池 `memoryCandidates.ts`、配置 `memoryConfig.ts`、主管线 `memoryPipeline.ts`、提示词 `memoryPrompts.ts`、Store `memoryStore.ts`、叙事图谱 `narrativeGraph.ts`、解析器 `narrativeParsers.ts`、记忆包 PNG `narrativePng.ts`、标准化 `normalize.ts`、类型 `types.ts`、向量工具 `vectorUtils.ts`、管线契约 `useMemorySystem.ts`、嵌入运行时 `embeddingRuntime.ts`、外部事实 `externalFacts.ts`、可见性 `memoryVisibility.ts`。
 
-### 2.1 9 阶段管线 — `src/memory/memoryPipeline.ts`
+**测试（8）**：`embeddingRuntime.test.ts`、`externalFacts.test.ts`、`memoryVisibility.test.ts`、`memoryPipeline.regression.test.ts`、`memoryStore.checkpoint.test.ts`、`memoryCancellation.test.ts`、`memoryVersionChain.test.ts`、`narrativeGraph.test.ts`。
+
+### 2.1 记忆管线 — `src/memory/memoryPipeline.ts`
 
 **文件路径**: `src/memory/memoryPipeline.ts`
 
-**9阶段管线**:
+**阶段标识不定义在本模块**：真实类型是 `src/engine/pipelineTypes.ts:6-18` 的 `PipelineTaskId`，记忆相关 9 个任务统一带 `memory_` 前缀：
 
 ```typescript
-// 阶段定义
-type MemoryPipelineStage =
-  | 'write'        // 提取叙事对象
-  | 'summary'      // 生成结构化摘要
-  | 'vector'       // 提取长期向量事实
-  | 'query_rewrite' // 分析输入，提取检索关键词
-  | 'retrieve_plan' // AI规划哪些记忆需要注入
-  | 'multi_round'  // 多轮补充检索
-  | 'rerank'       // AI打分重排序
-  | 'finalize'     // 本地匹配 + 去重 + 排序
-  | 'compile';     // 组装记忆上下文
+type PipelineTaskId =
+  | 'main' | 'variable' | 'settlement'                      // 非记忆任务
+  | 'memory_write'                // 提取叙事对象
+  | 'memory_summary'              // 生成结构化摘要
+  | 'memory_vector'               // 提取长期向量事实
+  | 'memory_query_rewrite'        // 分析输入，提取检索关键词
+  | 'memory_retrieve_plan'        // AI 规划哪些记忆需要注入
+  | 'memory_multi_round'          // 多轮补充检索
+  | 'memory_rerank'               // AI 打分重排序
+  | 'memory_retrieve_finalize'    // 本地匹配 + 去重 + 排序
+  | 'memory_compile';             // 组装记忆上下文
 ```
 
-**执行顺序图**:
+`MemoryPipelineStage` 这个类型名**在仓库中不存在**。
+
+**执行顺序**（`src/engine/pipelineTypes.ts:72-82` 的 `DEFAULT_EXECUTION_ORDER`，共 9 层；`variable` 是其后单独的第 10 层）：
 
 ```
 main（正文生成完成）
   ↓
-[write ──并行── summary ──并行── vector]  ← 3个并行阶段
+[memory_write ──并行── memory_summary ──并行── memory_vector]  ← 3 个并行阶段
   ↓ (全部完成)
-query_rewrite  ← 串行
+memory_query_rewrite  ← 串行
   ↓
-retrieve_plan  ← 串行
+memory_retrieve_plan  ← 串行
   ↓
-multi_round    ← 串行
+memory_multi_round    ← 串行
   ↓
-rerank         ← 串行
+memory_rerank         ← 串行
   ↓
-finalize       ← 串行
+memory_retrieve_finalize ← 串行
   ↓
-compile        ← 串行
+memory_compile        ← 串行
+  ↓
+variable              ← 串行（变量提取，不属记忆）
+  ↓
+settlement            ← 循环外单独执行（玩法结算）
 ```
 
-#### 2.1.1 write阶段 — 叙事对象提取
+`settlement` **不在** `DEFAULT_EXECUTION_ORDER` 里，由 `src/engine/pipelineExecutor.ts:169-172` 在循环结束后单独 `executeMemoryTask('settlement', ...)` 调用。
+
+另有一条文档未记录的前置路径：每轮正文生成前，`src/engine/useGameEngine.ts:953-961` 会先 `await executeMemoryPrepareForMain(memStore, memCtx)`，一次性完成本地摘要选择 + 向量召回 + 上下文编译；失败仅告警并沿用现有热态记忆。
+
+#### 2.1.1 memory_write 阶段 — 叙事写入
 
 ```typescript
-// 从AI响应中提取叙事对象：人物/地点/事件/关系
-interface NarrativeObject {
-  type: 'person' | 'place' | 'event' | 'relation';
-  name: string;
-  description: string;
-  mentions: number;         // 提及次数
-  firstMentionedRound: number;
-  relatedObjects: string[]; // 相关对象ID
-}
-
-// 使用 narrativePromptTemplates.ingest 构建提示词
-// 调用 API（writeConfig）提取叙事对象
-// 结果写入 memoryStore.runtime.narrativeObjects
+// 使用 templates.ingest（getDefaultNarrativeIngestPrompt）构建提示词
+// AI 返回分组补丁，由 applyIngestToRuntime 合并
+// 落盘字段：scenePatch / threadUpserts / stateSlotUpserts / relationUpserts /
+//          relationNetworkUpserts / eventCandidates / entityPatches / archiveHints
+//          并向 runtime.sourceEvents 追加本轮原始事件
 ```
 
-#### 2.1.2 summary阶段 — 结构化摘要生成
+**不存在 `NarrativeObject` 接口**，也不存在 `runtime.narrativeObjects` 字段。第 2.5 节表格里"叙事对象提取"的说法一并作废。合并入口是 `applyIngestToRuntime`（`src/memory/memoryPipeline.ts:1041`）。
+
+#### 2.1.2 memory_summary 阶段 — 结构化摘要
 
 ```typescript
-// 生成当前场景的结构化摘要
-interface NarrativeSummary {
-  scene: string;           // 场景描述
-  keyEvents: string[];     // 关键事件
-  characterStates: Record<string, string>; // 角色状态
-  activeThreads: string[]; // 开放线索
-  importantFacts: string[]; // 重要事实
+// src/memory/types.ts:694-698
+interface NarrativeSummaryResult {
+  otherCharacterMemories: SummaryMemoryItem[];
+  playerMemories: SummaryMemoryItem[];
+  itemMemories: SummaryMemoryItem[];
 }
-
-// 使用 narrativePromptTemplates.summary
-// 结果写入 memoryStore.runtime.summarySaveHistory
 ```
 
-#### 2.1.3 vector阶段 — 向量事实提取
+`SummaryMemoryItem` 定义见 `src/memory/types.ts:413`。解析函数 `parseNarrativeSummaryResult`（`src/memory/narrativeParsers.ts:412`）会补齐 `sourceType` / `layer` / `confidence` / `validFromRound` / `sourceEventIds` 等溯源字段，随后写入 `runtime.summarySaveHistory`。
+
+#### 2.1.3 memory_vector 阶段 — 向量事实提取
 
 ```typescript
-// 提取需要长期记忆的向量事实（定义见 memory/types.ts；字段远多于下）
-interface VectorFact {
-  fact: string;                       // 事实内容（非 content）
-  title?: string;
-  summary?: string;
-  keywords: string[];
-  entities: string[];
-  primaryType: VectorFactType;        // 'task'|'character'|'relationship'|'location'|'faction'|'event'|'clue'|'item'|'ability'|'status'|'rule'|'world'|'other'（非 category）
-  secondaryTypes: VectorFactType[];
-  characters: string[];
-  locations: string[];
-  factions: string[];
-  items: string[];
-  abilities: string[];
-  events: string[];
-  rules: string[];
-  timeMarkers: string[];
-  importance: number;
-  timeScope: 'short' | 'mid' | 'long';
-  state: 'active' | 'resolved' | 'expired' | 'unknown';
-  sourceStartIndex?: number | null;
-  sourceEndIndex?: number | null;
-  createdAt?: number;
-  embedding?: number[];
-  sourceType?: MemorySourceType;
-  layer?: MemoryLayer;
-  confidence?: number;
-  evidence?: string[];
-  validFromRound?: number | null;
-  validUntilRound?: number | null;
-  validFromLabel?: string;
-  validUntilLabel?: string;
-  supersedesId?: string | null;
-  previousVersionId?: string | null;
-  conflictStatus?: 'none' | 'disputed' | 'superseded' | 'rejected';
-  sourceEventIds?: string[];
-}
-// VectorMemoryItem = VectorFact & { id: string; searchText?; embeddingTimestamp? }
-
-// 使用 narrativePromptTemplates.vectorExtract
+// 使用 templates.vectorExtract（getDefaultVectorExtractPrompt）
 // 结果写入 memoryStore.vectorMemory
-// 同时调用 fetchEmbeddingBatch 向量化
+// 若启用语义检索（semanticRetrieveEnabled 且已配置本地模型或远端端点），
+// 由 embeddingRuntime.createEmbeddingClient 调用 fetchEmbeddingBatch 补 embedding / embeddingTimestamp
+// 向量化失败仅记 appendWriteDebugLog({ kind: 'vector_embedding' }) 调试日志并保留纯文本事实，不阻断写入
 ```
 
-#### 2.1.4 query_rewrite阶段 — 查询改写
+`VectorFact` 完整字段见 §2.2.2，此处不再重复。
+
+#### 2.1.4 memory_query_rewrite 阶段 — 查询改写
 
 ```typescript
-// 分析用户输入，提取检索关键词
-interface QueryRewriteResult {
-  originalQuery: string;
-  keywords: string[];        // 扩展后的关键词列表
-  concepts: string[];        // 概念提取
-  searchDepth: number;       // 检索深度建议
-  timeContext: string;       // 时间上下文
+// src/memory/narrativeParsers.ts:506
+interface VectorQueryRewriteResult {
+  semanticQuery: string;
+  retrievalKeywords: string[];
+  entityFocus: string[];
+  timeFocus: string[];
+  locationFocus: string[];
+  intent: string;
+  needHistoricalCause: boolean;
+  needRelationshipFocus: boolean;
 }
-
-// 使用 narrativePromptTemplates.queryRewrite
-// 结果写入 memCtx.queryRewriteResult
 ```
 
-#### 2.1.5 retrieve_plan阶段 — 检索规划
+解析器 `parseVectorQueryRewriteResult`（`:517`）。执行处 `src/memory/memoryPipeline.ts:612-613` **只写** `ctx._retrievalKeywords` 与 `ctx._semanticQuery`，不改写用户原始输入，也不写 `ctx._queryRewriteResult`。
+
+#### 2.1.5 memory_retrieve_plan 阶段 — 检索规划
 
 ```typescript
-// AI规划哪些记忆分片需要注入
-interface RetrievePlan {
-  strategy: 'recent' | 'relevant' | 'comprehensive' | 'focused';
-  targetMemoryIds: string[];     // 需要注入的记忆ID
-  injectionOrder: string[];      // 注入顺序
-  reasoning: string;             // 规划理由
-  estimatedTokens: number;       // 预估token消耗
+// src/memory/types.ts:702
+interface NarrativeRetrievePlannerResult {
+  items: Array<{ title: string; reason?: string }>;
+  retrievalKeywords: string[];
+  notes?: string;
 }
-
-// 使用 narrativePromptTemplates.retrievePlanner
 ```
 
-#### 2.1.6 multi_round阶段 — 多轮补充检索
+写入 `ctx._plannerResult` / `ctx._finalSelectedTitles` / `ctx._candidateList` / `ctx._allMemories`（`src/memory/memoryPipeline.ts:646-670`）。落盘快照为 `RetrievePlanSnapshot`（`src/memory/types.ts:445-451`）：`{ plannedAt; candidates: Array<{ title; source? }>; selectedTitles; selectedModes; strategy: string }`——`strategy` 是自由字符串，**不是** `'recent' | 'relevant' | 'comprehensive' | 'focused'` 四值枚举。
+
+#### 2.1.6 memory_multi_round 阶段 — 多轮补充检索
+
+多轮补充**默认关闭**（`memoryConfig.ts:69` `multiRoundEnabled: false`）。开启后默认上限 `multiRoundMaxRounds = 3`（`memoryConfig.ts:70`），配置面板可调 2–10（`src/components/settings/memory/RetrievalConfigPanel.tsx:74-76`）。循环从第 2 轮起（`memoryPipeline.ts:692` `for (let round = 2; round <= maxRounds; round++)`，首轮由 retrieve_plan 承担），任一轮无新增标题即提前终止。模板为 `templates.multiRoundRetrievePlanner` / `templates.multiRoundRetrievePlannerFinal`。
+
+#### 2.1.7 memory_rerank 阶段 — 重排序
 
 ```typescript
-// 基于检索结果，进行多轮补充检索
-// 每轮检索可能发现新的相关记忆
-// 最多5轮迭代（防止无限循环）
-// 使用 narrativePromptTemplates.multiRoundRetrievePlanner
-```
-
-#### 2.1.7 rerank阶段 — 重排序
-
-```typescript
-// AI对检索结果打分重排序
-interface RerankedMemory {
-  memoryId: string;
-  score: number;         // 相关性分数 0-1
-  reason: string;        // 评分理由
-  injectionPosition: 'before' | 'after' | 'replace';
+// src/memory/narrativeParsers.ts:534
+interface RerankResult {
+  rankings: Array<{ index: number; score: number }>;
+  needVectorRecall: boolean;
+  vectorRecallReason: string;
+  currentSceneRelationNetwork: string;
 }
-
-// 使用 narrativePromptTemplates.rerank
 ```
 
-#### 2.1.8 finalize阶段 — 最终化
+解析器 `parseRerankResult`（`:541`）；执行处 `src/memory/memoryPipeline.ts:738-791` 按 score 降序重排 `ctx._selectedEntries`。**`RerankedMemory` 类型不存在**，返回的是候选下标与分数，不含注入位置。失败时回退标题匹配结果并标记 `memory_rerank` 降级。
+
+#### 2.1.8 memory_retrieve_finalize 阶段 — 最终化（纯本地）
+
+`src/memory/memoryPipeline.ts:795-843`，实际四步：
+
+1. 标题**双向包含匹配**（`:808-810`）
+2. 关键词命中率 ≥ `keywordRecallThreshold / 100` 时补足候选（`:813-820`）
+3. 按 `title.toLowerCase()` 去重（`:823-829`）
+4. **按 `sourceFloor` 升序排序**（`:830` `deduped.sort((a, b) => a.sourceFloor - b.sourceFloor)`）
+
+随后 `setRetrievePlan`（`:833-839`）。全程**无 `cosineSimilarity`、无注入位置策略**；`selectedModes` 统一记 `'keyword_hit'`。余弦相似度只出现在向量召回路径 `recallVectorFacts` 里。
+
+#### 2.1.9 memory_compile 阶段 — 编译
 
 ```typescript
-// 本地匹配 + 去重 + 排序
-// 1. 余弦相似度匹配（vectorUtils.cosineSimilarity）
-// 2. 去重（相同内容的记忆只保留一条）
-// 3. 按分数降序排序
-// 4. 应用注入位置策略
-```
-
-#### 2.1.9 compile阶段 — 编译
-
-```typescript
-// 将处理后的记忆组装成上下文文本
-interface CompiledMemoryContext {
-  fullText: string;       // 完整上下文文本
-  tokenCount: number;     // token计数
-  memoryCount: number;    // 包含的记忆条数
-  injectionPoints: Array<{ position: string; content: string }>;
+// src/memory/types.ts:453-459
+interface CompiledContextSnapshot {
+  compiledAt: number;
+  fullText: string;
+  sections: Record<string, string>;
+  sceneAnchor?: SceneAnchor;
+  runtimeFlow?: RuntimeFlowSnapshot;
 }
-
-// 编译阶段由 compileFormatter 生成注入文本
-// 结果写入 memoryStore.lastCompiledContext
 ```
+
+`CompiledMemoryContext` 类型不存在；`injectionPoints` / `memoryCount` / `tokenCount` 三个字段也都不存在。编译核心是 `compileFormatter.formatRuntimeToCompiledText(...)`，返回 `CompiledOutput { text; tokenEstimate; sections: CompiledSectionBudget; hotIds: string[] }`（`src/memory/compileFormatter.ts:239`），再归一成上面的快照写入 `memoryStore.lastCompiledContext`。
 
 #### 2.1.10 降级机制
 
-各阶段失败时向 `ctx._degradedStages` 追加阶段标识，由调用方按已降级阶段决定后续行为；不阻塞主线。
+只有 **4 个**阶段经 `withDegradationCheck` 包装（`src/engine/useGameEngine.ts:162-165`）：`memory_query_rewrite`、`memory_retrieve_plan`、`memory_multi_round`、`memory_rerank`。write(:159)、summary(:160)、vector(:161)、retrieveFinalize(:166)、compile(:167) 均为裸 `await`。
 
-降级包装统一由 `src/engine/useGameEngine.ts` 的 `withDegradationCheck(memCtx, label, task)` 完成：
+向 `_degradedStages` 追加的标识是 pipeline task id：`'memory_query_rewrite'`（`memoryPipeline.ts:622`）、`'memory_retrieve_plan'`（`:670`）、`'memory_multi_round'`（`:730`）、`'memory_rerank'`（`:787`）；向量召回在正文前准备阶段另有 `'memory_vector'` / `'memory_vector_strict_failure'` 两个标识（`:253` / `:258`）。
+
+包装函数本体如下（`src/engine/useGameEngine.ts:93-105`，与原文档逐字一致）：
 
 ```typescript
 function withDegradationCheck(
@@ -241,7 +199,15 @@ function withDegradationCheck(
 
 #### 2.1.11 写入重试与失败记账
 
-`executeMemoryWrite` / `executeMemorySummary` 按 `writePipeline.retryCount`（默认 2）与 `retryDelayMs`（默认 1200）重试 `retryCount + 1` 次，重试间隔走 `abortableDelay(retryDelayMs, ctx.signal)` 以响应取消。每次失败先记 `lastIngestFailure`（含 `sourceStartIndex` / `cursor` / `attempt` / `maxAttempts` / `status: 'active'`）并抛错；成功时推进 `lastIngestCursor`，若此前有 `active` 失败则置为 `resolved` 并写 `resolvedAt`。写入不引入暂存代理，失败一律记账到 runtime，不落半个对象。
+`executeMemoryWrite` 与 `executeMemorySummary` 均按 `retryCount + 1` 次重试（`writePipeline.retryCount` 默认 2），间隔 `abortableDelay(retryDelayMs, ctx.signal)`（默认 1200ms）以响应取消。
+
+失败记账**不对称**：
+- **write** 重试全部耗尽后写一次 `lastIngestFailure`（含 `sourceStartIndex` / `cursor` / `attempt` / `maxAttempts` / `status: 'active'`）并抛错；注意 `attempt` 记的是 `maxAttempts` 而非当次序号（`memoryPipeline.ts:442-455`）。
+- **summary** **不写** `lastIngestFailure`，只 `appendWriteDebugLog({ kind: 'summary', mode: 'error' })` 并抛 `new Error('摘要保存失败: ...')`（`memoryPipeline.ts:520-524`）。
+
+成功时推进 `lastIngestCursor`，若此前有 `active` 失败则置为 `resolved` 并写 `resolvedAt`。
+
+**提交契约（CAS）**：写入在本地 runtime 副本上完成后，经 `commitMemoryRuntime(runtime, expectedVersion, baseline)` 提交（`src/memory/memoryStore.ts:119` 声明，`:449-467` 实现）。版本或基线不一致时抛 `DOMException('记忆版本已变化，请重试当前阶段', 'AbortError')`。合并采用"只合并不覆盖"——`structuredFacts` 会先排除 `summarySaveHistory` / `lastSummarySave` / `sourceEvents` / `checkpoints` / `lastCompiledContext` / `lastRuntimeFlow` / `lastRetrievePlan` / 三个 `debugLogs` / `vectorMemory`。
 
 ---
 
@@ -279,7 +245,7 @@ interface MemoryStore {
   bumpRuntimeVersion: () => void;
 
   // Checkpoint
-  createCheckpoint: () => NarrativeCheckpoint | null;
+  createCheckpoint: (retainedIds?: readonly string[]) => NarrativeCheckpoint | null;
   restoreCheckpoint: (checkpointId: string) => boolean;
 
   // Narrative 元素 CRUD（均为 upsert*/update* 模式）
@@ -292,116 +258,102 @@ interface MemoryStore {
 }
 ```
 
-#### 2.2.1 NarrativeMemoryRuntime 结构（完整定义见 `memory/types.ts`；下列为节选，另含 version/bankId/mutationLog/sourceEvents/lastSummarySave/lastRetrievePlan 等字段，且 SceneAnchor、NarrativeThread 等子结构字段以源码为准）
+#### 2.2.1 NarrativeMemoryRuntime 结构
+
+完整定义见 `src/memory/types.ts`。以下为节选，字段名以源码为准（本节此前使用的"中文键名 + 推测字段"写法已全部作废）：
 
 ```typescript
-interface NarrativeMemoryRuntime {
-  // 场景锚点 — 当前场景的上下文快照
-  sceneAnchor: {
-    时间: string;              // "第3天上午"
-    地点: string;              // "长安城集市"
-    涉及实体: string[];        // ["玩家", "李四", "王五"]
-    当前目标: string;          // "完成采购任务"
-    当前风险: string;          // "可能被发现身份"
-    情绪氛围: string;          // "紧张"
-  };
-  
-  // 叙事线索 — 跟踪开放/阻塞/已解决的 storyline
-  activeThreads: Array<{
-    id: string;
-    名称: string;
-    状态: 'open' | 'blocked' | 'resolved';
-    重要性: number;            // 1-5
-    创建回合: number;
-    最后活跃回合: number;
-    相关实体: string[];
-    摘要: string;
-  }>;
-  
-  // 作用域状态值 — 快速访问的键值对
-  stateSlots: Array<{
-    slot: string;              // "玩家血量" / "当前天气"
-    scope: 'player' | 'npc' | 'location' | 'world';
-    key: string;               // 具体key
-    value: string;
-    updatedRound: number;
-  }>;
-  
-  // 关系边 — 实体之间的关系图
-  relationEdges: Array<{
-    id: string;
-    source: string;            // 实体A
-    target: string;            // 实体B
-    relation: string;          // "朋友" / "敌人" / "恋人"
-    weight: number;            // 关系强度 0-1
-    updatedRound: number;
-    备注?: string;
-  }>;
-  
-  // 关系网络节点
-  relationNetwork: Array<{
-    id: string;
-    type: 'person' | 'place' | 'faction' | 'item';
-    name: string;
-    importance: number;        // 1-10
-    描述: string;
-    首次出现回合: number;
-  }>;
-  
-  // 重要事件卡（类型见 NarrativeEventCard，memory/types.ts；hot/warm/cold 状态衰减）
-  eventCards: Array<{
-    id: string;
-    title: string;
-    summary: string;
-    excerpt: string;
-    importance: number;
-    status: 'hot' | 'warm' | 'cold';
-    entityRefs: string[];
-    locationRefs: string[];
-    threadRefs: string[];
-    timeLabels: string[];
-    sourceStartIndex: number | null;
-    sourceEndIndex: number | null;
-    createdAt?: number;
-    updatedAt?: number;
-  }>;
-  
-  // 实体档案 — 人物/地点/组织的详细信息卡
-  entityCards: Array<{
-    id: string;
-    type: 'person' | 'place' | 'faction' | 'item' | 'event';
-    name: string;
-    描述: string;
-    关键属性: Record<string, unknown>;
-    关系: string[];            // 关联的relationEdge ids
-    创建回合: number;
-    最后活跃回合: number;
-    重要性: number;
-  }>;
-
-  // 归档线索ID列表
-  archiveCards: string[];
-  
-  // 向量记忆（长期事实，可选字段）
-  vectorMemory?: VectorFact[];
-  
-  // 检查点（最多5个）
-  checkpoints: Array<{
-    id: string;
-    round: number;
-    timestamp: number;
-    data: SerializedMemoryRuntime;
-  }>;
-  
-  // AI生成的摘要历史
-  summarySaveHistory: Array<{
-    round: number;
-    summary: string;
-    keyFacts: string[];
-    topicTags: string[];
-  }>;
+// SceneAnchor — src/memory/types.ts:184-199（无「情绪氛围」字段）
+sceneAnchor: {
+  timeLabel: string; locationLabel: string; presentEntities: string[];
+  immediateGoal: string; immediateRisk: string; conversationFocus: string;
+  recentChange: string; confidence: number;
+  updatedAt?: number; sourceType?: MemorySourceType;
+  validFromRound?: number; validUntilRound?: number; sourceEventIds?: string[];
 }
+
+// NarrativeThread — src/memory/types.ts:248-265（状态 6 个，非 3 个）
+activeThreads: Array<{
+  id: string; title: string; summary: string; goal: string;
+  status: 'open' | 'blocked' | 'suspended' | 'resolved' | 'failed' | 'superseded';
+  priority: number; blockingReason: string;
+  relatedEntities: string[]; relatedItems: string[]; relatedLocations: string[];
+  deadline: string; sourceStartIndex: number | null; sourceEndIndex: number | null;
+  category?: string; createdAt?: number; updatedAt?: number;
+}>;
+
+// NarrativeStateSlot — 267-281
+stateSlots: Array<{
+  id: string; scopeType: string; scopeId: string; slotType: string;
+  value: string; summary: string; status: string; priority: number;
+  sourceStartIndex: number | null; sourceEndIndex: number | null;
+  history?: Array<{ value: string; summary: string; recordedAt: number }>;
+}>;
+
+// NarrativeRelationEdge — 283-298
+relationEdges: Array<{
+  id: string; sourceEntityId: string; targetEntityId: string;
+  relationType: string; stance: string; strength: number;
+  status: 'active' | 'broken' | 'changed'; summary: string;
+  sourceStartIndex: number | null; sourceEndIndex: number | null;
+  locationScope?: string;
+}>;
+
+// NarrativeRelationNetworkItem — 300-315（是「关系边」，不是实体节点）
+relationNetwork: Array<{
+  id: string; sourceEntityId: string; targetEntityId: string;
+  relationType: string; summary: string; strength: number;
+  status: string; confidence: number;
+}>;
+
+// NarrativeEventCard — 318-332（hot/warm/cold 状态衰减）
+eventCards: Array<{
+  id: string; title: string; summary: string; excerpt: string;
+  importance: number; status: 'hot' | 'warm' | 'cold';
+  entityRefs: string[]; locationRefs: string[]; threadRefs: string[];
+  timeLabels: string[]; sourceStartIndex: number | null; sourceEndIndex: number | null;
+  createdAt?: number; updatedAt?: number;
+}>;
+
+// NarrativeEntityCard — 336-355；类型枚举见 :334（6 值，无 'event'）
+entityCards: Array<{
+  name: string;
+  entityType: 'character' | 'location' | 'faction' | 'item' | 'ability' | 'other';
+  aliases: string[]; currentStatus: string; stableFacts: string[];
+  currentStance: string; affiliations: string[];
+  relatedThreads: string[]; relatedEvents: string[];
+  locationFacts?: Record<string, unknown>;
+  factHistory?: Array<{ fact: string; recordedAt: number }>;
+}>;
+
+// NarrativeArchiveCard — 357-369（对象卡，非 ID 字符串数组）
+archiveCards: Array<{
+  id: string; title: string; arcTitle: string; summary: string;
+  timeSpan: string; keywords: string[]; entityRefs: string[]; archivedAt: number;
+}>;
+
+// 向量记忆（长期事实）
+vectorMemory?: VectorFact[];
+
+// NarrativeCheckpoint — 380-390；上限 10（memoryStore.ts:792 MAX_CHECKPOINTS = 10）
+checkpoints: Array<{
+  id: string; createdAt: number; lastIngestCursor: number;
+  activeThreadCount: number; eventCount: number; entityCount: number;
+  snapshot?: unknown; vectorMemory?: VectorFact[];
+}>;
+
+// SummarySaveRecord — 392-411；历史上限 MAX_SUMMARY_HISTORY = 500（memoryStore.ts:56）
+summarySaveHistory: Array<{
+  id?: string; savedAt: number; status: 'success' | 'error';
+  sourceStartIndex: number; sourceEndIndex: number; sourceEventIds?: string[];
+  applyResult: { otherCharacterCount: number; playerCount: number; itemCount: number;
+                 eventCount?: number; archiveCount?: number; vectorCount?: number };
+  summaryData?: { otherCharacterMemories: SummaryMemoryItem[];
+                  playerMemories: SummaryMemoryItem[]; itemMemories: SummaryMemoryItem[] };
+}>;
 ```
+
+冲突的旧摘要记录会标 `superseded` 并裁到 `MAX_SUMMARY_HISTORY = 500`（`src/memory/memoryStore.ts:838-869`、`:56`）。
 
 #### 2.2.2 VectorFact 结构（以 `memory/types.ts` 为准）
 
@@ -459,66 +411,43 @@ export interface VectorFact {
 
 #### 2.3.1 向量工具 — `src/memory/vectorUtils.ts`
 
-**文件路径**: `src/memory/vectorUtils.ts`
+**文件路径**: `src/memory/vectorUtils.ts`（12 个导出，全部为纯函数/归一化工具）
+
+真实导出面:`cosineSimilarity`(:15)、`normalizeVectorFactType`(:45)、`normalizeVectorTypeList`(:89)、`normalizeVectorEntityField`(:110)、`buildVectorFallbackEntitySlots`(:118)、`collectVectorSlotEntities`(:179)、`normalizeVectorFactImportance`(:206)、`normalizeVectorFactTimeScope`(:212)、`normalizeVectorFactState`(:218)、`normalizeVectorFact`(:226)、`normalizeVectorMemoryItem`(:280)、`resolveVectorFactArrayFromPayload`(:298)。
 
 ```typescript
-// 余弦相似度计算
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-  
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+// src/memory/vectorUtils.ts:15-36 —— 取 min(len) 对齐，而非长度不等即返回 0
+export function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (!Array.isArray(vecA) || !Array.isArray(vecB)) return 0;
+  const len = Math.min(vecA.length, vecB.length);
+  if (len === 0) return 0;
+  let dotProduct = 0, normA = 0, normB = 0;
+  for (let i = 0; i < len; i++) {
+    const a = Number(vecA[i]) || 0;
+    const b = Number(vecB[i]) || 0;
+    dotProduct += a * b; normA += a * a; normB += b * b;
   }
-  
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  if (denominator === 0) return 0;
+  return dotProduct / denominator;
 }
+```
 
-// 实体槽位构建 — 将实体信息转换为向量检索用的字符串
-function buildEntitySlot(entity: {
-  name: string;
-  type: string;
-  description?: string;
-  aliases?: string[];
-}): string {
-  const parts = [entity.name];
-  if (entity.aliases) parts.push(...entity.aliases);
-  if (entity.description) parts.push(entity.description);
-  return parts.join(' ');
-}
+**`buildEntitySlot` / `embedTexts` / `searchBySimilarity` 三个函数在仓库中不存在**。对应能力分别是:
 
-// 批量向量化
-async function embedTexts(
-  texts: string[],
-  config: EmbeddingConfig,
-): Promise<Array<{ text: string; embedding: number[] }>> {
-  const response = await fetchEmbeddingBatch(texts, config);
-  // 返回文本及其对应的向量
-}
+- **实体槽位** → `buildVectorFallbackEntitySlots`(:118) 与 `collectVectorSlotEntities`(:179)——从向量事实的 `entities` / `characters` / `locations` 等字段回退拼出检索用槽位字符串。
+- **批量向量化** → 统一走 `embeddingRuntime.createEmbeddingClient(config).embed(texts, options)`；底层 `fetchEmbeddingBatch` 定义在 `src/api/client.ts:782`，由 `src/memory/embeddingRuntime.ts:176-177` 动态 `await import('../api/client')` 取得。
+- **相似度检索** → `memoryPipeline.recallVectorFacts`（`src/memory/memoryPipeline.ts:108-188`）：先过滤不可见 / 已过期 / 被取代事实，再用 `cosineSimilarity` 打分（`:152`），过 `vectorScoreThreshold` 取候选，缺失 embedding 时按 batchSize 64 补齐，必要时走 `fetchRerank` 重排，最后按 `primaryType` 限流并截取 `vectorRetrieveTopK`。
 
-// 相似度搜索
-function searchBySimilarity(
-  query: string,
-  facts: VectorFact[],
-  topK: number = 10,
-): VectorFact[] {
-  const queryEmbedding = embedTexts([query])[0].embedding;
-  return facts
-    .filter(f => f.embedding)
-    .map(f => ({
-      fact: f,
-      similarity: cosineSimilarity(queryEmbedding, f.embedding!),
-    }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, topK)
-    .map(r => r.fact);
-}
-````
+#### 2.3.2 嵌入运行时 — `src/memory/embeddingRuntime.ts`
+
+`DEFAULT_LOCAL_EMBEDDING_MODEL = 'onnx-community/bge-small-zh-v1.5-ONNX'`(:4)。对外导出:
+
+- 模型管理:`getInstalledLocalEmbeddingModels`(:134)、`isLocalEmbeddingModelInstalled`(:144)、`deleteLocalEmbeddingModel`(:148)、`clearAllLocalEmbeddingModels`(:159)、`warmLocalEmbeddingModel`(:223)、`isLocalEmbeddingModelLoaded`(:236)。
+- 端点与客户端:`resolveEmbeddingEndpoint`(:180) 按 `vectorRuntime` 三值分流(`'remote'` / `'local'` / `'local_endpoint'`),`createEmbeddingClient`(:189) 是唯一入口。
+- 类型:`EmbeddingClient`(:6)、`EmbeddingRuntimeDependencies`(:10)、`LocalEmbeddingProgress`(:15)、`LocalEmbeddingProgressCallback`(:23)、`LocalEmbeddingModelMetadata`(:25)、`LocalEmbeddingModelManagerDependencies`(:31)。
+
+相关配置字段在 `src/memory/types.ts:104-149`:`vectorRuntime`、`localEmbeddingModelId`、`vectorRerankApiUrl`、`vectorRerankModel`、`vectorRetrieveMode`。
 
 ---
 
@@ -526,116 +455,32 @@ function searchBySimilarity(
 
 **文件路径**: `src/memory/memoryPrompts.ts`
 
-**10个提示词模板**:
+**11 个提示词模板**：每个模板由 `getDefault*` 工厂导出，占位符统一为 `{{...}}` 双花括号（如 `{{玩家名字}}` / `{{剧情原文}}` / `{{叙事写入参考}}` / `{{batchText}}` / `{{inputText}}` / `{{recentContext}}`）。
 
-```typescript
-// writePrompt — 叙事对象提取
-// 输入: batchText (用户+AI的回合内容)
-// 输出: JSON数组 [{ type, name, description, mentions, relatedObjects }]
-const writePrompt = `你是一个叙事分析系统。从以下对话中提取所有重要的叙事对象...
+文档此前列出的 `writePrompt` / `summaryPrompt` / `vectorExtractPrompt` / `queryRewritePrompt` / `retrievePlanPrompt` / `rerankPrompt` / `compiledText` **七个常量在仓库中均不存在**。真实导出面（`src/memory/memoryPrompts.ts`）：
 
-## 提取对象类型
-- person: 人物（玩家、NPC、路人等）
-- place: 地点（城市、建筑、自然景观等）
-- event: 事件（发生的行为、决定、冲突等）
-- relation: 关系（人与人、人与地点的关系变化）
+| 行号 | 工厂函数 | 模板键 | 作用 |
+| --- | --- | --- | --- |
+| :11 | `getDefaultVectorExtractPrompt` | `vectorExtract` | 向量事实提取（12 类主分类、importance 1-5） |
+| :147 | `getDefaultNarrativeIngestPrompt` | `ingest` | 叙事写入补丁提取 |
+| :236 | `getDefaultNarrativeQueryRewritePrompt` | `queryRewrite` | 检索关键词改写 |
+| :273 | `getDefaultNarrativeSummaryPrompt` | `summary` | 结构化摘要生成 |
+| :312 | `getDefaultNarrativeRetrievePlannerPrompt` | `retrievePlanner` | 检索规划 |
+| :345 | `getDefaultMultiRoundRetrievePlannerPrompt` | `multiRoundRetrievePlanner` | 多轮补充规划 |
+| :369 | `getDefaultMultiRoundRetrievePlannerFinalPrompt` | `multiRoundRetrievePlannerFinal` | 多轮补充收尾 |
+| :393 | `getDefaultNarrativeRerankPrompt` | `rerank` | 精排打分 |
+| :424 | `getDefaultNarrativeConflictJudgePrompt` | `conflictJudge` | 冲突裁决 |
+| :453 | `getDefaultVectorQueryRewritePrompt` | `vectorQueryRewrite` | 向量查询改写 |
+| :480 | `getDefaultVectorRerankPrompt` | `vectorRerank` | 向量召回重排 |
 
-## 输出格式
-请以JSON数组格式输出，每项包含：
-- type: 对象类型
-- name: 对象名称
-- description: 简要描述
-- mentions: 提及次数
-- relatedObjects: 相关对象列表
+另有两个装配函数：`createDefaultNarrativePromptTemplates`（:507）与 `normalizeNarrativePromptTemplates(templates: unknown)`（:525）。`NarrativePromptTemplates` 类型（`src/memory/types.ts:154-165`）为上述 11 个模板字段 + `_version?`。
 
-## 对话内容
-{batchText}`;
+**两个容易写错的取值**：
 
-// summaryPrompt — 结构化摘要生成
-// 输入: recentContext (最近N条消息)
-// 输出: JSON { scene, keyEvents, characterStates, activeThreads, importantFacts }
-const summaryPrompt = `分析以下对话，生成结构化摘要...
+- **主分类是 12 类**，无 `plot`：`task` / `character` / `relationship` / `location` / `faction` / `event` / `clue` / `item` / `ability` / `status` / `rule` / `world`。
+- **`importance` 是 1–5 整数**（5 为长期关键事实、1 为临时细节），**不是 10 分制**。
 
-## 输出格式
-{
-  "scene": "当前场景描述",
-  "keyEvents": ["关键事件1", "关键事件2"],
-  "characterStates": { "角色名": "状态描述" },
-  "activeThreads": ["开放线索1", "开放线索2"],
-  "importantFacts": ["重要事实1", "重要事实2"]
-}
-
-## 最近对话
-{recentContext}`;
-
-// vectorExtractPrompt — 向量事实提取
-// 输入: batchText, currentFacts (已存在的向量事实)
-// 输出: JSON数组 [{ fact, primaryType, secondaryTypes, entities, importance, timeScope, state, ... }]（字段见 VectorFact 类型，非 content/entitySlots/category）
-const vectorExtractPrompt = `从对话中提取需要长期记忆的重要事实...
-
-## 重要性评分标准
-- 10: 主线剧情关键转折点
-- 7-9: 重要人物关系变化、重大发现
-- 4-6: 中等重要的事件和决定
-- 1-3: 日常细节、闲聊内容
-
-## 分类
-- character: 人物相关信息
-- plot: 剧情相关事实
-- world: 世界设定相关
-- rule: 规则和机制相关
-- relationship: 关系变化
-
-## 对话内容
-{batchText}`;
-
-// queryRewritePrompt — 查询改写
-// 输入: userText (用户当前输入)
-// 输出: JSON { keywords, concepts, searchDepth, timeContext }
-const queryRewritePrompt = `分析用户输入，提取用于记忆检索的关键词...
-
-## 用户输入
-{userText}`;
-
-// retrievePlanPrompt — 检索规划
-// 输入: queryResult, vectorMemory, budget (token预算)
-// 输出: JSON { strategy, targetMemoryIds, injectionOrder }
-const retrievePlanPrompt = `根据检索结果，规划记忆注入策略...
-
-## 可用记忆
-{availableMemories}
-
-## Token预算
-{maxTokens}
-
-## 用户查询
-{userQuery}`;
-
-// rerankPrompt — 重排序
-// 输入: query, retrievedMemories
-// 输出: JSON数组 [{ memoryId, score, reason, injectionPosition }]
-const rerankPrompt = `对检索到的记忆进行相关性打分...
-
-## 用户查询
-{query}
-
-## 待评分记忆
-{memories}`;
-
-// 编译注入文本（由 compileFormatter 生成）
-// 输入: runtime, queryKeywords, budget, resourceState
-// 输出: string
-const compiledText = `将记忆片段编译成连贯的上下文文本...
-
-## 记忆片段
-{memories}
-
-## 用户查询
-{query}
-
-## Token预算
-{maxTokens}`;
-```
+`compiledText` 不是提示词——编译注入文本由 `compileFormatter` 程序化渲染，见 §2.5。
 
 ---
 
@@ -643,20 +488,23 @@ const compiledText = `将记忆片段编译成连贯的上下文文本...
 
 | 文件                                                                | 职责                                                           |
 | ----------------------------------------------------------------- | ------------------------------------------------------------ |
-| `src/memory/compileFormatter.ts`                                  | 把 `RerankedMemory[]` 编译成最终注入文本(`fullText`),控制 token 预算与排版    |
-| `src/memory/narrativeGraph.ts` | `multi_round` 阶段遍历相关记忆 |
-| `src/memory/narrativeParsers.ts`                                  | 从 AI 响应解析叙事对象,补充 `write` 阶段提取不到的实体引用                         |
-| `src/memory/narrativePng.ts`                                      | 叙事图 PNG 导出(可视化调试,可选)                                         |
-| `src/memory/memoryCandidates.ts`                                  | 候选记忆去重/合并策略(`entities`/`keywords`/`primaryType` 重叠检测)        |
+| `src/memory/compileFormatter.ts`                                  | 把 `NarrativeMemoryRuntime` 按「热态常驻层 + 查询扩展层」两段编译成注入文本，控制 token 预算与排版 |
+| `src/memory/narrativeGraph.ts` | 把运行时渲染成 Mermaid 图谱负载，供记忆面板可视化标签页使用，**与管线阶段无关** |
+| `src/memory/narrativeParsers.ts`                                  | 从 AI 响应容错解析六类结构:`parseNarrativeIngestResult`(:186) / `parseNarrativeSummaryResult`(:412) / `parseNarrativeRetrievePlannerResult`(:461) / `parseNarrativeConflictJudgeResult`(:489) / `parseVectorQueryRewriteResult`(:517) / `parseRerankResult`(:541) |
+| `src/memory/narrativePng.ts`                                      | 记忆包 PNG 隐写导出/导入:`createMemoryDataPngBlob`(:441) / `extractMemoryPackFromPng`(:454) / `isMemoryPngFile`(:496) / `getMemoryExportFileName`(:501) |
+| `src/memory/memoryCandidates.ts`                                  | 把运行时各结构化集合投影为统一 `MemoryEntry` 检索池,并按受众(`player`/`director`)做可见性投影:`collectMemoryEntries(runtime, audience = 'player')`(:96);**无去重/合并** |
 | `src/memory/memoryConfig.ts`                                      | 记忆系统配置 schema(嵌入模型/管线预算/降级策略)                                |
 | `src/memory/normalize.ts`                                         | 记忆数据标准化(版本兼容/字段合并)                                           |
-| `src/memory/types.ts`                                      | `NarrativeMemoryRuntime` / `VectorFact` / `Checkpoint` 等类型定义 |
+| `src/memory/types.ts`                                      | `NarrativeMemoryRuntime` / `VectorFact` / `NarrativeCheckpoint` 等类型定义 |
+
+`narrativeGraph.ts` 只被 `src/components/settings/memory/runtimeGraph/GraphView.tsx:4` 与本文件的测试 `narrativeGraph.test.ts:2` 引用；`memoryCandidates.ts` 的消费方是检索候选池构建(`memoryPipeline.ts`)。
 
 **`compileFormatter` 与 `compile` 阶段的关系**:
 
-- 编译阶段 `executeMemoryCompile` 调用 `compileFormatter.formatRuntimeToCompiledText(runtime, queryKeywords, budget, resourceState)` 生成注入文本
-- 输出写入 `memoryStore.lastCompiledContext`,供下次 `mainTask` 步骤 6 使用
-- 失败兜底:返回空字符串,不阻塞主线(但会触发 `_degradedStages` 标记)
+- 编译阶段 `executeMemoryCompile` 调用 `formatRuntimeToCompiledText(runtime, queryKeywords, budget, resourceState)` 生成注入文本。签名:`formatRuntimeToCompiledText(runtime: NarrativeMemoryRuntime, queryKeywords: string[], budget = DEFAULT_COMPILE_BUDGET, resourceState?: ResourceSnapshot[]): CompiledOutput`(`src/memory/compileFormatter.ts:246`;热态常驻层与查询扩展层的分段构造在 `:363-370`)。
+- `CompiledOutput`(`:239`)= `{ text; tokenEstimate; sections: CompiledSectionBudget; hotIds: string[] }`,由 `executeMemoryCompile` 归一成 `CompiledContextSnapshot` 写入 `memoryStore.lastCompiledContext`。
+- 注入位置是**系统提示第 4 段**(`src/engine/promptAssembler.ts:96-102`,顺序为 1 世界书 / 2 玩家档案 / 3 角色认知防火墙 / 4 编译后的记忆上下文 / 5 剧情导演指导 / 6 预设提示词条目),拼装在 `:230-231`,取值 `src/engine/useGameEngine.ts:1112 memCtx ? memStore.lastCompiledContext?.fullText || '' : ''`。
+- **compile 无内部兜底**:`executeMemoryCompile`(`src/memory/memoryPipeline.ts:847-901`)没有 try/catch,异常上抛给 `src/engine/pipelineExecutor.ts:255-287`——那里记 debug 日志、把该 stage 标 `status: 'error'`,不中断后续层级。「返回空字符串、触发 `_degradedStages`」的说法不成立(`memory_compile` 不在 `withDegradationCheck` 的 4 个包装里)。
 
 **叙事图谱 (`narrativeGraph`)**:
 

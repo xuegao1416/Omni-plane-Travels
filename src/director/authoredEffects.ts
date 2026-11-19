@@ -4,7 +4,8 @@ import type { DirectorAuthoredEffect } from './authoredEffectsTypes';
 import type { StateFieldDefinition } from '../custom-modules/schema';
 import { executeCustomModuleRuleInGame } from '../custom-modules/hostRuntime';
 import { validateCustomGameplayModule } from '../custom-modules/validator';
-import { createGameplayStateDiff, executeGameplayTransaction, getGameplayPath, setGameplayPath } from '../gameplay/kernel';
+import { getGameplayPath, setGameplayPath, stateDiffOps } from '../core/state';
+import { commitTransaction } from '../core/transaction';
 import { isNpcDead } from '../utils/npcHelpers';
 
 export interface AuthoredEffectsOptions { eventId: string; now?: number }
@@ -123,9 +124,9 @@ export function executeAuthoredEffects(source: GameState, plan: PlotPlan, direct
   }
   draft.authoredEffectReceipts ??= {};
   draft.authoredEffectReceipts[key] = { planId: plan.id, effectSignature: signature };
-  // Nested rules only preview costs and actions; publish one aggregate kernel transaction.
+  // 嵌套规则只预演消耗与动作；最后作为一笔内部事务整体提交。
   if (source.gameplay) draft.gameplay = structuredClone(source.gameplay); else delete draft.gameplay;
-  const transaction = executeGameplayTransaction(source, { id: `authored:${key}`, source: 'director:authored', label: plan.intent, effects: createGameplayStateDiff(source, draft), events: [{ type: 'director.authored.accepted', payload: { planId: plan.id, eventId: options.eventId } }] }, { tick: draft.simulationRuntime?.tick ?? 0, bestEffort: false });
+  const transaction = commitTransaction(source, { id: `authored:${key}`, source: 'director:authored', label: plan.intent, ops: stateDiffOps(source, draft), events: [{ type: 'director.authored.accepted', payload: { planId: plan.id, eventId: options.eventId } }] });
   if (transaction.status !== 'applied') return fail('authored_transaction_rejected');
   return { state: transaction.state, success: true, summary };
 }

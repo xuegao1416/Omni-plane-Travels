@@ -2,12 +2,15 @@
 // 管线监控弹窗 - 独立 UI，从输入框旁按钮打开
 // ============================================================
 
-import { useState } from 'react';
+import { useState,type CSSProperties } from 'react';
 import type { PipelineStatus as PipelineStatusType,PipelineStageResult,PipelineTaskId } from '../../../engine/pipelineTypes';
 import { STAGE_LABELS } from '../../../engine/pipelineTypes';
 import { STAGE_META,STAGE_ORDER,STATUS_CONFIG,formatMs } from './pipelineUI';
 import { RETRYABLE_STAGES } from '../../../engine/pipelineExecutor';
-import { X,ChevronDown,ChevronRight,RefreshCw,Copy } from 'lucide-react';
+import { X,ChevronDown,ChevronRight,RefreshCw,Copy,Check,Minus } from 'lucide-react';
+import OverlayPortal from '../../shared/OverlayPortal';
+import PlanarFrame from '../../../ui/planar/PlanarFrame';
+import '../../../ui/screens/pipeline-monitor.css';
 
 interface Props {
   status: PipelineStatusType | null;
@@ -16,6 +19,8 @@ interface Props {
   onRetryPipeline?: () => void;
   isGenerating?: boolean;
 }
+
+const stageElapsed = (stage: PipelineStageResult) => stage.startTime && stage.endTime ? stage.endTime - stage.startTime : undefined;
 
 export default function PipelineMonitorModal({ status, onClose, onRetrySingleStage, onRetryPipeline, isGenerating }: Props) {
   const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>({});
@@ -43,148 +48,90 @@ export default function PipelineMonitorModal({ status, onClose, onRetrySingleSta
   const skipCount = stages.filter(s => s.stage.status === 'skipped').length;
   const errorCount = stages.filter(s => s.stage.status === 'error').length;
   const runningStage = stages.find(s => s.stage.status === 'running');
+  const settled = stages.filter(s => s.stage.status !== 'pending' && s.stage.status !== 'running').length;
+  const progress = stages.length ? settled / stages.length : 0;
 
   return (
-    <div className="game-journey__nested-overlay" style={styles.overlay} onClick={onClose}>
-      <div className="game-journey__nested-panel" style={styles.modal} onClick={e => e.stopPropagation()}>
-        {/* 头部 */}
-        <div style={styles.header}>
-          <div>
-            <h3 style={styles.title}>管线监控</h3>
-            <p style={styles.subtitle}>
+    <OverlayPortal className="game-journey__nested-overlay pm-overlay" ariaLabel="管线监控" onClose={onClose}>
+      <PlanarFrame className="pm-dialog" variant="plate" onClick={e => e.stopPropagation()}>
+        <header className="pm-header">
+          <div className="pm-header__copy">
+            <small>第 {status.round} 轮 · 回合管线</small>
+            <h2 className="pk-title">管线监控</h2>
+            <p className={runningStage ? 'is-running' : undefined}>
               {runningStage
-                ? `${STAGE_LABELS[runningStage.id]} 执行中...`
+                ? `${STAGE_LABELS[runningStage.id]} 执行中`
                 : allDone
                   ? `本轮完成 · ${formatMs(elapsed)}`
-                  : `第 ${status.round} 轮`
-              }
+                  : '等待开始'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="pm-header__tally">
+            {successCount > 0 && <span className="pm-tally is-success"><Check />{successCount}</span>}
+            {skipCount > 0 && <span className="pm-tally is-skipped"><Minus />{skipCount}</span>}
+            {errorCount > 0 && <span className="pm-tally is-error"><X />{errorCount}</span>}
             {onRetryPipeline && status.stages.main.status === 'success' && (
-              <button onClick={onRetryPipeline} disabled={isGenerating} style={styles.retrySmallBtn}>补交未完成步骤</button>
+              <button type="button" className="pk-btn pk-btn--secondary pk-btn--sm" onClick={onRetryPipeline} disabled={isGenerating}>补交未完成步骤</button>
             )}
-            {successCount > 0 && <span style={{ fontSize: 'var(--font-size-sm)', color: '#4caf50' }}>✓{successCount}</span>}
-            {skipCount > 0 && <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>-{skipCount}</span>}
-            {errorCount > 0 && <span style={{ fontSize: 'var(--font-size-sm)', color: '#f44336' }}>✕{errorCount}</span>}
-            <button onClick={onClose} style={styles.closeBtn}><X size={16} /></button>
+            <button type="button" className="pm-close" onClick={onClose} aria-label="关闭管线监控"><X /></button>
           </div>
-        </div>
+        </header>
 
-        {/* 流程可视化（横向滑动） */}
-        <div style={{
-          ...styles.flowBar,
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', minWidth: 'max-content' }}>
-            {stages.map(({ id, stage }, i) => {
+        {/* 流程轨道：每个任务一枚刻度珠，已结算部分沿黄铜轨点亮 */}
+        <div className="pm-flow" style={{ '--pm-progress': progress } as CSSProperties}>
+          <ol className="pm-flow__track">
+            {stages.map(({ id, stage }) => {
               const meta = STAGE_META[id];
-              const isRunning = stage.status === 'running';
-              const isSuccess = stage.status === 'success';
-              const isSkipped = stage.status === 'skipped';
-              const isError = stage.status === 'error';
-
               return (
-                <div key={id} style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    padding: '6px 8px', borderRadius: 'var(--radius-md)',
-                    border: `1.5px solid ${isRunning ? meta.color : isSuccess ? `${meta.color}88` : 'var(--border)'}`,
-                    background: isSuccess ? `${meta.color}11` : isError ? 'rgba(244,67,54,0.08)' : isRunning ? `${meta.color}11` : 'var(--bg-primary)',
-                    minWidth: '52px', position: 'relative',
-                  }}>
-                    {isRunning && (
-                      <div style={{
-                        position: 'absolute', inset: '-2px', borderRadius: 'var(--radius-md)',
-                        border: `2px solid ${meta.color}44`,
-                        animation: 'pipeline-pulse 1.5s ease-in-out infinite',
-                      }} />
-                    )}
-                    <span style={{ display: 'flex', marginBottom: '2px', color: meta.color }}><meta.icon size={16} /></span>
-                    <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: isRunning || isSuccess ? meta.color : 'var(--text-muted)' }}>
-                      {STAGE_LABELS[id]}
-                    </span>
-                    <span style={{ fontSize: 'var(--font-size-xs)', color: STATUS_CONFIG[stage.status]?.color || '#666', marginTop: '1px' }}>
-                      {isRunning ? '...' : isSuccess ? `✓${formatMs(stage.startTime && stage.endTime ? stage.endTime - stage.startTime : undefined)}` : isSkipped ? '-' : isError ? '✕' : '○'}
-                    </span>
-                  </div>
-                  {i < stages.length - 1 && (
-                    <div style={{ width: '6px', height: '2px', background: isSuccess ? `${meta.color}44` : 'var(--border)' }} />
-                  )}
-                </div>
+                <li key={id} className={`pm-node is-${stage.status}`} style={{ '--c': meta.color } as CSSProperties} title={`${STAGE_LABELS[id]} · ${STATUS_CONFIG[stage.status]?.label ?? ''}`}>
+                  <span className="pm-node__bead"><meta.icon /></span>
+                  <span className="pm-node__label">{STAGE_LABELS[id]}</span>
+                  <span className="pm-node__state">
+                    {stage.status === 'running' ? '…' : stage.status === 'success' ? formatMs(stageElapsed(stage)) : stage.status === 'skipped' ? '跳过' : stage.status === 'error' ? '异常' : stage.status === 'warning' ? '降级' : '待命'}
+                  </span>
+                </li>
               );
             })}
-          </div>
+          </ol>
         </div>
 
-        {/* 详情列表 */}
-        <div style={styles.detailList}>
-          {stages.map(({ id, stage }) => {
+        <div className="pm-list">
+          {stages.map(({ id, stage }, index) => {
             const meta = STAGE_META[id];
             const statusCfg = STATUS_CONFIG[stage.status] || STATUS_CONFIG.pending;
-            const elapsed = stage.startTime && stage.endTime ? stage.endTime - stage.startTime : undefined;
-
+            const took = stageElapsed(stage);
+            const retryable = !isGenerating && id !== 'main' && (stage.status === 'error' || stage.status === 'warning') && RETRYABLE_STAGES.has(id) && onRetrySingleStage;
             return (
-              <div key={id} style={{
-                ...styles.detailRow,
-                borderLeftColor: stage.status === 'running' ? meta.color
-                  : stage.status === 'success' ? meta.color
-                  : stage.status === 'error' ? '#f44336'
-                  : 'var(--border)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'flex', color: meta.color }}><meta.icon size={14} /></span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {STAGE_LABELS[id]}
-                      </div>
-                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1px' }}>
-                        {meta.desc}
-                      </div>
-                    </div>
+              <div key={id} className={`pm-row is-${stage.status}`} style={{ '--c': meta.color, animationDelay: `${Math.min(index, 8) * 24}ms` } as CSSProperties}>
+                <div className="pm-row__main">
+                  <span className="pm-row__icon"><meta.icon /></span>
+                  <div className="pm-row__copy">
+                    <strong>{STAGE_LABELS[id]}</strong>
+                    <span>{meta.desc}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'right', flexShrink: 0 }}>
-                    <div>
-                      <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: statusCfg.color }}>
-                        {statusCfg.label}
-                        {stage.status === 'success' && elapsed != null ? ` · ${formatMs(elapsed)}` : ''}
-                      </div>
-                      {stage.dataLength != null && (
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-                          {stage.dataLength} 字
-                        </div>
-                      )}
-                    </div>
-                    {!isGenerating && id !== 'main' && (stage.status === 'error' || stage.status === 'warning') && RETRYABLE_STAGES.has(id) && onRetrySingleStage && (
-                      <button
-                        onClick={() => { onRetrySingleStage(id); }}
-                        disabled={isGenerating}
-                        title="重试此步骤"
-                        style={styles.retrySmallBtn}
-                      >
-                        <RefreshCw size={11} />
-                      </button>
-                    )}
+                  <div className="pm-row__status">
+                    <b>{statusCfg.label}{stage.status === 'success' && took != null ? ` · ${formatMs(took)}` : ''}</b>
+                    {stage.dataLength != null && <small>{stage.dataLength} 字</small>}
                   </div>
+                  {retryable && (
+                    <button type="button" className="pm-icon-btn" onClick={() => onRetrySingleStage(id)} title="重试此步骤" aria-label={`重试${STAGE_LABELS[id]}`}>
+                      <RefreshCw />
+                    </button>
+                  )}
                 </div>
                 {stage.status === 'error' && stage.error && (
-                  <div style={styles.errorBlock}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <button type="button" onClick={() => toggleError(id)} style={styles.errorActionBtn}>
-                        {expandedErrors[id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  <div className="pm-row__error">
+                    <div className="pm-row__error-actions">
+                      <button type="button" className="pm-chip" onClick={() => toggleError(id)} aria-expanded={Boolean(expandedErrors[id])}>
+                        {expandedErrors[id] ? <ChevronDown /> : <ChevronRight />}
                         <span>{expandedErrors[id] ? '收起' : '查看详情'}</span>
                       </button>
-                      <button type="button" onClick={() => copyError(id, stage.error!)} style={styles.errorActionBtn}>
-                        <Copy size={12} />
+                      <button type="button" className="pm-chip" onClick={() => copyError(id, stage.error!)}>
+                        <Copy />
                         <span>{copiedId === id ? '已复制' : '复制'}</span>
                       </button>
                     </div>
-                    {expandedErrors[id] && (
-                      <pre style={styles.errorDetail}>{stage.error}</pre>
-                    )}
+                    {expandedErrors[id] && <pre>{stage.error}</pre>}
                   </div>
                 )}
               </div>
@@ -192,99 +139,11 @@ export default function PipelineMonitorModal({ status, onClose, onRetrySingleSta
           })}
         </div>
 
-        {/* 总耗时 */}
-        <div style={styles.footer}>
+        <footer className="pm-footer">
           <span>总耗时</span>
-          <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{formatMs(elapsed)}</span>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes pipeline-pulse {
-          0%, 100% { opacity: 0.4; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.05); }
-        }
-      `}</style>
-    </div>
+          <strong>{formatMs(elapsed) || '—'}</strong>
+        </footer>
+      </PlanarFrame>
+    </OverlayPortal>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed', inset: 0, zIndex: 9980,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  modal: {
-    width: 'min(700px, 92vw)',
-    borderRadius: 'var(--radius-xl)',
-    border: '1px solid var(--border)',
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '16px 20px',
-    borderBottom: '1px solid var(--border)',
-  },
-  title: { margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' },
-  subtitle: { margin: '4px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' },
-  closeBtn: {
-    width: '28px', height: '28px', borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--border)', background: 'transparent',
-    color: 'var(--text-muted)', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  flowBar: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '14px 16px', gap: '2px', flexWrap: 'wrap',
-    borderBottom: '1px solid var(--border)',
-  },
-  detailList: {
-    padding: '12px 16px',
-    display: 'flex', flexDirection: 'column', gap: '8px',
-    maxHeight: '440px', overflow: 'auto',
-  },
-  detailRow: {
-    display: 'flex', flexDirection: 'column', alignItems: 'stretch',
-    padding: '10px 14px', borderRadius: 'var(--radius-md)',
-    background: 'var(--bg-primary)',
-    borderLeft: '3px solid',
-  },
-  errorBlock: {
-    marginTop: '8px',
-  },
-  errorActionBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '3px',
-    padding: '3px 8px', borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border)', background: 'transparent',
-    color: 'var(--text-muted)', cursor: 'pointer',
-    fontSize: 'var(--font-size-xs)',
-  },
-  errorDetail: {
-    margin: '6px 0 0', padding: '8px 10px',
-    background: 'rgba(244,67,54,0.08)', color: '#f44336',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: 'var(--font-size-xs)', lineHeight: 1.5,
-    whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere',
-    maxHeight: '200px', overflow: 'auto', textAlign: 'left',
-  },
-  footer: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '10px 20px',
-    borderTop: '1px solid var(--border)',
-    fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)',
-  },
-  retryBtn: {
-    display: 'flex', alignItems: 'center', gap: '4px',
-    padding: '5px 12px', borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--accent)', background: 'transparent',
-    color: 'var(--accent)', cursor: 'pointer',
-    fontSize: 'var(--font-size-sm)', fontWeight: 600,
-  },
-  retrySmallBtn: {
-    width: '24px', height: '24px', borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--border)', background: 'transparent',
-    color: 'var(--text-muted)', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0, transition: 'all 0.15s',
-  },
-};

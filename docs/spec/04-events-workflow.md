@@ -1,5 +1,5 @@
 > 本文档是 `PROJECT_FUNCTIONAL_SPEC.md` 的拆分子文件（4、事件与工作流系统）。
-> 总索引见 `../PROJECT_FUNCTIONAL_SPEC.md`。
+> 总索引见仓库根目录的 `PROJECT_FUNCTIONAL_SPEC.md`（相对本文件为 `../../PROJECT_FUNCTIONAL_SPEC.md`）。
 
 ## 4、事件与工作流系统
 
@@ -17,7 +17,7 @@ interface CardWorkflowExecutionResult {
   executedNodeIds: string[];                             // 按执行顺序的节点ID列表
   warnings: string[];                                     // 警告信息
   aborted: boolean;                                       // 是否因超限中止
-  dynamicConfig?: Record<string, unknown>;                // AI动态选项配置
+  dynamicConfig?: DynamicChoiceConfig;                    // AI动态选项配置（结构见 src/modules/schema.ts:1298）
 }
 ```
 
@@ -44,7 +44,11 @@ export function executeCardWorkflow(
   while (queue.length > 0) {
     // 超限检查
     if (executed.size >= limits.maxNodes) { aborted = true; break; }
-    if (Date.now() - startTime > limits.maxWallMs) { aborted = true; break; }
+    const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime;
+    if (elapsed > limits.maxWallMs) {
+      warnings.push(`工作流执行超时（${Math.round(elapsed)}ms > ${limits.maxWallMs}ms）`);
+      aborted = true; break;
+    }
     
     const { nodeId } = queue.shift();
     if (executed.has(nodeId)) continue;
@@ -59,7 +63,7 @@ export function executeCardWorkflow(
     // 记录结果
     executed.add(nodeId);
     executedNodeIds.push(nodeId);
-    outputCache.set(nodeId, result.outputs);
+    if (result.outputs) { outputCache.set(nodeId, result.outputs); }
     if (result.renderData) renderData.push(result.renderData);
     if (result.choices) choices = result.choices;
     if (result.pendingEffects) pendingEffects.push(...result.pendingEffects);
@@ -84,7 +88,7 @@ export function executeCardWorkflow(
     }
   }
   
-  return { renderData, choices, pendingEffects, executedNodeIds, warnings, aborted, dynamicConfig };
+  return { renderData, choices: choices ?? [], pendingEffects: pendingEffects.flat(), executedNodeIds, warnings, aborted, dynamicConfig };
 }
 ```
 
@@ -158,10 +162,9 @@ export function executeCardWorkflow(
 **choice.dynamic** — 核心设计:
 
 ```typescript
-// 返回空choices + dynamicConfig，由CardOverlay层AI生成
+// 契约形态（与 src/modules/schema.ts:1533 的 CardNodeExecutionResult.dynamicConfig 一致）：空 choices + 顶层 dynamicConfig，由 CardOverlay 层调 AI 生成
 {
   choices: [],
-  outputs: { flow_out: true },
   dynamicConfig: {
     instruction: String(w.instruction ?? inputs.instruction ?? ''),
     countRange: [Number(w.minCount ?? inputs.minCount ?? 2), Number(w.maxCount ?? inputs.maxCount ?? 4)],
@@ -175,8 +178,11 @@ export function executeCardWorkflow(
       return Array.isArray(raw) ? raw : [];
     })(),
   },
+  outputs: { flow_out: true },
 }
 ```
+
+⚠ **与代码实际行为不符（已知缺陷，记录在此以免误读）**：类型声明（`src/modules/schema.ts:1533`）与引擎（`src/modules/cardWorkflowEngine.ts:104/196-198/231`）都按**顶层** `result.dynamicConfig` 读写，但 `choice.dynamic` 执行器（`src/modules/cardNodeExecutors.ts:143-164`）把它塞进了 `outputs.dynamicConfig`。两条通道不一致，因此 `executeCardWorkflow` 返回的 `dynamicConfig` 恒为 `undefined`，`CardOverlay.tsx:59` 的动态选项分支实际不会进入，`fallbackChoices` 也取不到。上面的结构是**类型契约**；修复应改执行器（把 `dynamicConfig` 提到返回值顶层），而不是改这里的契约。
 
 **choice.conditional** — 运行时过滤:
 
@@ -205,14 +211,14 @@ export function executeCardWorkflow(
 {
   choices: selected.map(opt => ({
     label: String(opt.label ?? ''),
-    aiNote: String(opt.aiNote ?? ''),
-    effect: opt.effect,
-    action: opt.action as NarrativeDecisionAction,
-    weight: Number(opt.weight ?? 1),
+    aiNote: opt.aiNote as string | undefined,
+    effect: opt.effect as { statId?: string; resourcePath?: string; delta: number } | undefined,
+    ...(opt.action ? { action: opt.action as NarrativeDecisionAction } : {}),
+    weight: opt.weight,   // 权重已在 weighted 映射里归一化为 Number(opt.weight ?? 1)
   })),
   outputs: { flow_out: true },
 }
-// 选取逻辑：按weight降序，取前showCount个（非随机，是确定性排序）
+// 选取逻辑：先对每个选项补 weight: Number(opt.weight ?? 1)，再按 weight 降序取前 showCount(默认 3) 个（非随机，是确定性排序）
 ```
 
 #### 效果节点（3种）
@@ -220,19 +226,23 @@ export function executeCardWorkflow(
 **effect.stat**:
 
 ```typescript
+const statKey = String(w.statKey ?? inputs.statKey ?? '');
+const delta = Number(w.delta ?? inputs.delta ?? inputs.delta_in ?? 0);
 {
-  pendingEffects: statKey ? [{ statId: statKey, delta: Number(delta) }] : [],
+  pendingEffects: statKey ? [{ statId: statKey, delta }] : [],
   outputs: { flow_out: true },
 }
-// statKey: "血量" / "体力值" / "dim1" 等
-// delta: 正数增加，负数减少
+// statKey: 规范化属性键 attrA(生命) / attrB(能量) / dim1-dim6，见 src/modules/canonicalStats.ts:17-26
+// delta: 正数增加，负数减少；优先级 widget → inputs.delta → inputs.delta_in → 0
 ```
 
 **effect.resource**:
 
 ```typescript
+const resourceKey = String(w.resourceKey ?? inputs.resourceKey ?? '');
+const delta = Number(w.delta ?? inputs.delta ?? inputs.delta_in ?? 0);
 {
-  pendingEffects: resourceKey ? [{ resourcePath: resourceKey, delta: Number(delta) }] : [],
+  pendingEffects: resourceKey ? [{ resourcePath: resourceKey, delta }] : [],
   outputs: { flow_out: true },
 }
 // resourceKey: "金币" / "木材" 等
@@ -241,12 +251,14 @@ export function executeCardWorkflow(
 **effect.flag**:
 
 ```typescript
+const flagPath = String(w.flagPath ?? inputs.flagPath ?? '');
+const value = w.value ?? inputs.value ?? true;
 {
-  pendingEffects: flagPath ? [{ flagPath, value: w.value ?? true }] : [],
+  pendingEffects: flagPath ? [{ flagPath, value }] : [],
   outputs: { flow_out: true },
 }
 // flagPath: "玩家.状态.已触发事件A"
-// value: 默认true
+// value: widget → inputs.value → 默认 true
 ```
 
 #### 流程节点（1种）
@@ -359,7 +371,7 @@ const ACTION_PERMISSION: Record<ActionKind, Permission> = {
 **条件求值**:
 
 ```typescript
-function evalCondition(
+export function evalCondition(
   cond: Condition,
   ctx: WorldContext,
   events: Array<{ type: string; where?: Record<string, Literal> }>,
@@ -385,8 +397,15 @@ function evalCondition(
     return !evalCondition(cond.not, ctx, events, depth + 1, limits, stepRef);
   }
   
-  // state/event条件 → 委托gameplay kernel
-  if ('state' in cond || 'event' in cond) {
+  // state / event 条件 → 委托 gameplay kernel，是两条各自计步的独立分支
+  if ('state' in cond) {
+    stepRef.steps++;
+    return evaluateGameplayCondition(cond, ctx as GameplayStateRoot, events.map(e => ({
+      type: e.type,
+      payload: e.where,
+    })));
+  }
+  if ('event' in cond) {
     stepRef.steps++;
     return evaluateGameplayCondition(cond, ctx as GameplayStateRoot, events.map(e => ({
       type: e.type,
@@ -408,63 +427,87 @@ export function evaluate(
 ): EvaluateResult {
   const ctx = clone(ctxIn);  // 克隆，不污染原状态
   const runtime = options.runtime ?? { onceFired: {}, cooldownRemaining: {} };
-  
+  const warnings: string[] = [];
+  const applied: AppliedAction[] = [];   // 实际实现以此累积
+  const start = nowMs();
+  const stepRef: StepRef = { steps: 0, aborted: false };
+
+  // 上限：每 mod ≤ maxRulesPerMod（默认 128），超限先告警再截断
+  if (rulesIn.length > limits.maxRulesPerMod) {
+    warnings.push(`规则数 ${rulesIn.length} 超过上限 ${limits.maxRulesPerMod}，截断至前 ${limits.maxRulesPerMod} 条`);
+  }
+  const rules = rulesIn.slice(0, limits.maxRulesPerMod);
+  // 上限：每 tick 求值集 ≤ maxEvalSet（默认 1024），超限告警（已含上一条截断，此处二次防御）
+  if (rules.length > limits.maxEvalSet) {
+    warnings.push(`求值集 ${rules.length} 超过上限 ${limits.maxEvalSet}，截断`);
+  }
+
   // 冷却递减（确定性，由tick驱动）
   for (const k of Object.keys(runtime.cooldownRemaining)) {
     if (runtime.cooldownRemaining[k] > 0) runtime.cooldownRemaining[k] -= 1;
   }
-  
+
   // 过滤活跃规则
-  const active = rulesIn
+  const active = rules
     .filter(r => !(r.once && runtime.onceFired[r.id]))
     .filter(r => (runtime.cooldownRemaining[r.id] ?? 0) <= 0)
     .filter(r => evalCondition(r.when, ctx, events, 1, limits, stepRef))
     .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));  // 高优先级先执行
-  
+
   // 遍历执行
   for (const rule of active) {
     if (stepRef.aborted) break;
-    
-    const actions = rule.then?.slice(0, limits.maxActionsPerRule) ?? [];
-    
+
+    const then = rule.then ?? [];
+    if (then.length > limits.maxActionsPerRule) {
+      warnings.push(`规则 ${rule.id} 动作数 ${then.length} 超过上限 ${limits.maxActionsPerRule}，截断`);
+    }
+    const actions = then.slice(0, limits.maxActionsPerRule);
+
     for (const action of actions) {
       if (stepRef.aborted) break;
-      
+      if (stepRef.steps >= limits.maxStepsPerTick) { stepRef.aborted = true; break; }
+
       // 动作校验
       const kind = actionKindOf(action);
-      if (!kind) { warnings.push(...); continue; }
-      if (!ACTION_KINDS.includes(kind)) { warnings.push(...); continue; }
-      if (!options.permissions.includes(ACTION_PERMISSION[kind])) { warnings.push(...); continue; }
-      
-      // 执行（异常隔离）
+      if (!kind) { warnings.push(`规则 ${rule.id} 含无法识别的动作，已拒绝`); continue; }
+      if (!ACTION_KINDS.includes(kind)) { warnings.push(`规则 ${rule.id} 动作 ${kind} 不在白名单，跳过`); continue; }
+      if (!options.permissions.includes(ACTION_PERMISSION[kind])) { warnings.push(`规则 ${rule.id} 缺少权限 ${ACTION_PERMISSION[kind]}，跳过动作 ${kind}`); continue; }
+
+      // 执行（单条规则异常隔离）
       try {
         applyAction(action, ctx, applied, rule.id);
         stepRef.steps++;
       } catch (e) {
-        warnings.push(`规则 ${rule.id} 动作执行失败: ${e.message}`);
+        warnings.push(`规则 ${rule.id} 动作 ${kind} 执行失败，已隔离: ${e.message}`);
       }
     }
-    
+
     // 更新运行时状态
     if (rule.once) runtime.onceFired[rule.id] = true;
     if (rule.cooldownTicks && rule.cooldownTicks > 0) {
       runtime.cooldownRemaining[rule.id] = rule.cooldownTicks;
     }
-    
+
     // 墙钟检查
     if (nowMs() - start > limits.maxWallMs) stepRef.aborted = true;
   }
-  
-  // 提取scheduleTick条目
-  const scheduledTickEntries = applied
-    .filter(a => a.kind === 'scheduleTick')
-    .map(a => ({
-      scheduledAt: options.tick + (a.detail as { after: number }).after,
-      ruleId: a.ruleId,
-      payload: (a.detail as { payload?: Record<string, unknown> }).payload,
-    }));
-  
-  return { ctx, applied, warnings, aborted: stepRef.aborted, scheduledTickEntries };
+
+  // 提取scheduleTick条目（不改 applyAction 签名，保持纯函数）
+  const scheduledTickEntries: Array<{ scheduledAt: number; ruleId: string; payload?: Record<string, unknown> }> = [];
+  for (const a of applied) {
+    if (a.kind === 'scheduleTick') {
+      const detail = a.detail as { after: number; payload?: Record<string, unknown> };
+      scheduledTickEntries.push({ scheduledAt: options.tick + detail.after, ruleId: a.ruleId, payload: detail.payload });
+    }
+  }
+
+  const aborted = stepRef.aborted || nowMs() - start > limits.maxWallMs;
+  return {
+    ctx, applied, warnings, aborted,
+    reason: aborted ? '超过步数 / 墙钟上限，本次求值中止并告警' : undefined,
+    scheduledTickEntries,
+  };
 }
 ```
 
@@ -503,7 +546,7 @@ interface StatModifierDefinition {
 
 interface DerivedStatDefinition {
   id: string; name: string;
-  inputs: string[];  formula: 'sum' | 'average' | 'min' | 'max' | 'ratio';
+  inputs: string[];  formula?: 'sum' | 'average' | 'min' | 'max' | 'ratio';
   scale?: number; offset?: number; min?: number; max?: number;
 }
 
@@ -560,10 +603,10 @@ interface ProgressionConfig {
 interface SurvivalResource {
   id: string; name: string; symbol: string;
   amount: number; max: number;
-  scarce?: boolean;
+  scarce: boolean;
   gatherRate?: string; usage?: string;
   gatherAmount?: number; gatherTimeMinutes?: number; gatherStaminaCost?: number;
-  description?: string;
+  description: string;
 }
 
 interface SurvivalRecipe {
@@ -584,14 +627,24 @@ interface ResourceEvolutionStep {
 }
 
 interface SurvivalModuleSchema {
-  description?: string;
+  description: string;
   resources: SurvivalResource[];
   recipes?: SurvivalRecipe[];
+  rules: {
+    cycleName: string;
+    consumePerCycle: string;
+    criticalThreshold: number;
+  };
   consumption?: {
     perCycle: Record<string, number>;
     exhaustionPenalty?: Record<string, number>;
   };
+  statuses?: Array<{
+    id: string; name: string; description?: string;
+    durationTicks?: number; statEffects?: GameplayEffect[];
+  }>;
   resourceEvolution?: ResourceEvolutionStep[];
+  [key: string]: unknown;
 }
 ```
 
@@ -623,12 +676,19 @@ interface PeriodicRule {
 
 interface Manifest {
   id: string; name: string; version: string; author: string;
+  description?: string; homepage?: string | null;
   engine: 'opt-event';
   schemaVersion: number;
   minAppVersion: string;
   type: 'card' | 'rule' | 'worldbook' | 'bundle';
+  coverColor: string; icon: string;
+  enabledByDefault?: boolean; loadOrder?: number;
+  dependencies?: string[]; conflicts?: string[];
   permissions?: Permission[];
-  rules?: string[];
+  rules?: string[]; cards?: string[];
+  assets?: { path: string; kind: AssetKind; size: number }[];
+  checksum?: { manifest: string; assets: Record<string, string> };
+  signature?: string | null;
   worldId?: string;  // 空则全局可见
 }
 
@@ -663,6 +723,7 @@ interface CardNodeDefinition {
   widgets?: CardWidgetConfig[];
   terminal?: boolean;  // 是否终端节点
   source?: boolean;    // 是否源节点
+  searchTags?: string[];  // 供 searchCardNodes 检索
 }
 
 interface CardExecutionContext {
@@ -674,12 +735,24 @@ interface CardExecutionContext {
 }
 
 interface CardNodeExecutionResult {
-  renderData?: { type: 'title' | 'text' | 'image' | 'dialog'; [key: string]: unknown };
-  choices?: ChoiceOption[];
+  renderData?: {
+    type: 'title' | 'text' | 'image' | 'dialog';
+    title?: string; text?: string; imageUrl?: string;
+    npcName?: string; npcEmotion?: string;
+  };
+  choices?: Array<{
+    label: string;
+    aiNote?: string;
+    effect?: { statId?: string; resourcePath?: string; delta: number };
+    action?: { type: string; [key: string]: unknown };
+    conditionPath?: string;
+    conditionValue?: unknown;
+    weight?: number;
+  }>;
   pendingEffects?: Array<{ statId?: string; resourcePath?: string; flagPath?: string; delta?: number; value?: unknown }>;
   branchTarget?: string;
   outputs?: Record<string, unknown>;
-  dynamicConfig?: Record<string, unknown>;
+  dynamicConfig?: DynamicChoiceConfig;
 }
 ```
 
@@ -689,19 +762,30 @@ interface CardNodeExecutionResult {
 
 | 文件                                      | 职责                                                                        |
 | --------------------------------------- | ------------------------------------------------------------------------- |
-| `src/modules/cardNodeRegistry.ts`       | 节点类型 → 执行器映射表(`Map<CardNodeType, CardNodeExecutor>`),支持运行时扩展(自定义模块注册新节点)  |
+| `src/modules/cardNodeRegistry.ts`       | **节点类型定义表**（`CardNodeDefinition` 元数据：socket / widget / 图标 / 配色 / `searchTags`），导出 `registerCardNode:13`、`getCardNodeDefinition:17`、`getAllCardNodeDefinitions:21`、`validateCardConnection:49`；执行器在另一文件 |
+| `src/modules/cardNodeExecutors.ts`      | **执行器映射表** `const executors = new Map<string, CardNodeExecutor>()`（`:17`），导出 `registerCardNodeExecutor(typeId, executor)`（`:19`）与 `getCardNodeExecutor`（`:23`），内置 12 种节点实现 |
 | `src/modules/dynamicChoiceGenerator.ts` | `choice.dynamic` 节点的 AI 异步生成逻辑,接收 `dynamicConfig` 调用 API 产出实际 `choices[]` |
-| `src/modules/workflowBridge.ts`         | 卡片工作流与 DAG 工作流之间的桥接(允许卡片事件触发 DAG 节点)                                      |
-| `src/modules/workflowConverters.ts`     | 工作流格式转换(ReactFlow JSON ↔ 内部 `WorkflowDefinition`)                         |
-| `src/modules/cardWorldBindings.ts`      | 卡片与世界配置的绑定关系(每世界注册专属卡片模板)                                                 |
+| `src/modules/workflowBridge.ts`         | 把 **DAG 工作流**包装成规则引擎的 `EvaluateResult`（`executeWorkflowAsEvaluation:28`），供 `eventIntegration.evaluateTick` 走同一条 tick 结算通道；与卡片工作流无关 |
+| `src/modules/workflowConverters.ts`     | 三方格式互转：`EventGraph`(规则编辑器图, `eventGraphToWorkflow:32` / `workflowToEventGraph:129`)、`RuleFile`(`schema/rules.json` 落盘形态, `ruleFileToWorkflow:244` / `workflowToRuleFile:329`)、`WorkflowDefinition`；不处理 ReactFlow 原始 JSON |
+| `src/modules/cardWorldBindings.ts`      | 把世界内联的 `cardWorkflows` 安装成 builtin 卡片事件包（`installWorldCardWorkflows(worldDef):14`，packId 为 `world-card-${world.id}-${entry.id}`，幂等写 IndexedDB，`type:'card'`、`builtin:true`），并提供 `hasWorldCardWorkflows(worldId):67` 判定 |
 
-**注册表模式**:
+**注册方式（函数式，不是 Map 实例方法）**:
 
 ```typescript
-const registry = new Map<CardNodeType, CardNodeExecutor>();
-registry.set('narrative.text', narrativeTextExecutor);
-registry.set('choice.static', choiceStaticExecutor);
-// 自定义模块可调用:registry.register('custom.x', customExecutor);
+// src/modules/cardNodeExecutors.ts:17-23
+const executors = new Map<string, CardNodeExecutor>();
+
+export function registerCardNodeExecutor(typeId: string, executor: CardNodeExecutor): void {
+  executors.set(typeId, executor);
+}
+export function getCardNodeExecutor(typeId: string): CardNodeExecutor | undefined {
+  return executors.get(typeId);
+}
+
+// 内置节点在文件内注册，例：
+registerCardNodeExecutor('narrative.text', narrativeTextExecutor);
+// 自定义模块从外部注册新节点：
+registerCardNodeExecutor('custom.x', customExecutor);
 ```
 
 ### 4.7 事件运行时生态
@@ -710,31 +794,31 @@ registry.set('choice.static', choiceStaticExecutor);
 
 | 文件                                                                | 职责                                                      |
 | ----------------------------------------------------------------- | ------------------------------------------------------- |
-| `src/modules/eventActivation.ts`                                  | 二级开关(`sessionActivePacks > global enabledIds`)激活过滤      |
-| `src/modules/eventApi.ts`                                         | 事件包暴露给工作流/引擎的 API 表面(emit/subscribe/tick)               |
-| `src/modules/eventRuntime.ts`                                     | 事件循环调度(tick 触发 → evaluate → apply)                      |
-| `src/modules/eventIntegration.ts`                                 | 与 §6 模拟引擎、`§4.3` 工作流、`§4.1` 卡片工作流的集成点                   |
-| `src/modules/eventDb.ts`                                          | 事件状态持久化(IndexedDB)                                      |
-| `src/modules/eventErrors.ts`                                      | 错误捕获与降级(失败时不影响主线程)                                      |
-| `src/modules/eventChoiceState.ts`                                 | 事件选项的状态机(已选/禁用/超时)                                      |
+| `src/modules/eventActivation.ts`                                  | 事件包**全局**启用态判定 `isEventActive(entryEnabled):1-9`；事件包启用/禁用是全局操作（`rec.enabled`），**已无存档级二级开关** |
+| `src/modules/eventApi.ts`                                         | 事件包**管理面 API**（Tauri invoke 桥，`call<T>:56`）：`discoverPacks:100`/`listPacks:105`/`validateEvent:114`/`installPack:123`/`uninstallPack:134`/`enablePack:144`/`disablePack:154`/`importPack:165`/`exportPack:183`/`getEventDetail:192`/`getRuntimePack:199` + 合集 CRUD `:221-253`；**不含 `emit`/`subscribe`/`tick`** |
+| `src/modules/eventRuntime.ts`                                     | 仅「按世界筛选可运行时事件包」`selectRuntimePacksForWorld(packs, worldId):1-13`；真正的 tick 结算在 `eventIntegration.ts` 的 `eventWorldEvolution.evaluateTick` |
+| `src/modules/eventIntegration.ts`                                 | 规则求值 / DAG 工作流与游戏 tick 的集成点：`evaluateTick:91-144`（`if (pack.workflow) executeWorkflowAsEvaluation(...) else evaluate(...)`）、`collectAddEventEvents:156`、`collectCombatEncounterRequests:173`、`collectScheduledTickEntries:184`、`runEventRulesOnTick:204`；**不涉及卡片工作流** |
+| `src/modules/eventDb.ts`                                          | 事件状态持久化(IndexedDB)：`putWebEvent:60`、`getWebEvent:68`、`allWebEvents:79` 等 |
+| `src/modules/eventErrors.ts`                                      | 统一错误码与构造/归一化工具（`EventApiErrorCode:6-9`、`EventApiError:18`、`ensureEventApiError:34`）；**不承担捕获与降级**，按包异常隔离实际在 `eventIntegration.ts:130-134` |
+| `src/modules/eventChoiceState.ts`                                 | 「待结算选项」的模块级 Map（按 save 维度）：`PendingChoice:15-33`、`selectChoice:40`、`getPendingForSave:45`、`clearPendingForSave:54`、`resolvePendingChoices:147` → `applyEffectTarget:133`；**没有「禁用/超时」状态机** |
 | `src/modules/eventPackFormat.ts`                                  | canonical v2 事件包读取 + v1 indexed pack→v2 的直接迁移边界                    |
 | `src/modules/webEventStore.ts`                                   | Web 端事件存储、导入导出、运行时包读取与启用清单持久化                |
 | `src/modules/manifestSchema.ts`                                   | 事件包 manifest schema(`id/name/version/permissions/type`) |
 
-**事件触发链**:
+**事件触发链**（真实实现）:
 
 ```
-事件来源(AI 响应/周期规则/按钮/定时)
+事件来源（AI 响应 / 周期规则 / 按钮 / 定时）
   ↓
-eventActivation.filter(activePacks, enabledIds)
+getRuntimePack / readCanonicalEventPack — 读取 canonical v2 事件包
   ↓
-eventRuntime.schedule(event)
+eventRuntime.selectRuntimePacksForWorld(packs, worldId) — 按世界过滤
   ↓
-eventIntegration.bridge() → 卡片 / DAG 工作流 / 模拟引擎
+分支一：CardOverlay → executeCardWorkflow(workflow, ctx)        （卡片工作流，见 §4.1）
+分支二：eventWorldEvolution.evaluateTick → executeWorkflowAsEvaluation / evaluate
+                                                                （DAG 工作流 / 规则包，见 §4.3）
   ↓
-executeCardWorkflow() / executeWorkflow() / simEngine.settleMechanics()
-  ↓
-eventDb.persist(state)
+结果持久化：eventDb.putWebEvent / saveStore
 ```
 
 #### 4.7.1 事件生态核心文件
@@ -759,49 +843,49 @@ eventDb.persist(state)
 
 | 文件                                 | 职责                                |
 | ---------------------------------- | --------------------------------- |
-| `src/modules/playerDecisionLog.ts` | 玩家决策历史(选项点击 + 时间 + 影响)记录,用于后续叙事回顾 |
-| `src/modules/playTracker.ts`       | 游玩统计(回合数/会话时长/死亡次数/重大事件)          |
+| `src/modules/playerDecisionLog.ts` | 记录最近 8 条玩家决策的 **aiNote 文本 + 回合号 + 时间戳**（`PlayerDecision { note; round; at }`），供 `getPlayerDecisionContext()` 注入下一轮提示词；不记录选项 id / 来源 / 效果 |
+| `src/modules/playTracker.ts`       | **需用户同意的匿名游玩统计**：会话活跃时长 + 到达的最深页面 + 是否回访 + 浏览器/屏幕/时区；不含回合数、死亡次数或重大事件 |
 
-**`playerDecisionLog` 结构**:
+**`playerDecisionLog` 结构**（`src/modules/playerDecisionLog.ts:5-9`）:
 
 ```typescript
-interface PlayerDecisionEntry {
+interface PlayerDecision {
+  note: string;    // 取自选项的 aiNote
   round: number;
-  decisionId: string;          // narrativeDecision.id
-  source: 'option' | 'free-input' | 'system';
-  choice: string;
-  effects?: { statId?: string; delta?: number; flagPath?: string; value?: unknown };
-  timestamp: number;
+  at: number;      // 时间戳
 }
+// MAX_RECENT = 8（:11）；recordPlayerDecision(note: string, round = 0)（:15）
 ```
+
+`playTracker.ts` 相关类型：`PlayDepth = 'home' | 'lobby' | 'events' | 'wizard' | 'game'`(`:8`)、`PlayTrackingConsent = 'granted' | 'denied' | null`(`:9`)、`PlaySession { id; startedAt; endedAt; activeDurationMs; maxDepth; isReturn }`(`:23-30`)、`initPlayTracker()`(`:203`)。
 
 ### 4.9 构建/标准/默认
 
 | 文件                               | 职责                                |
 | -------------------------------- | --------------------------------- |
-| `src/modules/buildPipeline.ts`   | 事件包 → 模块运行时实例的构建管线                |
-| `src/modules/buildContext.ts`    | 构建上下文(注册表 + 权限 + 配置)              |
-| `src/modules/canonicalStats.ts`  | 标准统计量定义(`血量`/`体力值`/`dim1-6`)的统一引用 |
+| `src/modules/buildPipeline.ts`   | **世界创建**的多步生成管线（头注释：主题提取 → 顺序生成 → 世界书生成 → 合成验证），导出 `executeBuildPipeline(ctx: BuildContext, config: PipelineConfig): Promise<BuildContext>`(`:53`)；与事件包运行时实例化无关 |
+| `src/modules/buildContext.ts`    | 世界构建管线使用的上下文**数据类型**集合（`StatConfig:10`/`StatState:25`/`StatBonuses:38`/`ProgressionConfig:50` 等），不含注册表或权限模型 |
+| `src/modules/canonicalStats.ts`  | 规范化属性选项表：`FIXED_OPTIONS`(`:17-26`) = `attrA`「生命」/ `attrB`「能量」/ `dim1`–`dim6` 六维语义标签；`getCanonicalStatOptions():31`、`getStatOptionsFromState():38`、`CUSTOM_STAT_SENTINEL='__custom_stat__':50`。键名不是「血量/体力值」 |
 | `src/modules/defaults.ts`        | 各模块默认值(无配置时的兜底)                   |
-| `src/modules/normalizeModule.ts` | 模块数据标准化(版本兼容/字段合并)                |
+| `src/modules/normalizeModule.ts` | 只做轻量标准化：`normalizeModule:16`/`normalizeModules:27` 补默认值（progression 交给 `xpAlgorithm.normalizeProgressionConfig`），`normalizeSpecial:38` 处理特色属性；**无版本兼容迁移或字段合并** |
 
 ### 4.10 工作流 Schema 与节点系统
 
 | 文件                              | 职责                                                                    |
 | ------------------------------- | --------------------------------------------------------------------- |
-| `src/modules/workflowSchema.ts` | DAG 工作流 schema 定义(`WorkflowDefinition`/`NodeDefinition`/`Connection`) |
+| `src/modules/workflowSchema.ts` | DAG 工作流 schema 定义(`WorkflowDefinition`/`NodeDefinition`/`Connection`)；`SocketType` 10 种(`:9-19`)、配色 `SOCKET_COLORS`(`:22-33`) |
 | `src/modules/workflowConverters.ts` | 当前 `WorkflowDefinition` 与规则执行表示之间的显式转换层                                  |
 | `src/modules/nodeExecutors.ts`  | DAG 工作流节点执行器集合(与 §4.6 卡片节点区分)                                         |
-| `src/modules/nodeRegistry.ts`   | DAG 节点注册表                                                             |
-| `src/modules/autoLayout.ts`     | 工作流画布自动布局算法(Sugiyama/ELK)                                             |
+| `src/modules/nodeRegistry.ts`   | DAG 节点注册表：共 **36 种**节点（triggers 4：`triggers.world_event`/`periodic`/`manual`/`choice_made`；conditions 10：`compare`/`check_resource`/`check_stat`/`and`/`or`/`not`/`check_flag`/`check_inventory`/`check_npc`/`event_match`；actions 10：`set_value`/`modify_resource`/`modify_stat`/`add_event`/`request_combat`/`schedule_tick`/`modify_inventory`/`modify_currency`/`modify_npc`/`add_notebook`；data 6：`get_value`/`get_resource`/`get_stat`/`constant`/`math`/`get_random`；flow 3：`branch`/`gate`/`reroute`；output 3：`show_card`/`narrate_hint`/`end_workflow`） |
+| `src/modules/autoLayout.ts`     | 工作流画布自动布局，使用 **dagre**（`:6 import dagre from 'dagre'`、`computeAutoLayout(nodes, edges, getTypeId?):87`、`:107-113` `setGraph({ rankdir:'LR', ranksep:300, nodesep: maxNodeHeight*0.5+50, marginx:80, marginy:80 })`）；未使用 ELK |
 
 ### 4.11 经验与世界工作流
 
 | 文件                              | 职责                                                          |
 | ------------------------------- | ----------------------------------------------------------- |
 | `src/modules/xpAlgorithm.ts`    | 经验值计算(`xpFormula`: `baseXP * level^exponent * scaleFactor`) |
-| `src/modules/worldWorkflows.ts` | 世界级工作流注册表(每世界挂载独立工作流集合)                                     |
-| `src/modules/runtime.ts`        | 模块运行时容器(汇总所有子系统 + 提供给 engineBridge 访问)                      |
+| `src/modules/worldWorkflows.ts` | `worldId → 工作流工厂`（`WORLD_WORKFLOWS: Record<string, WorldWorkflowFactory>:62`）：`WORLD_NAMES` 仅列 6 个内置世界(`:9-16`)，`createWorldWorkflow(worldId):19-60` 按需生成「`triggers.periodic` → `actions.add_event`」两节点工作流；不是每世界预挂独立工作流集合 |
+| `src/modules/runtime.ts`        | 两个投影辅助函数：`extractWorldSystemData(worldSystem):14` 汇总世界系统数据、`getProgressionDisplay(progression):33` 生成成长体系展示数据；**不存在模块运行时容器，也不供 `engineBridge` 使用** |
 
 ---
 

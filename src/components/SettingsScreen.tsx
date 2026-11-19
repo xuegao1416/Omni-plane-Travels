@@ -1,5 +1,5 @@
 import { useState,useRef,useCallback,useEffect } from 'react';
-import { Palette,Cpu,ImageIcon,FileText } from 'lucide-react';
+import { ArrowLeft,Palette,Cpu,ImageIcon,FileText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useUISettings } from '../context/UISettingsContext';
@@ -11,6 +11,7 @@ import ImageGenSettingsTab, { type ImageSettingsRef } from './settings/ImageGenS
 import { useImageStore } from '../stores/imageStore';
 import PresetSettingsTab from './settings/PresetSettingsTab';
 import DawnFrameV4 from './shared/dawn/DawnFrameV4';
+import '../ui/screens/settings.css';
 
 type SettingsTab = 'general' | 'api' | 'image' | 'preset';
 
@@ -71,9 +72,12 @@ export default function SettingsScreen() {
             aria-label={t('settings.back')}
             title={t('settings.back')}
           >
-            <img src="/art/theme/emblems/emblem-27-v2.png" alt="" aria-hidden="true" />
+            <ArrowLeft size={18} strokeWidth={1.6} aria-hidden="true" />
           </button>
-          <h1>{t('settings.title')}</h1>
+          <div className="settings-screen__title">
+            <span className="settings-screen__kicker">ASTROLABE · CALIBRATION</span>
+            <h1>{t('settings.title')}</h1>
+          </div>
         </header>
 
         {isMobile && (
@@ -107,6 +111,7 @@ export default function SettingsScreen() {
                   >
                     <TabIcon size={15} strokeWidth={1.5} />
                     <span>{t.label}</span>
+                    <i className="settings-tab-btn__numeral" aria-hidden="true">{['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ'][SETTINGS_TABS.indexOf(t)]}</i>
                   </button>
                 );
               })}

@@ -1,0 +1,162 @@
+/* ═══════════════════════════════════════════════
+   晨雾琉璃 · Dawn theme (light).
+   Every screen sheet writes its colours as `rgb(var(--d-<role>, <night rgb>))`,
+   so the night theme needs no rule here; this file only re-points the roles.
+   Palette: mist-green paper ground, slate-green ink, old-gold accents.
+   Light source for the whole site: upper left (highlights top/left, shadows fall
+   to the bottom right).
+   ═══════════════════════════════════════════════ */
+
+:root[data-ui-theme='dawn'] {
+  color-scheme: light;
+
+  /* ─── Role palette (r, g, b) ─── */
+  /* ink: text and hairlines that were cream / gold on night */
+  --d-ink: 41, 66, 74;          /* #29424a 主文字 */
+  --d-cream: 41, 66, 74;
+  --d-white-fg: 41, 66, 74;
+  --d-ink2: 79, 106, 104;       /* #4f6a68 次文字 */
+  --d-ink3: 127, 149, 145;      /* #7f9591 弱文字 */
+  --d-gold: 143, 115, 56;       /* #8f7338 旧金线 / 强调字 */
+  --d-brass: 128, 100, 46;
+  --d-bronze: 101, 80, 38;
+  /* night grounds used as foreground (rings around dots, hairline seats) */
+  --d-deep: 237, 245, 240;
+  --d-night: 237, 245, 240;
+  --d-raise: 219, 232, 226;
+  /* status */
+  --d-red: 164, 84, 84;         /* #a45454 */
+  --d-redpale: 255, 244, 238;
+  --d-redbg: 110, 44, 44;
+  --d-ok: 63, 122, 92;          /* #3f7a5c */
+  --d-okbg: 63, 122, 92;
+  --d-warn: 176, 122, 42;       /* #b07a2a */
+  --d-aether: 74, 128, 120;     /* 雾青替代以太青 */
+  --d-blue: 78, 106, 140;
+  --d-violet: 112, 96, 132;
+  /* shadows: slate instead of black, much lighter */
+  --d-shade: 41, 66, 74;
+  --d-shade-k: .28;
+  --d-seat: 196, 212, 205;
+  --d-rail: 211, 190, 140;     /* solid brass rings → pale old gold */
+  --d-rail-lo: 230, 238, 233;  /* outer bronze ring → mist, so the stack reads as one hairline */     /* hairline seat under brass edges (was #2a1a04) */
+  --d-ts-k: .35;
+
+  /* surfaces */
+  --d-deep-bg: 229, 239, 234;
+  --d-night-bg: 251, 252, 246;  /* 板面：带暖意的近白 */
+  --d-raise-bg: 237, 245, 240;  /* #edf5f0 */
+  --d-shade-bg: 41, 66, 74;
+  --d-ink-bg: 255, 255, 250;
+  --d-ink2-bg: 205, 220, 213;
+  --d-ink3-bg: 150, 172, 166;
+  --d-cream-bg: 240, 226, 172;  /* 旧金高光 */
+  --d-gold-bg: 211, 179, 111;   /* rgba(211,179,111) */
+  --d-brass-bg: 179, 148, 83;   /* #b39453 */
+  --d-bronze-bg: 143, 115, 56;
+  --d-red-bg: 176, 96, 90;
+  --d-redbg-bg: 148, 70, 68;
+  --d-redpale-bg: 248, 230, 224;
+  --d-ok-bg: 120, 170, 140;
+  --d-okbg-bg: 220, 236, 226;
+  --d-warn-bg: 214, 170, 92;
+  --d-aether-bg: 122, 166, 153; /* rgba(122,166,153) */
+  --d-blue-bg: 160, 182, 204;
+  --d-violet-bg: 190, 180, 206;
+
+  /* ─── Shared tokens (tokens.css / planar.css) ─── */
+  --bg-primary: #edf5f0;
+  --bg-secondary: rgba(255, 255, 248, .86);
+  --bg-tertiary: rgba(219, 232, 226, .8);
+  --bg-deep: #e2ece7;
+  --bg-elevated: #fffff8;
+  --text-primary: #29424a;
+  --text-secondary: #4f6a68;
+  --text-muted: #7f9591;
+  --accent: #8f7338;
+  --accent-rgb: 143, 115, 56;
+  --accent-dim: rgba(179, 148, 83, .12);
+  --accent-glow: rgba(179, 148, 83, .2);
+  --border: rgba(41, 66, 74, .18);
+  --border-subtle: rgba(41, 66, 74, .1);
+  --danger: #a45454;
+  --warning: #b07a2a;
+  --success: #3f7a5c;
+  --color-on-accent: #2a1a04;
+  --primary: #8f7338;
+  --surface: rgba(255, 255, 248, .86);
+  --shadow-xs: 0 1px 2px rgba(41, 66, 74, .1);
+  --shadow-sm: 2px 3px 8px rgba(41, 66, 74, .1);
+  --shadow-md: 4px 8px 22px rgba(41, 66, 74, .12);
+  --shadow-lg: 8px 18px 48px rgba(41, 66, 74, .16);
+  --shadow-glow: 0 0 0 3px rgba(179, 148, 83, .22);
+
+  --pl-text: #29424a;
+  --pl-text-2: #4f6a68;
+  --pl-text-3: #7f9591;
+  --pl-danger: #a45454;
+  --pl-warn: #b07a2a;
+  --pl-ok: #3f7a5c;
+  --pl-shadow: 8px 18px 48px rgba(41, 66, 74, .16), 1px 2px 6px rgba(41, 66, 74, .1);
+  --pl-font-display: 'Palatino Linotype', 'Book Antiqua', 'Noto Serif SC', 'STSong', 'SimSun', serif;
+  --pl-font-num: 'Bahnschrift', 'DIN Alternate', 'Segoe UI', sans-serif;
+
+  --pk-text: #29424a;
+  --pk-text-2: #4f6a68;
+  --pk-text-3: #7f9591;
+  --pk-ink-label: #8f7338;
+  --pk-danger: #a45454;
+
+  /* ─── Kit materials: cut-glass plates instead of brass + night wells ─── */
+  /* paper grain: a static, very faint noise tile (SVG turbulence, ~2% contrast) */
+  --dw-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .16 0 0 0 0 .26 0 0 0 0 .29 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --pk-weave: var(--dw-grain);
+  --pk-cloth: #f6f9f4;
+  --pk-cloth-deep: #e6efea;
+  --pk-plate: linear-gradient(160deg, rgba(255, 255, 250, .96) 0%, rgba(246, 250, 245, .92) 55%, rgba(233, 242, 237, .92) 100%);
+  --pk-plate-edge: inset 1px 1px 0 rgba(255, 255, 255, .95), inset -1px -1px 0 rgba(41, 66, 74, .14), 0 0 0 1px rgba(41, 66, 74, .1), 4px 8px 22px rgba(41, 66, 74, .09);
+  --pk-well: linear-gradient(180deg, #dce8e2 0%, #e8f0ec 100%);
+  --pk-well-edge: inset 0 2px 0 rgba(41, 66, 74, .14), inset 0 0 0 1px rgba(41, 66, 74, .14), 0 1px 0 rgba(255, 255, 255, .9);
+  --pk-lit: linear-gradient(180deg, rgba(211, 179, 111, .2), rgba(211, 179, 111, .07));
+  --pk-brass-face: linear-gradient(160deg, #ecda97 0%, #cfae68 34%, #b39453 68%, #c9a865 100%);
+  --pk-brass-rail: linear-gradient(180deg, #f6ecc4 0%, #d3b36f 30%, #a78846 60%, #cdb070 100%);
+  --pk-shadow-deep: 10px 22px 60px rgba(41, 66, 74, .16), 2px 4px 12px rgba(41, 66, 74, .1);
+  --pk-ticks:
+    linear-gradient(#b39453, #b39453) top left / 10px 1px no-repeat, linear-gradient(#b39453, #b39453) top left / 1px 10px no-repeat,
+    linear-gradient(#b39453, #b39453) top right / 10px 1px no-repeat, linear-gradient(#b39453, #b39453) top right / 1px 10px no-repeat,
+    linear-gradient(#b39453, #b39453) bottom left / 10px 1px no-repeat, linear-gradient(#b39453, #b39453) bottom left / 1px 10px no-repeat,
+    linear-gradient(#b39453, #b39453) bottom right / 10px 1px no-repeat, linear-gradient(#b39453, #b39453) bottom right / 1px 10px no-repeat;
+  /* Morning-mist sky: light pours in from the upper left, fog settles low. */
+  --pk-sky:
+    var(--dw-grain),
+    radial-gradient(ellipse 70% 60% at 8% -6%, rgba(255, 252, 236, .95), transparent 62%),
+    radial-gradient(ellipse 60% 26% at 30% 78%, rgba(255, 255, 255, .55), transparent 70%),
+    radial-gradient(ellipse 70% 30% at 85% 92%, rgba(255, 255, 255, .5), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 110%, rgba(122, 166, 153, .22), transparent 70%),
+    linear-gradient(172deg, #f4f8f2 0%, #e7f0eb 46%, #d6e5de 100%);
+}
+
+:root[data-ui-theme='dawn'] body { background: #e7f0eb; }
+:root[data-ui-theme='dawn'] ::selection { background: rgba(211, 179, 111, .38); color: #1d3238; }
+
+/* ─── Shared planar controls: cut-corner facets instead of pills, no blur ─── */
+:root[data-ui-theme='dawn'] .pl-chip,
+:root[data-ui-theme='dawn'] .pl-button {
+  border-radius: 0;
+  clip-path: polygon(6px 0, 100% 0, 100% 100%, 0 100%, 0 6px);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+:root[data-ui-theme='dawn'] .pl-chip {
+  --chip-bg: rgba(255, 255, 250, .82);
+  border-color: rgba(41, 66, 74, .2);
+  color: #3a5a5f;
+  box-shadow: inset 1px 1px 0 #fff;
+}
+:root[data-ui-theme='dawn'] .pl-chip:hover { color: #29424a; border-color: rgba(143, 115, 56, .6); background: #fffff8; box-shadow: inset 1px 1px 0 #fff, 2px 3px 8px rgba(41, 66, 74, .1); }
+:root[data-ui-theme='dawn'] .pl-chip.is-on { color: #8f7338; }
+:root[data-ui-theme='dawn'] .pl-chip:focus-visible,
+:root[data-ui-theme='dawn'] .pl-button:focus-visible,
+:root[data-ui-theme='dawn'] .pl-icon-button:focus-visible,
+:root[data-ui-theme='dawn'] .pl-choice:focus-visible { outline-color: #b39453; }
+:root[data-ui-theme='dawn'] .pl-menu { border-radius: 0; backdrop-filter: none; -webkit-backdrop-filter: none; background: #fffff8; box-shadow: inset 1px 1px 0 #fff, 0 0 0 1px rgba(41, 66, 74, .14), 6px 12px 30px rgba(41, 66, 74, .14); }
+:root[data-ui-theme='dawn'] :focus-visible { outline-color: #b39453; }

@@ -11,6 +11,10 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import type { ProfessionPack,ProfessionWorldBinding,TalentModuleSchema } from '../../modules/schema';
 import { buildStatGenPrompt,buildProgressionGenPrompt,buildSurvivalGenPrompt,buildBusinessGenPrompt } from '../../modules/prompts';
 import { normalizeProgressionConfig } from '../../modules/xpAlgorithm';
+import { generateModuleData } from '../../modules/buildPipeline';
+import { generateWithRepair } from '../../api/generateWithRepair';
+import { buildModuleRepairPrompt,validateGeneratedModule } from '../../modules/moduleValidation';
+import type { Message } from '../../api/types';
 import { clampPointScale } from '../../gameplay/creation/creationPoints';
 import { buildProfessionPackGenerationPrompt,isProfessionBinding,parseGeneratedProfessionPack } from '../../data/professions';
 import ProfessionLibraryWorkspace from '../profession/ProfessionLibraryWorkspace';
@@ -20,10 +24,12 @@ import {
 type FormState,defaultForm,worldToForm,formToWorldDef,injectModuleRuleEntries,
 DEFAULT_MODULE_FACTORIES,MODULE_NAME_MAP,MUTEX,
 } from './worldEditorForm/types';
-import { X,Cpu,Pencil,Sparkles,Download,Save,Check,ChevronLeft,ChevronRight,AlertTriangle,Map,ScrollText,Flag,User,BarChart3,Upload } from 'lucide-react';
+import { X,Cpu,Pencil,Sparkles,Download,Save,Check,ChevronLeft,ChevronRight,AlertTriangle,Map,ScrollText,Flag,User,BarChart3,Upload,Dices } from 'lucide-react';
+import { PACING_LABELS,PACING_LEVELS } from '../../events/state';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import DirectorAuthorEditor from './worldEditorForm/DirectorAuthorEditor';
 import { collectDirectorDependencies } from '../../director/dependencies';
+import '../../ui/screens/world-weave.css';
 
 const WEAVE_STEPS = ['世界种子', '世界法则', '世界编年', '降临预览'];
 const clampWeaveStep = (value: number) => Math.min(4, Math.max(1, Math.round(value) || 1));
@@ -273,18 +279,32 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     let failure = '';
     try {
       const prompt = `为以下世界的"${cat.name}"天赋大类生成${count}个天赋：\n世界描述：${form.overview || aiGenName || '通用世界'}\n大类：${cat.name}（${cat.description || '无描述'}）\n品质分5档：普通(40%)、精良(25%)、稀有(20%)、史诗(10%)、传说(5%)。\n只输出JSON数组：[{"id":"英文","name":"天赋名","description":"描述","rarity":"品质","effects":["效果"]}]`;
-      const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompt }], { signal: new AbortController().signal, onDelta: () => {} });
-      const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\[[\s\S]*\])/);
-      if (!jsonMatch) failure = '模型没有返回可解析的天赋列表，请重试或换一个模型。';
-      else {
-        const fixed = jsonMatch[1].trim().replace(/[""]/g, '"').replace(/['']/g, "'");
-        const talents = JSON.parse(fixed);
-        if (Array.isArray(talents)) {
-          const next = JSON.parse(JSON.stringify(talentData));
-          for (const t of talents) { if (!next.categories[categoryIndex].talents.find((et: any) => et.id === t.id)) next.categories[categoryIndex].talents.push(t); }
-          updateModuleDataByModuleId('talent', next);
-        } else failure = '模型返回的天赋格式不正确，请重试。';
-      }
+      // 新天赋并进现有天赋树后整体校验（id 不能和已有的撞、前置要存在）；有错误交回 AI 修一次。
+      const merge = (talents: unknown[], dedupe = false) => {
+        const next = JSON.parse(JSON.stringify(talentData));
+        const list = next.categories[categoryIndex].talents ?? (next.categories[categoryIndex].talents = []);
+        const taken = new Set<string>(next.categories.flatMap((category: any) => (category.talents ?? []).map((t: any) => t.id)));
+        for (const t of talents as any[]) {
+          if (dedupe && (!t || typeof t !== 'object' || taken.has(t.id))) continue;
+          taken.add(t?.id);
+          list.push(t);
+        }
+        return next;
+      };
+      const { value: talents } = await generateWithRepair({
+        messages: [{ role: 'user', content: prompt }],
+        request: async messages => (await requestStreamWithRetry(apiConfig, messages, { signal: new AbortController().signal, onDelta: () => {} })).text,
+        parse: text => {
+          const match = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\[[\s\S]*\])/);
+          if (!match) throw new Error('没有找到 JSON 数组');
+          const parsed = JSON.parse(match[1].trim());
+          if (!Array.isArray(parsed)) throw new Error('需要一个 JSON 数组');
+          return parsed as unknown[];
+        },
+        validate: list => validateGeneratedModule('talent', merge(list)),
+        repairPrompt: issues => `${buildModuleRepairPrompt('talent', issues)}\n已有天赋的 id 不能再用；只输出新天赋的 JSON 数组。`,
+      });
+      updateModuleDataByModuleId('talent', merge(talents, true));
     } catch (err: unknown) {
       failure = err instanceof Error ? err.message : String(err);
       console.warn('[天赋AI生成] 失败:', failure);
@@ -296,6 +316,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     if (!apiConfig) { await dialog.alert('尚未配置可用的 API：请先到「设置」中填写接口后再试。'); return; }
     setGeneratingModule(moduleId);
     let failure = '';
+    let notice = '';
     try {
       const desc = form.overview || aiGenName || '通用世界';
       const prompts: Record<string, string> = {
@@ -306,12 +327,14 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       };
       if (!prompts[moduleId]) failure = '该模块暂不支持 AI 补全。';
       else {
-        const result = await requestStreamWithRetry(apiConfig, [{ role: 'user', content: prompts[moduleId] }], { signal: new AbortController().signal, onDelta: () => {} });
-        const jsonMatch = result.text.match(/```(?:json)?\s*([\s\S]*?)```/) || result.text.match(/(\{[\s\S]*\})/);
-        if (!jsonMatch) failure = '模型没有返回可解析的模块数据，请重试或换一个模型。';
+        // 生成 → 校验 → 修复一次；修不好的问题列给作者手改。
+        const generated = await generateModuleData<Record<string, any>>(moduleId, prompts[moduleId],
+          async messages => (await requestStreamWithRetry(apiConfig, messages as Message[], { signal: new AbortController().signal, onDelta: () => {} })).text);
+        if (!generated) failure = '模型没有返回可用的模块数据（修复一次后仍无法解析或无法开局），请重试或换一个模型。';
         else {
-          const fixed = jsonMatch[1].trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
-          const parsed = JSON.parse(fixed);
+          const parsed = generated.value;
+          const remaining = generated.issues.filter(issue => issue.level === 'error');
+          if (remaining.length) notice = `已填入，但还有 ${remaining.length} 处需要手动调整：\n${remaining.slice(0, 6).map(issue => `· ${issue.path}：${issue.message}`).join('\n')}`;
           const normalized = moduleId === 'progression'
             ? normalizeProgressionConfig(parsed as import('../../modules/schema').ProgressionModuleSchema)
             : moduleId === 'stat'
@@ -329,6 +352,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       console.warn(`[模块AI补全] ${moduleId} 失败:`, failure);
     } finally { setGeneratingModule(null); }
     if (failure) await dialog.alert(`模块补全失败：${failure}`);
+    else if (notice) await dialog.alert(notice);
   };
 
   const professionModuleConfig = form.modules?.find(module => module.moduleId === 'profession')?.moduleConfig;
@@ -483,6 +507,11 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
           <div className="world-weave-section-heading"><div><span className="world-weave-kicker">STEP 02 · RULES</span><h4 id="world-weave-rules-title">选择这座世界遵循的法则</h4></div><span className="world-weave-section-hint">未选择的模块不会凭空生成数据</span></div>
           <div className="world-weave-module-surface"><ModuleSelector selected={selectedModules} onToggle={toggleModule} disabledByConflict={disabledByConflict} /><div className="world-weave-module-summary" aria-live="polite"><strong>当前启用</strong>{enabledModules.length ? enabledModules.map(module => <span key={module.id}>{module.name}</span>) : <span className="is-muted">暂无额外模块，仍可继续编年</span>}</div></div>
           {disabledByConflict.size > 0 && <p className="world-weave-validation world-weave-validation--warning"><AlertTriangle size={14} /> 已按互斥关系标记不可同时启用的模块，请选择适合本世界的一组法则。</p>}
+          <div className="world-weave-rule-note world-weave-pacing"><Dices size={18} /><div><strong>随机事件</strong><p>新开局时事件卡出现的频率；玩家在游戏里还能再改。</p>
+            <div className="world-weave-mode-toggle" role="radiogroup" aria-label="随机事件节奏">
+              {PACING_LEVELS.map(level => <button key={level} type="button" role="radio" aria-checked={form.eventPacing === level} className={form.eventPacing === level ? 'is-active' : ''} onClick={() => update({ eventPacing: level })}>{PACING_LABELS[level]}</button>)}
+            </div>
+          </div></div>
           <div className="world-weave-rule-note"><ScrollText size={18} /><div><strong>参数稍后仍可调整</strong><p>第 3 步会展开已经启用模块的初始数据与编辑入口；没有实际数据的模块只保留说明，不会伪造内容。</p></div></div>
         </section>
       )}
@@ -522,7 +551,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
           <div className="world-weave-arrival-visual">
             <div className="world-weave-arrival-gate" aria-label="降临之门预览">
               <div className="world-weave-arrival-scene" style={selectedScene ? { backgroundImage: `url("${selectedScene}")` } : undefined} />
-              <img src="/art/theme/ui-kit/dawn-v4/ritual/departure-gate-v1.png" alt="降临之门" />
+              <span className="pl-gate" aria-hidden="true"><i className="pl-gate__arch" /><i className="pl-gate__keystone" /><i className="pl-gate__sill" /></span>
             </div>
             <span className="world-weave-arrival-caption">{form.location || '中央旅庭 · 待命'}</span>
           </div>
@@ -568,14 +597,14 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
 
   return (
     <>
-      <div className="entry-default-theme world-editor-overlay world-weave-editor-overlay">
+      <div className="world-editor-overlay world-weave-editor-overlay">
         <div className="world-editor-panel world-weave-editor-panel" onClick={e => e.stopPropagation()}>
           <DawnFrameV4 mode="panel" withFill className="world-weave-editor-frame" ariaLabel="世界编织仪式">
             <div className="world-weave-editor-content">
           <div className="world-editor-header">
             <div className="world-weave-header-main">
-              <span className="world-weave-kicker">{isEditing ? 'EDIT WORLD · DAWN V4' : 'CREATE WORLD · DAWN V4'}</span>
-              <h3 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700 }}>世界编织仪式</h3>
+              <span className="world-weave-kicker">{isEditing ? 'ATLAS WEAVE · EDIT WORLD' : 'ATLAS WEAVE · NEW WORLD'}</span>
+              <h3>世界编织仪式</h3>
             </div>
             <div className="world-weave-header-actions">
               <button type="button" className="world-weave-header-export" onClick={handleExport} aria-label="导出世界副本" title="导出世界副本"><Download size={15} /></button>

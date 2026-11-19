@@ -18,8 +18,6 @@ export default function CardWidgetRenderer({ config, value, onChange }: Props) {
     width: '100%',
     padding: '4px 6px',
     fontSize: 'var(--font-size-xs)',
-    background: 'var(--bg-primary)',
-    border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm)',
     color: 'var(--text-primary)',
   };

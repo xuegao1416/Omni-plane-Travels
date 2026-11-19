@@ -12,35 +12,33 @@
 }
 
 .profession-tree-canvas__empty { position: absolute; inset: 0; display: grid; place-content: center; padding: 32px; color: var(--text-muted); text-align: center; }
-.profession-tree-canvas .react-flow__controls,
-.profession-tree-canvas .react-flow__minimap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: color-mix(in srgb, var(--bg-primary) 92%, transparent); }
 .profession-tree-canvas .react-flow__edge-path { stroke: color-mix(in srgb, var(--accent) 58%, var(--border)); stroke-width: 2; }
 .profession-tree-canvas .profession-tree-edge--locked .react-flow__edge-path { opacity: .42; }
-.profession-tree-canvas .profession-tree-edge--available .react-flow__edge-path { stroke: color-mix(in srgb, var(--accent) 82%, #fff); }
-.profession-tree-canvas .profession-tree-edge--owned .react-flow__edge-path { stroke: color-mix(in srgb, #d6b56a 78%, var(--accent)); }
+.profession-tree-canvas .profession-tree-edge--available .react-flow__edge-path { stroke: color-mix(in srgb, var(--accent) 82%, rgb(var(--d-white-fg, 255, 255, 255))); }
+.profession-tree-canvas .profession-tree-edge--owned .react-flow__edge-path { stroke: color-mix(in srgb, rgb(var(--d-gold, 214, 181, 106)) 78%, var(--accent)); }
 .profession-tree-canvas .react-flow__handle { width: 8px; height: 8px; border: 2px solid var(--bg-primary); background: var(--accent); }
 
-.profession-tree-node { width: 214px; box-sizing: border-box; display: grid; gap: 5px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--bg-primary) 94%, transparent); color: var(--text-primary); box-shadow: 0 8px 20px color-mix(in srgb, #000 10%, transparent); transition: border-color .15s, box-shadow .15s, opacity .15s; }
-.profession-tree-node.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent), 0 10px 24px color-mix(in srgb, #000 14%, transparent); }
+.profession-tree-node { width: 214px; box-sizing: border-box; display: grid; gap: 5px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--bg-primary) 94%, transparent); color: var(--text-primary); box-shadow: 0 8px 20px color-mix(in srgb, rgba(var(--d-shade, 0, 0, 0), calc(1 * var(--d-shade-k, 1))) 10%, transparent); transition: border-color .15s, box-shadow .15s, opacity .15s; }
+.profession-tree-node.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent), 0 10px 24px color-mix(in srgb, rgba(var(--d-shade, 0, 0, 0), calc(1 * var(--d-shade-k, 1))) 14%, transparent); }
 .profession-tree-node.is-locked { opacity: .62; filter: saturate(.68); }
 .profession-tree-node.is-available { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); }
 .profession-tree-node.is-owned { background: color-mix(in srgb, var(--accent-dim) 56%, var(--bg-primary)); }
-.profession-tree-node.is-ultimate { border-color: color-mix(in srgb, #d9ab55 72%, var(--border)); }
+.profession-tree-node.is-ultimate { border-color: color-mix(in srgb, rgb(var(--d-brass, 217, 171, 85)) 72%, var(--border)); }
 .profession-tree-node__meta { display: flex; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: 10px; letter-spacing: .05em; }
 .profession-tree-node strong { font-size: 13px; line-height: 1.2; }
 .profession-tree-node p { display: -webkit-box; margin: 0; overflow: hidden; color: var(--text-muted); font-size: 11px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .profession-tree-node small { color: var(--accent); font-size: 10px; }
-.profession-tree-node.is-game { border-radius: 3px 12px 3px 12px; background: linear-gradient(145deg, color-mix(in srgb, var(--bg-primary) 92%, transparent), color-mix(in srgb, var(--accent) 7%, var(--bg-primary))); box-shadow: 0 9px 22px color-mix(in srgb, #000 12%, transparent), inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent); }
+.profession-tree-node.is-game { border-radius: 3px 12px 3px 12px; background: linear-gradient(145deg, color-mix(in srgb, var(--bg-primary) 92%, transparent), color-mix(in srgb, var(--accent) 7%, var(--bg-primary))); box-shadow: 0 9px 22px color-mix(in srgb, rgba(var(--d-shade, 0, 0, 0), calc(1 * var(--d-shade-k, 1))) 12%, transparent), inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent); }
 .profession-tree-node.is-game .react-flow__handle { opacity: 0; pointer-events: none; }
-.profession-tree-node.is-game.is-owned { border-color: color-mix(in srgb, #d6b56a 66%, var(--accent)); background: linear-gradient(145deg, color-mix(in srgb, #d6b56a 12%, var(--bg-primary)), color-mix(in srgb, var(--accent) 14%, var(--bg-primary))); }
-.profession-tree-canvas--game { min-height: 360px; height: min(52vh, 540px); border-radius: 4px 16px 4px 16px; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, #d6b56a 10%, transparent), transparent 52%), linear-gradient(145deg, color-mix(in srgb, var(--bg-secondary) 82%, transparent), color-mix(in srgb, var(--bg-primary) 90%, transparent)); }
-.profession-tree-canvas--game .react-flow__edge-path { stroke: color-mix(in srgb, #d6b56a 62%, var(--accent)); }
+.profession-tree-node.is-game.is-owned { border-color: color-mix(in srgb, rgb(var(--d-gold, 214, 181, 106)) 66%, var(--accent)); background: linear-gradient(145deg, color-mix(in srgb, rgb(var(--d-gold-bg, 214, 181, 106)) 12%, var(--bg-primary)), color-mix(in srgb, var(--accent) 14%, var(--bg-primary))); }
+.profession-tree-canvas--game { min-height: 360px; height: min(52vh, 540px); border-radius: 4px 16px 4px 16px; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, rgb(var(--d-gold-bg, 214, 181, 106)) 10%, transparent), transparent 52%), linear-gradient(145deg, color-mix(in srgb, var(--bg-secondary) 82%, transparent), color-mix(in srgb, var(--bg-primary) 90%, transparent)); }
+.profession-tree-canvas--game .react-flow__edge-path { stroke: color-mix(in srgb, rgb(var(--d-gold, 214, 181, 106)) 62%, var(--accent)); }
 
-.profession-library { position: fixed; inset: 12px; z-index: 2400; overflow: hidden; background: transparent; filter: drop-shadow(0 24px 48px rgba(0,0,0,.26)); }
-.profession-library__backdrop { position: fixed; inset: 0; z-index: 2399; background: rgba(7,12,18,.44); backdrop-filter: blur(4px); }
+.profession-library { position: fixed; inset: 12px; z-index: 2400; overflow: hidden; background: transparent; filter: drop-shadow(0 24px 48px rgba(var(--d-shade, 0, 0, 0), calc(.26 * var(--d-shade-k, 1)))); }
+.profession-library__backdrop { position: fixed; inset: 0; z-index: 2399; background: rgba(var(--d-night-bg, 7, 12, 18), .44); backdrop-filter: blur(4px); }
 .profession-library__frame { width: 100%; height: 100%; }
-.profession-library__frame > .dawn-frame-v4__fill { background: color-mix(in srgb, var(--bg-primary) 94%, transparent) !important; }
-.profession-library__frame > .dawn-frame-v4__content { width: 100%; height: 100%; padding: 30px 34px 34px !important; overflow: hidden; }
+
+.profession-library__frame > .dawn-frame-v4__content { width: 100%; height: 100%; padding: 30px 34px 34px; overflow: hidden; }
 .profession-library__shell { display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; backdrop-filter: blur(16px); }
 .profession-library__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
 .profession-library__title { min-width: 0; }
@@ -106,14 +104,14 @@
 
 @media (max-width: 900px) {
   .profession-library { inset: 6px; }
-  .profession-library__frame > .dawn-frame-v4__content { padding: 24px 26px 28px !important; }
+  .profession-library__frame > .dawn-frame-v4__content { padding: 24px 26px 28px; }
   .profession-library__body { grid-template-columns: 180px minmax(340px, 1fr); }
-  .profession-library__inspector { position: absolute; right: 6px; top: 74px; bottom: 6px; width: min(280px, calc(100vw - 24px)); z-index: 4; box-shadow: -12px 0 32px rgba(0,0,0,.18); }
+  .profession-library__inspector { position: absolute; right: 6px; top: 74px; bottom: 6px; width: min(280px, calc(100vw - 24px)); z-index: 4; box-shadow: -12px 0 32px rgba(var(--d-shade, 0, 0, 0), calc(.18 * var(--d-shade-k, 1))); }
 }
 
 @media (max-width: 640px) {
   .profession-library { inset: 4px; }
-  .profession-library__frame > .dawn-frame-v4__content { padding: 20px 16px 22px !important; }
+  .profession-library__frame > .dawn-frame-v4__content { padding: 20px 16px 22px; }
   .profession-library__header { align-items: flex-start; padding: 10px; }
   .profession-library__body { display: block; overflow: auto; }
   .profession-library__packs { max-height: 150px; border-right: 0; border-bottom: 1px solid var(--border); }
@@ -123,7 +121,7 @@
   .profession-library__inspector { top: 64px; }
 }
 
-.combat-encounter-overlay { position: fixed; inset: 0; z-index: 2200; display: grid; place-items: center; padding: 18px; background: rgba(7,12,18,.5); backdrop-filter: blur(8px); }
+.combat-encounter-overlay { position: fixed; inset: 0; z-index: 2200; display: grid; place-items: center; padding: 18px; background: rgba(var(--d-night-bg, 7, 12, 18), .5); backdrop-filter: blur(8px); }
 .combat-encounter-overlay__frame { width: min(900px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
 .combat-encounter-overlay__content { display: grid; gap: 16px; padding: 24px 28px; overflow: auto; color: var(--text-primary); }
 .combat-encounter-overlay__content > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
@@ -137,10 +135,48 @@ button.combatant-card { cursor: pointer; }
 .combatant-card.is-selected { border-color: var(--accent); background: var(--accent-dim); }
 .combatant-card strong, .combatant-card span { display: flex; align-items: center; gap: 5px; }
 .combatant-card span { color: var(--text-muted); font-size: 11px; }
-.combatant-card i { position: absolute; left: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, #b45b5b, #e4a46d); }
+.combatant-card i { position: absolute; left: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, rgb(var(--d-red-bg, 180, 91, 91)), rgb(var(--d-brass-bg, 228, 164, 109))); }
 .combat-encounter-overlay__actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 7px; }
 .combat-encounter-overlay__actions button { display: flex; align-items: center; justify-content: space-between; gap: 7px; min-width: 0; }
 .combat-encounter-overlay__actions small { display: inline-flex; align-items: center; gap: 3px; opacity: .75; }
 .combat-encounter-overlay__log { max-height: 160px; overflow: auto; color: var(--text-muted); font-size: 11px; }
 .combat-encounter-overlay__log p { margin: 3px 0; }
 @media (max-width: 640px) { .combat-encounter-overlay { padding: 5px; } .combat-encounter-overlay__content { padding: 16px; } .combat-encounter-overlay__field { grid-template-columns: 1fr; } .combat-encounter-overlay__versus { grid-auto-flow: column; justify-content: center; } }
+
+/* ── Night + brass pass: library shell, packs, inspector, tree canvas ── */
+.profession-library__backdrop { background: rgba(var(--d-deep-bg, 3, 5, 12), .66); }
+.profession-library__header { border-bottom: 0; box-shadow: inset 0 -1px 0 rgba(var(--d-gold, 233, 207, 150), .28); }
+.profession-library__title h2 { font: 700 20px/1.25 var(--pl-font-serif); letter-spacing: .2em; background: linear-gradient(180deg, rgb(var(--d-ink-bg, 255, 250, 234)) 0%, rgb(var(--d-gold-bg, 242, 212, 142)) 46%, rgb(var(--d-brass-bg, 184, 141, 69)) 54%, rgb(var(--d-gold-bg, 240, 212, 149)) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.profession-library__packs, .profession-library__inspector { border: 0; background: var(--pk-plate); }
+.profession-library__packs { box-shadow: inset -1px 0 0 rgba(var(--d-gold, 233, 207, 150), .22); }
+.profession-library__inspector { box-shadow: inset 1px 0 0 rgba(var(--d-gold, 233, 207, 150), .22); }
+.profession-library__packs > h3, .profession-library__packs > strong, .profession-library__inspector h3 { color: rgb(var(--d-cream, 242, 227, 189)); font-family: var(--pl-font-serif); letter-spacing: .12em; }
+.profession-library__pack { border: 0; border-radius: 3px; background: var(--pk-well); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .16); transition: box-shadow .25s, transform .3s var(--pk-spring); }
+.profession-library__pack:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .5); }
+.profession-library__pack.is-active { background: var(--pk-lit), var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .7), inset 3px 0 0 rgb(var(--d-gold, 227, 194, 126)), 0 0 14px rgba(var(--d-gold, 242, 212, 142), .14); }
+.profession-library__pack strong { color: rgb(var(--d-cream, 242, 227, 189)); font-family: var(--pl-font-serif); }
+.profession-library__field { color: var(--text-muted); letter-spacing: .06em; }
+.profession-library__field input, .profession-library__field textarea, .profession-library__field select { border: 0; border-radius: 3px; background: var(--pk-well); box-shadow: var(--pk-well-edge); color: var(--text-primary); }
+.profession-library__field input:focus, .profession-library__field textarea:focus, .profession-library__field select:focus { outline: none; box-shadow: var(--pk-well-edge), 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .6); }
+.profession-library__profession-editor, .profession-library__combat-editor, .profession-library__binding { border: 0; border-radius: 3px; background: var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .24), inset 0 2px 0 rgb(var(--d-brass, 184, 136, 63)), 0 4px 12px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1))); }
+.profession-library__profession-editor > strong, .profession-library__combat-editor > strong { color: rgb(var(--d-gold, 242, 212, 142)); font-family: var(--pl-font-serif); letter-spacing: .1em; }
+.profession-library__binding-list span { border: 0; box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .3); color: rgb(var(--d-gold, 233, 207, 150)); }
+.profession-library__mechanic-summary { border-left-color: rgb(var(--d-gold, 227, 194, 126)); background: linear-gradient(90deg, rgba(var(--d-gold-bg, 227, 194, 126), .1), transparent); }
+.profession-tree-canvas { border: 0; border-radius: 4px; background: radial-gradient(ellipse 60% 50% at 50% 45%, rgba(var(--d-blue-bg, 58, 72, 130), .16), transparent 72%), linear-gradient(180deg, rgb(var(--d-night-bg, 8, 12, 26)), rgb(var(--d-deep-bg, 5, 7, 15))); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .3), inset 0 0 40px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+.profession-tree-canvas .react-flow__edge-path { stroke: rgba(var(--d-gold, 227, 194, 126), .5); }
+.profession-tree-canvas .profession-tree-edge--available .react-flow__edge-path { stroke: rgb(var(--d-gold, 242, 212, 142)); filter: drop-shadow(0 0 3px rgba(var(--d-gold, 242, 212, 142), .6)); }
+.profession-tree-canvas .profession-tree-edge--owned .react-flow__edge-path { stroke: rgb(var(--d-gold, 227, 194, 126)); }
+.profession-tree-canvas .react-flow__handle { border-color: rgb(var(--d-seat, 42, 26, 4)); background: rgb(var(--d-gold-bg, 227, 194, 126)); }
+.profession-tree-node { border: 0; border-radius: 4px; background: linear-gradient(180deg, rgba(255, 255, 255, .025), transparent 40%), linear-gradient(180deg, rgb(var(--d-raise-bg, 21, 28, 56)), rgb(var(--d-night-bg, 10, 14, 32))); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .26), 0 8px 18px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); transition: box-shadow .25s; }
+.profession-tree-node:hover { box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .55), 0 0 14px rgba(var(--d-gold, 242, 212, 142), .12), 0 8px 18px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+.profession-tree-node strong { color: rgb(var(--d-cream, 242, 227, 189)); font-family: var(--pl-font-serif); letter-spacing: .04em; }
+.profession-tree-node small { color: rgb(var(--d-gold, 233, 207, 150)); }
+.profession-tree-node.is-available { box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .6), 0 8px 18px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+.profession-tree-node.is-owned { background: var(--pk-lit), linear-gradient(180deg, rgb(var(--d-raise-bg, 26, 33, 64)), rgb(var(--d-night-bg, 11, 16, 34))); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .6), inset 3px 0 0 rgb(var(--d-gold, 227, 194, 126)), 0 8px 18px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+.profession-tree-node.is-ultimate { background: radial-gradient(ellipse 70% 90% at 100% 0%, rgba(var(--d-warn-bg, 240, 180, 86), .14), transparent 70%), linear-gradient(180deg, rgb(var(--d-raise-bg, 21, 28, 56)), rgb(var(--d-night-bg, 10, 14, 32))); }
+.profession-tree-node.is-selected { box-shadow: inset 0 0 0 1.5px rgb(var(--d-gold, 227, 194, 126)), 0 0 22px rgba(var(--d-gold, 242, 212, 142), .3), 0 8px 18px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+.profession-tree-node.is-game { border-radius: 4px; }
+@media (max-width: 640px) {
+  .profession-library__inspector { position: static; width: auto; margin-top: 10px; box-shadow: inset 0 1px 0 rgba(var(--d-gold, 233, 207, 150), .3); }
+  .profession-library__packs { box-shadow: inset 0 -1px 0 rgba(var(--d-gold, 233, 207, 150), .22); }
+}

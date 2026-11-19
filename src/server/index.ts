@@ -3,7 +3,6 @@
  */
 import { Hono, Context, Next } from 'hono';
 import type { Bindings, SessionData, WorkshopItemType } from './types';
-import type { WorkshopInput } from './workshop';
 import { extractToken, getSession, destroySession, buildClearCookie } from './session';
 import { handleSendCode, handleRegister, handleLogin, handleResetPassword } from './email-auth';
 import { getUserById } from './db';
@@ -14,17 +13,34 @@ import {
   deleteSlot,
   MAX_SLOT_BYTES,
 } from './saves';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { bytesToB64url, hmacSha256 } from './crypto';
 import {
-  listItems,
-  getItem,
+  adminUpdateItem,
+  checkUpdates,
+  clearRating,
   createItem,
-  updateItem,
   deleteItem,
-  incrementDownloadCount,
-  toPublic,
-  checkDependencies,
+  getDownload,
+  getItemDetail,
+  getRow,
+  isWorkshopAdmin,
+  listFavoriteItems,
+  listItems,
+  listOwnerItems,
+  listReports,
+  listVersions,
+  rateItem,
+  reportItem,
   resolveInstallPlan,
+  resolveReport,
+  setFavorite,
+  setItemStatus,
+  updateItem,
+  type WorkshopInput,
+  type WorkshopResult,
 } from './workshop';
+import { WORKSHOP_LIMITS } from '../workshop/protocol';
 
 type AppEnv = {
   Bindings: Bindings;
@@ -44,8 +60,8 @@ app.use('*', async (c: Context<AppEnv>, next: Next) => {
   if (origin && (allowed.includes(origin) || origin.startsWith(DESKTOP_ORIGIN_PREFIX))) {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Credentials', 'true');
-    c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-save-version, x-content-encoding');
+    c.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-Match, x-save-version, x-content-encoding, x-workshop-client');
     c.header('Vary', 'Origin');
   }
   if (c.req.method === 'OPTIONS') return c.body(null, 204);
@@ -99,6 +115,8 @@ app.get('/api/me', requireAuth, async (c) => {
       id: user.id,
       username: user.username,
       email: user.email,
+      displayName: user.display_name ?? null,
+      workshopAdmin: isWorkshopAdmin(c.env, user.id),
     },
   });
 });
@@ -147,141 +165,165 @@ app.delete('/api/saves/:slotId', async (c) => {
   return c.json(res.body, res.status as 200 | 404);
 });
 
-// —— 创意工坊（列表/详情 公开；上传/修改/删除 需登录）——
+// —— 创意工坊 ——
+// 浏览、详情、安装计划、下载公开；发布、修改、评分、收藏、举报需登录；举报处理与精选需管理员。
+// 静态路径（mine / favorites / updates / admin）必须注册在 /:itemId 之前。
+
+/** 1MB 内容 + 元数据与 JSON 转义余量。 */
+const MAX_WORKSHOP_BODY_BYTES = 1_572_864;
+
+type JsonBody = { ok: true; body: Record<string, unknown> } | { ok: false; response: Response };
+
+async function readJsonBody(c: Context<AppEnv>, maxBytes = 65_536): Promise<JsonBody> {
+  const declared = Number(c.req.header('Content-Length') || 0);
+  const tooLarge = () => ({ ok: false as const, response: c.json({ error: 'PAYLOAD_TOO_LARGE', message: '请求体过大' }, 413) });
+  if (declared > maxBytes) return tooLarge();
+  let text = '';
+  try { text = await c.req.text(); } catch { text = ''; }
+  if (new TextEncoder().encode(text).length > maxBytes) return tooLarge();
+  try {
+    const body = JSON.parse(text || 'null') as unknown;
+    if (body && typeof body === 'object' && !Array.isArray(body)) return { ok: true, body: body as Record<string, unknown> };
+  } catch { /* fall through */ }
+  return { ok: false, response: c.json({ error: 'INVALID_JSON', message: '请求体必须是 JSON 对象' }, 400) };
+}
+
+function workshopInput(body: Record<string, unknown>): WorkshopInput {
+  const pick = <K extends keyof WorkshopInput>(key: K) => body[key] as WorkshopInput[K];
+  return {
+    title: pick('title'), description: pick('description'), changelog: pick('changelog'), type: pick('type'), contentType: pick('contentType'),
+    tags: pick('tags'), data: pick('data'), version: pick('version'), expectedVersion: pick('expectedVersion'), category: pick('category'),
+    dependencies: pick('dependencies'), recommendations: pick('recommendations'), minAppVersion: pick('minAppVersion'),
+    compatibility: pick('compatibility'), screenshots: pick('screenshots'), status: pick('status'),
+  };
+}
+
+function reply(c: Context<AppEnv>, result: WorkshopResult) {
+  return c.json(result.body, result.status as ContentfulStatusCode);
+}
+
+async function optionalSession(c: Context<AppEnv>): Promise<SessionData | null> {
+  const token = extractToken(c.req.raw);
+  return token ? getSession(c.env, token) : null;
+}
+
+/** 下载去重用的客户端摘要：登录用户按账号，否则按客户端随机 id，最后才退回 IP+UA 的摘要（不存原文）。 */
+async function downloadClientKey(c: Context<AppEnv>, session: SessionData | null): Promise<string> {
+  if (session) return `u:${session.userId}`;
+  const client = c.req.header('x-workshop-client');
+  const ip = c.req.header('CF-Connecting-IP') || c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || '';
+  const raw = client && /^[a-z0-9-]{8,64}$/i.test(client) ? `c:${client}` : `i:${ip}|${c.req.header('User-Agent') || ''}`;
+  return `${raw[0]}:${bytesToB64url(await hmacSha256(c.env.SESSION_SECRET, raw)).slice(0, 22)}`;
+}
+
+async function requireWorkshopAdmin(c: Context<AppEnv>, next: Next) {
+  if (!isWorkshopAdmin(c.env, c.get('session')?.userId)) return c.json({ error: 'FORBIDDEN', message: '需要创意工坊管理员权限' }, 403);
+  await next();
+}
+
 app.get('/api/workshop', async (c) => {
   const result = await listItems(c.env, {
     type: c.req.query('type'),
     tag: c.req.query('tag'),
+    q: c.req.query('q'),
+    author: c.req.query('author'),
     page: Number(c.req.query('page') || '1'),
     pageSize: Number(c.req.query('pageSize') || '20'),
-    sort: (c.req.query('sort') as 'latest' | 'popular' | 'featured' | undefined) || undefined,
+    sort: c.req.query('sort'),
     category: c.req.query('category'),
   });
-  return c.json({
-    items: result.items,
-    page: result.page,
-    total: result.total,
-    pageSize: result.pageSize,
-  });
+  return c.json(result);
 });
 
-app.get('/api/workshop/:itemId/install-check', async (c) => {
-  const item = await getItem(c.env, c.req.param('itemId')!);
-  if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
-  let installed: Record<string, string> = {};
-  try {
-    const raw = c.req.query('installed');
-    if (raw) installed = Object.fromEntries(raw.split(',').map((entry) => {
-      const [id, version] = entry.split('@');
-      return [id, version || '0.0.0'];
-    }).filter(([id]) => Boolean(id)));
-  } catch { installed = {}; }
-  return c.json(checkDependencies(item, installed));
+app.get('/api/workshop/updates', async (c) => {
+  const ids = (c.req.query('ids') || '').split(',').map(entry => entry.split('@')[0]);
+  return c.json({ items: await checkUpdates(c.env, ids) });
+});
+
+app.get('/api/workshop/mine', requireAuth, async (c) => c.json({ items: await listOwnerItems(c.env, c.get('session').userId) }));
+app.get('/api/workshop/favorites', requireAuth, async (c) => c.json({ items: await listFavoriteItems(c.env, c.get('session').userId) }));
+
+app.get('/api/workshop/admin/reports', requireAuth, requireWorkshopAdmin, async (c) => c.json({ reports: await listReports(c.env, c.req.query('status')) }));
+app.post('/api/workshop/admin/reports/:reportId', requireAuth, requireWorkshopAdmin, async (c) => {
+  const parsed = await readJsonBody(c);
+  if (!parsed.ok) return parsed.response;
+  return reply(c, await resolveReport(c.env, c.get('session').userId, c.req.param('reportId')!, parsed.body.action, parsed.body.note, parsed.body.hideItem));
+});
+app.patch('/api/workshop/admin/items/:itemId', requireAuth, requireWorkshopAdmin, async (c) => {
+  const parsed = await readJsonBody(c);
+  if (!parsed.ok) return parsed.response;
+  return reply(c, await adminUpdateItem(c.env, c.req.param('itemId')!, { featured: parsed.body.featured, status: parsed.body.status }));
 });
 
 app.get('/api/workshop/:itemId/install-plan', async (c) => {
-  const plan = await resolveInstallPlan(c.req.param('itemId')!, async id => getItem(c.env, id));
+  const plan = await resolveInstallPlan(c.req.param('itemId')!, id => getRow(c.env, id));
   return c.json(plan, plan.ok ? 200 : 409);
 });
 
-app.get('/api/workshop/:itemId', async (c) => {
-  const item = await getItem(c.env, c.req.param('itemId')!);
-  if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
-  let data: unknown;
-  try { data = JSON.parse(item.data_json); } catch { data = null; }
-  return c.json({ item: { ...toPublic(item), data } });
+app.get('/api/workshop/:itemId/versions', async (c) => {
+  const session = await optionalSession(c);
+  return reply(c, await listVersions(c.env, c.req.param('itemId')!, session?.userId));
 });
 
 app.get('/api/workshop/:itemId/download', async (c) => {
-  try {
-    const itemId = c.req.param('itemId')!;
-    const item = await getItem(c.env, itemId);
-    if (!item) return c.json({ error: 'NOT_FOUND', message: '条目不存在' }, 404);
+  const session = await optionalSession(c);
+  const clientKey = await downloadClientKey(c, session);
+  return reply(c, await getDownload(c.env, c.req.param('itemId')!, clientKey, c.req.query('version') || undefined));
+});
 
-    // 先增加下载计数
-    await incrementDownloadCount(c.env, itemId);
-
-    let tags: string[] = [];
-    try { tags = item.tags ? JSON.parse(item.tags) : []; } catch { tags = []; }
-
-    let data: unknown;
-    try { data = JSON.parse(item.data_json); } catch { data = item.data_json; }
-
-    return c.json({
-      id: item.id,
-      type: item.content_type || item.type,
-      version: item.version || '1.0.0',
-      title: item.title,
-      description: item.description,
-      tags,
-      data,
-      download_count: item.download_count + 1,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      dependencies: item.dependencies_json ? JSON.parse(item.dependencies_json) : [],
-      recommendations: item.recommendations_json ? JSON.parse(item.recommendations_json) : [],
-      min_app_version: item.min_app_version || null,
-      compatibility: item.compatibility_json ? JSON.parse(item.compatibility_json) : {},
-      screenshots: item.screenshots_json ? JSON.parse(item.screenshots_json) : [],
-    });
-  } catch (err) {
-    return c.json({ error: 'DOWNLOAD_FAILED', message: String(err) }, 500);
-  }
+app.get('/api/workshop/:itemId', async (c) => {
+  const session = await optionalSession(c);
+  return reply(c, await getItemDetail(c.env, c.req.param('itemId')!, session?.userId));
 });
 
 app.post('/api/workshop', requireAuth, async (c) => {
-  const s = c.get('session');
-  const body = await c.req.json();
-  const input: WorkshopInput = {
-    title: body.title,
-    description: body.description,
-    type: body.type,
-    tags: body.tags,
-    data: body.data,
-    contentType: body.contentType,
-    version: body.version,
-    category: body.category,
-    dependencies: body.dependencies,
-    recommendations: body.recommendations,
-    screenshots: body.screenshots,
-    minAppVersion: body.minAppVersion,
-    compatibility: body.compatibility,
-    featured: body.featured,
-  };
-  const res = await createItem(c.env, s.userId, input);
-  return c.json(res.body, res.status as 201 | 400 | 413);
+  const parsed = await readJsonBody(c, MAX_WORKSHOP_BODY_BYTES);
+  if (!parsed.ok) return parsed.response;
+  return reply(c, await createItem(c.env, c.get('session').userId, workshopInput(parsed.body)));
 });
 
 app.put('/api/workshop/:itemId', requireAuth, async (c) => {
-  const s = c.get('session');
-  const body = await c.req.json();
-  const input: WorkshopInput = {
-    title: body.title,
-    description: body.description,
-    type: body.type,
-    tags: body.tags,
-    data: body.data,
-    contentType: body.contentType,
-    version: body.version,
-    category: body.category,
-    dependencies: body.dependencies,
-    recommendations: body.recommendations,
-    screenshots: body.screenshots,
-    minAppVersion: body.minAppVersion,
-    compatibility: body.compatibility,
-    featured: body.featured,
-  };
-  const res = await updateItem(c.env, s.userId, c.req.param('itemId')!, input);
-  return c.json(res.body, res.status as 200 | 400 | 403 | 404 | 413);
+  const parsed = await readJsonBody(c, MAX_WORKSHOP_BODY_BYTES);
+  if (!parsed.ok) return parsed.response;
+  const input = workshopInput(parsed.body);
+  const ifMatch = c.req.header('If-Match');
+  if (input.expectedVersion === undefined && ifMatch) input.expectedVersion = ifMatch.replace(/^W\//, '').replace(/"/g, '');
+  return reply(c, await updateItem(c.env, c.get('session').userId, c.req.param('itemId')!, input));
 });
 
-app.delete('/api/workshop/:itemId', requireAuth, async (c) => {
-  const s = c.get('session');
-  const res = await deleteItem(c.env, s.userId, c.req.param('itemId')!);
-  return c.json(res.body, res.status as 200 | 403 | 404);
+app.patch('/api/workshop/:itemId/status', requireAuth, async (c) => {
+  const parsed = await readJsonBody(c);
+  if (!parsed.ok) return parsed.response;
+  return reply(c, await setItemStatus(c.env, c.get('session').userId, c.req.param('itemId')!, parsed.body.status));
 });
 
+app.delete('/api/workshop/:itemId', requireAuth, async (c) => reply(c, await deleteItem(c.env, c.get('session').userId, c.req.param('itemId')!)));
 
+app.put('/api/workshop/:itemId/rating', requireAuth, async (c) => {
+  const parsed = await readJsonBody(c);
+  if (!parsed.ok) return parsed.response;
+  return reply(c, await rateItem(c.env, c.get('session').userId, c.req.param('itemId')!, parsed.body.score));
+});
+app.delete('/api/workshop/:itemId/rating', requireAuth, async (c) => reply(c, await clearRating(c.env, c.get('session').userId, c.req.param('itemId')!)));
+
+app.put('/api/workshop/:itemId/favorite', requireAuth, async (c) => reply(c, await setFavorite(c.env, c.get('session').userId, c.req.param('itemId')!, true)));
+app.delete('/api/workshop/:itemId/favorite', requireAuth, async (c) => reply(c, await setFavorite(c.env, c.get('session').userId, c.req.param('itemId')!, false)));
+
+app.post('/api/workshop/:itemId/report', requireAuth, async (c) => {
+  const parsed = await readJsonBody(c);
+  if (!parsed.ok) return parsed.response;
+  return reply(c, await reportItem(c.env, c.get('session').userId, c.req.param('itemId')!, parsed.body.reason, parsed.body.detail));
+});
+
+/** 公开昵称（工坊作者名）。 */
+app.put('/api/me/profile', requireAuth, async (c) => {
+  const parsed = await readJsonBody(c);
+  if (!parsed.ok) return parsed.response;
+  const raw = typeof parsed.body.displayName === 'string' ? parsed.body.displayName : '';
+  const displayName = raw.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, WORKSHOP_LIMITS.displayName);
+  await c.env.DB.prepare('UPDATE users SET display_name = ? WHERE id = ?').bind(displayName || null, c.get('session').userId).run();
+  return c.json({ ok: true, displayName: displayName || null });
+});
 
 // ——— 匿名游玩统计（无需鉴权；数据完全匿名）———
 import { handlePostPlayStat } from './playStats';

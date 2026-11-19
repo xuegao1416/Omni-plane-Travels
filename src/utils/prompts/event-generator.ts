@@ -28,13 +28,28 @@ export interface EventGeneratorOptions {
   npcNames: string[];
   /** 世界书中的势力名列表 */
   factionNames: string[];
+  /** 事件效果与条件可用的变量（来自玩法宿主的变量注册表）。 */
+  variables?: Array<{ path: string; label: string; type: string; writable: boolean }>;
+  /** 事件效果可调用的模块命令。 */
+  commands?: string[];
+  /** 本世界会发生的领域事件类型（卡片触发器 on 可用）。 */
+  domainEvents?: string[];
 }
+
+/** 没有世界目录时（旧调用方）用的常见领域事件；正常情况由玩法宿主按已启用模块给出（generatorReference）。 */
+export const COMMON_DOMAIN_EVENTS = [
+  'turn.ended（每回合结束）', 'time.day（跨过一天）', 'quest.completed / quest.failed / quest.accepted',
+  'check.rolled（事件检定，payload.success）', 'dice.resolved（正文检定）', 'player.downed（生命归零）', 'stat.changed',
+  'resources.low / resources.depleted（payload.id 为物资 id）', 'status.applied', 'resources.crafted',
+  'economy.traded（payload.side 为 buy/sell）', 'economy.contractFulfilled / economy.contractFailed', 'economy.incident',
+  'progression.promoted（升级）', 'events.resolved（玩家处理完一张事件卡）',
+  'combat.ended（战斗结束，payload.status 为 victory/defeat/escaped/draw）', 'talent.unlocked / skill.learned / skill.used（能力）',
+];
 
 /** 卡片节点类型白名单 */
 const CARD_NODE_TYPES = [
   'narrative.title', 'narrative.text', 'narrative.image', 'narrative.dialog',
   'choice.static', 'choice.dynamic', 'choice.conditional', 'choice.weighted',
-  'effect.stat', 'effect.resource', 'effect.flag',
   'flow.branch',
 ];
 
@@ -58,6 +73,11 @@ export function buildEventGeneratorPrompt(options: EventGeneratorOptions): strin
     worldName, worldDescription, worldBookEntries, moduleNames,
     statKeys, statNames, resources, assets, npcNames, factionNames,
   } = options;
+  const variableRef = (options.variables ?? []).length
+    ? options.variables!.slice(0, 60).map(item => `- ${item.path}（${item.label}，${item.type}${item.writable ? '' : '，只读'}）`).join('\n')
+    : '（无）';
+  const commandRef = (options.commands ?? []).length ? options.commands!.map(item => `- ${item}`).join('\n') : '（无）';
+  const eventRef = (options.domainEvents?.length ? options.domainEvents : COMMON_DOMAIN_EVENTS).map(item => `- ${item}`).join('\n');
 
   const worldBookContext = worldBookEntries.length > 0
     ? worldBookEntries.map(e => `【${e.comment}】\n${e.content}`).join('\n\n')
@@ -118,10 +138,10 @@ ${worldBookContext}
 ═══════════════════════════════════════
 【可选值参考表 —— widgetValues 必须使用以下精确值】
 
-属性 key（用于 effect.stat / conditions.check_stat / actions.modify_stat 的 stat_key / statKey 字段）：
+属性 key（用于选项效果 stat、检定 check.stat，以及规则节点 conditions.check_stat / actions.modify_stat 的 stat_key）：
 ${statRef}
 
-生存资源 id（用于 effect.resource / conditions.check_resource / actions.modify_resource 的 resource_key / resourceKey 字段）：
+物资 id（用于选项效果 resource，以及规则节点 conditions.check_resource / actions.modify_resource 的 resource_key）：
 ${resourceRef}
 
 经营资产 id：
@@ -147,6 +167,7 @@ ${RULE_NODE_TYPES.map(t => `- ${t}`).join('\n')}
     {
       "id": "event_id",
       "name": "事件名称",
+      "trigger": { "on": ["deck"], "cooldownTurns": 6 },
       "workflow": {
         "nodes": [
           {
@@ -185,11 +206,8 @@ ${RULE_NODE_TYPES.map(t => `- ${t}`).join('\n')}
 - narrative.title: { "title": "标题文本", "style": "default"|"warning"|"important" }
 - narrative.text: { "text": "叙事文本内容" }
 - narrative.dialog: { "npcName": "从NPC参考表选取", "dialogText": "台词", "emotion": "neutral"|"friendly"|"serious"|"angry"|"sad"|"surprised" }
-- choice.static: { "options": [{ "label": "选项文本", "aiNote": "给AI的备注" }] }
+- choice.static: { "options": [选项对象...] }（选项对象格式见下方【选项的后果】）
 - choice.dynamic: { "instruction": "生成指令", "minCount": 2, "maxCount": 4 }
-- effect.stat: { "statKey": "从属性key参考表选取如attrA", "delta": 10 }
-- effect.resource: { "resourceKey": "从资源id参考表选取如food", "delta": -5 }
-- effect.flag: { "flagPath": "flags.自定义标记名", "value": true }
 - flow.branch: { "checkPath": "从属性key参考表选取", "op": ">"|"<"|">="|"<="|"=="|"!=", "compareValue": "50" }
 - triggers.periodic: { "interval": 5, "description": "描述", "narrate": true }
 - triggers.world_event: { "match_type": "自定义事件类型", "priority": 10 }
@@ -209,9 +227,49 @@ ${RULE_NODE_TYPES.map(t => `- ${t}`).join('\n')}
 6. 节点 id 必须全局唯一（跨事件也唯一），建议格式：evt1_narrative_1、evt1_choice_1、evt2_trigger_1
 
 【每个事件的典型连线模式】
+narrative.title(flow_out) → narrative.text(flow_in)
 narrative.text(flow_out) → choice.static(flow_in)
-choice.static(flow_out) → effect.stat(flow_in)
-effect.stat(flow_out) → narrative.text(flow_in)
+（不要在选项后面再接 effect 节点：那样的效果对所有选项一视同仁。效果写在每个选项自己身上。）
+
+═══════════════════════════════════════
+【选项的后果 —— 每个选项写自己的效果，不同选项后果必须不同】
+{
+  "label": "选项文字",
+  "aiNote": "给下一段正文的提示（玩家这样选意味着什么）",
+  "effects": [效果...],                      // 选了就生效
+  "check": { "stat": "属性key或变量路径", "dc": 12, "label": "检定名" },   // 可选：d20 检定，dc 8~18
+  "success": { "effects": [...], "note": "成功时发生了什么", "next": "后续事件id" },
+  "failure": { "effects": [...], "note": "失败时发生了什么", "next": "后续事件id" },
+  "next": "选完接着出现的事件id（可选）",
+  "requires": { "fact": "变量路径", "op": ">=", "value": 100 },   // 可选：不满足时选项灰掉
+  "requiresText": "不满足时显示的原因"
+}
+效果写法（数值用增减，系统会按范围钳制）：
+- { "stat": "属性key", "delta": -10 }
+- { "resource": "物资id", "delta": 3 }
+- { "currency": -50 }
+- { "item": "物品名", "delta": 1 }
+- { "flag": "标记名", "value": true }            // 写入 flags.标记名，可被后续条件读取
+- { "fact": "变量路径", "delta": 1 } 或 { "fact": "变量路径", "value": "新值" }
+- { "status": "状态id", "days": 3 } / { "clearStatus": "状态id" }
+- { "command": "命令名", "args": { ... } }
+- { "note": "需要正文承认的事实" }
+
+【事件出现方式 —— 每个事件可写 "trigger"】
+"trigger": { "on": ["deck"], "cooldownTurns": 6 }                    // 进随机牌堆（默认）
+"trigger": { "on": ["deck"], "once": true, "when": { "fact": "turn", "op": ">=", "value": 10 } }
+"trigger": { "on": ["resources.low"], "when": { "event": { "type": "resources.low", "where": { "id": "water" } } }, "cooldownTurns": 4 }
+"trigger": { "on": ["turn.ended"], "when": { "fact": "flags.某标记", "op": "==", "value": true }, "once": true }
+可选字段：chance（0~1 概率）、weight（牌堆权重）、once、cooldownTurns。只作为 next 后续出现的事件不要写 trigger。
+
+可监听的领域事件：
+${eventRef}
+
+条件与效果可用的变量：
+${variableRef}
+
+效果可调用的命令：
+${commandRef}
 
 【每条规则的典型连线模式】
 triggers.periodic(flow_out) → conditions.check_resource(flow_in)
@@ -260,14 +318,15 @@ export function buildEventGeneratorUserMessage(options: EventGeneratorOptions): 
   return `请根据「${options.worldName}」的世界设定，生成一个完整的游戏内容合集。
 
 要求：
-1. 包含 3~5 个有意义的事件（每个事件至少 1 个叙事节点 + 1 个交互/效果节点）
+1. 包含 3~5 个有意义的事件（每个事件至少 1 个叙事节点 + 1 个 choice 节点；每个选项写自己的 effects，至少一个选项带检定和成功/失败分支）
 2. 包含 2~3 条规则（周期触发或条件触发）
 3. 【核心】规则必须与事件联动！至少 1 条规则要用 actions.add_event 弹出本合集中的事件卡
 4. 内容要与世界书中的势力、NPC、地点、冲突等元素深度融合
 5. 事件之间要有故事连贯性
 6. 【重要】每个事件的工作流必须有完整的连线！choice 节点的 flow_out 必须连到后续节点
 7. 【重要】所有节点 id 必须全局唯一
-8. 【重要】widgetValues 中的 statKey / resourceKey / stat_key / resource_key 必须使用参考表中的精确值
+8. 【重要】属性 key、物资 id、变量路径、命令名必须使用参考表中的精确值
+10. 【重要】每个事件写 trigger：至少一个事件监听领域事件（如物资告急、任务完成、交易），而不是全部随机出现
 9. 【重要】actions.add_event 的 event_id 必须填写本合集中 events 里某个事件的 id
 ${extra ? `\n【用户额外要求】\n${extra}` : ''}
 

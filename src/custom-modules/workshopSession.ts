@@ -1,6 +1,7 @@
 import type { CustomModuleAgentWorldContext } from './agentSession';
 import type { CustomGameplayModuleDefinition } from './schema';
 import { validateCustomGameplayModule } from './validator';
+import { checkCustomModuleWorldFit } from './worldFit';
 
 export interface WorkshopTextPart { type: 'text'; text: string }
 export interface WorkshopToolPart {
@@ -48,6 +49,9 @@ export function commitWorkshopRevision(session: WorkshopSession, input: unknown,
   if (!validation.valid || !validation.normalized) {
     throw new Error(validation.errors.map(issue => `${issue.path.join('.') || 'module'}: ${issue.message}`).join('\n') || '模块校验失败');
   }
+  // 再按本世界的能力目录查一遍（读的输入、用的物资要在这个世界存在）；报错交回 Agent 修正。
+  const misfit = checkCustomModuleWorldFit(validation.normalized, session.world).filter(issue => issue.severity === 'error');
+  if (misfit.length) throw new Error(misfit.map(issue => `${issue.path.join('.') || 'module'}: ${issue.message}`).join('\n'));
   const number = (session.revisions.at(-1)?.number ?? 0) + 1;
   const module = cloneWorkshopValue(validation.normalized);
   const previous = currentWorkshopDraft(session);

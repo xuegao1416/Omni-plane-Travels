@@ -1,16 +1,16 @@
 > 本文档是 `PROJECT_FUNCTIONAL_SPEC.md` 的拆分子文件（5、游戏玩法内核 — `src/gameplay/`）。
-> 总索引见 `../PROJECT_FUNCTIONAL_SPEC.md`。
+> 总索引见仓库根目录的 `PROJECT_FUNCTIONAL_SPEC.md`（相对本文件为 `../../PROJECT_FUNCTIONAL_SPEC.md`）。
 
 ## 5、游戏玩法内核 — `src/gameplay/`
 
-玩法/战斗/技能/职业/叙事决策的统一抽象层,与引擎解耦,通过 `engineBridge` 接入 `§1 核心引擎`。
+玩法/战斗/技能/职业/叙事决策的统一抽象层,与引擎解耦,通过 `src/custom-modules/engineBridge.ts` 接入 `§1 核心引擎`(注意:`src/gameplay/` 下不存在 `engineBridge.ts`)。
 
 ### 5.1 内核与类型
 
 | 文件                       | 行数  | 职责                                               |
 | ------------------------ | --- | ------------------------------------------------ |
-| `src/gameplay/kernel.ts` | 539 | 玩法内核主入口(条件求值/状态机/事件分发)                           |
-| `src/gameplay/types.ts`  | 166 | `GameplayStateRoot` / `Condition` / `Action` 等类型 |
+| `src/gameplay/kernel.ts` | 534 | 玩法内核主入口(条件求值/状态机/事件分发)                           |
+| `src/gameplay/types.ts`  | 165 | `GameplayStateRoot` / `Condition` / `Action` 等类型 |
 
 **`kernel.ts` 导出**:
 
@@ -52,21 +52,29 @@ combatNarrativeBoundary.ts 返回正文
 
 能力(技能/天赋/职业/ innate 天赋)的统一构建与实例化管理接口。
 
-> 注:`AbilityDefinition` 接口定义在 `src/gameplay/protocols.ts`(含 `schemaVersion`/`id`/`name`/`category`/`rarity`/`maxRank`/`pointCost`/`prerequisites`/`tags`/`mechanics` 等字段);触发逻辑位于 `mechanics` 内的 `cooldownRounds`/`statuses`/`combat` 等子字段。
+> 注:`AbilityDefinition` 接口定义在 `src/gameplay/protocols.ts:33`(含 `schemaVersion`/`id`/`name`/`category`/`rarity`/`maxRank`/`pointCost`/`prerequisites`/`tags`/`mechanics` 等字段);`AbilityCategory` 在 `:14`(`'innate_talent' | 'profession' | 'free_skill' | 'dynamic' | 'pet' | 'summon' | 'combat_item'`);触发逻辑位于 `mechanics` 内的 `cooldownRounds`/`statuses`/`combat` 等子字段。
 
-`abilitySystem.ts` 导出的关键函数:
+`abilitySystem.ts` 导出的关键函数(行号对应当前代码):
 
 ```typescript
-function createAbilityInstance(definition: AbilityDefinition, source: AbilityCategory, acquiredAt?: number): AbilityInstance;
-function createAbilityRuntime(rank?: number): AbilityRuntime;
-function abilityRankCost(definition: AbilityDefinition, rank: number): number;
-function createAbilityLibraryRuntime(): AbilityLibraryRuntime;
-function stageAbilityProposal(runtime, proposal): { state; preview: AbilityDefinition };
-function confirmAbilityProposal(runtime, proposalId): { state; definition?: AbilityDefinition };
-function balanceAbilityProposal(proposal: AbilityProposal): AbilityDefinition;
-function isMechanicalAbilityDefinition(definition: AbilityDefinition): boolean;
-// 以及能力来源转换:abilityDefinitionFromProfessionAbility / FromInnateTalent / FromTalent / FromSkill
+function ensureCombatAbilityDefaults(source: AbilityDefinition): AbilityDefinition;              // :68
+function abilityDefinitionFromProfessionAbility(source: ProfessionAbilityDef, professionId?: string): AbilityDefinition; // :92
+function abilityDefinitionFromInnateTalent(source: InnateTalentDef): AbilityDefinition;          // :117
+function abilityDefinitionFromTalent(source: TalentDef): AbilityDefinition;                      // :143
+function abilityDefinitionFromSkill(source: SkillDef): AbilityDefinition;                        // :168
+function abilityRankCost(definition: AbilityDefinition, rank: number): number;                   // :189
+function createAbilityRuntime(rank?: number): AbilityRuntime;                                    // :193
+function createAbilityInstance(definition: AbilityDefinition, source?: AbilityCategory, acquiredAt?: number): AbilityInstance; // :197
+function balanceAbilityProposal(proposal: AbilityProposal): AbilityDefinition;                   // :218
+function createAbilityLibraryRuntime(): AbilityLibraryRuntime;                                    // :286
+function stageAbilityProposal(runtime, proposal): { state; preview: AbilityDefinition };         // :290
+function confirmAbilityProposal(runtime, proposalId): { state; definition?: AbilityDefinition };  // :297
+function isMechanicalAbilityDefinition(definition: AbilityDefinition): boolean;                   // :306
+function stageAbilityProposalOnGameState(state, proposalInput): { state; proposal?; staged };     // :334
+function resolveAbilityProposalOnGameState(...)                                                   // :347
 ```
+
+`createAbilityInstance` 的 `source` 默认取 `definition.category`、`acquiredAt` 默认取 `Date.now()`。
 
 ### 5.4 叙事决策 — `src/gameplay/narrativeDecision.ts`
 
@@ -82,28 +90,32 @@ interface NarrativeDecisionRecord {
 }
 ```
 
-导出函数:
+导出函数(行号对应当前代码):
 
 ```typescript
-function createNarrativeDecisionRecord(input: NarrativeDecisionRecordInput): NarrativeDecisionRecord;
-function applyNarrativeDecision(state, record): NarrativeDecisionApplication;
-function getPendingNarrativeDecisions(state): NarrativeDecisionRecord[];
-function consumeNarrativeDecisions(state, consumption): GameState;
-function settleNarrativeResponse(state, result): GameState;
-function getNarrativeDecisionPromptSnapshot(state, saveId?): NarrativeDecisionPromptSnapshot;
+function normalizeNarrativeDecisionAction(input: unknown): NarrativeDecisionAction | undefined;  // :102
+function createNarrativeDecisionRecord(input: NarrativeDecisionRecordInput): NarrativeDecisionRecord; // :144
+function applyNarrativeDecision(state: GameState, record): NarrativeDecisionApplication;         // :180
+function getPendingNarrativeDecisions(state: GameState): NarrativeDecisionRecord[];              // :191
+function getPendingNarrativeDecisionsForSave(state, saveId): NarrativeDecisionRecord[];          // :197
+function settleNarrativeResponse(state: GameState, result): GameState;                          // :201
+function narrativeDecisionFromChoice(...): NarrativeDecisionRecord;                             // :210
+function consumeNarrativeDecisions(state, consumption): GameState;                              // :226
+function getNarrativeDecisionPromptSnapshot(state, saveId?): NarrativeDecisionPromptSnapshot;    // :244
+function getNarrativeDecisionContext(state: GameState): string;                                 // :255
 ```
 
 ### 5.5 协议 — `src/gameplay/protocols.ts`
 
-玩法层与 UI/AI 的通信协议(请求/响应/事件类型定义)。
+玩法层与 UI/AI 的通信协议(请求/响应/事件类型定义),1004 行。`AbilityDefinition`(`:33`)、`AbilityCategory`(`:14`)、`normalizeGameStateV3`(`:961`)均在此文件。
 
 ### 5.6 状态归一 — `src/gameplay/statePreparation.ts`
 
 当前迁移策略不是串联保留所有历史代际：
 
 - `GameState.v3` 是当前状态容器，战斗会话协议本身仍为 `CombatSessionV2`。
-- `normalizeGameStateV3()` 只接收直接上一代可识别状态并归一到 V3。
-- `prepareGameplayState()` 负责当前 gameplay runtime 初始化与模块状态补齐。
+- `normalizeGameStateV3()` 定义在 `src/gameplay/protocols.ts:961`(不在本文件),只接收直接上一代可识别状态并归一到 V3。
+- `prepareGameplayState()`(`:278`)负责当前 gameplay runtime 初始化与模块状态补齐;本文件另定义 `GameplayPrepareMode`(`:11`)、`PrepareGameplayOptions`(`:13`)、`PrepareGameplayResult`(`:17`)三个类型。
 - 更早战斗修补层已经退出；运行时不再维护 `state.combat` 与 `v3.combatSession` 双状态。
 
 ### 5.7 子目录

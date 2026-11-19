@@ -5,12 +5,9 @@ import { cloneDeep, get, set, merge } from 'lodash-es';
 import { cloneSnapshotWithSharing } from '../utils/snapshotSharing';
 import { formatWorldClock, normalizeTimeSystemConfig, normalizeWorldClockState, reconcileEditedWorldClock, type WorldClockConfig, type WorldClockState } from '../time/worldClock';
 import { toDisplayText } from '../utils/displayText';
-import {
-  ensureGameplayRuntime,
-  executeGameplayTransaction,
-  type GameplayTransaction,
-  type GameplayEffect,
-} from '../gameplay/kernel';
+import { ensureGameplayRuntime } from '../core/state';
+import type { GameplayEffect, GameplayTransaction } from '../gameplay/types';
+
 import type { GameplayValue } from '../gameplay/types';
 import { extractModulePartitions, materializeModulePartitions } from '../gameplay/moduleRuntime/facade';
 import { ModuleRuntimeRegistry } from '../gameplay/moduleRuntime/registry';
@@ -19,12 +16,20 @@ import { canRollbackCombat } from '../gameplay/protocols';
 import { ensureKnowledgeState } from '../director/knowledge';
 import { selectPlayerKnownNPCs } from './playerKnowledge';
 import { enforcePlayerIdentity } from '../director/initialIdentity';
+import type { WorldDef } from '../data/worlds-schema';
+import type { GameplayHost } from '../core/host';
+import { createGameplayHost } from '../core/registry';
+import { gameplayGeneration } from '../core/generation';
+import { aiCommandsFor, isAiCommand } from '../core/aiCommands';
+import { intentsToTransaction, isIntentPayload } from './extractionIntents';
+import { gameplayTransactionToOps } from '../core/legacy';
+import { evaluateCondition } from '../core/conditions';
 
 /** 原型污染防护 — 过滤危险路径段 */
 const DANGEROUS_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
 const AI_STATE_ROOTS = new Set(['世界', '玩家', '人物档案']);
-const AI_TRANSACTION_KEYS = new Set(['id', 'moduleId', 'source', 'label', 'conditions', 'costs', 'effects', 'rewards', 'events']);
+const AI_TRANSACTION_KEYS = new Set(['id', 'moduleId', 'source', 'label', 'conditions', 'costs', 'effects', 'rewards', 'events', 'commands']);
 const AI_FORBIDDEN_FIELDS = new Set(['before', 'after']);
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -32,6 +37,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isSafePath(path: string): boolean {
   return !path.split('.').some(seg => DANGEROUS_PATH_SEGMENTS.has(seg));
 }
+
+type PathCheck = (path: unknown) => boolean;
 
 function isAllowedAiStatePath(path: unknown): boolean {
   if (typeof path !== 'string' || !path.trim()) return false;
@@ -53,7 +60,7 @@ function containsForbiddenAiField(value: unknown, seen: WeakSet<object> = new We
   return false;
 }
 
-function areAllowedAiEffects(value: unknown): boolean {
+function areAllowedAiEffects(value: unknown, allowedPath: PathCheck): boolean {
   if (!Array.isArray(value)) return value === undefined;
   return value.every(effect => {
     if (!isRecord(effect)) return false;
@@ -61,7 +68,7 @@ function areAllowedAiEffects(value: unknown): boolean {
       if (operation in effect) {
         const payload = effect[operation];
         return isRecord(payload)
-          && isAllowedAiStatePath(payload.path)
+          && allowedPath(payload.path)
           && !containsForbiddenAiField(payload.value);
       }
     }
@@ -69,11 +76,11 @@ function areAllowedAiEffects(value: unknown): boolean {
   });
 }
 
-function areAllowedAiConditions(value: unknown): boolean {
+function areAllowedAiConditions(value: unknown, allowedPath: PathCheck): boolean {
   if (!Array.isArray(value)) return value === undefined;
   const check = (condition: unknown): boolean => {
     if (!isRecord(condition)) return false;
-    if (isRecord(condition.state)) return isAllowedAiStatePath(condition.state.path);
+    if (isRecord(condition.state)) return allowedPath(condition.state.path);
     if (Array.isArray(condition.all)) return condition.all.every(check);
     if (Array.isArray(condition.any)) return condition.any.every(check);
     if (condition.not !== undefined) return check(condition.not);
@@ -82,12 +89,25 @@ function areAllowedAiConditions(value: unknown): boolean {
   return value.every(check);
 }
 
-function isAllowedAiTransaction(value: Record<string, unknown>): boolean {
+/** commands：只允许白名单里的模块命令（买卖、订单、物资增减等需要本地规则计算的变化）。 */
+function areAllowedAiCommands(value: unknown): boolean {
+  if (value === undefined) return true;
+  return Array.isArray(value) && value.length <= 12 && value.every(item => isRecord(item)
+    && isAiCommand(item.command)
+    && (item.args === undefined || (isRecord(item.args) && !containsForbiddenAiField(item.args))));
+}
+
+/**
+ * allowedPath：世界/玩家/人物档案下的原始路径，或玩法宿主变量表里登记的变量（如 player.stats.hp、
+ * player.resources.water——提取提示里的模块说明就是这么写的）。能不能由 AI 写由变量表在结算时判定。
+ */
+function isAllowedAiTransaction(value: Record<string, unknown>, allowedPath: PathCheck = isAllowedAiStatePath): boolean {
   if (!Object.keys(value).every(key => AI_TRANSACTION_KEYS.has(key))) return false;
-  if (!areAllowedAiConditions(value.conditions)) return false;
-  if (value.costs !== undefined && (!Array.isArray(value.costs) || !value.costs.every(cost => isRecord(cost) && isAllowedAiStatePath(cost.path)))) return false;
-  if (!areAllowedAiEffects(value.effects)) return false;
-  if (value.rewards !== undefined && (!Array.isArray(value.rewards) || !value.rewards.every(reward => isRecord(reward) && areAllowedAiEffects(reward.effects)))) return false;
+  if (!areAllowedAiCommands(value.commands)) return false;
+  if (!areAllowedAiConditions(value.conditions, allowedPath)) return false;
+  if (value.costs !== undefined && (!Array.isArray(value.costs) || !value.costs.every(cost => isRecord(cost) && allowedPath(cost.path)))) return false;
+  if (!areAllowedAiEffects(value.effects, allowedPath)) return false;
+  if (value.rewards !== undefined && (!Array.isArray(value.rewards) || !value.rewards.every(reward => isRecord(reward) && areAllowedAiEffects(reward.effects, allowedPath)))) return false;
   return true;
 }
 
@@ -115,10 +135,19 @@ export class VariableManager {
   private readonly moduleRegistry: ModuleRuntimeRegistry;
   private worldClockConfig: WorldClockConfig;
   private lastAiUpdateRejection: string | null = null;
+  private world?: WorldDef;
+  private host?: { world: WorldDef | undefined; generation: number; instance: GameplayHost };
 
   /** Ephemeral validation feedback for the next extraction attempt, never saved. */
   getLastAiUpdateRejection(): string | null {
     return this.lastAiUpdateRejection;
+  }
+
+  /** 上一次 AI 更新里被丢弃的意图及原因（其余意图已生效）。 */
+  private lastAiUpdateNotes: string[] = [];
+
+  getLastAiUpdateNotes(): readonly string[] {
+    return this.lastAiUpdateNotes;
   }
 
   private rejectAiUpdate(reason: string): false {
@@ -141,6 +170,36 @@ export class VariableManager {
       : source;
     this.normalizeState();
     this.syncModuleRuntime();
+  }
+
+  /** 绑定当前世界：AI 更新与模块效果按该世界启用的模块解析变量。 */
+  bindWorld(world: WorldDef | undefined): void {
+    this.world = world;
+    this.host = undefined;
+    this.prepareGameplayModules();
+  }
+
+  /** 各玩法模块补齐自身状态并迁移旧存档字段（幂等）。 */
+  private prepareGameplayModules(): void {
+    if (!this.world) return;
+    try {
+      this.state = this.gameplayHost().prepare(this.state);
+    } catch (error) {
+      console.warn('[gameplay] 模块状态准备失败，保留原状态', error);
+    }
+  }
+
+  getBoundWorld(): WorldDef | undefined {
+    return this.world;
+  }
+
+  /** 当前世界的玩法宿主（按世界与玩法配置版本缓存；事件目录加载后自动重建）。 */
+  gameplayHost(): GameplayHost {
+    const generation = gameplayGeneration();
+    if (!this.host || this.host.world !== this.world || this.host.generation !== generation) {
+      this.host = { world: this.world, generation, instance: createGameplayHost(this.world, this.state) };
+    }
+    return this.host.instance;
   }
 
   setWorldClockConfig(config: Partial<WorldClockConfig>): void {
@@ -360,20 +419,45 @@ export class VariableManager {
   }
 
   private commitGameplayTransaction(transaction: GameplayTransaction): boolean {
-    const tick = this.state.simulationRuntime?.tick ?? 0;
     const isAiSource = transaction.source.startsWith('ai');
-    const result = executeGameplayTransaction(this.state, transaction, { tick, bestEffort: isAiSource });
-    if (result.status === 'applied' && !this.hasValidCoreStateShape(result.state as GameState)) {
-      // AI transactions must not be able to replace a core container with a
-      // scalar/null value. Keep the original state and report rejection.
+    const host = this.gameplayHost();
+    const { conditions, ops: effectOps } = gameplayTransactionToOps(transaction);
+    const commands = (transaction as GameplayTransaction & { commands?: Array<{ command: string; args?: Record<string, unknown> }> }).commands ?? [];
+    const ops = [...effectOps, ...commands.filter(item => isAiCommand(item.command)).map(item => ({ op: 'command' as const, command: item.command, args: item.args ?? {} }))];
+    // 条件里的事件匹配：本回合已经发生的领域事件。
+    const turn = this.state.simulationRuntime?.tick ?? 0;
+    const events = [...(this.state.gameplay?.pendingEvents ?? []), ...(this.state.gameplay?.eventHistory ?? []).filter(event => event.tick === turn)]
+      .map(event => ({ type: event.type, payload: event.payload }));
+    if (!conditions.every(condition => evaluateCondition(condition, { state: this.state, facts: host.facts, events }))) {
+      return this.rejectAiUpdate('事务未应用：条件未满足');
+    }
+    // 消耗必须付得起，否则整笔事务不生效（与旧内核一致）。
+    for (const cost of transaction.costs ?? []) {
+      const available = Number(host.facts.read(this.state, cost.path));
+      const amount = Number(cost.amount);
+      if (!Number.isFinite(available) || !Number.isFinite(amount) || amount < 0 || available < amount) {
+        return this.rejectAiUpdate(`事务未应用：${cost.label || cost.id || host.facts.label(cost.path)}不足`);
+      }
+    }
+    const outcome = host.apply(this.state, ops, {
+      source: isAiSource ? 'ai' : 'system',
+      label: transaction.label || transaction.id,
+      transactionId: transaction.id,
+      moduleId: transaction.moduleId,
+      strict: !isAiSource,
+    });
+    if (outcome.status === 'failed') return this.rejectAiUpdate(`事务未应用：${outcome.reason ?? '执行失败'}`);
+    if (outcome.status === 'blocked') {
+      // 全部是「写入同样的值」时视为成功；所有效果都失败时把原因交给重试。
+      if (outcome.warnings.length > 0) return this.rejectAiUpdate(`事务未应用：${outcome.warnings.slice(0, 3).join('；')}`);
+      return true;
+    }
+    if (!this.hasValidCoreStateShape(outcome.state)) {
       return this.rejectAiUpdate('更新会破坏世界、玩家或人物档案的必需对象结构');
     }
-    // Failed/blocked results still carry the kernel log; preserve that state.
-    this.state = result.state as GameState;
-    if (result.status === 'applied') {
-      this.normalizeState();
-    }
-    if (result.status !== 'applied') return this.rejectAiUpdate(`事务未应用：${result.reason ?? result.status}`);
+    // AI 事务发出的事件已在宿主内交给事件系统处理，不再转存给旧机械层。
+    this.state = outcome.state;
+    this.normalizeState();
     return true;
   }
 
@@ -405,7 +489,7 @@ export class VariableManager {
     }
   }
 
-  /** Normalize display-name NPC paths before they enter the generic kernel. */
+  /** 人物显示名路径先规范成稳定 ID，再进入事务。 */
   private normalizeCanonicalTransaction(payload: Record<string, unknown>): Record<string, unknown> | null {
     const transaction = cloneDeep(payload) as Record<string, any>;
     const chronicleCache = new Map<string, string[]>();
@@ -556,6 +640,7 @@ export class VariableManager {
   // 从 AI 响应中的更新标签解析并应用当前 GameplayTransaction。
   applyUpdateVariable(updateText: string): boolean {
     this.lastAiUpdateRejection = null;
+    this.lastAiUpdateNotes = [];
     let parsed: unknown;
     try {
       parsed = JSON.parse(updateText);
@@ -564,13 +649,34 @@ export class VariableManager {
     }
     if (!isRecord(parsed)) return this.rejectAiUpdate('GameplayTransaction 必须是 JSON 对象');
 
+    // 意图格式（新）：逐条按变量表与命令白名单校验，合格的转成事务；全部不合格时整笔拒绝并给出逐条原因。
+    if (isIntentPayload(parsed)) {
+      const host = this.gameplayHost();
+      const converted = intentsToTransaction(parsed, {
+        facts: host.facts,
+        commands: new Set(aiCommandsFor(host).map(item => item.command)),
+        rawPathAllowed: path => isAllowedAiStatePath(path),
+      });
+      if (!converted.transaction) {
+        // 空列表表示这一轮没有需要更新的变量。
+        if (parsed.intents.length === 0 && converted.rejected.length === 0) return true;
+        return this.rejectAiUpdate(`意图全部未通过校验：${converted.rejected.slice(0, 8).join('；')}`);
+      }
+      const applied = this.applyGameplayTransactionPayload(converted.transaction);
+      if (applied) this.lastAiUpdateNotes = converted.rejected;
+      return applied;
+    }
+
     const unknownKeys = Object.keys(parsed).filter(key => !AI_TRANSACTION_KEYS.has(key));
     if (unknownKeys.length > 0) return this.rejectAiUpdate(`不允许的顶层字段：${unknownKeys.join('、')}；允许字段：${[...AI_TRANSACTION_KEYS].join('、')}`);
 
-    const canonical = ['conditions', 'costs', 'effects', 'rewards', 'events']
+    const canonical = ['conditions', 'costs', 'effects', 'rewards', 'events', 'commands']
       .some(key => Array.isArray(parsed[key]));
-    if (!canonical) return this.rejectAiUpdate('缺少事务数组：conditions、costs、effects、rewards 或 events');
-    if (!isAllowedAiTransaction(parsed)) return this.rejectAiUpdate('事务结构或权限校验失败；conditions、costs、effects、rewards 必须符合契约，只能访问世界、玩家、人物档案的允许路径，禁止 before/after 字段');
+    if (!canonical) return this.rejectAiUpdate('缺少事务数组：conditions、costs、effects、rewards、events 或 commands');
+    const facts = this.gameplayHost().facts;
+    const allowedPath: PathCheck = path => isAllowedAiStatePath(path)
+      || (typeof path === 'string' && isSafePath(path) && Boolean(facts.resolve(path)?.spec) && !path.split('.').some(segment => AI_FORBIDDEN_FIELDS.has(segment)));
+    if (!isAllowedAiTransaction(parsed, allowedPath)) return this.rejectAiUpdate('事务结构或权限校验失败；conditions、costs、effects、rewards 必须符合契约，只能访问世界、玩家、人物档案的允许路径，commands 只能用提示里列出的命令，禁止 before/after 字段');
     return this.applyGameplayTransactionPayload(parsed);
   }
 
@@ -637,281 +743,6 @@ export class VariableManager {
 
     delete items[itemKey];
     return true;
-  }
-
-  /**
-   * 校验 AI 叙事层声明的变量更新
-   * 根据 narrativeGuardrails 裁剪或丢弃越界部分
-   *
-   * @param effects AI 声明的效果
-   * @param guardrails 护栏配置
-   * @returns 校验后的效果（可能被裁剪）
-   */
-  validateNarrativeEffects(
-    effects: import('../modules/schema').ModuleEffects,
-    guardrails: import('../modules/schema').NarrativeGuardrails | null,
-  ): { valid: import('../modules/schema').ModuleEffects; rejected: string[] } {
-    if (!guardrails) {
-      return { valid: effects, rejected: [] };
-    }
-
-    const rejected: string[] = [];
-    const valid: import('../modules/schema').ModuleEffects = {};
-
-    // 校验生存资源
-    if (effects.survival?.resources) {
-      valid.survival = { ...valid.survival, resources: {} };
-      const resources = valid.survival.resources!;
-      for (const [id, change] of Object.entries(effects.survival.resources)) {
-        // 检查是否是新资源（当前不存在）
-        const isNewResource = !this.state.玩家.生存资源?.[id];
-
-        if (isNewResource) {
-          // 新资源：检查是否允许创建
-          if (!guardrails.allowCreateResources) {
-            rejected.push(`survival.resources.${id}: 不允许创建新资源`);
-            continue;
-          }
-          // 允许创建新资源
-          resources[id] = { ...change };
-          continue;
-        }
-
-        // 已有资源：正常校验
-        const maxDelta = guardrails.maxDeltaPerResource[id];
-
-        if (change.delta !== undefined && maxDelta !== undefined) {
-          if (Math.abs(change.delta) > maxDelta) {
-            rejected.push(`survival.resources.${id}: delta ${change.delta} 超过限制 ${maxDelta}`);
-            resources[id] = {
-              delta: Math.sign(change.delta) * maxDelta,
-              min: change.min,
-            };
-            continue;
-          }
-        }
-
-        // set 操作受限（不在白名单中则拒绝）
-        if (change.set !== undefined && !guardrails.setAllowedVars.includes(`survival.resources.${id}`)) {
-          rejected.push(`survival.resources.${id}: set 操作不在白名单中`);
-          continue;
-        }
-
-        resources[id] = { ...change };
-      }
-    }
-
-    // 校验生存资源动态操作（add/remove/update）——直接放行，由引擎层处理
-    if (effects.survival?.addResources || effects.survival?.removeResources || effects.survival?.updateResources) {
-      if (!valid.survival) valid.survival = {};
-      if (effects.survival.addResources) valid.survival.addResources = effects.survival.addResources;
-      if (effects.survival.removeResources) valid.survival.removeResources = effects.survival.removeResources;
-      if (effects.survival.updateResources) valid.survival.updateResources = effects.survival.updateResources;
-    }
-
-    // 校验经营资产
-    if (effects.business) {
-      valid.business = {};
-      if (effects.business.fundsDelta !== undefined) {
-        const maxDelta = guardrails.maxDeltaPerResource['funds'];
-        if (maxDelta !== undefined && Math.abs(effects.business.fundsDelta) > maxDelta) {
-          rejected.push(`business.fundsDelta: ${effects.business.fundsDelta} 超过限制 ${maxDelta}`);
-          valid.business.fundsDelta = Math.sign(effects.business.fundsDelta) * maxDelta;
-        } else {
-          valid.business.fundsDelta = effects.business.fundsDelta;
-        }
-      }
-    }
-
-    // 校验数值属性
-    if (effects.stats?.changes) {
-      valid.stats = { changes: {} };
-      const changes = valid.stats.changes!;
-      for (const [id, change] of Object.entries(effects.stats.changes)) {
-        const maxDelta = guardrails.maxDeltaPerStat[id];
-
-        if (change.delta !== undefined && maxDelta !== undefined) {
-          if (Math.abs(change.delta) > maxDelta) {
-            rejected.push(`stats.changes.${id}: delta ${change.delta} 超过限制 ${maxDelta}`);
-            changes[id] = {
-              delta: Math.sign(change.delta) * maxDelta,
-              min: change.min,
-            };
-            continue;
-          }
-        }
-
-        // set 操作受限
-        if (change.set !== undefined && !guardrails.setAllowedVars.includes(`stats.${id}`)) {
-          rejected.push(`stats.changes.${id}: set 操作不在白名单中`);
-          continue;
-        }
-
-        changes[id] = { ...change };
-      }
-    }
-
-    // 校验成长体系
-    if (effects.progression) {
-      valid.progression = {};
-      if (effects.progression.xpDelta !== undefined) {
-        const maxDelta = guardrails.maxDeltaPerStat['xp'];
-        if (maxDelta !== undefined && Math.abs(effects.progression.xpDelta) > maxDelta) {
-          rejected.push(`progression.xpDelta: ${effects.progression.xpDelta} 超过限制 ${maxDelta}`);
-          valid.progression.xpDelta = Math.sign(effects.progression.xpDelta) * maxDelta;
-        } else {
-          valid.progression.xpDelta = effects.progression.xpDelta;
-        }
-      }
-      // tierIndex 变化总是允许的（升级/降级）
-      if (effects.progression.tierIndex !== undefined) {
-        valid.progression.tierIndex = effects.progression.tierIndex;
-      }
-    }
-
-    return { valid, rejected };
-  }
-
-  /**
-   * 应用模块效果（来自世界演化系统的机械层结算）
-   * 校验模块开关 → 应用 delta/set（带 min 下限）→ 写 effectLog
-   *
-   * @param effects 模块效果
-   * @param source 来源（用于日志）
-   * @param enabledModules 当前启用的模块 ID 列表（用于校验模块开关）
-   * @returns 效果日志
-   */
-  applyModuleEffects(
-    effects: import('../modules/schema').ModuleEffects,
-    source: 'rule' | 'periodic' | 'ai' | 'npc' = 'rule',
-    enabledModules?: string[],
-  ): import('../modules/schema').EffectLogEntry[] {
-    type EffectLog = import('../modules/schema').EffectLogEntry;
-    const tick = this.state.simulationRuntime?.tick ?? 0;
-    const rejected: EffectLog[] = [];
-    const transactionEffects: GameplayEffect[] = [];
-    const enabled = (moduleId: string) => !enabledModules || enabledModules.includes(moduleId);
-    const reject = (module: EffectLog['module'], variable: string, reason: string) => {
-      console.warn(`[applyModuleEffects] ${reason}`);
-      rejected.push({ tick, source, module, variable, before: 'N/A' as never, after: 'N/A' as never, reason });
-    };
-
-    const resources = this.state.玩家.生存资源 ?? {};
-    if (effects.survival?.resources && enabled('survival')) {
-      for (const [id, change] of Object.entries(effects.survival.resources)) {
-        if (!(id in resources)) {
-          reject('survival', id, `跳过：资源 ${id} 不存在于当前世界`);
-          continue;
-        }
-        const path = `玩家.生存资源.${id}.数量`;
-        if (change.set !== undefined) {
-          transactionEffects.push({ set: { path, value: Math.max(change.min ?? 0, change.set) } });
-        } else if (change.delta !== undefined) {
-          transactionEffects.push({ add: { path, delta: change.delta, min: Math.max(0, change.min ?? 0) } });
-        }
-      }
-    }
-    if (effects.survival?.addResources && enabled('survival')) {
-      for (const resource of effects.survival.addResources) {
-        if (resources[resource.id]) continue;
-        transactionEffects.push({ set: { path: `玩家.生存资源.${resource.id}`, value: {
-          数量: Math.max(0, resource.amount ?? 0),
-          name: resource.name,
-          symbol: resource.symbol,
-          最大值: resource.max,
-          scarce: resource.scarce,
-          ...(resource.description ? { description: resource.description } : {}),
-          ...(resource.gatherRate ? { gatherRate: resource.gatherRate } : {}),
-          ...(resource.usage ? { usage: resource.usage } : {}),
-        } } });
-      }
-    }
-    if (effects.survival?.removeResources && enabled('survival')) {
-      for (const { id } of effects.survival.removeResources) {
-        if (resources[id]) transactionEffects.push({ remove: { path: `玩家.生存资源.${id}` } });
-      }
-    }
-    if (effects.survival?.updateResources && enabled('survival')) {
-      for (const update of effects.survival.updateResources) {
-        const current = resources[update.id];
-        if (!current) continue;
-        transactionEffects.push({ set: { path: `玩家.生存资源.${update.id}`, value: {
-          ...current,
-          ...(update.max !== undefined ? { 最大值: update.max } : {}),
-          ...(update.scarce !== undefined ? { scarce: update.scarce } : {}),
-          ...(update.gatherRate !== undefined ? { gatherRate: update.gatherRate } : {}),
-        } } });
-      }
-    }
-
-    if (effects.business && enabled('business')) {
-      if (!this.state.玩家.经营资产) {
-        transactionEffects.push({ set: { path: '玩家.经营资产', value: { 资金: 0, 资产列表: [] } } });
-      }
-      if (effects.business.fundsDelta !== undefined) {
-        transactionEffects.push({ add: { path: '玩家.经营资产.资金', delta: effects.business.fundsDelta, min: 0, create: true } });
-      }
-      for (const asset of effects.business.newAssets ?? []) {
-        if (isRecord(asset)) transactionEffects.push({ append: { path: '玩家.经营资产.资产列表', value: asset as never, create: true } });
-      }
-    }
-
-    if (effects.stats?.changes && enabled('stat')) {
-      const stats = this.state.玩家.生存状态;
-      for (const [id, change] of Object.entries(effects.stats.changes)) {
-        const stateKey = id === 'attrA' ? '血量' : id === 'attrB' ? '体力值' : id;
-        if (!(stateKey in stats)) {
-          reject('stats', id, `跳过：属性 ${id} 不存在于当前世界`);
-          continue;
-        }
-        const path = `玩家.生存状态.${stateKey}`;
-        if (change.set !== undefined) {
-          transactionEffects.push({ set: { path, value: Math.max(change.min ?? 0, change.set) } });
-        } else if (change.delta !== undefined) {
-          transactionEffects.push({ add: { path, delta: change.delta, min: Math.max(0, change.min ?? 0) } });
-        }
-      }
-    }
-
-    if (effects.progression && enabled('progression')) {
-      if (effects.progression.xpDelta !== undefined) {
-        transactionEffects.push({ add: { path: '玩家.当前经验值', delta: effects.progression.xpDelta, min: 0, create: true } });
-      }
-      if (effects.progression.tierIndex !== undefined) {
-        transactionEffects.push({ set: { path: '玩家.当前段位索引', value: Math.max(0, Math.trunc(effects.progression.tierIndex)) } });
-      }
-    }
-
-    if (transactionEffects.length === 0) return rejected;
-    const result = executeGameplayTransaction(this.state, {
-      id: `module-effects:${source}:${tick}:${(this.state.gameplay?.sequence ?? 0) + 1}`,
-      moduleId: 'system',
-      source,
-      label: '机械层统一结算',
-      effects: transactionEffects,
-      events: [{ type: 'modules.effects-applied', payload: { source, effectCount: transactionEffects.length } }],
-    }, { tick });
-    if (result.status === 'applied') this.state = result.state;
-
-    const logs: EffectLog[] = result.changes.map(change => {
-      const parts = change.path.split('.');
-      const meta: Pick<EffectLog, 'module' | 'variable'> = change.path.startsWith('玩家.生存资源.')
-        ? { module: 'survival', variable: parts[2] ?? 'resources' }
-        : change.path.startsWith('玩家.经营资产.') || change.path === '玩家.经营资产'
-          ? { module: 'business', variable: parts[2] ?? 'assets' }
-          : change.path.startsWith('玩家.生存状态.')
-            ? { module: 'stats', variable: parts[2] ?? 'stats' }
-            : { module: 'progression', variable: change.path.endsWith('当前段位索引') ? 'tierIndex' : 'xp' };
-      return { tick, source, module: meta.module, variable: meta.variable, before: change.before as never, after: change.after as never, reason: '机械层统一结算' };
-    });
-    logs.push(...rejected);
-    if (this.state.simulationRuntime && logs.length > 0) {
-      this.state.simulationRuntime.effectLog.push(...logs);
-      if (this.state.simulationRuntime.effectLog.length > 100) {
-        this.state.simulationRuntime.effectLog = this.state.simulationRuntime.effectLog.slice(-100);
-      }
-    }
-    return logs;
   }
 
   /**
@@ -992,6 +823,8 @@ export class VariableManager {
     } else {
       this.state = cloneDeep(snapshot);
     }
+    // 旧快照可能是迁移前的结构，回滚后同样补齐/迁移模块状态。
+    this.prepareGameplayModules();
     // 保留 portraitBlobKey，确保画像能从 IndexedDB 恢复
     if (currentState.人物档案 && this.state.人物档案) {
       for (const [id, npc] of Object.entries(currentState.人物档案)) {
@@ -1027,6 +860,7 @@ export class VariableManager {
             : incomingClock;
         }
         this.state = cloneDeep(parsed);
+        this.prepareGameplayModules();
         this.normalizeState();
         return true;
       }

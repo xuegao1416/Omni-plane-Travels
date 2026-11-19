@@ -8,7 +8,6 @@ interface Props {
 export function SnapshotDetail({ editText, isLatest, onEditTextChange, onApply }: Props) {
   return (
     <div className="game-variable-snapshot-detail" style={{
-      padding: '10px 14px',
       borderTop: '1px solid var(--border)',
       background: 'var(--bg-primary)',
     }}>
@@ -20,16 +19,10 @@ export function SnapshotDetail({ editText, isLatest, onEditTextChange, onApply }
         spellCheck={false}
         style={{
           width: '100%',
-          minHeight: 200,
           maxHeight: 400,
-          padding: '10px',
-          border: '1px solid var(--border)',
           borderRadius: 'var(--radius-sm)',
-          background: isLatest ? 'var(--bg-secondary)' : 'var(--bg-tertiary, rgba(255,255,255,0.02))',
           color: 'var(--text-primary)',
           fontSize: 'var(--font-size-sm)',
-          fontFamily: "var(--font-mono, 'Consolas', monospace)",
-          lineHeight: 1.6,
           resize: 'vertical',
           outline: 'none',
         }}

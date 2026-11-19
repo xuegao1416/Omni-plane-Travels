@@ -9,6 +9,7 @@ useNodesState,useEdgesState,addEdge,
 type Node,type Edge,type Connection,type NodeTypes
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import '../../ui/screens/event-workbench.css';
 import {
 ArrowLeft,Save,Undo2,Redo2,Play,Braces,
 X,AlertTriangle,Check,LayoutDashboard,BookOpen,Lock,
@@ -67,9 +68,9 @@ function getEdgeColor(socketKey: string, wf: WorkflowDefinition): string {
     const def = getNodeDefinition(node.typeId);
     if (!def) continue;
     const socket = def.outputs.find((s) => s.key === socketKey);
-    if (socket) return SOCKET_COLORS[socket.type] ?? '#94a3b8';
+    if (socket) return SOCKET_COLORS[socket.type] ?? SOCKET_COLORS.any;
   }
-  return '#94a3b8';
+  return '#c8bca0';
 }
 
 function reactFlowToWorkflow(nodes: WFNode[], edges: WFEdge[], existing: WorkflowDefinition): WorkflowDefinition {
@@ -338,7 +339,7 @@ export default function WorkflowEditor({
 
     pushHistory();
     const srcSocket = srcDef.outputs.find((s) => s.key === (c.sourceHandle ?? 'flow_out'));
-    const color = SOCKET_COLORS[srcSocket?.type ?? 'any'] ?? '#94a3b8';
+    const color = SOCKET_COLORS[srcSocket?.type ?? 'any'] ?? SOCKET_COLORS.any;
 
     setEdges((eds) => addEdge({
       ...c,
@@ -444,11 +445,11 @@ export default function WorkflowEditor({
   }), []);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <div className="pk-workbench" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 'var(--space-3)', padding: isPhone ? '6px 8px' : '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0, overflow: 'hidden' }}>
+      <div className="pk-workbench__bar" style={{ display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 'var(--space-3)', padding: isPhone ? '6px 8px' : '10px 16px', flexShrink: 0, overflow: 'hidden' }}>
         <button className="btn-ghost btn-sm" onClick={() => void handleBack()} style={{ minHeight: isPhone ? 36 : 'var(--touch-min)', minWidth: isPhone ? 36 : undefined, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isPhone ? '4px' : undefined }}><ArrowLeft size={16} />{!isPhone && ' 返回'}</button>
-        <h1 style={{ fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-lg)', fontWeight: 600, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>工作流编辑器</h1>
+        <h1 className="pk-workbench__title" style={{ fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-lg)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>工作流编辑器</h1>
         <div className="event-toolbar-scroll" style={{ marginLeft: 'auto', display: 'flex', gap: isPhone ? '2px' : 'var(--space-2)', alignItems: 'center', minWidth: 0, flexShrink: 1, overflowX: 'auto', overflowY: 'hidden' }}>
           {/* 撤销/重做 */}
           <button className="btn-ghost btn-sm" onClick={undo} disabled={!canUndo} title="撤销" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: isPhone ? 32 : undefined, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px' : '4px 6px', flexShrink: 0, opacity: canUndo ? 1 : 0.35 }}><Undo2 size={isPhone ? 14 : 15} /></button>
@@ -461,7 +462,7 @@ export default function WorkflowEditor({
           <button className={mode === 'json' ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'} onClick={() => mode === 'json' ? (applyJson() && setMode('visual')) : enterJson()} style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 0 : 6, minHeight: isPhone ? 32 : undefined, padding: isPhone ? '4px 6px' : undefined, flexShrink: 0 }}><Braces size={14} /> {mode === 'json' ? '可视化' : !isPhone && 'JSON'}</button>
           {/* 世界绑定 */}
           {worldBound && worldDef ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span className="pk-workbench__lock" style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', padding: isPhone ? '2px 4px' : '4px 8px', whiteSpace: 'nowrap', flexShrink: 0 }}>
               <Lock size={12} /> {isPhone ? worldDef.name.slice(0, 3) : worldDef.name}
             </span>
           ) : showWorldPicker ? (
@@ -486,14 +487,14 @@ export default function WorkflowEditor({
 
       {/* 问题条 */}
       {issues.length > 0 && (
-        <div style={{ padding: 'var(--space-2) var(--space-4)', background: 'var(--danger-bg-soft)', borderBottom: '1px solid var(--border)', fontSize: 'var(--font-size-sm)', color: 'var(--danger)', maxHeight: 120, overflow: 'auto' }}>
+        <div className="pk-workbench__notice is-danger" style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--font-size-sm)', maxHeight: 120, overflow: 'auto' }}>
           {issues.map((i, k) => <div key={k} style={{ display: 'flex', gap: 6 }}><AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{i}</span></div>)}
         </div>
       )}
 
       {/* 模拟结果 */}
       {simResult && (
-        <div style={{ padding: 'var(--space-2) var(--space-4)', background: simResult.aborted ? 'var(--warning-bg-soft)' : 'var(--success-bg-soft)', borderBottom: '1px solid var(--border)', fontSize: 'var(--font-size-sm)', maxHeight: 200, overflow: 'auto' }}>
+        <div className={`pk-workbench__notice ${simResult.aborted ? 'is-warning' : 'is-success'}`} style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--font-size-sm)', maxHeight: 200, overflow: 'auto' }}>
           <div style={{ fontWeight: 600, color: simResult.aborted ? 'var(--warning)' : 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
             {simResult.aborted ? <AlertTriangle size={14} /> : <Check size={14} />} 模拟{simResult.aborted ? '中止' : '完成'} — {simResult.totalExecutedNodes} 节点, {simResult.totalWallMs.toFixed(1)}ms
           </div>
@@ -513,10 +514,10 @@ export default function WorkflowEditor({
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isPhone ? '1fr' : '200px 1fr 220px', overflow: 'hidden', position: 'relative' }}>
+        <div className="pk-workbench__body" style={{ flex: 1, display: 'grid', gridTemplateColumns: isPhone ? '1fr' : '208px 1fr 248px', overflow: 'hidden', position: 'relative' }}>
           {/* 左侧：节点面板（桌面端内联 / 移动端隐藏） */}
           {!isPhone && (
-            <div style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+            <div className="pk-workbench__side" style={{ overflow: 'hidden' }}>
               <NodePalette onAddNode={handleAddNode} />
             </div>
           )}
@@ -535,15 +536,15 @@ export default function WorkflowEditor({
                 nodeTypes={nodeTypes}
                 fitView
                 proOptions={{ hideAttribution: true }}
-                style={{ background: 'var(--bg-primary)' }}
+                className="pk-flow"
                 defaultEdgeOptions={{ animated: true }}
               >
-                <Background color="var(--canvas-grid)" gap={24} />
+                <Background color="rgba(233, 207, 150, 0.14)" gap={24} />
                 <Controls showInteractive={false} />
-                <MiniMap pannable zoomable style={{ background: 'var(--bg-secondary)' }} nodeColor={(n) => {
+                <MiniMap pannable zoomable nodeColor={(n) => {
                   const def = getNodeDefinition((n.data as unknown as NodeInstance)?.typeId ?? '');
                   return def?.color ?? 'var(--accent)';
-                }} maskColor="rgba(0,0,0,0.3)" />
+                }} />
               </ReactFlow>
             </ReactFlowProvider>
             </WorkflowProvider>
@@ -554,7 +555,7 @@ export default function WorkflowEditor({
                 <button
                   onClick={() => setMobileNodePanel(true)}
                   aria-label="节点面板"
-                  style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+                  className="pk-workbench__fab"
                 >
                   <PanelLeft size={20} />
                 </button>
@@ -562,7 +563,7 @@ export default function WorkflowEditor({
                   <button
                     onClick={() => setMobilePropsPanel(true)}
                     aria-label="属性面板"
-                    style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--accent)', color: 'var(--color-on-accent, #fff)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+                    className="pk-workbench__fab is-lit"
                   >
                     <SlidersHorizontal size={20} />
                   </button>
@@ -573,7 +574,7 @@ export default function WorkflowEditor({
 
           {/* 右侧：属性面板（桌面端内联 / 移动端隐藏） */}
           {!isPhone && (
-            <div style={{ borderLeft: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'auto', padding: 'var(--space-3)' }}>
+            <div className="pk-workbench__side pk-workbench__side--right" style={{ overflow: 'auto', padding: 'var(--space-3)' }}>
               {selectedId ? (
                 <SelectedNodePanel
                   node={nodes.find((n) => n.id === selectedId) as WFNode | undefined}
@@ -710,9 +711,7 @@ function WidgetRendererInline({
   eventPackId?: string | null;
 }) {
   const inputStyle: React.CSSProperties = {
-    padding: '4px 6px', minHeight: 28, borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border)', background: 'var(--bg-primary)',
-    color: 'var(--text-primary)', fontSize: '11px', width: '100%', boxSizing: 'border-box',
+    padding: '4px 6px', minHeight: 28, fontSize: '11px', width: '100%', boxSizing: 'border-box',
   };
 
   switch (widget.type) {

@@ -21,7 +21,7 @@ import {
   type CombatCheckpointRestore,
   type CombatSessionOptions,
 } from './combatV2';
-import { getGameplayPath, setGameplayPath } from './kernel';
+import { getGameplayPath, setGameplayPath } from '../core/state';
 
 function clone<T>(value: T): T {
   if (value === undefined || value === null || typeof value !== 'object') return value;

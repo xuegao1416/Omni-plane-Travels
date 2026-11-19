@@ -64,7 +64,7 @@ const ImageGenSettingsTab = forwardRef<ImageSettingsRef>(function ImageGenSettin
                 <TextArea
                   value={config.inlineImagePromptTemplate}
                   onChange={(v) => updateConfig('inlineImagePromptTemplate', v)}
-                  placeholder={`【强制规则 — 正文生图标签】\n\n每次回复的 <contenttext> 正文中，必须插入 1-3 个生图标签。标签格式严格为：\n\nimage###英文提示词###\n\n━━ 配图决策（决定在哪里插入） ━━\n\n必配：角色首次登场 / 战斗高潮 / 关键剧情转折 / 重要场景切换\n推荐：情绪爆发 / 环境变化 / 重要互动 / 特殊氛围\n跳过：纯对话 / 纯心理描写 / 过渡段落\n\n每张图必须对应正文中一个具体的视觉场景，不要凭空捏造画面。`}
+                  placeholder={`【强制规则 — 正文生图标签】\n\n每次回复的 <contenttext> 正文中，必须插入 1-3 个生图标签。标签格式严格为：\n\nimage###英文提示词###\n\n━━ 配图决策（决定在哪里插入） ━━\n\n必配：角色首次登场 / 战斗关键帧 / 关键剧情转折 / 重要场景切换\n推荐：情绪爆发 / 环境变化 / 重要互动 / 特殊氛围\n跳过：纯对话 / 纯心理描写 / 过渡段落\n\n每张图必须对应正文中一个具体的视觉场景，不要凭空捏造画面。`}
                   rows={10}
                   mono
                 />

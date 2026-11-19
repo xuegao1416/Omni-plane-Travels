@@ -1,9 +1,12 @@
-// 内联骰子检定卡片：正文完成后由本地系统自动结算，玩家不选择机械结果。
+// 内联骰子检定卡片：正文完成后交给本地骰子模块自动结算（种子随机、计入状态与天赋/职业加成），玩家不选择机械结果。
+// 回合还在处理时暂不结算，回合结束后卡片重新挂载会再请求一次。
 import { useEffect,useMemo,useRef,useState } from 'react';
 import { CheckCircle2,Dices,Sparkles,XCircle } from 'lucide-react';
 import type { DiceModuleSchema,DiceRoll,StatModuleSchema } from '../../../modules/schema';
 import { resolveCheckableAttribute } from '../../../modules/xpAlgorithm';
-import { createDiceRoll } from '../../../gameplay/modules/dice';
+import { createDiceRoll, type DiceRollRequest } from '../../../gameplay/modules/dice';
+import { diceAttributeModifier } from '../../../domains/dice/module';
+import { findStat } from '../../../domains/stats/module';
 import JourneyCardShell from '../shared/JourneyCardShell';
 
 interface InlineDiceCardProps {
@@ -13,7 +16,8 @@ interface InlineDiceCardProps {
   existingRoll?: DiceRoll;
   statData?: StatModuleSchema;
   diceData?: DiceModuleSchema;
-  onRoll?: (roll: DiceRoll) => void;
+  /** 交给骰子模块结算并提交；返回 null 表示暂时不能结算（例如回合还在处理）。未提供时只在本地预览。 */
+  onRoll?: (request: DiceRollRequest) => DiceRoll | null;
 }
 
 export default function InlineDiceCard({
@@ -27,6 +31,7 @@ export default function InlineDiceCard({
 }: InlineDiceCardProps) {
   const [animating, setAnimating] = useState(!existingRoll);
   const [result, setResult] = useState<DiceRoll | null>(existingRoll ?? null);
+  const [waiting, setWaiting] = useState(false);
   const startedRef = useRef(false);
   const selectedAttribute = useMemo(
     () => statData ? resolveCheckableAttribute(statData, attr) : undefined,
@@ -49,7 +54,7 @@ export default function InlineDiceCard({
     startedRef.current = true;
     setAnimating(true);
     const timer = window.setTimeout(() => {
-      const roll = createDiceRoll(diceData, {
+      const request: DiceRollRequest = {
         requestId,
         attributeId: selectedAttribute.id,
         attributeName: selectedAttribute.name,
@@ -58,13 +63,20 @@ export default function InlineDiceCard({
         timestamp: Date.now(),
         advantageMode: 'normal',
         bonuses: matchingBonuses,
-      });
-      setResult(roll);
+      };
+      const range = statData ? findStat(statData, selectedAttribute.id)?.range : undefined;
+      const roll = onRoll
+        ? onRoll(request)
+        : createDiceRoll(diceData, { ...request, ...(range ? { attributeModifier: diceAttributeModifier(diceData, selectedAttribute.value, range) } : {}) });
       setAnimating(false);
-      onRoll?.(roll);
+      if (!roll) {
+        setWaiting(true);
+        return;
+      }
+      setResult(roll);
     }, 260);
     return () => window.clearTimeout(timer);
-  }, [dc, diceData, existingRoll, matchingBonuses, onRoll, requestId, selectedAttribute]);
+  }, [dc, diceData, existingRoll, matchingBonuses, onRoll, requestId, selectedAttribute, statData]);
 
   const resultColor = result
     ? result.isNatural20 ? 'var(--success)'
@@ -93,7 +105,7 @@ export default function InlineDiceCard({
                 <strong>{selectedAttribute.name}</strong>
                 <span className="inline-dice-modifier">{selectedAttribute.semanticLabel ?? selectedAttribute.id} · 当前值 {selectedAttribute.value}</span>
                 {matchingBonuses.length > 0 && <small>职业/天赋修正：{matchingBonuses.map(item => `${item.source} ${item.value >= 0 ? '+' : ''}${item.value}`).join('、')}</small>}
-                <small>{animating ? '本地系统正在自动结算…' : '本次检定已自动结算，结果不可手动改选。'}</small>
+                <small>{animating ? '本地系统正在自动结算…' : waiting && !result ? '本回合处理完后自动结算。' : '本次检定已自动结算，结果不可手动改选。'}</small>
               </>
             ) : (
               <span className="inline-dice-no-attr">当前世界没有可用于“{attr}”的数值属性，未执行检定。</span>

@@ -6,6 +6,7 @@ import { isDivineTalent } from '../../gameplay/creation/creationPoints';
 import { professionEmblemSrc,resolveAbilityIconKey } from '../../data/professions/professionVisuals';
 import OverlayPortal from '../shared/OverlayPortal';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
+import '../../ui/screens/ritual-overlays.css';
 
 interface TalentCodexOverlayProps {
   config: ProfessionModuleSchema;

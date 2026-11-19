@@ -6,7 +6,7 @@ const read = (relativePath: string) => readFileSync(new URL(relativePath, import
 describe('settings screen Dawn V4 migration contract', () => {
   test('keeps the complete settings shell inside one Dawn surface', () => {
     const source = read('./SettingsScreen.tsx');
-    const css = read('../styles/layout-settings.css');
+    const css = read('../ui/screens/settings.css');
     const general = read('./settings/GeneralSettingsTab.tsx');
     const api = read('./settings/ApiSettingsTab.tsx');
     const image = read('./settings/ImageGenSettingsTab.tsx');
@@ -32,13 +32,12 @@ describe('settings screen Dawn V4 migration contract', () => {
     expect(general).not.toContain("maxWidth: '560px'");
     expect(api).not.toContain("maxWidth: '560px'");
     expect(css).toContain('.settings-screen__frame');
-    expect(css).toMatch(/\.settings-screen__frame\s*\{[\s\S]*height:\s*calc\(100dvh/);
+    expect(css).toMatch(/\.settings-screen__frame\s*\{[^}]*calc\(100dvh/);
     expect(css).toMatch(/\.settings-screen__frame\s*>\s*\.dawn-frame-v4__content\s*\{[\s\S]*display:\s*grid/);
-    expect(css).toMatch(/\.settings-screen__body\s*\{[\s\S]*grid-template-columns:\s*148px\s+minmax\(0,\s*1fr\)/);
+    expect(css).toMatch(/\.settings-screen__body\s*\{[\s\S]*grid-template-columns:\s*172px\s+minmax\(0,\s*1fr\)/);
     expect(css).toMatch(/\.settings-screen__scroll\s*\{[\s\S]*overflow:\s*auto/);
     expect(css).toMatch(/\.settings-tab-panel\s*\{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0/);
     expect(css).toContain('.settings-section--paper');
-    expect(css).toMatch(/\.settings-section--paper[^}]*background:\s*transparent/);
     expect(css).toContain('@media (max-width: 640px)');
     expect(css).toContain('env(safe-area-inset-bottom)');
   });

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { createGameplayHost } from '../core/registry';
 import { createDefaultGameState } from '../schema/variables';
 import type { WorldModule } from '../data/worlds-schema';
 import { prepareGameplayState } from './statePreparation';
@@ -67,9 +68,10 @@ describe('gameplay state preparation', () => {
     expect(result.state.玩家.能力系统?.已觉醒).toEqual({});
     expect(result.state.玩家.能力系统?.装备槽).toEqual({});
     expect(result.state.玩家.能力系统?.已掌握技能.识字?.使用次数).toBe(9);
-    expect(result.state.玩家.生存资源?.food?.数量).toBe(2);
-    expect(result.state.玩家.生存资源?.food?.name).toBe('已有口粮');
-    expect(result.state.玩家.生存资源?.water?.数量).toBe(3);
+    // 生存物资改由资源模块初始化/迁移：已有数量保留，配置里新增的资源按初始值补齐。
+    const resources = createGameplayHost({ id: 'prep', name: 'prep', description: '', modules } as never, result.state).prepare(result.state).resources;
+    expect(resources?.stocks.food).toBe(2);
+    expect(resources?.stocks.water).toBe(3);
     expect(result.state.玩家.经营资产?.资金).toBe(88);
     expect(result.state.玩家.经营资产?.交易日志).toEqual([]);
   });

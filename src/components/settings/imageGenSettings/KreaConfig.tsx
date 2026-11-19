@@ -99,7 +99,7 @@ export default function KreaConfig({ config, updateConfig }: ConfigSectionProps)
               color: '#ef4444',
               fontSize: '13px',
             }}>
-              ❌ {modelsError}
+              {modelsError}
             </div>
           )}
 

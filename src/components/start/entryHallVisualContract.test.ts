@@ -1,20 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { describe,expect,test } from 'bun:test';
 
-const hallStyles = readFileSync(new URL('../../styles/entry-crystal.css', import.meta.url), 'utf8');
+const hallStyles = readFileSync(new URL('../../styles/planar-entry.css', import.meta.url), 'utf8');
 
 describe('entry hall visual contract', () => {
-  test('defines the neutral hall, crystal states, and detail overlay surfaces', () => {
+  test('defines the planar hall shell, navigation and world dive surfaces', () => {
     for (const selector of [
-      '.entry-hall',
-      '.entry-hall-backdrop',
-      '.entry-world-crystal:hover',
-      '.entry-world-crystal.is-selected',
-      '.entry-detail-layer',
-      '.entry-detail-panel',
+      '.pl-hall',
+      '.pl-hall__bar',
+      '.pl-hall__nav',
+      '.pl-hall__vignette',
+      '.pl-dive__frame',
+      '.pl-dive__body',
     ]) {
       expect(hallStyles).toContain(selector);
     }
   });
-
 });

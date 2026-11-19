@@ -1,218 +1,127 @@
 /**
- * 创意工坊状态管理
+ * 创意工坊界面状态：浏览条件与结果、已安装列表、我的发布、收藏。
+ * 请求封装在 src/workshop/api.ts，安装/卸载流程在 src/workshop/service.ts。
  */
 import { create } from 'zustand';
-import { API_ENDPOINTS, fetchWithAuth } from '../config/api';
-import { useAuthStore } from './authStore';
-import type { WorkshopAssetType } from '../workshopCatalog';
+import type { PublicWorkshopType } from '../workshopCatalog';
+import { describeWorkshopError, workshopApi } from '../workshop/api';
+import { listInstalledEntries, type InstalledEntry } from '../workshop/service';
+import type { WorkshopItemSummary, WorkshopSort } from '../workshop/protocol';
 
-export interface WorkshopItem {
-  id: string;
-  ownerId: string;
-  type: WorkshopAssetType;
-  contentType?: string;
-  title: string;
-  description: string | null;
-  tags: string[];
-  downloadCount: number;
-  createdAt: number;
-  updatedAt: number;
-  category?: string | null;
-  dependencies?: Array<{ id: string; version?: string; optional?: boolean }>;
-  minAppVersion?: string | null;
-  compatibility?: Record<string, unknown>;
-  featured?: boolean;
-  screenshots?: string[];
-  version: string;
-  recommendations?: Array<{ id: string; type?: WorkshopItem['type']; version?: string; optional?: boolean; reason?: string }>;
+export type { WorkshopItemDetail, WorkshopInstallPlan, WorkshopItemSummary as WorkshopItem } from '../workshop/protocol';
+
+export interface WorkshopBrowseQuery {
+  type: PublicWorkshopType | '';
+  q: string;
+  sort: WorkshopSort;
+  page: number;
+  /** 只看某位作者的作品（authorName 仅用于显示筛选条）。 */
+  author: string;
+  authorName: string;
 }
 
-export interface WorkshopItemDetail extends WorkshopItem {
-  data: any;  // 完整数据
-}
-
-export interface WorkshopInstallPlan {
-  ok: boolean;
-  rootId: string;
-  items: WorkshopItem[];
-  recommendations: Array<{ id: string; type?: WorkshopItem['type']; version?: string; optional?: boolean; reason?: string }>;
-  errors: Array<{ code: 'MISSING' | 'INCOMPATIBLE' | 'CYCLE'; id: string; requiredBy?: string; requiredVersion?: string; actualVersion?: string; path: string[] }>;
-}
+export const WORKSHOP_PAGE_SIZE = 18;
 
 interface WorkshopState {
-  items: WorkshopItem[];
+  query: WorkshopBrowseQuery;
+  items: WorkshopItemSummary[];
   total: number;
-  page: number;
-  pageSize: number;
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
 
-  // Actions
-  fetchItems: (params?: { type?: string; tag?: string; page?: number; sort?: 'latest' | 'popular' | 'featured'; category?: string }) => Promise<void>;
-  fetchItem: (itemId: string) => Promise<WorkshopItemDetail | null>;
-  downloadItem: (itemId: string) => Promise<any>;
-  createItem: (input: {
-    type: string;
-    contentType?: string;
-    title: string;
-    description?: string;
-    tags?: string[];
-    data: any;
-    version?: string;
-    category?: string;
-    dependencies?: Array<{ id: string; version?: string; optional?: boolean }>;
-    minAppVersion?: string;
-    compatibility?: Record<string, unknown>;
-    screenshots?: string[];
-    recommendations?: Array<{ id: string; type?: WorkshopItem['type']; version?: string; optional?: boolean; reason?: string }>;
-  }) => Promise<string>;
-  deleteItem: (itemId: string) => Promise<void>;
-  checkInstall: (itemId: string, installed?: Record<string, string>) => Promise<{ ok: boolean; missing: Array<{ id: string; version?: string; optional?: boolean }>; incompatible: Array<{ id: string; version?: string; optional?: boolean }> } | null>;
-  getInstallPlan: (itemId: string) => Promise<WorkshopInstallPlan | null>;
+  installed: InstalledEntry[];
+  installedLoaded: boolean;
+  installedOffline: boolean;
+
+  mine: WorkshopItemSummary[];
+  mineLoading: boolean;
+  mineError: string | null;
+
+  favorites: WorkshopItemSummary[];
+  favoritesLoading: boolean;
+  favoritesError: string | null;
+
+  /** 改条件并重新加载；除非显式给 page，否则回到第一页。 */
+  setQuery: (patch: Partial<WorkshopBrowseQuery>) => Promise<void>;
+  fetchItems: () => Promise<void>;
+  refreshInstalled: () => Promise<void>;
+  fetchMine: () => Promise<void>;
+  fetchFavorites: () => Promise<void>;
+  /** 本地改动某个条目后（评分、收藏、发布新版本），同步到已加载的列表里。 */
+  patchItem: (id: string, patch: Partial<WorkshopItemSummary>) => void;
 }
 
+let requestSerial = 0;
+
 export const useWorkshopStore = create<WorkshopState>((set, get) => ({
+  query: { type: '', q: '', sort: 'latest', page: 1, author: '', authorName: '' },
   items: [],
   total: 0,
-  page: 1,
-  pageSize: 20,
-  isLoading: false,
+  loading: false,
   error: null,
 
-  fetchItems: async (params = {}) => {
-    set({ isLoading: true, error: null });
-    try {
-      const queryParams = new URLSearchParams();
-      if (params.type) queryParams.set('type', params.type);
-      if (params.tag) queryParams.set('tag', params.tag);
-      if (params.page) queryParams.set('page', String(params.page));
-      if ((params as { sort?: string }).sort) queryParams.set('sort', (params as { sort: string }).sort);
-      if ((params as { category?: string }).category) queryParams.set('category', (params as { category: string }).category);
+  installed: [],
+  installedLoaded: false,
+  installedOffline: false,
 
-      const url = `${API_ENDPOINTS.workshop.list}?${queryParams.toString()}`;
-      const response = await fetch(url, {
-        credentials: 'include',
+  mine: [],
+  mineLoading: false,
+  mineError: null,
+
+  favorites: [],
+  favoritesLoading: false,
+  favoritesError: null,
+
+  setQuery: async (patch) => {
+    set(state => ({ query: { ...state.query, ...patch, page: patch.page ?? 1 } }));
+    await get().fetchItems();
+  },
+
+  fetchItems: async () => {
+    const serial = ++requestSerial;
+    const { query } = get();
+    set({ loading: true, error: null });
+    try {
+      const result = await workshopApi.list({
+        type: query.type || undefined,
+        q: query.q.trim() || undefined,
+        author: query.author || undefined,
+        sort: query.sort,
+        page: query.page,
+        pageSize: WORKSHOP_PAGE_SIZE,
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        set({
-          items: data.items || [],
-          total: data.total || 0,
-          page: data.page || 1,
-          pageSize: data.pageSize || 20,
-          isLoading: false,
-        });
-      } else {
-        set({ error: '获取工坊列表失败', isLoading: false });
-      }
+      // 只采用最后一次请求的结果，快速切换筛选时不会被旧响应覆盖。
+      if (serial === requestSerial) set({ items: result.items, total: result.total, loading: false });
     } catch (error) {
-      console.error('获取工坊列表失败:', error);
-      set({ error: '获取工坊列表失败', isLoading: false });
+      if (serial === requestSerial) set({ loading: false, error: describeWorkshopError(error) });
     }
   },
 
-  fetchItem: async (itemId: string) => {
+  refreshInstalled: async () => {
+    const { entries, offline } = await listInstalledEntries();
+    set({ installed: entries, installedLoaded: true, installedOffline: offline });
+  },
+
+  fetchMine: async () => {
+    set({ mineLoading: true, mineError: null });
     try {
-      const response = await fetch(API_ENDPOINTS.workshop.get(itemId), {
-        credentials: 'include',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        return data.item;
-      }
-      return null;
+      set({ mine: await workshopApi.mine(), mineLoading: false });
     } catch (error) {
-      console.error('获取工坊条目失败:', error);
-      return null;
+      set({ mineLoading: false, mineError: describeWorkshopError(error) });
     }
   },
 
-  downloadItem: async (itemId: string) => {
-    set({ isLoading: true, error: null });
+  fetchFavorites: async () => {
+    set({ favoritesLoading: true, favoritesError: null });
     try {
-      const response = await fetch(API_ENDPOINTS.workshop.download(itemId), {
-        credentials: 'include',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        set({ isLoading: false });
-        return data;
-      } else {
-        set({ error: '下载失败', isLoading: false });
-        return null;
-      }
+      set({ favorites: await workshopApi.favorites(), favoritesLoading: false });
     } catch (error) {
-      console.error('下载工坊条目失败:', error);
-      set({ error: '下载失败', isLoading: false });
-      return null;
+      set({ favoritesLoading: false, favoritesError: describeWorkshopError(error) });
     }
   },
 
-  createItem: async (input) => {
-    const { isAuthenticated } = useAuthStore.getState();
-    if (!isAuthenticated) {
-      throw new Error('请先登录');
-    }
-
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetchWithAuth(API_ENDPOINTS.workshop.create, {
-        method: 'POST',
-        body: JSON.stringify(input),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        set({ isLoading: false });
-        await get().fetchItems(); // 刷新列表
-        return data.id;
-      } else {
-        const error = await response.json();
-        set({ error: error.message || '创建失败', isLoading: false });
-        throw new Error(error.message || '创建失败');
-      }
-    } catch (error) {
-      set({ error: '创建失败', isLoading: false });
-      throw error;
-    }
-  },
-
-  deleteItem: async (itemId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetchWithAuth(API_ENDPOINTS.workshop.delete(itemId), {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        set({ isLoading: false });
-        await get().fetchItems(); // 刷新列表
-      } else {
-        set({ error: '删除失败', isLoading: false });
-      }
-    } catch (error) {
-      console.error('删除工坊条目失败:', error);
-      set({ error: '删除失败', isLoading: false });
-    }
-  },
-
-  checkInstall: async (itemId, installed = {}) => {
-    try {
-      const encoded = Object.entries(installed).map(([id, version]) => `${id}@${version}`).join(',');
-      const response = await fetch(`${API_ENDPOINTS.workshop.get(itemId)}/install-check?installed=${encodeURIComponent(encoded)}`, { credentials: 'include' });
-      return response.ok ? await response.json() : null;
-    } catch {
-      return null;
-    }
-  },
-
-  getInstallPlan: async (itemId) => {
-    try {
-      const response = await fetch(API_ENDPOINTS.workshop.installPlan(itemId), { credentials: 'include' });
-      const data = await response.json();
-      return data && typeof data.rootId === 'string' ? data as WorkshopInstallPlan : null;
-    } catch {
-      return null;
-    }
+  patchItem: (id, patch) => {
+    const apply = (list: WorkshopItemSummary[]) => list.map(item => (item.id === id ? { ...item, ...patch } : item));
+    set(state => ({ items: apply(state.items), mine: apply(state.mine), favorites: apply(state.favorites) }));
   },
 }));

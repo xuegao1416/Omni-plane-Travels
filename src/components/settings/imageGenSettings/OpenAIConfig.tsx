@@ -129,7 +129,7 @@ export default function OpenAIConfig({ config, updateConfig }: ConfigSectionProp
               color: '#ef4444',
               fontSize: '13px',
             }}>
-              ❌ {modelsError}
+              {modelsError}
             </div>
           )}
 

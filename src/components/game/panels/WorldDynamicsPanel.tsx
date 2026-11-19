@@ -33,7 +33,7 @@ export default function WorldDynamicsPanel({ gameState,onManualTick,isSimulating
       <button className="btn-ghost btn-xs" disabled={reviewing} onClick={onManualTick}><RefreshCw size={12}/>{reviewing?'审查中':'手动审查'}</button>
     </div>
     {lastError && <div role="alert" className="game-director-error">{lastError}</div>}
-    <div className="game-director-tabs">{tabs.map(t=><button key={t.id} className={active===t.id?'btn-primary btn-xs':'btn-ghost btn-xs'} onClick={()=>setActive(t.id)} style={{whiteSpace:'nowrap'}}>{t.label}{t.badge?` ${t.badge}`:''}</button>)}</div>
+    <div className="game-director-tabs">{tabs.map(t=><button key={t.id} className={active===t.id?'btn-primary btn-xs':'btn-ghost btn-xs'} onClick={()=>setActive(t.id)}>{t.label}{t.badge?` ${t.badge}`:''}</button>)}</div>
     <div className="game-director-body">
       {active==='overview'&&<DirectorOverviewTab simState={simState}/>} {active==='plans'&&<DirectorPlansTab director={director} participantNames={participantNames}/>} {active==='directives'&&<DirectorDirectivesTab director={director}/>} {active==='receipts'&&<DirectorReceiptsTab director={director}/>} {active==='offscreen'&&<DirectorOffscreenTab director={director} participantNames={participantNames}/>} {active==='source'&&<DirectorSourceTab simState={simState}/>} {active==='diagnostics'&&<DirectorDiagnosticsTab simState={simState}/>} {active==='mechanics'&&<MechanicalLogTab gameState={gameState} simState={simState} variableLabels={variableLabels}/>} {active==='settings'&&<SimSettings/>}
     </div>

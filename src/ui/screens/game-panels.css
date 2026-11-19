@@ -1,0 +1,139 @@
+/* ═══════════════════════════════════════════════
+   In-game dossier panels: notebook, variables, world book, director,
+   ability / talent modules, business drawer, inventory.
+   Most panel bodies paint with inline var(--bg-*) / var(--accent) which now
+   resolve to night + brass; this sheet supplies their layout and the kit
+   treatment of tab rails, filter chips and section heads.
+   ═══════════════════════════════════════════════ */
+
+/* Filter chip rails (notebook / tasks / director tabs) */
+.game-notebook-panel { min-width: 0; }
+.game-notebook-filters, .game-director-tabs {
+  display: flex; gap: 3px; min-width: 0; margin-bottom: 12px; padding: 3px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  border-radius: 4px; background: var(--pk-well); box-shadow: var(--pk-well-edge);
+}
+.game-notebook-filters::-webkit-scrollbar, .game-director-tabs::-webkit-scrollbar { display: none; }
+.game-notebook-filters > button, .game-director-tabs > button {
+  flex: 0 0 auto; white-space: nowrap; min-height: 30px; padding: 0 12px; border: 0; border-radius: 3px; cursor: pointer;
+  color: var(--text-muted); font: 500 12.5px/1 var(--pl-font-serif); letter-spacing: .08em; background: transparent; box-shadow: none;
+  transition: color .2s, background .25s;
+}
+/* Inactive chips stay bare on hover/press (outranks .btn-ghost:hover:not(:disabled) on the director tabs). */
+.game-notebook-filters > button:not(.active, [aria-pressed='true'], [aria-selected='true'], .btn-primary):is(:hover, :active),
+.game-director-tabs > button:not(.active, [aria-pressed='true'], [aria-selected='true'], .btn-primary):is(:hover, :active) { background: transparent; box-shadow: none; }
+.game-notebook-filters > button:not(.active, [aria-pressed='true'], [aria-selected='true'], .btn-primary):hover,
+.game-director-tabs > button:not(.active, [aria-pressed='true'], [aria-selected='true'], .btn-primary):hover { color: rgb(var(--d-cream, 242, 227, 189)); }
+.game-notebook-filters > button:is(.active, [aria-pressed='true'], [aria-selected='true'], .btn-primary),
+.game-director-tabs > button:is(.active, [aria-pressed='true'], [aria-selected='true'], .btn-primary) {
+  color: #2a1a04; font-weight: 700; clip-path: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 50%), var(--pk-brass-face); box-shadow: 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); filter: none;
+}
+
+/* Variables */
+.game-variable-panel { position: relative; display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; }
+.game-variable-toolbar { position: relative; display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 4px 2px 14px; }
+.game-variable-toolbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .4), transparent); }
+.game-variable-toolbar__heading, .game-variable-toolbar__actions { display: flex; align-items: center; min-width: 0; }
+.game-variable-toolbar__heading { gap: 10px; }
+.game-variable-toolbar__actions { flex: 0 0 auto; gap: 8px; }
+.game-variable-api-body { display: flex; flex-direction: column; gap: 10px; padding: 0 2px 12px; }
+.game-variable-api-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.game-variable-api-select { width: min(170px, 58%); min-width: 0; }
+.game-variable-snapshot-list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px 2px; }
+.game-variable-snapshot-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.game-variable-snapshot-detail { padding: 14px 16px 16px; }
+.game-variable-snapshot-editor { min-height: 240px; padding: 12px; border: 0; line-height: 1.72; background: var(--pk-well); box-shadow: var(--pk-well-edge); font-family: ui-monospace, Consolas, monospace; }
+
+/* World book */
+.game-worldbook-panel { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; }
+.game-worldbook-header { position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 10px; min-width: 0; padding: 2px 2px 12px; }
+.game-worldbook-title { flex: 0 0 auto; color: rgb(var(--d-cream, 242, 227, 189)); font: 600 15px/1.3 var(--pl-font-serif); letter-spacing: .12em; }
+.game-worldbook-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11.5px; }
+.game-worldbook-header-spacer { flex: 1 1 auto; min-width: 4px; }
+.game-worldbook-filters { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 0; padding: 0 2px 10px; }
+.game-worldbook-search { position: relative; flex: 1 1 auto; min-width: 0; }
+.game-worldbook-search input { width: 100%; box-sizing: border-box; min-height: 36px; padding: 7px 12px 7px 32px; border: 0; border-radius: 3px; color: var(--text-primary); background: var(--pk-well); box-shadow: var(--pk-well-edge); }
+.game-worldbook-search svg { color: rgb(var(--d-gold, 233, 207, 150)); }
+.game-worldbook-list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 2px 8px; }
+.game-worldbook-entry { margin-bottom: 6px; overflow: hidden; border: 0; border-radius: 3px; background: var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .18), 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.3 * var(--d-shade-k, 1))); transition: box-shadow .25s; }
+.game-worldbook-entry:hover { box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .45), 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.3 * var(--d-shade-k, 1))); }
+.game-worldbook-entry__toggle { min-height: 42px; padding-block: 8px; color: rgb(var(--d-cream, 242, 227, 189)); font-family: var(--pl-font-serif); letter-spacing: .04em; }
+.game-worldbook-entry__toggle svg { color: rgb(var(--d-gold, 227, 194, 126)); }
+.game-worldbook-entry__detail { padding: 14px; box-shadow: inset 0 1px 0 rgba(var(--d-gold, 233, 207, 150), .14); }
+.game-worldbook-entry__meta { flex-wrap: wrap; row-gap: 5px; line-height: 1.5; }
+.game-worldbook-entry__content { padding: 11px; border: 0; border-radius: 3px; line-height: 1.75; background: var(--pk-well); box-shadow: var(--pk-well-edge); }
+.wbe-btn-outline { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 0; border-radius: 3px; cursor: pointer; color: rgb(var(--d-cream, 242, 227, 189)); font: 500 12.5px/1 var(--pl-font-serif); background: var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .45); transition: box-shadow .25s, color .2s; }
+.wbe-btn-outline:hover { color: rgb(var(--d-cream, 255, 243, 207)); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .85), 0 0 12px rgba(var(--d-gold, 242, 212, 142), .16); }
+
+/* Director console */
+.game-director-panel { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.game-director-header { position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 0; padding: 2px 2px 12px; }
+.game-director-header > strong { min-width: 0; color: rgb(var(--d-cream, 242, 227, 189)); font-family: var(--pl-font-serif); letter-spacing: .1em; }
+.game-director-header__spacer { flex: 1 1 auto; min-width: 4px; }
+.game-director-body { flex: 1 1 auto; min-width: 0; min-height: 0; overflow: auto; padding: 4px 2px 10px; }
+.game-director-error { margin: 0 0 10px; padding: 8px 12px; border-radius: 3px; color: rgb(var(--d-redpale, 255, 216, 208)); font-size: 12.5px; line-height: 1.5; background: rgba(var(--d-redbg-bg, 120, 28, 30), .3); box-shadow: inset 0 0 0 1px rgba(var(--d-red, 214, 112, 98), .45); }
+
+/* Ability / talent module (right ledger + profile) */
+.ability-module { display: flex; flex-direction: column; gap: 12px; }
+.ability-module__points { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ability-module__points > span { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 9px; border-radius: 3px; color: var(--text-secondary); font-size: 11.5px; background: var(--pk-well); box-shadow: var(--pk-well-edge); }
+.ability-module__points > span strong, .ability-module__points > span b { color: rgb(var(--d-cream, 255, 243, 207)); font-family: var(--pl-font-display); }
+.ability-module__section h5 { margin: 0 0 6px; color: rgb(var(--d-gold, 233, 207, 150)); font: 600 10.5px/1.2 var(--pl-font-display); letter-spacing: .2em; }
+.ability-module__section-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ability-module__section-heading h5 { margin-bottom: 6px; }
+.ability-module__row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 42px; padding: 6px 0; box-shadow: inset 0 -1px 0 rgba(var(--d-gold, 233, 207, 150), .1); }
+.ability-module__content { min-width: 0; }
+.ability-module__name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.ability-module__name strong { color: rgb(var(--d-cream, 242, 227, 189)); font-size: 13px; }
+.ability-module__name span, .ability-module__name small { color: var(--text-muted); font-size: 10.5px; }
+.ability-module__quality { padding: 1px 7px; border-radius: 999px; box-shadow: inset 0 0 0 1px currentColor; font-size: 10px; }
+.ability-module__content p { margin: 2px 0 0; color: var(--text-muted); font-size: 11.5px; line-height: 1.45; }
+.ability-module__skill-icon { color: rgb(var(--d-gold, 227, 194, 126)); }
+.ability-module__empty { color: var(--text-muted); font-size: 12px; font-style: italic; }
+/* Talent constellation */
+.talent-graph { position: relative; min-height: 190px; overflow: hidden; border-radius: 3px; background: radial-gradient(circle at 50% 50%, rgba(var(--d-gold-bg, 227, 194, 126), .07), transparent 70%), var(--pk-well); box-shadow: var(--pk-well-edge); }
+.talent-graph__edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; stroke: rgb(var(--d-gold, 227, 194, 126)); stroke-width: .7; stroke-dasharray: 2 1.4; opacity: .5; }
+.talent-graph__node {
+  position: absolute; width: min(31%, 132px); min-height: 42px; padding: 5px 7px; transform: translate(-50%, -50%); border-radius: 3px; color: var(--text-secondary); font-size: 10.5px;
+  background: linear-gradient(180deg, rgb(var(--d-raise-bg, 21, 28, 54)), rgb(var(--d-night-bg, 10, 14, 30))); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .3), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)));
+}
+.talent-graph__node.is-owned { color: rgb(var(--d-cream, 242, 227, 189)); box-shadow: inset 0 0 0 1px rgb(var(--d-gold, 227, 194, 126)), 0 0 12px rgba(var(--d-gold, 242, 212, 142), .25); }
+.talent-graph__node.is-awakened { box-shadow: inset 0 0 0 1.5px rgb(var(--d-cream, 255, 241, 200)), 0 0 18px rgba(var(--d-gold, 242, 212, 142), .5); }
+.talent-graph__node-title { display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.talent-graph__node small { display: block; color: var(--text-muted); line-height: 1.3; }
+.talent-graph__node .btn-xs { margin-top: 4px; padding: 1px 6px; font-size: 9.5px; }
+
+/* Business drawer (nested side sheet) */
+.business-drawer { position: absolute; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; width: clamp(300px, 50vw, 620px); }
+@media (max-width: 480px) { .business-drawer { width: 100%; max-width: 100%; } }
+
+/* Inventory: brass-studded slots */
+.inventory-grid > * { border-radius: 3px; }
+/* responsive.css drops .grid-fixed-6 to 3/2 columns on phones; the inventory keeps 4. */
+@media (max-width: 768px) { .inventory-grid.grid-fixed-6 { grid-template-columns: repeat(4, 1fr); gap: 6px; } }
+.profession-game-panel__formula { padding: 8px 12px; border-radius: 3px; color: rgb(var(--d-gold, 233, 207, 150)); font: 12px/1.6 ui-monospace, Consolas, monospace; background: var(--pk-well); box-shadow: var(--pk-well-edge); }
+
+@media (max-width: 520px) {
+  .game-variable-toolbar { gap: 8px; }
+  .game-variable-toolbar__heading > div:last-child > div:last-child { display: none; }
+  .game-variable-api-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .game-variable-api-select { width: 100%; }
+  .game-worldbook-header { flex-wrap: wrap; gap: 6px; }
+  .game-worldbook-meta { order: 3; width: 100%; font-size: 10.5px; }
+  .game-director-header { flex-wrap: wrap; align-items: flex-start; gap: 5px 7px; }
+  .game-director-header > strong { flex: 1 1 calc(100% - 30px); }
+  .game-director-header__spacer { display: none; }
+  .game-director-header > button { order: 4; margin-left: auto; }
+  .game-director-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+  .game-director-tabs > button { min-width: 0; min-height: 34px; padding-inline: 4px; justify-content: center; white-space: normal; text-align: center; }
+}
+
+/* Profession dossier (in-game 职业) */
+.profession-dossier__identity.profession-dossier__identity { position: relative; border: 0; border-radius: 4px; background: var(--pk-lit), var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .4), inset 3px 0 0 rgb(var(--d-brass, 184, 136, 63)), 0 6px 16px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1))); }
+.profession-dossier__emblem.profession-dossier__emblem { box-sizing: border-box; border: 2px solid transparent; background: radial-gradient(circle at 50% 36%, rgb(var(--d-raise-bg, 38, 48, 90)), rgb(var(--d-night-bg, 11, 16, 34)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box; box-shadow: 0 0 0 3px rgba(var(--d-night, 7, 10, 22), .9), 0 0 18px rgba(var(--d-gold, 242, 212, 142), .2); }
+.profession-dossier .profession-dossier__name > span { color: rgb(var(--d-gold, 233, 207, 150)); font-family: var(--pl-font-display); letter-spacing: .2em; }
+.profession-dossier__name h2 { color: rgb(var(--d-cream, 242, 227, 189)); font: 700 20px/1.25 var(--pl-font-serif); letter-spacing: .16em; }
+.profession-dossier .profession-dossier__stats strong { color: rgb(var(--d-gold, 242, 212, 142)); font: 700 18px/1 var(--pl-font-display); }
+.profession-dossier__details.profession-dossier__details { border: 0; border-radius: 3px; background: var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .28), inset 0 2px 0 rgb(var(--d-brass, 184, 136, 63)), 0 6px 16px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1))); }
+.profession-dossier__details h3 { color: rgb(var(--d-cream, 242, 227, 189)); font: 600 14px/1.35 var(--pl-font-serif); letter-spacing: .08em; }
+.profession-game-panel__hint { color: var(--text-muted); }

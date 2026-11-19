@@ -75,11 +75,6 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
         left: x,
         top: y,
         zIndex: 10000,
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border)',
-        borderRadius: '8px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08)',
-        padding: '4px 0',
         minWidth: '160px',
         animation: 'contextMenuIn 0.12s ease-out',
       }}

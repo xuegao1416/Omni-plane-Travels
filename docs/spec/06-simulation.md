@@ -8,11 +8,11 @@
 
 `definitionCompiler.ts` 将原创原稿或小说事件整理成固定主线定义，保留来源、阶段、人物、事件与条件依赖；`definitionStore.ts` 保存版本和编译任务。小说分析段与游戏阶段不是一一对应关系。
 
-`sourceAdapter.ts` 与开局流程读取选定版本，支持自创/原作角色及阶段起点。`actorIdentity.ts` 负责角色编号对齐，原角色扮演绑定玩家身份。已开局存档保持其固定版本，不随世界编辑自动换版。
+`sourceAdapter.ts` 与开局流程读取选定版本，支持自创/原作角色及阶段起点；`src/director/initialIdentity.ts:32` 的 `enforcePlayerIdentity()`（`:4`）解析开局身份并把所选原角色绑定为玩家身份，`actorIdentity.ts` 负责原作角色与存档 NPC 的编号对齐（`src/director/actorIdentity.ts:11` 显式 `continue` 跳过 `player`）。已开局存档保持其固定版本，不随世界编辑自动换版。
 
 ### 6.2 每回合指导与落实
 
-`DirectorReviewController` 在 `engine/useGameEngine.ts` 的正文前准备指导，正文后审查实际落实；`runtime.ts` 编译供正文使用的指导文本。正文仍由既有管线以非流式请求生成。
+`DirectorReviewController`（定义在 `src/director/review.ts:45`，由 `src/simulation/SimulationApi.ts:24` 实例化为 `directorReviews`）在 `engine/useGameEngine.ts` 的正文前准备指导（`:1128` `prepareForTurn`），正文后审查实际落实（`:352-353` `run`）；`src/director/runtime.ts` 编译供正文使用的指导文本。正文仍由既有管线生成：引擎在配置层强制 `stream: false`（`src/engine/useGameEngine.ts:1268`），仍走 `requestStreamWithRetry` 入口并以 `onDelta` 累积整段文本（`:1269-1273`），保证重试与格式修复落在同一份非流式契约上。
 
 导演拥有未来计划和落实状态，指导与提案均不是事实。条件支持成立、不成立和未知；前提失效、拒绝或人物死亡会影响待执行计划，未落实不假推进。固定来源耗尽后停止生成该主线指令，仍允许后续自由游玩。
 
@@ -20,7 +20,7 @@
 
 `engine/offscreenAcceptance.ts` 验证身份、版本、前提、在场/死亡边界及允许修改的字段，再经既有变量事务提交。变量与记忆消费者分别记录受理结果，重试不重复已完成提交；已提交事件的原始内容在重试时保持不变。
 
-人物真实状态由变量系统持有；`engine/playerKnowledge.ts` 提供普通面板与正文所需的玩家已知投影。本轮已提交正文出现的在场角色，其公开字段（姓名、种族、性别、人物分类、外貌、表性格、当前穿着、当前位置、当前状态、当前行动、关系数据）由变量提取阶段自动投影；玩家输入提及人物或正文提及离场人物，不触发真实状态自动同步。当前想法、里性格、真实目标、背景等秘密字段只在正文明确披露时同步，隐藏事实仍留在幕后。开局自建角色直接登记为已知。`memoryVisibility.ts` 控制记忆可见范围，读者打开幕后视图不更新角色知情。
+人物真实状态由变量系统持有；`engine/playerKnowledge.ts` 提供普通面板与正文所需的玩家已知投影。本轮已提交正文出现的在场角色，其公开字段（姓名、种族、性别、人物分类、外貌、表性格、当前穿着、当前位置、当前状态、当前行动、关系数据）由变量提取阶段自动投影；玩家输入提及人物或正文提及离场人物，不触发真实状态自动同步。当前想法、里性格、短期目标、长期目标、背景等秘密字段只在正文明确披露时同步，隐藏事实仍留在幕后。开局自建角色直接登记为已知。`src/memory/memoryVisibility.ts`（`projectMemoryRuntime`，`:65`）控制记忆可见范围，读者打开幕后视图不更新角色知情。
 
 ### 6.4 机械规则与状态持久化
 
@@ -28,7 +28,7 @@
 
 `simulation/engine.ts` 的 `DirectorRuntime`、`SimulationApi.ts` 和 `simulationStore.ts` 承接运行状态与快照；`worldContext.ts` 提供世界上下文。手动导演审查成功后刷新当前回合快照并自动保存，迟到响应受存档/世界/回合作用域限制。
 
-导演状态、玩家观察、记忆检查点和固定剧情定义依赖纳入存档及导入导出。`simulation/mainline.ts` 仅保留旧存档历史数据类型，不再推进旧主线。
+导演状态、玩家观察、记忆检查点和固定剧情定义（连同其依赖）纳入存档及导入导出：`src/director/dependencies.ts:24` `collectDirectorDependencies(owner)`、`:32` `restoreDirectorDependencies(owner, input)`，导出时由 `src/storage/db.ts:1065` 调 `collectDirectorDependencies(record)` 写入 `directorDefinitions`。`simulation/mainline.ts` 仅保留旧存档历史数据类型，不再推进旧主线。
 
 ### 6.5 控制台
 

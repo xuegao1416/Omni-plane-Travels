@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import 'fake-indexeddb/auto';
-import type { CardWorkflowDefinition, EventIndexEntry, Manifest } from './schema';
+import type { CardWorkflowDefinition, EventIndexEntry } from './schema';
 import { EventPackFormatError, readCanonicalEventPack } from './eventPackFormat';
-import { deleteWebEvent, putWebEvent } from './eventDb';
-import { emitCanonicalEventCard } from '../simulation/engine';
-import { eventBus, EVENTS } from '../engine/eventBus';
+// 事件目录对规范/旧格式包的取舍见 src/events/eventsEngine.test.ts。
 
 function workflow(entry: EventIndexEntry, withNode = false): CardWorkflowDefinition {
   return {
@@ -76,71 +74,4 @@ describe('readCanonicalEventPack', () => {
       });
     }
   });
-});
-
-function manifest(id: string): Manifest {
-  return {
-    id,
-    name: id,
-    version: '1.0.0',
-    author: 'test',
-    engine: 'opt-event',
-    schemaVersion: 1,
-    minAppVersion: '2.7.0',
-    type: 'card',
-    coverColor: '#000000',
-    icon: 'Package',
-  };
-}
-
-test('simulation emits only an indexed canonical workflow', async () => {
-  const packId = 'consumer-engine-pack';
-  await putWebEvent({
-    id: packId,
-    manifest: manifest(packId),
-    enabled: true,
-    status: 'enabled',
-    installedAt: new Date().toISOString(),
-    files: canonicalFixture(),
-  });
-  const received: Array<{ cardId: string; eventPackId: string }> = [];
-  const off = eventBus.on(EVENTS.EVENT_CARD, (event: { cardId: string; eventPackId: string }) => {
-    received.push(event);
-  });
-
-  try {
-    expect(await emitCanonicalEventCard('event-one', [packId])).toBe(true);
-    expect(await emitCanonicalEventCard('stale', [packId])).toBe(false);
-    expect(received).toEqual([{ cardId: 'event-one', eventPackId: packId }]);
-  } finally {
-    off();
-    await deleteWebEvent(packId);
-  }
-});
-
-test('simulation rejects a legacy embedded-card pack without emitting', async () => {
-  const packId = 'consumer-legacy-pack';
-  await putWebEvent({
-    id: packId,
-    manifest: manifest(packId),
-    enabled: true,
-    status: 'enabled',
-    installedAt: new Date().toISOString(),
-    files: {
-      'schema/events.json': JSON.stringify({
-        version: 1,
-        events: [{ id: 'legacy-event', name: '旧事件', cards: [{ id: 'legacy-card' }] }],
-      }),
-    },
-  });
-  let emitted = false;
-  const off = eventBus.on(EVENTS.EVENT_CARD, () => { emitted = true; });
-
-  try {
-    await expect(emitCanonicalEventCard('legacy-event', [packId])).rejects.toBeInstanceOf(EventPackFormatError);
-    expect(emitted).toBe(false);
-  } finally {
-    off();
-    await deleteWebEvent(packId);
-  }
 });

@@ -473,6 +473,36 @@ export function formatWorldClock(clockInput: WorldClockState, configInput: World
   return `${datePart} ${String(current.hour).padStart(2, '0')}:${String(current.minute).padStart(2, '0')}·${weekday}${timeOfDay ? `·${timeOfDay}` : ''}`;
 }
 
+export interface WorldClockIndices {
+  /** 自纪元起的绝对分钟。 */
+  absoluteMinute: number;
+  hour: number;
+  day: number;
+  week: number;
+  /** 月份序号（年 × 100 + 月），只用于比较是否跨月。 */
+  month: number;
+  hourOfDay: number;
+  date: WorldClockDate;
+}
+
+/** 周期结算用的整数下标：两次时钟的下标差就是跨过的小时/天/周数。 */
+export function getWorldClockIndices(clockInput: WorldClockState, configInput: WorldClockConfig): WorldClockIndices {
+  const config = normalizeTimeSystemConfig(configInput);
+  const clock = normalizeWorldClockState(clockInput, config);
+  const date = dateAtElapsed(config, clock);
+  const absoluteMinute = absoluteMinutes(config, date);
+  const day = dateToDayNumber(config, date);
+  return {
+    absoluteMinute,
+    hour: Math.floor(absoluteMinute / 60),
+    day,
+    week: Math.floor(day / Math.max(1, config.weekdays.length)),
+    month: date.year * 100 + date.month,
+    hourOfDay: date.hour,
+    date,
+  };
+}
+
 export function getWorldClockPeriodKeys(clockInput: WorldClockState, configInput: WorldClockConfig): WorldClockPeriodKeys {
   const config = normalizeTimeSystemConfig(configInput);
   const clock = normalizeWorldClockState(clockInput, config);

@@ -31,6 +31,8 @@ const jsResult = await Bun.build({
   minify: true,
   define: {
     'process.env.NODE_ENV': '"production"',
+    // 桌面版指向已部署的 API（网页版留空即同源），见 docs/workshop-ops.md。
+    'process.env.OMNI_API_BASE': JSON.stringify(process.env.OMNI_API_BASE ?? ''),
     __RITUAL_PREVIEW_DEV__: 'false',
   },
 });

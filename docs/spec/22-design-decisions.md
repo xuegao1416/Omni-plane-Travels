@@ -1,5 +1,5 @@
 > 本文档是 `PROJECT_FUNCTIONAL_SPEC.md` 的拆分子文件（22、关键设计决策）。
-> 总索引见 `../PROJECT_FUNCTIONAL_SPEC.md`。
+> 总索引见仓库根目录的 `PROJECT_FUNCTIONAL_SPEC.md`（相对本文件为 `../../PROJECT_FUNCTIONAL_SPEC.md`）。
 
 ## 22、关键设计决策
 
@@ -31,8 +31,8 @@
 | 虚拟滚动          | visibleStart + 批量加载 80 条                                                                                                                                                        | 长对话不卡顿     |
 | 双写模式          | messagesRef + messages state                                                                                                                                                    | 同步访问+触发 UI |
 | 增量存档          | newMessages 过滤 + 滑动窗口优化                                                                                                                                                         | 减少写入量      |
-| Coalescing 防抖 | `saveStore` 用 `_saveQueued` 合并存档请求：`saveGame` 进行中再次调用则置 `_saveQueued = true`（`:349`）并返回在途 Promise，循环结束后用最新 `buildSaveData` 再存一次（`:355` 复位、`:360` `do/while` 重跑），实现请求合并 | 合并连续存档请求   |
-| 500ms 自动存档防抖  | setTimeout 清除重设计时器                                                                                                                                                              | 减少存档次数     |
+| Coalescing 防抖 | 已抽到独立文件 `src/storage/saveCoordinator.ts`（167 行）。`saveStore.saveGame`（`src/stores/saveStore.ts:303-307`）只做 `buildSaveData()` 后 `saveCoordinator.request(capture)`；协调器按存档维护 `queues: Map<string, SaveQueue>`，`enqueue`（`:54-64`）在 `target.pending` 已存在时把最新 `capture` 覆盖进单槽（只保留最后一次），`drain`（`:146-166`）串行 `while (queue.pending)` 消费；另有失败重试 `getFailedCapture`/`retryFailed`（`:132-144`）与 `SaveOutcome` 订阅 | 合并连续存档请求   |
+| 500ms 自动存档防抖  | `scheduleAutoSave` 走 `saveCoordinator.scheduleCapture(saveId, () => {...})`（`src/stores/saveStore.ts:309-319`）；协调器内 `scheduled: Map<string, ScheduledSave>` + `delay = 500`（`saveCoordinator.ts:66-84`），setTimeout 清除重设计时器 | 减少存档次数     |
 | 快照优化          | optimizeSnapshots 保留关键帧                                                                                                                                                         | 内存占用降低     |
 | 消息分片          | IndexedDB 分片+复合主键                                                                                                                                                               | 加载速度提升     |
 
@@ -56,8 +56,6 @@
 
 **Connected Flow Gating**:只有所有 connected flow 类型输入都为 true 时才执行节点;未连接的 flow 输入不触发门控(节点可作为根触发器);跳过时 flow 输出全置 false 阻断下游。
 
-**NodeOutputCache stub**:存在 `computeKey/get/set/clear` 方法但未被实际查询,是为未来 memoization 优化预留的基础。
-
 ### 22.7 规则引擎安全模型
 
 **硬性上限 (DEFAULT_LIMITS)**:maxRulesPerMod=128 / maxEvalSet=1024 / maxConditionDepth=6 / maxActionsPerRule=16 / maxStepsPerTick=8192 / maxWallMs=8(严格主线程保护)。
@@ -68,7 +66,7 @@
 
 ### 22.8 存档系统设计
 
-**v4 格式 vs v3 格式**:v3 messages 内联;v4 messageCount + lastMessageSeq + messages store 分片。
+**v5 格式 vs v4 格式**:v4 是 messageCount + lastMessageSeq + messages store 分片;v5 在其上再加存储层演进（当前 `SAVE_SCHEMA_VERSION = 5`,见 `src/storage/db.ts:715`）。
 
 **增量写入幂等键**:`${saveId}#${seq}`,重复 put 不覆盖;revision 相同则跳过 moduleStates。
 
@@ -76,7 +74,7 @@
 
 **全量重写检测**:`dbMessageCount > allMessages.length` → 发生过 rollbackAndTruncate。
 
-**导出包含完整事件包**:`collectPacksForExport` 收集所有已启用包的完整内容,确保导入后可独立运行。
+**导出包含完整事件包**:`exportSaveCapture(capture: GameSave)`（`src/storage/db.ts`）动态引入 `../modules/eventDb` 取 `allWebEvents()`,构造 `byId` 与 `selectedEvents` 两张表,再用 `visitEvent(id, visiting)` 递归收集 `event.manifest.dependencies`(disabled 依赖也一并收进闭包),缺依赖时抛 `` `存档事件包缺少依赖 ${id}，无法生成完整备份。` ``,最后 `encodeEventDependency` 编码进导出对象的 `eventPacks` 字段,确保导入后可独立运行。
 
 ### 22.9 战斗 V3 架构
 
@@ -108,4 +106,4 @@
 
 ### 22.12 内部存档只保留单代迁移
 
-当前内部存档为 v4。自动迁移只接受 v3 内联消息格式并一次转换为 v4 分片；v0/v1/v2 不再串联升级。外部导出文件导入继续通过独立 normalization 进入 canonical v4，因此不与 IndexedDB 历史 schema 混用。
+当前内部存档为 **v5**（`src/storage/db.ts:715` `export const SAVE_SCHEMA_VERSION = 5;`）。自动迁移只接受 v4 → v5（`:745` `planV4ToV5Migration`；`:748` 对其它版本抛 `` `不支持的内部存档格式；仅保留 v4 → v5` ``；`:759` `if ('messages' in record) return null` 表示 v3 内联 messages 已彻底不支持）；v0/v1/v2/v3 不再串联升级。外部导出文件导入继续通过独立 normalization 进入 canonical 格式，因此不与 IndexedDB 历史 schema 混用。

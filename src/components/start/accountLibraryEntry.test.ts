@@ -10,11 +10,12 @@ describe('hall account and library entry contract', () => {
     const app = read('../../App.tsx');
 
     expect(startScreen).toContain('onOpenSettings');
-    expect(startScreen).toContain("h.navigate('settings')");
-    expect(startScreen).toContain("h.navigate('user-center')");
+    expect(startScreen).toContain("leaveHallTo('settings')");
+    expect(startScreen).toContain("leaveHallTo('user-center')");
     expect(hall).toContain('onOpenSettings: () => void;');
     expect(hall).toContain('onClick={onOpenSettings}');
     expect(hall).toContain('onClick={onOpenUserCenter}');
+    expect(hall).toContain('setArchiveOpen(true)');
     expect(app).toContain("case 'user-center': return <UserCenterPage />;");
     expect(hall).toContain('setArchiveOpen(true)');
   });

@@ -1,5 +1,6 @@
 // Bun开发服务器 - 整体打包 + 静态文件 + 测试控制API
-const PORT = 3456;
+// 本副本固定使用 3457，避免与主仓库的开发服务（3456）互相抢占端口。
+const PORT = Number(process.env.PORT || 3457);
 
 interface DevBundle {
   js: any;       // Bun BuildArtifact — 打包后的 JS

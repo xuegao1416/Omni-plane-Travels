@@ -2,6 +2,8 @@ import { useState,useCallback } from 'react';
 import { AlertTriangle,Info,HelpCircle,Loader2 } from 'lucide-react';
 import { useConfigStore } from '../../stores/configStore';
 import OverlayPortal from './OverlayPortal';
+import PlanarFrame from '../../ui/planar/PlanarFrame';
+import { Seal } from '../../ui/planar/Ornaments';
 import s from './Dialog.module.css';
 
 interface DialogOptions {
@@ -69,79 +71,54 @@ export function useDialog() {
     setDialog(prev => prev ? { ...prev, inputValue: val } : null);
   }, []);
 
-  // ESC 关闭
-
-  const iconMap = {
-    confirm: HelpCircle,
-    alert: AlertTriangle,
-    info: Info,
-    prompt: HelpCircle,
-    loading: Loader2,
-  };
+  const glyph = dialog?.type === 'loading'
+    ? <Loader2 className={s.spinIcon} />
+    : dialog?.danger ? <AlertTriangle /> : dialog?.type === 'alert' ? <AlertTriangle /> : dialog?.type === 'info' ? <Info /> : <HelpCircle />;
 
   const DialogUI = dialog?.open ? (
     <OverlayPortal
-      className={s.overlay}
+      className="pk-dialog-overlay"
       ariaLabel={dialog.title || t(`dialog.${dialog.type}`)}
       onClose={dialog.type === 'loading' ? undefined : () => close(false)}
       closeOnBackdrop={dialog.type !== 'loading'}
       closeOnEscape={dialog.type !== 'loading'}
     >
-      <div className={s.dialog} onClick={e => e.stopPropagation()}>
-        {/* 头部 */}
-        <div className={s.header}>
-          {(() => {
-            const Icon = iconMap[dialog.type];
-            return (
-              <div className={`${s.iconBox} ${dialog.danger ? s.iconBoxDanger : s.iconBoxDefault}`}>
-                <Icon
-                  size={16}
-                  color={dialog.danger ? 'var(--danger)' : 'var(--accent, #d4af37)'}
-                  className={dialog.type === 'loading' ? s.spinIcon : undefined}
-                />
-              </div>
-            );
-          })()}
-          <span className={s.dialogTitle}>
-            {dialog.title || t(`dialog.${dialog.type}`)}
-          </span>
-        </div>
+      <PlanarFrame className="pk-dialog" gem={dialog.danger ? 'garnet' : 'amber'} onClick={e => e.stopPropagation()}>
+        <Seal tone={dialog.danger ? 'danger' : 'brass'} size={68} style={{ marginTop: -4 }}>{glyph}</Seal>
+        <h2 className="pk-title pk-dialog__title">{dialog.title || t(`dialog.${dialog.type}`)}</h2>
+        <p className="pk-dialog__message">{dialog.message}</p>
 
-        {/* 内容 */}
-        <div className={s.message}>{dialog.message}</div>
-
-        {/* Prompt 输入框 */}
         {dialog.type === 'prompt' && (
-          <div className={s.promptWrap}>
+          <div className="pk-dialog__prompt">
             <textarea
               value={dialog.inputValue || ''}
               onChange={e => setInputValue(e.target.value)}
               placeholder={dialog.placeholder || ''}
               autoFocus
-              className={s.promptInput}
+              className="pk-input"
               rows={4}
             />
           </div>
         )}
 
-        {/* 按钮（loading 类型不显示） */}
         {dialog.type !== 'loading' && (
-          <div className={s.actions}>
+          <div className="pk-dialog__actions">
             {(dialog.type === 'confirm' || dialog.type === 'prompt') && (
-              <button className={s.cancelBtn} onClick={() => close(false)}>
+              <button type="button" className="pk-btn pk-btn--secondary" onClick={() => close(false)}>
                 {dialog.cancelText || t('common.cancel')}
               </button>
             )}
             <button
+              type="button"
               onClick={() => close(true)}
-              autoFocus
-              className={`${s.confirmBtn} ${dialog.danger ? s.confirmBtnDanger : s.confirmBtnDefault}`}
+              autoFocus={dialog.type !== 'prompt'}
+              className={`pk-btn ${dialog.danger ? 'pk-btn--danger' : 'pk-btn--primary'}`}
             >
               {dialog.confirmText || (dialog.type === 'confirm' ? t('common.confirm') : t('dialog.gotIt'))}
             </button>
           </div>
         )}
-      </div>
+      </PlanarFrame>
     </OverlayPortal>
   ) : null;
 

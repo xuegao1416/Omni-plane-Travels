@@ -1,34 +1,54 @@
-.profession-book { --book-accent: #b2874b; --book-surface: var(--creation-elevated, var(--bg-secondary, #f7f5ec)); --book-text: var(--creation-text, var(--text-primary, #263d42)); --book-muted: var(--creation-muted, var(--text-muted, #6f8182)); --book-theme-line: var(--creation-border, var(--border, #8b9b9b)); --book-line: color-mix(in srgb, var(--book-accent) 42%, var(--book-theme-line)); position: relative; min-width: 0; padding: 12px 0 6px; color: var(--book-text); }
-.profession-book[data-accent="crimson"] { --book-accent: #a64c58; }
-.profession-book[data-accent="amber"] { --book-accent: #b2874b; }
-.profession-book[data-accent="jade"] { --book-accent: #4d8f78; }
-.profession-book[data-accent="azure"] { --book-accent: #4e7ea2; }
-.profession-book[data-accent="violet"] { --book-accent: #7b68a6; }
-.profession-book[data-accent="silver"] { --book-accent: #718b95; }
+/* Profession book: four-tier road of ability plates (in-game dossier + profession library). */
+.profession-book { --book-accent: rgb(var(--d-gold, 227, 194, 126)); --book-line: rgba(var(--d-gold, 233, 207, 150), .22); position: relative; min-width: 0; padding: 12px 0 6px; color: var(--text-primary); }
+.profession-book[data-accent="crimson"] { --book-accent: rgb(var(--d-red, 208, 103, 90)); }
+.profession-book[data-accent="amber"] { --book-accent: rgb(var(--d-brass, 232, 167, 74)); }
+.profession-book[data-accent="jade"] { --book-accent: rgb(var(--d-ok, 138, 166, 106)); }
+.profession-book[data-accent="azure"] { --book-accent: rgb(var(--d-blue, 127, 156, 214)); }
+.profession-book[data-accent="violet"] { --book-accent: rgb(var(--d-violet, 167, 122, 208)); }
+.profession-book[data-accent="silver"] { --book-accent: rgb(var(--d-ink2, 200, 188, 160)); }
 .profession-book__road { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; overflow-x: auto; padding: 4px 2px 10px; }
 .profession-book__tier { position: relative; min-width: 0; }
-.profession-book__tier-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; padding: 0 4px; border-bottom: 1px solid color-mix(in srgb, var(--book-accent) 30%, transparent); color: var(--book-accent); }
-.profession-book__tier-heading span { font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.profession-book__tier-heading small { color: var(--book-muted); font-size: 10px; }
+.profession-book__tier-heading { position: relative; display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; padding: 0 2px 6px; color: rgb(var(--d-cream, 242, 227, 189)); }
+.profession-book__tier-heading::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .55), transparent); }
+.profession-book__tier-heading span { font: 600 12.5px/1.2 var(--pl-font-serif); letter-spacing: .2em; }
+.profession-book__tier-heading span::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 8px; vertical-align: middle; transform: rotate(45deg); background: var(--book-accent); }
+.profession-book__tier-heading small { color: var(--text-muted); font-size: 10.5px; letter-spacing: .12em; }
 .profession-book__nodes { display: grid; gap: 8px; }
-.profession-book__node { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 58px; padding: 9px 8px; border: 1px solid color-mix(in srgb, var(--book-line) 80%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--book-surface) 94%, transparent); color: inherit; text-align: left; cursor: pointer; transition: border-color 120ms ease, background 120ms ease, transform 120ms ease; }
-.profession-book__node:hover, .profession-book__node:focus-visible { border-color: var(--book-accent); transform: translateY(-1px); outline: none; }
-.profession-book__node.is-selected { border-color: var(--book-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--book-accent) 22%, transparent); }
-.profession-book__node.is-owned { background: color-mix(in srgb, var(--book-accent) 13%, var(--book-surface)); }
-.profession-book__node.is-locked { opacity: .56; }
-.profession-book__node.is-specialization { border-left: 3px solid var(--book-accent); }
-.profession-book__node.is-ultimate { border-width: 2px; }
+.profession-book__node {
+  position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 58px; padding: 9px 10px; border: 0; border-radius: 3px; cursor: pointer; text-align: left; color: inherit;
+  background: var(--pk-plate); box-shadow: inset 0 0 0 1px var(--book-line), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1)));
+  transition: box-shadow .25s, transform .3s var(--pk-spring), background .25s, opacity .25s;
+}
+.profession-book__node:hover, .profession-book__node:focus-visible { outline: none; transform: translateY(-2px); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .7), 0 0 14px rgba(var(--d-gold, 242, 212, 142), .14), 0 6px 14px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1))); }
+.profession-book__node.is-available { box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .55), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1))); }
+.profession-book__node.is-available::after { content: ''; position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--d-gold-bg, 242, 212, 142)); box-shadow: 0 0 8px rgba(var(--d-gold, 242, 212, 142), .9); animation: profession-book-ready 1.8s ease-in-out infinite; }
+.profession-book__node.is-owned { background: var(--pk-lit), linear-gradient(180deg, rgb(var(--d-raise-bg, 26, 33, 64)), rgb(var(--d-night-bg, 11, 16, 34))); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .6), inset 3px 0 0 var(--book-accent), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1))); }
+.profession-book__node.is-locked { opacity: .5; }
+.profession-book__node.is-locked .profession-book__node-icon img { filter: grayscale(.8) brightness(.8); }
+.profession-book__node.is-specialization { box-shadow: inset 0 0 0 1px var(--book-line), inset 3px 0 0 color-mix(in srgb, var(--book-accent) 60%, transparent), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1))); }
+.profession-book__node.is-ultimate { background: radial-gradient(ellipse 70% 90% at 100% 0%, rgba(var(--d-warn-bg, 240, 180, 86), .12), transparent 70%), var(--pk-plate); }
+.profession-book__node.is-selected { box-shadow: inset 0 0 0 1.5px rgb(var(--d-gold, 227, 194, 126)), 0 0 18px rgba(var(--d-gold, 242, 212, 142), .28), 0 6px 14px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1))); }
 .profession-book__node.is-flash { animation: profession-book-node-flash 520ms ease-out; }
-.profession-book__node-icon { display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; border: 1px solid color-mix(in srgb, var(--book-accent) 55%, transparent); border-radius: 50%; color: var(--book-accent); }.profession-book__node-icon img { width: 28px; height: 28px; object-fit: contain; }
+.profession-book__node-icon {
+  display: grid; flex: 0 0 36px; width: 36px; height: 36px; place-items: center; box-sizing: border-box; border: 1.5px solid transparent; border-radius: 50%; color: var(--book-accent);
+  background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 30, 39, 72)), rgb(var(--d-night-bg, 10, 15, 32)) 70%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 201, 167, 102)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-brass-bg, 165, 120, 55)), rgb(var(--d-seat, 42, 26, 4)), rgb(var(--d-brass-bg, 201, 167, 102))) border-box;
+}
+.profession-book__node.is-owned .profession-book__node-icon { background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 34, 44, 80)), rgb(var(--d-night-bg, 11, 16, 34)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box; box-shadow: 0 0 10px rgba(var(--d-gold, 242, 212, 142), .3); }
+.profession-book__node-icon img { width: 24px; height: 24px; object-fit: contain; }
 .profession-book__node-copy { display: grid; min-width: 0; gap: 3px; flex: 1; }
-.profession-book__node-copy strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.profession-book__node-copy small { overflow: hidden; color: var(--book-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.profession-book__tier-arrow { display: none; width: 100%; margin: 7px 0 -5px; color: var(--book-accent); font-size: 14px; line-height: 1; text-align: center; }
-.profession-book__empty { display: block; padding: 18px 8px; border: 1px dashed color-mix(in srgb, var(--book-line) 60%, transparent); border-radius: 7px; color: var(--book-muted); font-size: 11px; text-align: center; }
-.profession-book__legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 6px 2px; color: var(--book-muted); font-size: 10px; }
-.profession-book__legend span { display: inline-flex; align-items: center; gap: 4px; }
-.profession-book__legend i { display: inline-block; width: 7px; height: 7px; border: 1px solid var(--book-line); border-radius: 50%; background: transparent; }
-.profession-book__legend i.is-owned { background: var(--book-accent); }.profession-book__legend i.is-available { border-color: var(--book-accent); }.profession-book__legend i.is-specialization { border-radius: 2px; border-left: 3px solid var(--book-accent); }.profession-book__legend i.is-ultimate { border-width: 2px; }
-@keyframes profession-book-node-flash { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--book-accent) 0%, transparent); } 35% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--book-accent) 36%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.profession-book__node-copy strong { overflow: hidden; color: rgb(var(--d-cream, 242, 227, 189)); font: 600 12.5px/1.25 var(--pl-font-serif); letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.profession-book__node-copy small { overflow: hidden; color: var(--text-muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.profession-book__node > svg { flex-shrink: 0; color: var(--text-muted); }
+.profession-book__tier-arrow { display: none; width: 100%; margin: 7px 0 -5px; color: rgb(var(--d-gold, 227, 194, 126)); font-size: 14px; line-height: 1; text-align: center; }
+.profession-book__empty { display: block; padding: 18px 8px; border-radius: 3px; color: var(--text-muted); font-size: 11px; text-align: center; box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .18); background-image: repeating-linear-gradient(135deg, rgba(var(--d-gold-bg, 233, 207, 150), .03) 0 6px, transparent 6px 12px); }
+.profession-book__legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 6px 2px; color: var(--text-muted); font-size: 10.5px; }
+.profession-book__legend span { display: inline-flex; align-items: center; gap: 5px; }
+.profession-book__legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .4); background: transparent; }
+.profession-book__legend i.is-owned { background: var(--pk-brass-face); box-shadow: none; }
+.profession-book__legend i.is-available { box-shadow: inset 0 0 0 1px rgb(var(--d-gold, 242, 212, 142)), 0 0 6px rgba(var(--d-gold, 242, 212, 142), .6); }
+.profession-book__legend i.is-specialization { border-radius: 1px; box-shadow: inset 2px 0 0 rgb(var(--d-gold, 227, 194, 126)), inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .4); }
+.profession-book__legend i.is-ultimate { background: radial-gradient(circle, rgba(var(--d-warn-bg, 240, 180, 86), .7), transparent 70%); }
+@keyframes profession-book-node-flash { 35% { box-shadow: inset 0 0 0 1.5px rgb(var(--d-cream, 255, 241, 200)), 0 0 24px rgba(var(--d-gold, 242, 212, 142), .6); } }
+@keyframes profession-book-ready { 50% { opacity: .35; transform: scale(.7); } }
 @media (max-width: 680px) { .profession-book__road { grid-template-columns: 1fr; overflow-x: visible; gap: 8px; } .profession-book__tier { padding-bottom: 4px; } .profession-book__tier-arrow { display: block; margin: 5px 0 -3px; } .profession-book__node { min-height: 54px; } }
-@media (prefers-reduced-motion: reduce) { .profession-book__node { transition: none; } .profession-book__node.is-flash { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .profession-book__node { transition: none; } .profession-book__node.is-flash, .profession-book__node.is-available::after { animation: none; } }

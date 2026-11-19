@@ -90,31 +90,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"鼓起勇气告白\",\"aiNote\":\"勇敢地说出心意\"},{\"label\":\"约对方一起回家\",\"aiNote\":\"先从朋友做起\"},{\"label\":\"假装路过离开\",\"aiNote\":\"错过这次机会\"}]"
-                  }
-                },
-                {
-                  "id": "conf_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -120,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim5",
-                    "delta": 10
-                  }
-                },
-                {
-                  "id": "conf_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 120,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -5
+                    "options": "[{\"label\":\"鼓起勇气告白\",\"aiNote\":\"勇敢地说出心意\",\"check\":{\"stat\":\"flags.心动值\",\"dc\":11,\"label\":\"心动\",\"range\":[0,6]},\"effects\":[{\"stat\":\"attrB\",\"delta\":-5}],\"success\":{\"effects\":[{\"flag\":\"恋爱关系\",\"value\":true},{\"fact\":\"flags.心动值\",\"delta\":2}],\"note\":\"对方红着脸点了点头。\"},\"failure\":{\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":-2},{\"stat\":\"attrB\",\"delta\":-10}],\"note\":\"对方说想先继续做朋友。\"}},{\"label\":\"约对方一起回家\",\"aiNote\":\"先从朋友做起\",\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":1},{\"stat\":\"attrB\",\"delta\":-5}]},{\"label\":\"假装路过离开\",\"aiNote\":\"错过这次机会\",\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":-1}]}]"
                   }
                 }
               ],
@@ -132,22 +108,20 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "conf_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "conf_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "conf_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "conf_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "conf_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "turn.ended"
+              ],
+              "when": {
+                "fact": "flags.心动值",
+                "op": ">=",
+                "value": 3
+              },
+              "once": true,
+              "description": "心动值攒到 3 以后，在某个放学后出现"
             }
           },
           {
@@ -189,19 +163,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"参与咖啡厅筹备\",\"aiNote\":\"负责咖啡厅的准备工作\"},{\"label\":\"加入话剧排练\",\"aiNote\":\"参与话剧表演\"},{\"label\":\"帮忙布置鬼屋\",\"aiNote\":\"参与鬼屋设计\"}]"
-                  }
-                },
-                {
-                  "id": "fest_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -8
+                    "options": "[{\"label\":\"参与咖啡厅筹备\",\"aiNote\":\"负责咖啡厅的准备工作\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-10},{\"currency\":30},{\"fact\":\"flags.班级评价\",\"delta\":1}]},{\"label\":\"加入话剧排练\",\"aiNote\":\"参与话剧表演\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-15},{\"fact\":\"flags.心动值\",\"delta\":1}]},{\"label\":\"帮忙布置鬼屋\",\"aiNote\":\"参与鬼屋设计\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-8},{\"flag\":\"鬼屋搭档\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -219,15 +181,15 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "fest_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "fest_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "fest_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true,
+              "weight": 2
             }
           },
           {
@@ -271,31 +233,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"接受好意一起走\",\"aiNote\":\"和同学一起撑伞回家\"},{\"label\":\"婉拒后跑回家\",\"aiNote\":\"在雨中奔跑\"},{\"label\":\"在学校等雨停\",\"aiNote\":\"在教室里等待\"}]"
-                  }
-                },
-                {
-                  "id": "rain_effect1",
-                  "typeId": "effect.flag",
-                  "position": {
-                    "x": -120,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "flagPath": "flags.雨天邂逅",
-                    "value": true
-                  }
-                },
-                {
-                  "id": "rain_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 120,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim5",
-                    "delta": 5
+                    "options": "[{\"label\":\"接受好意一起走\",\"aiNote\":\"和同学一起撑伞回家\",\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":1},{\"flag\":\"雨天邂逅\",\"value\":true}]},{\"label\":\"婉拒后跑回家\",\"aiNote\":\"在雨中奔跑\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-10}]},{\"label\":\"在学校等雨停\",\"aiNote\":\"在教室里等待\",\"effects\":[]}]"
                   }
                 }
               ],
@@ -313,22 +251,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "rain_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "rain_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "rain_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "rain_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "rain_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           },
           {
@@ -370,19 +300,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"全力以赴\",\"aiNote\":\"拼尽全力冲刺\"},{\"label\":\"正常发挥\",\"aiNote\":\"保持平常心\"},{\"label\":\"假装受伤\",\"aiNote\":\"不想太累\"}]"
-                  }
-                },
-                {
-                  "id": "sport_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -15
+                    "options": "[{\"label\":\"全力以赴\",\"aiNote\":\"拼尽全力冲刺\",\"check\":{\"stat\":\"attrB\",\"dc\":11,\"label\":\"体力\",\"range\":[0,100]},\"effects\":[{\"stat\":\"attrB\",\"delta\":-20}],\"success\":{\"effects\":[{\"flag\":\"接力赛冠军\",\"value\":true},{\"fact\":\"flags.心动值\",\"delta\":1},{\"fact\":\"flags.班级评价\",\"delta\":2}],\"note\":\"最后一棒反超，全班沸腾。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-5}],\"note\":\"冲线前摔了一跤，膝盖擦破了皮。\"}},{\"label\":\"正常发挥\",\"aiNote\":\"保持平常心\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-10}]},{\"label\":\"假装受伤\",\"aiNote\":\"不想太累\",\"effects\":[{\"fact\":\"flags.班级评价\",\"delta\":-2}]}]"
                   }
                 }
               ],
@@ -400,15 +318,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "sport_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "sport_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "sport_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           },
           {
@@ -450,19 +367,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"寻找送礼人\",\"aiNote\":\"想知道是谁送的\"},{\"label\":\"开心收下\",\"aiNote\":\"享受这份心意\"},{\"label\":\"放在原地\",\"aiNote\":\"不想理会\"}]"
-                  }
-                },
-                {
-                  "id": "val_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim5",
-                    "delta": 8
+                    "options": "[{\"label\":\"寻找送礼人\",\"aiNote\":\"想知道是谁送的\",\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":1},{\"flag\":\"知道巧克力是谁送的\",\"value\":true}]},{\"label\":\"开心收下\",\"aiNote\":\"享受这份心意\",\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":1}]},{\"label\":\"放在原地\",\"aiNote\":\"不想理会\",\"effects\":[{\"fact\":\"flags.心动值\",\"delta\":-1}]}]"
                   }
                 }
               ],
@@ -480,15 +385,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "val_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "val_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "val_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           }
         ]
@@ -583,7 +487,7 @@
           "活动"
         ],
         "comment": "校园行事历",
-        "content": "樱丘高等学校的年度行事历以季节为轴心展开：四月（开学典礼、新入生欢迎会、社团招新）→五月（期中考试、体育祭）→六月（梅雨季、游泳部活跃期、期末考试）→七月（暑假前、海边合宿）→八月（暑假、夏日祭、烟花大会）→九月（第二学期开学、学园祭准备期）→十月（学园祭、文化祭）→十一月（期中考试、修学旅行）→十二月（期末考试、圣诞节）→一月（寒假、新年参拜）→二月（第三学期开学、情人节）→三月（期末考试、毕业典礼、春假）。每个大型活动都是一段故事的高潮节点，而活动之间的日常则构成了故事的基底。",
+        "content": "樱丘高等学校的年度行事历以季节为轴心展开：四月（开学典礼、新入生欢迎会、社团招新）→五月（期中考试、体育祭）→六月（梅雨季、游泳部活跃期、期末考试）→七月（暑假前、海边合宿）→八月（暑假、夏日祭、烟花大会）→九月（第二学期开学、学园祭准备期）→十月（学园祭、文化祭）→十一月（期中考试、修学旅行）→十二月（期末考试、圣诞节）→一月（寒假、新年参拜）→二月（第三学期开学、情人节）→三月（期末考试、毕业典礼、春假）。每个大型活动都是一段故事的剧情节点，而活动之间的日常则构成了故事的基底。",
         "constant": false,
         "selectiveLogic": 0,
         "order": 4,
@@ -1030,7 +934,7 @@
           "校园文化"
         ],
         "comment": "校园文化与社交礼仪",
-        "content": "樱丘高校的校园文化以\"和谐\"为核心，形成了一套不成文但极为严格的社交礼仪体系。新生入学的第一周被称为\"蜜月期\"，学长学姐会主动带新生熟悉校园，但过了这周后社交格局就趋于固定。午餐时的便当文化极为重要：自带便当通常在教室或天台与好友一起吃，买面包的则在走廊或中庭独自解决。给喜欢的人做便当是一种重量级的告白信号，而交换便当配菜则是友谊的象征。情人节和白色情人节是全年最重要的社交事件，巧克力的种类（本命巧克力、义理巧克力、友情巧克力）和回礼的价值直接反映了人际关系。学园祭和体育祭是打破日常社交壁垒的两大节点，许多跨班跨社团的友谊和恋情都萌芽于此。",
+        "content": "樱丘高校的校园文化以\"和谐\"为核心，形成了一套不成文但极为严格的社交礼仪体系。新生入学的第一周被称为\"蜜月期\"，学长学姐会主动带新生熟悉校园，但过了这周后社交格局就趋于固定。午餐时的便当文化极为重要：自带便当通常在教室或天台与好友一起吃，买面包的则在走廊或中庭独自解决。给喜欢的人做便当是一种重量级的告白信号，而交换便当配菜则是友谊的象征。情人节和白色回礼日是全年最重要的社交事件，巧克力的种类（本命巧克力、义理巧克力、友情巧克力）和回礼的价值直接反映了人际关系。学园祭和体育祭是打破日常社交壁垒的两大节点，许多跨班跨社团的友谊和恋情都萌芽于此。",
         "constant": false,
         "selectiveLogic": 0,
         "order": 12,
@@ -1480,10 +1384,10 @@
         "key": [
           "情人节",
           "巧克力",
-          "白色情人节"
+          "白色回礼日"
         ],
         "comment": "情人节文化",
-        "content": "樱丘高校的情人节是全年最重要的社交事件。2月14日情人节，女生会给男生送巧克力。巧克力的种类直接反映了人际关系：本命巧克力（给喜欢的人，亲手做的）、义理巧克力（给普通朋友，买的）、友情巧克力（给好朋友，便宜的）。3月14日白色情人节，男生要回礼，回礼的价值通常是巧克力的三倍。情人节前后，校园里的气氛格外紧张——谁给谁送了巧克力，成了最大的八卦。",
+        "content": "樱丘高校的情人节是全年最重要的社交事件。2月14日情人节，女生会给男生送巧克力。巧克力的种类直接反映了人际关系：本命巧克力（给喜欢的人，亲手做的）、义理巧克力（给普通朋友，买的）、友情巧克力（给好朋友，便宜的）。3月14日白色回礼日，男生要回礼，回礼的价值通常是巧克力的三倍。情人节前后，校园里的气氛格外紧张——谁给谁送了巧克力，成了最大的八卦。",
         "constant": false,
         "order": 12,
         "position": "before_char",
@@ -2082,31 +1986,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"继续加班完成\",\"aiNote\":\"熬夜完成工作\"},{\"label\":\"明天再说\",\"aiNote\":\"先回家休息\"},{\"label\":\"找同事帮忙\",\"aiNote\":\"请同事协助\"}]"
-                  }
-                },
-                {
-                  "id": "ot_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -8
-                  }
-                },
-                {
-                  "id": "ot_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -15
+                    "options": "[{\"label\":\"继续加班完成\",\"aiNote\":\"熬夜完成工作\",\"effects\":[{\"stat\":\"attrA\",\"delta\":-10},{\"stat\":\"attrB\",\"delta\":-20},{\"stat\":\"happiness\",\"delta\":-5},{\"currency\":150}]},{\"label\":\"明天再说\",\"aiNote\":\"先回家休息\",\"check\":{\"stat\":\"dim3\",\"dc\":12},\"effects\":[{\"stat\":\"attrB\",\"delta\":5}],\"success\":{\"note\":\"你跟老板解释清楚，方案宽限了一天。\"},\"failure\":{\"effects\":[{\"currency\":-100},{\"stat\":\"happiness\",\"delta\":-3}],\"note\":\"方案没按时交，被扣了绩效。\"}},{\"label\":\"找同事帮忙\",\"aiNote\":\"请同事协助\",\"check\":{\"stat\":\"dim5\",\"dc\":11},\"success\":{\"effects\":[{\"stat\":\"attrB\",\"delta\":-8},{\"currency\":80}],\"note\":\"同事爽快地帮了忙，一起提前做完。\"},\"failure\":{\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"note\":\"同事都下班了，你只能一个人熬。\"}}]"
                   }
                 }
               ],
@@ -2124,22 +2004,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "ot_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "ot_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "ot_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "ot_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "ot_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 5
             }
           },
           {
@@ -2183,19 +2055,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"去高级餐厅\",\"aiNote\":\"享受精致晚餐\"},{\"label\":\"去街边小馆\",\"aiNote\":\"体验地道美食\"},{\"label\":\"去酒吧喝一杯\",\"aiNote\":\"在酒吧聊天\"}]"
-                  }
-                },
-                {
-                  "id": "date_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "dim5",
-                    "delta": 8
+                    "options": "[{\"label\":\"去高级餐厅\",\"aiNote\":\"享受精致晚餐\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":300},\"requiresText\":\"钱袋不足 300\",\"effects\":[{\"currency\":-300},{\"stat\":\"romance\",\"delta\":10},{\"stat\":\"happiness\",\"delta\":5}]},{\"label\":\"去街边小馆\",\"aiNote\":\"体验地道美食\",\"effects\":[{\"currency\":-60},{\"stat\":\"romance\",\"delta\":6},{\"stat\":\"happiness\",\"delta\":6}]},{\"label\":\"去酒吧喝一杯\",\"aiNote\":\"在酒吧聊天\",\"check\":{\"stat\":\"dim3\",\"dc\":12},\"effects\":[{\"currency\":-150}],\"success\":{\"effects\":[{\"stat\":\"romance\",\"delta\":12}],\"note\":\"酒过三巡，你们聊得很投机。\"},\"failure\":{\"effects\":[{\"stat\":\"attrB\",\"delta\":-10},{\"stat\":\"romance\",\"delta\":-3}],\"note\":\"喝多了说错了话，气氛有点尴尬。\"}}]"
                   }
                 }
               ],
@@ -2213,15 +2073,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "date_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "date_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "date_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           },
           {
@@ -2263,19 +2122,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"主动社交拓展人脉\",\"aiNote\":\"认识新朋友\"},{\"label\":\"找个角落观察\",\"aiNote\":\"安静地观察人群\"},{\"label\":\"早点离开\",\"aiNote\":\"不喜欢这种场合\"}]"
-                  }
-                },
-                {
-                  "id": "party_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "dim5",
-                    "delta": 5
+                    "options": "[{\"label\":\"主动社交拓展人脉\",\"aiNote\":\"认识新朋友\",\"check\":{\"stat\":\"dim5\",\"dc\":12},\"effects\":[{\"stat\":\"attrB\",\"delta\":-10}],\"success\":{\"effects\":[{\"stat\":\"dim5\",\"delta\":3},{\"flag\":\"派对人脉\",\"value\":true}],\"note\":\"你认识了几位能帮上忙的人。\"},\"failure\":{\"effects\":[{\"stat\":\"happiness\",\"delta\":-4}],\"note\":\"几次搭话都冷了场。\"}},{\"label\":\"找个角落观察\",\"aiNote\":\"安静地观察人群\",\"effects\":[{\"stat\":\"dim3\",\"delta\":2}]},{\"label\":\"早点离开\",\"aiNote\":\"不喜欢这种场合\",\"effects\":[{\"stat\":\"attrB\",\"delta\":5},{\"stat\":\"dim5\",\"delta\":-1}]}]"
                   }
                 }
               ],
@@ -2293,15 +2140,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "party_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "party_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "party_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           },
           {
@@ -2343,19 +2189,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"做一顿丰盛的晚餐\",\"aiNote\":\"好好犒劳自己\"},{\"label\":\"煮碗泡面\",\"aiNote\":\"简单对付\"},{\"label\":\"点外卖\",\"aiNote\":\"省事\"}]"
-                  }
-                },
-                {
-                  "id": "cook_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": 5
+                    "options": "[{\"label\":\"做一顿丰盛的晚餐\",\"aiNote\":\"好好犒劳自己\",\"check\":{\"stat\":\"dim4\",\"dc\":10},\"effects\":[{\"currency\":-40},{\"stat\":\"attrB\",\"delta\":-5}],\"success\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":10},{\"stat\":\"happiness\",\"delta\":6},{\"stat\":\"dim4\",\"delta\":1}],\"note\":\"一桌像样的饭菜，吃得心满意足。\"},\"failure\":{\"effects\":[{\"stat\":\"happiness\",\"delta\":-2}],\"note\":\"火候没掌握好，菜糊了一半。\"}},{\"label\":\"煮碗泡面\",\"aiNote\":\"简单对付\",\"effects\":[{\"currency\":-5},{\"stat\":\"attrA\",\"delta\":3},{\"stat\":\"dim1\",\"delta\":-1}]},{\"label\":\"点外卖\",\"aiNote\":\"省事\",\"effects\":[{\"currency\":-45},{\"stat\":\"attrA\",\"delta\":5}]}]"
                   }
                 }
               ],
@@ -2373,15 +2207,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "cook_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "cook_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "cook_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 4
             }
           },
           {
@@ -2423,19 +2256,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"进去好好练\",\"aiNote\":\"认真锻炼\"},{\"label\":\"在附近跑步\",\"aiNote\":\"户外运动\"},{\"label\":\"算了回家\",\"aiNote\":\"今天不想动\"}]"
-                  }
-                },
-                {
-                  "id": "gym_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -12
+                    "options": "[{\"label\":\"进去好好练\",\"aiNote\":\"认真锻炼\",\"effects\":[{\"currency\":-50},{\"stat\":\"attrA\",\"delta\":-10},{\"stat\":\"dim1\",\"delta\":3},{\"stat\":\"dim2\",\"delta\":1}]},{\"label\":\"在附近跑步\",\"aiNote\":\"户外运动\",\"effects\":[{\"stat\":\"attrA\",\"delta\":-6},{\"stat\":\"dim1\",\"delta\":2}]},{\"label\":\"算了回家\",\"aiNote\":\"今天不想动\",\"effects\":[{\"stat\":\"attrB\",\"delta\":4},{\"stat\":\"happiness\",\"delta\":-1}]}]"
                   }
                 }
               ],
@@ -2453,15 +2274,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "gym_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "gym_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "gym_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 4
             }
           },
           {
@@ -2503,19 +2323,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"开始找新房\",\"aiNote\":\"浏览租房信息\"},{\"label\":\"和房东谈\",\"aiNote\":\"尝试砍价\"},{\"label\":\"先忍忍\",\"aiNote\":\"暂时不搬\"}]"
-                  }
-                },
-                {
-                  "id": "mov_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -8
+                    "options": "[{\"label\":\"开始找新房\",\"aiNote\":\"浏览租房信息\",\"effects\":[{\"currency\":-200},{\"stat\":\"attrB\",\"delta\":-15},{\"stat\":\"happiness\",\"delta\":5},{\"flag\":\"搬了新家\",\"value\":true}]},{\"label\":\"和房东谈\",\"aiNote\":\"尝试砍价\",\"check\":{\"stat\":\"dim3\",\"dc\":13},\"success\":{\"effects\":[{\"flag\":\"房租谈下来\",\"value\":true}],\"note\":\"房东松了口，房租不涨了。\"},\"failure\":{\"effects\":[{\"currency\":-150}],\"note\":\"房东寸步不让，房租还是涨了。\"}},{\"label\":\"先忍忍\",\"aiNote\":\"暂时不搬\",\"effects\":[{\"currency\":-100},{\"stat\":\"happiness\",\"delta\":-3}]}]"
                   }
                 }
               ],
@@ -2533,15 +2341,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "mov_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "mov_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "mov_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           },
           {
@@ -2583,19 +2390,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"立刻带去宠物医院\",\"aiNote\":\"赶紧看病\"},{\"label\":\"先观察一天\",\"aiNote\":\"也许会好转\"},{\"label\":\"在网上查症状\",\"aiNote\":\"自己诊断\"}]"
-                  }
-                },
-                {
-                  "id": "pet_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -5
+                    "options": "[{\"label\":\"立刻带去宠物医院\",\"aiNote\":\"赶紧看病\",\"effects\":[{\"currency\":-250},{\"stat\":\"attrB\",\"delta\":-8},{\"stat\":\"happiness\",\"delta\":3}]},{\"label\":\"先观察一天\",\"aiNote\":\"也许会好转\",\"check\":{\"stat\":\"dim3\",\"dc\":12,\"label\":\"细心\"},\"success\":{\"note\":\"猫咪第二天恢复了胃口。\"},\"failure\":{\"effects\":[{\"currency\":-400},{\"stat\":\"happiness\",\"delta\":-8}],\"note\":\"病情加重，最后还是去了医院。\"}},{\"label\":\"在网上查症状\",\"aiNote\":\"自己诊断\",\"check\":{\"stat\":\"dim3\",\"dc\":14,\"label\":\"判断\"},\"effects\":[{\"stat\":\"attrB\",\"delta\":-5}],\"success\":{\"effects\":[{\"currency\":-60}],\"note\":\"对症买了药，猫咪慢慢好起来。\"},\"failure\":{\"effects\":[{\"currency\":-300},{\"stat\":\"happiness\",\"delta\":-5}],\"note\":\"判断错了，耽误了治疗，花得更多。\"}}]"
                   }
                 }
               ],
@@ -2613,15 +2408,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "pet_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "pet_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "pet_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           }
         ]
@@ -4046,31 +3840,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"接受比武\",\"aiNote\":\"正面迎战\"},{\"label\":\"婉言谢绝\",\"aiNote\":\"避免冲突\"},{\"label\":\"提议切磋点到为止\",\"aiNote\":\"友好交流\"}]"
-                  }
-                },
-                {
-                  "id": "duel_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -10
-                  }
-                },
-                {
-                  "id": "duel_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "dim1",
-                    "delta": 5
+                    "options": "[{\"label\":\"接受比武\",\"aiNote\":\"正面迎战\",\"check\":{\"stat\":\"dim1\",\"dc\":12},\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"success\":{\"effects\":[{\"stat\":\"melancholy\",\"delta\":3},{\"currency\":50},{\"fact\":\"flags.江湖声望\",\"delta\":1}],\"note\":\"你技高一筹，围观的江湖人齐声喝彩。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-30}],\"note\":\"你落败负伤。\",\"next\":\"injury\"}},{\"label\":\"婉言谢绝\",\"aiNote\":\"避免冲突\",\"effects\":[{\"stat\":\"dim5\",\"delta\":2},{\"fact\":\"flags.江湖声望\",\"delta\":-1}]},{\"label\":\"提议切磋点到为止\",\"aiNote\":\"友好交流\",\"check\":{\"stat\":\"dim3\",\"dc\":10},\"effects\":[{\"stat\":\"attrB\",\"delta\":-8}],\"success\":{\"effects\":[{\"stat\":\"dim3\",\"delta\":2},{\"fact\":\"flags.江湖声望\",\"delta\":1}],\"note\":\"点到为止，双方都心服口服。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-10}],\"note\":\"对方收手不及，你挨了一掌。\"}}]"
                   }
                 }
               ],
@@ -4088,22 +3858,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "duel_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "duel_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "duel_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "duel_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "duel_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           },
           {
@@ -4145,19 +3907,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"买下藏宝图去寻宝\",\"aiNote\":\"踏上寻宝之路\"},{\"label\":\"怀疑是骗局\",\"aiNote\":\"谨慎对待\"},{\"label\":\"告诉朋友一起\",\"aiNote\":\"结伴同行\"}]"
-                  }
-                },
-                {
-                  "id": "map_effect",
-                  "typeId": "effect.flag",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "flagPath": "flags.获得藏宝图",
-                    "value": true
+                    "options": "[{\"label\":\"买下藏宝图去寻宝\",\"aiNote\":\"踏上寻宝之路\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":120},\"requiresText\":\"钱袋不足 120\",\"check\":{\"stat\":\"dim6\",\"dc\":13},\"effects\":[{\"currency\":-120},{\"flag\":\"获得藏宝图\",\"value\":true}],\"success\":{\"effects\":[{\"currency\":400},{\"item\":\"残缺秘籍\",\"delta\":1}],\"note\":\"你在藏宝地找到了前辈的遗物。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-20}],\"note\":\"藏宝地早被人捷足先登，你还撞上了埋伏。\"}},{\"label\":\"怀疑是骗局\",\"aiNote\":\"谨慎对待\",\"effects\":[{\"stat\":\"dim4\",\"delta\":1}]},{\"label\":\"告诉朋友一起\",\"aiNote\":\"结伴同行\",\"effects\":[{\"currency\":-60},{\"flag\":\"获得藏宝图\",\"value\":true},{\"fact\":\"flags.江湖声望\",\"delta\":1}]}]"
                   }
                 }
               ],
@@ -4175,15 +3925,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "map_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "map_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "map_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           },
           {
@@ -4225,31 +3974,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"小心翼翼地进入\",\"aiNote\":\"谨慎探索\"},{\"label\":\"在洞口观察\",\"aiNote\":\"先了解情况\"},{\"label\":\"离开这里\",\"aiNote\":\"不冒险\"}]"
-                  }
-                },
-                {
-                  "id": "realm_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": 15
-                  }
-                },
-                {
-                  "id": "realm_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "dim4",
-                    "delta": 8
+                    "options": "[{\"label\":\"小心翼翼地进入\",\"aiNote\":\"谨慎探索\",\"check\":{\"stat\":\"dim5\",\"dc\":12},\"success\":{\"effects\":[{\"stat\":\"attrB\",\"delta\":30},{\"stat\":\"reputation\",\"delta\":5},{\"stat\":\"dim4\",\"delta\":3}],\"note\":\"你在洞中参悟了石壁上的心法。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-25},{\"stat\":\"attrB\",\"delta\":-20}],\"note\":\"洞中真气紊乱，你被内力反噬。\"}},{\"label\":\"在洞口观察\",\"aiNote\":\"先了解情况\",\"effects\":[{\"stat\":\"dim4\",\"delta\":2}]},{\"label\":\"离开这里\",\"aiNote\":\"不冒险\",\"effects\":[]}]"
                   }
                 }
               ],
@@ -4267,22 +3992,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "realm_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "realm_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "realm_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "realm_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "realm_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           },
           {
@@ -4326,19 +4043,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"拔剑应战\",\"aiNote\":\"正面对决\"},{\"label\":\"试图化解恩怨\",\"aiNote\":\"以和为贵\"},{\"label\":\"转身离开\",\"aiNote\":\"避其锋芒\"}]"
-                  }
-                },
-                {
-                  "id": "rival_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -15
+                    "options": "[{\"label\":\"拔剑应战\",\"aiNote\":\"正面对决\",\"check\":{\"stat\":\"dim1\",\"dc\":14},\"effects\":[{\"stat\":\"attrB\",\"delta\":-20}],\"success\":{\"effects\":[{\"stat\":\"melancholy\",\"delta\":4},{\"fact\":\"flags.江湖声望\",\"delta\":2}],\"note\":\"宿敌落败而逃。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-40}],\"note\":\"你中了对方淬毒的暗器。\",\"next\":\"poison\"}},{\"label\":\"试图化解恩怨\",\"aiNote\":\"以和为贵\",\"check\":{\"stat\":\"dim5\",\"dc\":13},\"success\":{\"effects\":[{\"flag\":\"化解宿怨\",\"value\":true},{\"stat\":\"dim5\",\"delta\":3}],\"note\":\"多年恩怨，一笑了之。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-15}],\"note\":\"对方不领情，趁你开口时出手偷袭。\"}},{\"label\":\"转身离开\",\"aiNote\":\"避其锋芒\",\"check\":{\"stat\":\"dim3\",\"dc\":10},\"success\":{\"note\":\"你几个起落便甩开了对方。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-15}],\"note\":\"被追上挨了一掌。\"}}]"
                   }
                 }
               ],
@@ -4356,15 +4061,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "rival_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "rival_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "rival_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           },
           {
@@ -4406,19 +4110,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"运功逼毒\",\"aiNote\":\"消耗内力逼出毒素\"},{\"label\":\"寻找解药\",\"aiNote\":\"去采药\"},{\"label\":\"硬撑\",\"aiNote\":\"希望毒素自行消散\"}]"
-                  }
-                },
-                {
-                  "id": "poison_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -20
+                    "options": "[{\"label\":\"运功逼毒\",\"aiNote\":\"消耗内力逼出毒素\",\"check\":{\"stat\":\"attrB\",\"dc\":11,\"label\":\"内息\"},\"effects\":[{\"stat\":\"attrB\",\"delta\":-30}],\"success\":{\"note\":\"毒素被逼出了体外。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-30}],\"note\":\"内力不济，毒素攻心。\"}},{\"label\":\"寻找解药\",\"aiNote\":\"去采药\",\"effects\":[{\"currency\":-80},{\"stat\":\"attrA\",\"delta\":-10}]},{\"label\":\"硬撑\",\"aiNote\":\"希望毒素自行消散\",\"effects\":[{\"stat\":\"attrA\",\"delta\":-45},{\"stat\":\"dim2\",\"delta\":-2}]}]"
                   }
                 }
               ],
@@ -4436,15 +4128,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "poison_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "poison_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "poison_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 10
             }
           },
           {
@@ -4486,31 +4177,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"闭关修炼\",\"aiNote\":\"专心突破\"},{\"label\":\"请教高手\",\"aiNote\":\"寻求指点\"},{\"label\":\"顺其自然\",\"aiNote\":\"不强求\"}]"
-                  }
-                },
-                {
-                  "id": "bt_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim1",
-                    "delta": 10
-                  }
-                },
-                {
-                  "id": "bt_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim2",
-                    "delta": 8
+                    "options": "[{\"label\":\"闭关修炼\",\"aiNote\":\"专心突破\",\"check\":{\"stat\":\"dim4\",\"dc\":12},\"effects\":[{\"stat\":\"attrB\",\"delta\":-30}],\"success\":{\"effects\":[{\"stat\":\"reputation\",\"delta\":8},{\"stat\":\"dim2\",\"delta\":4}],\"note\":\"真气贯通，内功大进。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-30}],\"note\":\"急于求成，险些走火入魔。\"}},{\"label\":\"请教高手\",\"aiNote\":\"寻求指点\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":100},\"requiresText\":\"钱袋不足 100\",\"effects\":[{\"currency\":-100},{\"stat\":\"reputation\",\"delta\":4},{\"stat\":\"dim4\",\"delta\":2}]},{\"label\":\"顺其自然\",\"aiNote\":\"不强求\",\"effects\":[{\"stat\":\"dim5\",\"delta\":2}]}]"
                   }
                 }
               ],
@@ -4528,22 +4195,19 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "bt_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "bt_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "bt_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "bt_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "bt_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true,
+              "when": {
+                "fact": "turn",
+                "op": ">=",
+                "value": 10
+              }
             }
           },
           {
@@ -4585,19 +4249,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"运功疗伤\",\"aiNote\":\"用内力修复伤势\"},{\"label\":\"找郎中\",\"aiNote\":\"去医馆治疗\"},{\"label\":\"硬撑\",\"aiNote\":\"伤势不重\"}]"
-                  }
-                },
-                {
-                  "id": "inj_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -25
+                    "options": "[{\"label\":\"运功疗伤\",\"aiNote\":\"用内力修复伤势\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-30},{\"stat\":\"attrA\",\"delta\":30}]},{\"label\":\"找郎中\",\"aiNote\":\"去医馆治疗\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":100},\"requiresText\":\"钱袋不足 100\",\"effects\":[{\"currency\":-100},{\"stat\":\"attrA\",\"delta\":50}]},{\"label\":\"硬撑\",\"aiNote\":\"伤势不重\",\"effects\":[{\"stat\":\"attrA\",\"delta\":-20}]}]"
                   }
                 }
               ],
@@ -4615,15 +4267,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "inj_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "inj_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "inj_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 10
             }
           },
           {
@@ -4665,31 +4316,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"上前请教\",\"aiNote\":\"虚心求教\"},{\"label\":\"恭敬行礼\",\"aiNote\":\"礼貌问候\"},{\"label\":\"悄悄离开\",\"aiNote\":\"不打扰\"}]"
-                  }
-                },
-                {
-                  "id": "enc_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim4",
-                    "delta": 12
-                  }
-                },
-                {
-                  "id": "enc_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim6",
-                    "delta": 10
+                    "options": "[{\"label\":\"上前请教\",\"aiNote\":\"虚心求教\",\"check\":{\"stat\":\"dim6\",\"dc\":12},\"success\":{\"effects\":[{\"stat\":\"dim4\",\"delta\":6},{\"stat\":\"reputation\",\"delta\":6},{\"flag\":\"隐世高人指点\",\"value\":true}],\"note\":\"高人传了你一套心法。\"},\"failure\":{\"effects\":[{\"stat\":\"dim5\",\"delta\":2}],\"note\":\"高人只留下一句话，便飘然而去。\"}},{\"label\":\"恭敬行礼\",\"aiNote\":\"礼貌问候\",\"effects\":[{\"stat\":\"dim6\",\"delta\":3},{\"flag\":\"结识隐世高人\",\"value\":true}]},{\"label\":\"悄悄离开\",\"aiNote\":\"不打扰\",\"effects\":[]}]"
                   }
                 }
               ],
@@ -4707,22 +4334,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "enc_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "enc_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "enc_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "enc_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "enc_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           }
         ]
@@ -6554,31 +6173,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"寻找废弃建筑躲避\",\"aiNote\":\"赶紧找掩体\"},{\"label\":\"用防护装备硬撑\",\"aiNote\":\"依靠装备防护\"},{\"label\":\"挖地洞躲避\",\"aiNote\":\"就地掩埋\"}]"
-                  }
-                },
-                {
-                  "id": "storm_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -15
-                  }
-                },
-                {
-                  "id": "storm_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": -10
+                    "options": "[{\"label\":\"寻找废弃建筑躲避\",\"aiNote\":\"赶紧找掩体\",\"check\":{\"stat\":\"dim3\",\"dc\":11},\"effects\":[{\"stat\":\"attrB\",\"delta\":-10}],\"success\":{\"note\":\"你及时钻进了一间地下室。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-15}],\"note\":\"没找到像样的掩体，淋了一身辐射尘。\",\"next\":\"radiation_sickness\"}},{\"label\":\"用防护装备硬撑\",\"aiNote\":\"依靠装备防护\",\"check\":{\"stat\":\"radiation_res\",\"dc\":12},\"success\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-5}],\"note\":\"防护装备撑住了。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-20}],\"note\":\"面罩的滤芯早就失效了。\",\"next\":\"radiation_sickness\"}},{\"label\":\"挖地洞躲避\",\"aiNote\":\"就地掩埋\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-25},{\"stat\":\"attrA\",\"delta\":-5}]}]"
                   }
                 }
               ],
@@ -6596,22 +6191,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "storm_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "storm_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "storm_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "storm_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "storm_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           },
           {
@@ -6653,19 +6240,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"用武器战斗\",\"aiNote\":\"正面对抗变异体\"},{\"label\":\"逃跑\",\"aiNote\":\"三十六计走为上\"},{\"label\":\"使用异能\",\"aiNote\":\"释放异能攻击\"}]"
-                  }
-                },
-                {
-                  "id": "mutant_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -20
+                    "options": "[{\"label\":\"用武器战斗\",\"aiNote\":\"正面对抗变异体\",\"check\":{\"stat\":\"dim1\",\"dc\":12},\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"success\":{\"effects\":[{\"currency\":40},{\"item\":\"变异体腺体\",\"delta\":1}],\"note\":\"你干掉了变异体，割下了值钱的腺体。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-25}],\"note\":\"爪子划开了你的护甲。\"}},{\"label\":\"逃跑\",\"aiNote\":\"三十六计走为上\",\"check\":{\"stat\":\"dim2\",\"dc\":10},\"effects\":[{\"stat\":\"attrB\",\"delta\":-20}],\"success\":{\"note\":\"你甩掉了它。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-12}],\"note\":\"逃跑时后背被抓了一道。\"}},{\"label\":\"使用异能\",\"aiNote\":\"释放异能攻击\",\"requires\":{\"fact\":\"flags.异能觉醒\",\"op\":\"==\",\"value\":true},\"requiresText\":\"异能尚未觉醒\",\"check\":{\"stat\":\"psychic_power\",\"dc\":11},\"effects\":[{\"stat\":\"attrB\",\"delta\":-10}],\"success\":{\"effects\":[{\"stat\":\"psychic_power\",\"delta\":1}],\"note\":\"异能把变异体撕成了碎片。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-15},{\"stat\":\"dim6\",\"delta\":-1}],\"note\":\"异能失控，反伤了自己。\"}}]"
                   }
                 }
               ],
@@ -6683,15 +6258,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "mutant_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "mutant_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "mutant_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 5
             }
           },
           {
@@ -6733,31 +6307,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"小心进入搜索\",\"aiNote\":\"谨慎地搜索物资\"},{\"label\":\"先观察是否有危险\",\"aiNote\":\"确认安全再行动\"},{\"label\":\"离开\",\"aiNote\":\"可能是陷阱\"}]"
-                  }
-                },
-                {
-                  "id": "supply_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": 10
-                  }
-                },
-                {
-                  "id": "supply_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": 8
+                    "options": "[{\"label\":\"小心进入搜索\",\"aiNote\":\"谨慎地搜索物资\",\"check\":{\"stat\":\"dim3\",\"dc\":11},\"success\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":10},{\"stat\":\"attrB\",\"delta\":10},{\"item\":\"罐头\",\"delta\":3},{\"item\":\"抗辐射药\",\"delta\":1}],\"note\":\"掩体里还有没过期的补给。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-12}],\"note\":\"门后连着一颗诡雷。\"}},{\"label\":\"先观察是否有危险\",\"aiNote\":\"确认安全再行动\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-5},{\"item\":\"罐头\",\"delta\":2}]},{\"label\":\"离开\",\"aiNote\":\"可能是陷阱\",\"effects\":[]}]"
                   }
                 }
               ],
@@ -6775,22 +6325,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "supply_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "supply_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "supply_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "supply_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "supply_effect2",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           },
           {
@@ -6832,43 +6374,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"尝试控制这股力量\",\"aiNote\":\"学习掌控异能\"},{\"label\":\"压制下去\",\"aiNote\":\"不敢轻易尝试\"},{\"label\":\"寻找导师\",\"aiNote\":\"找人指导\"}]"
-                  }
-                },
-                {
-                  "id": "awake_effect1",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": -100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "dim1",
-                    "delta": 15
-                  }
-                },
-                {
-                  "id": "awake_effect2",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 100,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "dim3",
-                    "delta": 10
-                  }
-                },
-                {
-                  "id": "awake_flag",
-                  "typeId": "effect.flag",
-                  "position": {
-                    "x": 0,
-                    "y": 440
-                  },
-                  "widgetValues": {
-                    "flagPath": "flags.异能觉醒",
-                    "value": true
+                    "options": "[{\"label\":\"尝试控制这股力量\",\"aiNote\":\"学习掌控异能\",\"check\":{\"stat\":\"dim6\",\"dc\":12},\"effects\":[{\"flag\":\"异能觉醒\",\"value\":true}],\"success\":{\"effects\":[{\"stat\":\"psychic_power\",\"delta\":4},{\"stat\":\"dim3\",\"delta\":1}],\"note\":\"你驯服了这股力量。\"},\"failure\":{\"effects\":[{\"stat\":\"psychic_power\",\"delta\":2},{\"stat\":\"attrA\",\"delta\":-10}],\"note\":\"力量失控，反噬了身体。\"}},{\"label\":\"压制下去\",\"aiNote\":\"不敢轻易尝试\",\"effects\":[{\"stat\":\"dim6\",\"delta\":1}]},{\"label\":\"寻找导师\",\"aiNote\":\"找人指导\",\"effects\":[{\"flag\":\"异能觉醒\",\"value\":true},{\"stat\":\"psychic_power\",\"delta\":2},{\"flag\":\"寻找异能导师\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -6886,29 +6392,30 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "awake_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "awake_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "awake_effect1",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c4",
-                  "sourceNodeId": "awake_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "awake_effect2",
-                  "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c5",
-                  "sourceNodeId": "awake_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "awake_flag",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "turn.ended"
+              ],
+              "once": true,
+              "chance": 0.35,
+              "when": {
+                "any": [
+                  {
+                    "fact": "player.hp",
+                    "op": "<=",
+                    "value": 30
+                  },
+                  {
+                    "fact": "turn",
+                    "op": ">=",
+                    "value": 20
+                  }
+                ]
+              },
+              "description": "濒死（生命 ≤ 30）或旅程进入后期时可能觉醒"
             }
           },
           {
@@ -6950,19 +6457,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"寻找抗辐射药\",\"aiNote\":\"去废弃医院找药\"},{\"label\":\"用碘片缓解\",\"aiNote\":\"暂时缓解症状\"},{\"label\":\"硬撑\",\"aiNote\":\"希望身体能扛住\"}]"
-                  }
-                },
-                {
-                  "id": "rs_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -18
+                    "options": "[{\"label\":\"寻找抗辐射药\",\"aiNote\":\"去废弃医院找药\",\"check\":{\"stat\":\"dim4\",\"dc\":11},\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"success\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":15},{\"item\":\"抗辐射药\",\"delta\":1}],\"note\":\"你在废弃医院找到了药。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-10}],\"note\":\"药柜早就被搬空了。\"}},{\"label\":\"用碘片缓解\",\"aiNote\":\"暂时缓解症状\",\"effects\":[{\"stat\":\"attrA\",\"delta\":5},{\"stat\":\"attrB\",\"delta\":-5}]},{\"label\":\"硬撑\",\"aiNote\":\"希望身体能扛住\",\"check\":{\"stat\":\"dim2\",\"dc\":13},\"success\":{\"effects\":[{\"stat\":\"radiation_res\",\"delta\":1}],\"note\":\"身体扛了过来，对辐射多了些抵抗力。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-25}],\"note\":\"症状越来越重。\"}}]"
                   }
                 }
               ],
@@ -6980,15 +6475,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "rs_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "rs_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "rs_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 10
             }
           },
           {
@@ -7030,19 +6524,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"战斗\",\"aiNote\":\"拼死一搏\"},{\"label\":\"交出物资\",\"aiNote\":\"破财免灾\"},{\"label\":\"逃跑\",\"aiNote\":\"寻找逃跑路线\"}]"
-                  }
-                },
-                {
-                  "id": "raider_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -15
+                    "options": "[{\"label\":\"战斗\",\"aiNote\":\"拼死一搏\",\"check\":{\"stat\":\"dim1\",\"dc\":13},\"effects\":[{\"stat\":\"attrB\",\"delta\":-20}],\"success\":{\"effects\":[{\"currency\":80},{\"item\":\"弹药\",\"delta\":5}],\"note\":\"你击退了掠夺者，还缴获了物资。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-30},{\"currency\":-100}],\"note\":\"寡不敌众，被抢走了一部分家当。\"}},{\"label\":\"交出物资\",\"aiNote\":\"破财免灾\",\"effects\":[{\"currency\":-150}]},{\"label\":\"逃跑\",\"aiNote\":\"寻找逃跑路线\",\"check\":{\"stat\":\"dim3\",\"dc\":12},\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"success\":{\"note\":\"你钻进下水道，绕开了包围。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-15},{\"currency\":-50}],\"note\":\"慌乱中丢了钱袋，还中了一枪。\"}}]"
                   }
                 }
               ],
@@ -7060,15 +6542,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "raider_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "raider_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "raider_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           },
           {
@@ -7110,19 +6591,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"交易物资\",\"aiNote\":\"用多余物资交换\"},{\"label\":\"加入商队\",\"aiNote\":\"结伴同行\"},{\"label\":\"离开\",\"aiNote\":\"不信任他们\"}]"
-                  }
-                },
-                {
-                  "id": "trader_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrB",
-                    "delta": 5
+                    "options": "[{\"label\":\"交易物资\",\"aiNote\":\"用多余物资交换\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":60},\"requiresText\":\"钱袋不足 60\",\"effects\":[{\"currency\":-60},{\"item\":\"净水\",\"delta\":3},{\"item\":\"抗辐射药\",\"delta\":1}]},{\"label\":\"加入商队\",\"aiNote\":\"结伴同行\",\"check\":{\"stat\":\"dim5\",\"dc\":11},\"success\":{\"effects\":[{\"flag\":\"商队同行\",\"value\":true},{\"stat\":\"attrB\",\"delta\":10}],\"note\":\"商队队长接纳了你。\"},\"failure\":{\"note\":\"队长打量了你一眼，婉拒了。\"}},{\"label\":\"离开\",\"aiNote\":\"不信任他们\",\"effects\":[]}]"
                   }
                 }
               ],
@@ -7140,15 +6609,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "trader_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "trader_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "trader_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           }
         ]
@@ -8530,7 +7998,26 @@
             "storageLimits": "物资露天堆放易受潮变质，建储藏棚可提升保存效率",
             "perishable": "生肉和鲜果两天内变质，熏制或晒干可延长至五天"
           },
-          "description": "荒岛生存的核心不是蛮力，而是资源管理。六项物资相互转化：木材+石材→工具，工具→食物+水，布料+草药→医疗包。每一次采集、加工和消耗的决策，都在为救援争取时间。"
+          "description": "荒岛生存的核心不是蛮力，而是资源管理。六项物资相互转化：木材+石材→工具，工具→食物+水，布料+草药→医疗包。每一次采集、加工和消耗的决策，都在为救援争取时间。",
+          "statuses": [
+            {
+              "id": "wounded",
+              "name": "伤口发炎",
+              "description": "伤口没有处理好，每天流失生命，做事也更容易出错。",
+              "severity": "major",
+              "perDay": {
+                "hp": -5
+              },
+              "modifiers": [
+                {
+                  "target": "dice.check",
+                  "mode": "flat",
+                  "value": -1
+                }
+              ],
+              "days": 3
+            }
+          ]
         }
       },
       {
@@ -8609,19 +8096,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"去山泉处取水\",\"aiNote\":\"冒险去山上找泉水\"},{\"label\":\"收集雨水\",\"aiNote\":\"等待下雨\"},{\"label\":\"蒸馏海水\",\"aiNote\":\"尝试海水淡化\"}]"
-                  }
-                },
-                {
-                  "id": "water_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "resourceKey": "water",
-                    "delta": 3
+                    "options": "[{\"label\":\"去山泉处取水\",\"aiNote\":\"冒险去山上找泉水\",\"check\":{\"stat\":\"player.hp\",\"dc\":10,\"label\":\"体能\",\"range\":[0,100]},\"effects\":[{\"stat\":\"attrB\",\"delta\":-20}],\"success\":{\"effects\":[{\"resource\":\"water\",\"delta\":5}],\"note\":\"你在山腰找到了一处清澈的泉眼。\"},\"failure\":{\"effects\":[{\"resource\":\"water\",\"delta\":2},{\"stat\":\"attrA\",\"delta\":-8}],\"note\":\"山路湿滑，打水时摔伤了手肘。\"}},{\"label\":\"收集雨水\",\"aiNote\":\"等待下雨\",\"requires\":{\"fact\":\"player.resources.cloth\",\"op\":\">=\",\"value\":1},\"requiresText\":\"需要 1 份布料\",\"effects\":[{\"resource\":\"cloth\",\"delta\":-1},{\"resource\":\"water\",\"delta\":3}]},{\"label\":\"蒸馏海水\",\"aiNote\":\"尝试海水淡化\",\"requires\":{\"fact\":\"player.resources.wood\",\"op\":\">=\",\"value\":2},\"requiresText\":\"需要 2 份木材\",\"effects\":[{\"resource\":\"wood\",\"delta\":-2},{\"resource\":\"water\",\"delta\":2},{\"stat\":\"attrB\",\"delta\":-10}]}]"
                   }
                 }
               ],
@@ -8639,15 +8114,24 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "water_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "water_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "water_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "resources.low",
+                "resources.depleted"
+              ],
+              "when": {
+                "event": {
+                  "type": "resources.*",
+                  "where": {
+                    "id": "water"
+                  }
+                }
+              },
+              "cooldownTurns": 4,
+              "description": "淡水告急或耗尽时出现"
             }
           },
           {
@@ -8689,19 +8173,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"添加柴火保持火堆\",\"aiNote\":\"用火光驱赶野兽\"},{\"label\":\"制作武器防身\",\"aiNote\":\"准备战斗\"},{\"label\":\"躲进庇护所\",\"aiNote\":\"等待天亮\"}]"
-                  }
-                },
-                {
-                  "id": "animal_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -10
+                    "options": "[{\"label\":\"添加柴火保持火堆\",\"aiNote\":\"用火光驱赶野兽\",\"requires\":{\"fact\":\"player.resources.wood\",\"op\":\">=\",\"value\":2},\"requiresText\":\"需要 2 份木材\",\"effects\":[{\"resource\":\"wood\",\"delta\":-2}]},{\"label\":\"制作武器防身\",\"aiNote\":\"准备战斗\",\"requires\":{\"fact\":\"player.resources.wood\",\"op\":\">=\",\"value\":1},\"requiresText\":\"需要 1 份木材\",\"check\":{\"stat\":\"attrB\",\"dc\":11,\"label\":\"体力\",\"range\":[0,100]},\"effects\":[{\"resource\":\"wood\",\"delta\":-1}],\"success\":{\"effects\":[{\"resource\":\"food\",\"delta\":3}],\"note\":\"你击退了野兽，还得到了一些肉。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-15}],\"note\":\"野兽扑倒了你。\",\"next\":\"injury\"}},{\"label\":\"躲进庇护所\",\"aiNote\":\"等待天亮\",\"effects\":[{\"stat\":\"attrB\",\"delta\":-5},{\"resource\":\"food\",\"delta\":-1}]}]"
                   }
                 }
               ],
@@ -8719,15 +8191,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "animal_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "animal_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "animal_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 5
             }
           },
           {
@@ -8769,19 +8240,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"进入洞穴探索\",\"aiNote\":\"探索未知洞穴\"},{\"label\":\"采集植物标本\",\"aiNote\":\"收集有用植物\"},{\"label\":\"做好标记后返回\",\"aiNote\":\"先回去准备\"}]"
-                  }
-                },
-                {
-                  "id": "explore_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "resourceKey": "food",
-                    "delta": 2
+                    "options": "[{\"label\":\"进入洞穴探索\",\"aiNote\":\"探索未知洞穴\",\"check\":{\"stat\":\"player.hp\",\"dc\":11,\"label\":\"体能\",\"range\":[0,100]},\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"success\":{\"effects\":[{\"resource\":\"stone\",\"delta\":4},{\"flag\":\"发现洞穴\",\"value\":true}],\"note\":\"洞里有古人留下的石器，还有一处干燥的栖身地。\"},\"failure\":{\"effects\":[{\"stat\":\"attrA\",\"delta\":-10}],\"note\":\"洞顶落石砸中了你。\"}},{\"label\":\"采集植物标本\",\"aiNote\":\"收集有用植物\",\"effects\":[{\"resource\":\"herb\",\"delta\":2},{\"resource\":\"food\",\"delta\":1},{\"stat\":\"attrB\",\"delta\":-8}]},{\"label\":\"做好标记后返回\",\"aiNote\":\"先回去准备\",\"effects\":[{\"flag\":\"洞穴位置已标记\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -8799,15 +8258,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "explore_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "explore_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "explore_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           },
           {
@@ -8849,19 +8307,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"尝试修理发报机\",\"aiNote\":\"修复通讯设备\"},{\"label\":\"用镜子反射阳光\",\"aiNote\":\"制作信号镜\"},{\"label\":\"点燃求救火堆\",\"aiNote\":\"用烟火信号\"}]"
-                  }
-                },
-                {
-                  "id": "rescue_flag",
-                  "typeId": "effect.flag",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "flagPath": "flags.发出救援信号",
-                    "value": true
+                    "options": "[{\"label\":\"尝试修理发报机\",\"aiNote\":\"修复通讯设备\",\"check\":{\"stat\":\"attrB\",\"dc\":13,\"label\":\"专注\",\"range\":[0,100]},\"effects\":[{\"stat\":\"attrB\",\"delta\":-15}],\"success\":{\"effects\":[{\"flag\":\"发报机修好\",\"value\":true},{\"flag\":\"发出救援信号\",\"value\":true}],\"note\":\"发报机发出了微弱的求救电码。\"},\"failure\":{\"note\":\"零件损坏严重，还需要更多材料。\"}},{\"label\":\"用镜子反射阳光\",\"aiNote\":\"制作信号镜\",\"effects\":[{\"flag\":\"发出救援信号\",\"value\":true}]},{\"label\":\"点燃求救火堆\",\"aiNote\":\"用烟火信号\",\"requires\":{\"fact\":\"player.resources.wood\",\"op\":\">=\",\"value\":4},\"requiresText\":\"需要 4 份木材\",\"effects\":[{\"resource\":\"wood\",\"delta\":-4},{\"flag\":\"发出救援信号\",\"value\":true},{\"flag\":\"烟火信号\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -8879,15 +8325,19 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "rescue_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "rescue_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "rescue_flag",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true,
+              "when": {
+                "fact": "turn",
+                "op": ">=",
+                "value": 6
+              }
             }
           },
           {
@@ -8929,19 +8379,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"用衣物包扎\",\"aiNote\":\"简单处理伤口\"},{\"label\":\"寻找草药\",\"aiNote\":\"用植物止血\"},{\"label\":\"不管它\",\"aiNote\":\"小伤不碍事\"}]"
-                  }
-                },
-                {
-                  "id": "inj_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "attrA",
-                    "delta": -12
+                    "options": "[{\"label\":\"用衣物包扎\",\"aiNote\":\"简单处理伤口\",\"requires\":{\"fact\":\"player.resources.cloth\",\"op\":\">=\",\"value\":1},\"requiresText\":\"需要 1 份布料\",\"effects\":[{\"resource\":\"cloth\",\"delta\":-1},{\"stat\":\"attrA\",\"delta\":5}]},{\"label\":\"寻找草药\",\"aiNote\":\"用植物止血\",\"check\":{\"stat\":\"attrB\",\"dc\":10,\"label\":\"体力\",\"range\":[0,100]},\"success\":{\"effects\":[{\"resource\":\"herb\",\"delta\":1},{\"stat\":\"attrA\",\"delta\":8}],\"note\":\"你找到了止血的草药。\"},\"failure\":{\"effects\":[{\"status\":\"wounded\"}],\"note\":\"没找到合用的草药，伤口开始发炎。\"}},{\"label\":\"不管它\",\"aiNote\":\"小伤不碍事\",\"effects\":[{\"status\":\"wounded\"}]}]"
                   }
                 }
               ],
@@ -8959,15 +8397,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "inj_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "inj_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "inj_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           },
           {
@@ -9009,19 +8446,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"出面调解\",\"aiNote\":\"化解矛盾\"},{\"label\":\"保持中立\",\"aiNote\":\"不参与争执\"},{\"label\":\"支持一方\",\"aiNote\":\"选边站\"}]"
-                  }
-                },
-                {
-                  "id": "conflict_effect",
-                  "typeId": "effect.stat",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "statKey": "dim5",
-                    "delta": -5
+                    "options": "[{\"label\":\"出面调解\",\"aiNote\":\"化解矛盾\",\"requires\":{\"fact\":\"player.resources.food\",\"op\":\">=\",\"value\":1},\"requiresText\":\"需要 1 份食物\",\"effects\":[{\"resource\":\"food\",\"delta\":-1},{\"fact\":\"flags.营地威望\",\"delta\":1}]},{\"label\":\"保持中立\",\"aiNote\":\"不参与争执\",\"effects\":[{\"fact\":\"flags.营地威望\",\"delta\":-1}]},{\"label\":\"支持一方\",\"aiNote\":\"选边站\",\"effects\":[{\"fact\":\"flags.营地威望\",\"delta\":1},{\"flag\":\"营地结怨\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -9039,15 +8464,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "conflict_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "conflict_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "conflict_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           }
         ]
@@ -10555,19 +9979,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"全款拿下\",\"aiNote\":\"一次性投入全部资金\"},{\"label\":\"只进一半\",\"aiNote\":\"控制风险\"},{\"label\":\"找人合伙\",\"aiNote\":\"分散风险\"}]"
-                  }
-                },
-                {
-                  "id": "deal_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "resourceKey": "经营资产.资金",
-                    "delta": 500
+                    "options": "[{\"label\":\"全款拿下\",\"aiNote\":\"一次性投入全部资金\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":400},\"requiresText\":\"钱袋不足 400\",\"effects\":[{\"currency\":-400},{\"fact\":\"economy.goods.羽绒服\",\"delta\":6}]},{\"label\":\"只进一半\",\"aiNote\":\"控制风险\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":200},\"requiresText\":\"钱袋不足 200\",\"effects\":[{\"currency\":-200},{\"fact\":\"economy.goods.羽绒服\",\"delta\":3}]},{\"label\":\"找人合伙\",\"aiNote\":\"分散风险\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":150},\"requiresText\":\"钱袋不足 150\",\"effects\":[{\"currency\":-150},{\"fact\":\"economy.goods.羽绒服\",\"delta\":2},{\"fact\":\"economy.reputation.local\",\"delta\":3},{\"flag\":\"有合伙人\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -10585,15 +9997,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "deal_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "deal_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "deal_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 6
             }
           },
           {
@@ -10637,19 +10048,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"接下这单\",\"aiNote\":\"铤而走险\"},{\"label\":\"拒绝\",\"aiNote\":\"不想冒险\"},{\"label\":\"举报立功\",\"aiNote\":\"做个守法公民\"}]"
-                  }
-                },
-                {
-                  "id": "smuggle_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "resourceKey": "经营资产.资金",
-                    "delta": 300
+                    "options": "[{\"label\":\"接下这单\",\"aiNote\":\"铤而走险\",\"check\":{\"stat\":\"economy.reputation.local\",\"dc\":12,\"label\":\"门路\",\"range\":[-100,100]},\"success\":{\"effects\":[{\"currency\":600}],\"note\":\"货顺利过了关。\"},\"failure\":{\"effects\":[{\"currency\":-300},{\"fact\":\"economy.reputation.local\",\"delta\":-10}],\"note\":\"货在口岸被扣下，还交了一笔罚款。\"}},{\"label\":\"拒绝\",\"aiNote\":\"不想冒险\",\"effects\":[]},{\"label\":\"举报立功\",\"aiNote\":\"做个守法公民\",\"effects\":[{\"fact\":\"economy.reputation.local\",\"delta\":8},{\"flag\":\"举报走私\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -10667,15 +10066,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "smuggle_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "smuggle_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "smuggle_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 10
             }
           },
           {
@@ -10717,19 +10115,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"借钱周转\",\"aiNote\":\"向朋友借钱\"},{\"label\":\"低价抛售库存\",\"aiNote\":\"割肉止损\"},{\"label\":\"谈判延期付款\",\"aiNote\":\"和供货商协商\"}]"
-                  }
-                },
-                {
-                  "id": "crisis_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "resourceKey": "经营资产.资金",
-                    "delta": -200
+                    "options": "[{\"label\":\"借钱周转\",\"aiNote\":\"向朋友借钱\",\"effects\":[{\"currency\":300},{\"flag\":\"欠朋友人情\",\"value\":true},{\"fact\":\"economy.reputation.local\",\"delta\":-2}]},{\"label\":\"低价抛售库存\",\"aiNote\":\"割肉止损\",\"requires\":{\"fact\":\"economy.goods.羽绒服\",\"op\":\">=\",\"value\":2},\"requiresText\":\"仓库里不到 2 件羽绒服\",\"effects\":[{\"fact\":\"economy.goods.羽绒服\",\"delta\":-2},{\"currency\":110}]},{\"label\":\"谈判延期付款\",\"aiNote\":\"和供货商协商\",\"check\":{\"stat\":\"economy.reputation.local\",\"dc\":11,\"label\":\"信誉\",\"range\":[-100,100]},\"success\":{\"note\":\"供货商同意宽限一周。\"},\"failure\":{\"effects\":[{\"currency\":-200},{\"fact\":\"economy.reputation.local\",\"delta\":-5}],\"note\":\"供货商当场翻脸，催走了一笔货款。\"}}]"
                   }
                 }
               ],
@@ -10747,15 +10133,20 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "crisis_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "crisis_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "crisis_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "when": {
+                "fact": "player.currency",
+                "op": "<",
+                "value": 600
+              },
+              "cooldownTurns": 12,
+              "description": "钱袋低于 600 时可能出现"
             }
           },
           {
@@ -10797,19 +10188,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"带上好酒参加\",\"aiNote\":\"给人留下好印象\"},{\"label\":\"空手去\",\"aiNote\":\"先看看情况\"},{\"label\":\"不去\",\"aiNote\":\"不信任陌生人\"}]"
-                  }
-                },
-                {
-                  "id": "net_effect",
-                  "typeId": "effect.flag",
-                  "position": {
-                    "x": 0,
-                    "y": 360
-                  },
-                  "widgetValues": {
-                    "flagPath": "flags.建立人脉",
-                    "value": true
+                    "options": "[{\"label\":\"带上好酒参加\",\"aiNote\":\"给人留下好印象\",\"requires\":{\"fact\":\"player.currency\",\"op\":\">=\",\"value\":30},\"requiresText\":\"钱袋不足 30\",\"effects\":[{\"currency\":-30},{\"fact\":\"economy.reputation.local\",\"delta\":10},{\"flag\":\"建立人脉\",\"value\":true}]},{\"label\":\"空手去\",\"aiNote\":\"先看看情况\",\"check\":{\"stat\":\"economy.reputation.local\",\"dc\":11,\"label\":\"口碑\",\"range\":[-100,100]},\"success\":{\"effects\":[{\"fact\":\"economy.reputation.local\",\"delta\":5},{\"flag\":\"建立人脉\",\"value\":true}],\"note\":\"有人听说过你，主动来攀谈。\"},\"failure\":{\"note\":\"一晚上没人搭理你。\"}},{\"label\":\"不去\",\"aiNote\":\"不信任陌生人\",\"effects\":[]}]"
                   }
                 }
               ],
@@ -10827,15 +10206,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "net_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "net_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "net_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true
             }
           },
           {
@@ -10877,19 +10255,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"全额退款\",\"aiNote\":\"维护信誉\"},{\"label\":\"换货\",\"aiNote\":\"更换商品\"},{\"label\":\"拒绝退款\",\"aiNote\":\"不承认问题\"}]"
-                  }
-                },
-                {
-                  "id": "qi_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "resourceKey": "经营资产.资金",
-                    "delta": -100
+                    "options": "[{\"label\":\"全额退款\",\"aiNote\":\"维护信誉\",\"effects\":[{\"currency\":-120},{\"fact\":\"economy.reputation.local\",\"delta\":4}]},{\"label\":\"换货\",\"aiNote\":\"更换商品\",\"effects\":[{\"currency\":-60},{\"fact\":\"economy.reputation.local\",\"delta\":2}]},{\"label\":\"拒绝退款\",\"aiNote\":\"不承认问题\",\"effects\":[{\"fact\":\"economy.reputation.local\",\"delta\":-10}]}]"
                   }
                 }
               ],
@@ -10907,15 +10273,24 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "qi_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "qi_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "qi_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "economy.traded"
+              ],
+              "when": {
+                "event": {
+                  "type": "economy.traded",
+                  "where": {
+                    "side": "sell"
+                  }
+                }
+              },
+              "chance": 0.2,
+              "cooldownTurns": 8,
+              "description": "卖货之后偶尔会遇到客户投诉"
             }
           },
           {
@@ -10957,19 +10332,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"接单\",\"aiNote\":\"抓住机会\"},{\"label\":\"分期交付\",\"aiNote\":\"降低风险\"},{\"label\":\"拒绝\",\"aiNote\":\"风险太大\"}]"
-                  }
-                },
-                {
-                  "id": "bd_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "resourceKey": "经营资产.资金",
-                    "delta": 800
+                    "options": "[{\"label\":\"接单\",\"aiNote\":\"抓住机会\",\"effects\":[{\"command\":\"economy.offerContract\",\"args\":{\"client\":\"大客户\",\"title\":\"大批羽绒服\",\"goods\":\"羽绒服\",\"quantity\":10,\"days\":7}}]},{\"label\":\"分期交付\",\"aiNote\":\"降低风险\",\"effects\":[{\"command\":\"economy.offerContract\",\"args\":{\"client\":\"大客户\",\"title\":\"分批交付羽绒服\",\"goods\":\"羽绒服\",\"quantity\":5,\"days\":10}}]},{\"label\":\"拒绝\",\"aiNote\":\"风险太大\",\"effects\":[{\"fact\":\"economy.reputation.local\",\"delta\":-2}]}]"
                   }
                 }
               ],
@@ -10987,15 +10350,14 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "bd_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "bd_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "bd_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "cooldownTurns": 8
             }
           },
           {
@@ -11037,19 +10399,7 @@
                     "y": 220
                   },
                   "widgetValues": {
-                    "options": "[{\"label\":\"报警\",\"aiNote\":\"寻求法律帮助\"},{\"label\":\"自己追讨\",\"aiNote\":\"找人帮忙追债\"},{\"label\":\"吸取教训\",\"aiNote\":\"当作学费\"}]"
-                  }
-                },
-                {
-                  "id": "scam_effect",
-                  "typeId": "effect.resource",
-                  "position": {
-                    "x": 0,
-                    "y": 350
-                  },
-                  "widgetValues": {
-                    "resourceKey": "经营资产.资金",
-                    "delta": -300
+                    "options": "[{\"label\":\"报警\",\"aiNote\":\"寻求法律帮助\",\"check\":{\"stat\":\"economy.reputation.local\",\"dc\":13,\"label\":\"关系\",\"range\":[-100,100]},\"effects\":[{\"currency\":-300},{\"flag\":\"有合伙人\",\"value\":false}],\"success\":{\"effects\":[{\"currency\":200}],\"note\":\"警方追回了一部分钱。\"},\"failure\":{\"note\":\"报案以后石沉大海。\"}},{\"label\":\"自己追讨\",\"aiNote\":\"找人帮忙追债\",\"check\":{\"stat\":\"economy.reputation.local\",\"dc\":12,\"label\":\"门路\",\"range\":[-100,100]},\"effects\":[{\"currency\":-350},{\"flag\":\"有合伙人\",\"value\":false}],\"success\":{\"effects\":[{\"currency\":280}],\"note\":\"你托人找到了骗子的下落，追回了大半。\"},\"failure\":{\"effects\":[{\"fact\":\"economy.reputation.local\",\"delta\":-5}],\"note\":\"追债闹得满城风雨，钱却没要回来。\"}},{\"label\":\"吸取教训\",\"aiNote\":\"当作学费\",\"effects\":[{\"currency\":-300},{\"flag\":\"有合伙人\",\"value\":false},{\"flag\":\"防骗经验\",\"value\":true}]}]"
                   }
                 }
               ],
@@ -11067,15 +10417,20 @@
                   "sourceSocketKey": "flow_out",
                   "targetNodeId": "scam_choice",
                   "targetSocketKey": "flow_in"
-                },
-                {
-                  "id": "c3",
-                  "sourceNodeId": "scam_choice",
-                  "sourceSocketKey": "flow_out",
-                  "targetNodeId": "scam_effect",
-                  "targetSocketKey": "flow_in"
                 }
               ]
+            },
+            "trigger": {
+              "on": [
+                "deck"
+              ],
+              "once": true,
+              "when": {
+                "fact": "flags.有合伙人",
+                "op": "==",
+                "value": true
+              },
+              "description": "和人合伙做过生意以后才会出现"
             }
           }
         ]

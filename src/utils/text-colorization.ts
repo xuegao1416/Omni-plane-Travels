@@ -483,9 +483,15 @@ function tokenizeHtmlTags(html: string, placeholders: Array<{ token: string; val
   return html.replace(/<[^>]+>/g, match => pushHtmlPlaceholder(placeholders, match))
 }
 
+// The default dialogue colour is a light-theme brown; the night reader shows it as the theme's dialogue gold.
+function themedFragmentColor(color: string): string {
+  const safe = sanitizeHexColor(color)
+  return safe === DEFAULT_TEXT_COLORIZATION_RULE_COLOR ? `var(--journey-dialogue, ${safe})` : safe
+}
+
 function wrapColorizedHtmlSegment(html: string, color: string): string {
   if (!html) return ''
-  return `<span class="text-colorized-fragment" style="color: ${sanitizeHexColor(color)};">${html}</span>`
+  return `<span class="text-colorized-fragment" style="color: ${themedFragmentColor(color)};">${html}</span>`
 }
 
 // === LRU缓存：避免重复的文本染色计算 ===

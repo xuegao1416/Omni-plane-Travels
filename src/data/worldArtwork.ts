@@ -32,7 +32,7 @@ export const WORLD_ARTWORK_PRESETS: WorldArtworkPreset[] = [
   { id: 'border_trade', name: '边境贸易', tone: '淡金边境', src: BUILTIN_SCENES.border_trade },
 ];
 
-export const NEUTRAL_WORLD_ARTWORK = '/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-v1.png';
+export const NEUTRAL_WORLD_ARTWORK = '/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-nocturne-v1.png';
 
 const clampFocal = (value: number | undefined, fallback: number) => (
   typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback

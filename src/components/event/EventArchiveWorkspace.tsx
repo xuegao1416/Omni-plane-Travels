@@ -22,7 +22,7 @@ import type { UseEventsResult } from './useEvents';
 import EventSwitch from './EventSwitch';
 import { resolveEventIcon } from './eventIcons';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
-import './event-archive.css';
+import '../../ui/screens/event-archive.css';
 
 interface EventArchiveWorkspaceProps {
   eventApi: UseEventsResult;
@@ -102,7 +102,7 @@ export default function EventArchiveWorkspace({
   };
 
   return (
-    <div className="entry-default-theme event-archive-screen">
+    <div className="event-archive-screen">
       <div className="event-archive-backdrop" aria-hidden="true" />
       <div className="event-archive-shell-wrap">
         <DawnFrameV4 mode="panel" withFill className="event-archive-frame" ariaLabel="旅庭事件典藏室">
@@ -112,7 +112,7 @@ export default function EventArchiveWorkspace({
                 <ArrowLeft size={17} /><span>返回旅庭</span>
               </button>
               <div className="event-archive-heading">
-                <span className="event-archive-kicker">DAWN ARCHIVE · GLOBAL EVENTS</span>
+                <span className="event-archive-kicker">ATLAS ARCHIVE · GLOBAL EVENTS</span>
                 <h1>事件典藏</h1>
                 <p>管理跨世界启用的事件包、规则与典藏来源。</p>
               </div>
@@ -210,7 +210,7 @@ function ArchiveListItem({ entry, selected, onSelect, onEnable, onDisable }: { e
   return (
     <div className={`event-archive-list-item${selected ? ' is-selected' : ''}`} role="listitem">
       <button type="button" className="event-archive-list-select" onClick={onSelect} aria-current={selected ? 'true' : undefined}>
-        <span className="event-archive-list-icon" style={{ background: entry.meta.coverColor }}><Icon size={18} /></span>
+        <span className="event-archive-list-icon" style={{ backgroundColor: entry.meta.coverColor }}><Icon size={18} /></span>
         <span className="event-archive-list-copy"><strong>{entry.meta.name}</strong><small>{TYPE_LABEL[entry.meta.type]} · v{entry.meta.version}</small><small>{entry.meta.author} · {formatDate(entry.registeredAt)}</small></span>
         <ChevronRight size={16} />
       </button>
@@ -223,7 +223,7 @@ function ArchiveDetail({ entry, detail, ruleCount, cardCount, conflictCount, onO
   const Icon = resolveEventIcon(entry.meta.icon, entry.meta.type);
   return (
     <div className="event-archive-detail">
-      <div className="event-archive-detail-heading"><span className="event-archive-detail-icon" style={{ background: entry.meta.coverColor }}><Icon size={22} /></span><div><span className="event-archive-kicker">{TYPE_LABEL[entry.meta.type]}</span><h2>{entry.meta.name}</h2><p>{entry.meta.author} · v{entry.meta.version}</p></div><span className={`event-archive-enabled-badge${entry.enabled ? ' is-on' : ''}`}>{entry.enabled ? '全局启用' : '全局停用'}</span></div>
+      <div className="event-archive-detail-heading"><span className="event-archive-detail-icon" style={{ backgroundColor: entry.meta.coverColor }}><Icon size={22} /></span><div><span className="event-archive-kicker">{TYPE_LABEL[entry.meta.type]}</span><h2>{entry.meta.name}</h2><p>{entry.meta.author} · v{entry.meta.version}</p></div><span className={`event-archive-enabled-badge${entry.enabled ? ' is-on' : ''}`}>{entry.enabled ? '全局启用' : '全局停用'}</span></div>
       <p className="event-archive-description">{entry.meta.description || '这份典藏尚未写下描述。打开编辑器补充它的世界规则与叙事入口。'}</p>
       <div className="event-archive-detail-stats"><span><strong>{cardCount}</strong>事件卡</span><span><strong>{ruleCount}</strong>规则</span><span><strong>{detail?.worldbookSummary?.length || 0}</strong>世界书</span><span><strong>{conflictCount || '—'}</strong>冲突</span></div>
       <div className="event-archive-detail-sections"><div><span>来源与兼容</span><strong>{entry.builtin ? '内置世界事件包' : '本地导入事件包'}</strong><small>schema v{entry.meta.schemaVersion} · 最低版本 {entry.meta.minAppVersion}</small></div><div><span>依赖状态</span><strong>{detail?.dependencyStatus?.filter((item) => !item.satisfied).length ? '有待处理依赖' : '依赖已满足'}</strong><small>{conflictCount ? '请打开规则编辑器检查冲突。' : '当前没有检测到活动冲突。'}</small></div></div>

@@ -266,34 +266,34 @@ function createGraphBuilder(direction: 'TB' | 'LR' = 'TB') {
       }
     }
 
-    // 样式类定义（匹配项目浅色主题）
+    // 样式类定义（夜色玻璃 + 分类描边）
     lines.push('');
-    lines.push('  classDef center fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e293b;');
-    lines.push('  classDef scene fill:#dbeafe,stroke:#3b82f6,stroke-width:1.6px,color:#1e293b;');
-    lines.push('  classDef thread fill:#ede9fe,stroke:#8b5cf6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef state fill:#d1fae5,stroke:#10b981,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef relation fill:#ffedd5,stroke:#f97316,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef event fill:#fce7f3,stroke:#ec4899,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef entity fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef archive fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef vector fill:#ccfbf1,stroke:#14b8a6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef summary fill:#fef3c7,stroke:#f59e0b,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef mutation fill:#fef9c3,stroke:#eab308,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef checkpoint fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef log fill:#d1fae5,stroke:#10b981,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef accent fill:#dbeafe,stroke:#3b82f6,stroke-width:1.4px,color:#1e293b;');
-    lines.push('  classDef muted fill:#f1f5f9,stroke:#94a3b8,stroke-width:1.1px,color:#475569,stroke-dasharray:5 3;');
-    lines.push('  classDef rootNode fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e293b;');
-    lines.push('  classDef infoNode fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef goalNode fill:#d1fae5,stroke:#10b981,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef riskNode fill:#fce7f3,stroke:#ec4899,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef focusNode fill:#ede9fe,stroke:#8b5cf6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef changeNode fill:#ffedd5,stroke:#f97316,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef metricNode fill:#ccfbf1,stroke:#14b8a6,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef timeNode fill:#fef3c7,stroke:#f59e0b,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef collectionNode fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#1e293b;');
-    lines.push('  classDef emptyNode fill:#f1f5f9,stroke:#94a3b8,stroke-width:1.1px,color:#475569;');
-    lines.push('  classDef filterNode fill:#dbeafe,stroke:#3b82f6,stroke-width:1.4px,color:#1e293b;');
+    lines.push('  classDef center fill:#121a33,stroke:#e3c27e,stroke-width:2px,color:#f1ead8;');
+    lines.push('  classDef scene fill:#121a33,stroke:#e3c27e,stroke-width:1.6px,color:#f1ead8;');
+    lines.push('  classDef thread fill:#1a1633,stroke:#c9a8ff,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef state fill:#122420,stroke:#a9d48a,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef relation fill:#2a1a12,stroke:#f2a76d,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef event fill:#2a1420,stroke:#f08f86,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef entity fill:#121a33,stroke:#e3c27e,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef archive fill:#141826,stroke:#8f8875,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef vector fill:#10222a,stroke:#8fd0d6,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef summary fill:#2a2210,stroke:#f2c66d,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef mutation fill:#262210,stroke:#e8d48a,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef checkpoint fill:#121a33,stroke:#e3c27e,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef log fill:#122420,stroke:#a9d48a,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef accent fill:#121a33,stroke:#e3c27e,stroke-width:1.4px,color:#f1ead8;');
+    lines.push('  classDef muted fill:#0f1322,stroke:#6f6a5c,stroke-width:1.1px,color:#a39c88,stroke-dasharray:5 3;');
+    lines.push('  classDef rootNode fill:#121a33,stroke:#e3c27e,stroke-width:2px,color:#f1ead8;');
+    lines.push('  classDef infoNode fill:#121a33,stroke:#e3c27e,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef goalNode fill:#122420,stroke:#a9d48a,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef riskNode fill:#2a1420,stroke:#f08f86,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef focusNode fill:#1a1633,stroke:#c9a8ff,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef changeNode fill:#2a1a12,stroke:#f2a76d,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef metricNode fill:#10222a,stroke:#8fd0d6,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef timeNode fill:#2a2210,stroke:#f2c66d,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef collectionNode fill:#141826,stroke:#8f8875,stroke-width:1.5px,color:#f1ead8;');
+    lines.push('  classDef emptyNode fill:#0f1322,stroke:#6f6a5c,stroke-width:1.1px,color:#a39c88;');
+    lines.push('  classDef filterNode fill:#121a33,stroke:#e3c27e,stroke-width:1.4px,color:#f1ead8;');
 
     // 应用样式类到节点
     const classNodes = nodes.filter((n) => n.class);

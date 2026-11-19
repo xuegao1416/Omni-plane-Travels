@@ -210,7 +210,6 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
       zIndex: 1000, animation: 'fadeIn 0.15s ease',
     }} onClick={onClose}>
       <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
-        borderRadius: 'var(--radius-lg)',
         width: '92%', maxWidth: '640px', height: '82vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>

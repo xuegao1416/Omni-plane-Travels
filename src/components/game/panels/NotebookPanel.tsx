@@ -18,7 +18,7 @@ interface Props { gameState: GameState; }
 const CHRONICLE_TYPE_CONFIG: Record<ChronicleType, { icon: typeof AlertTriangle; color: string; label: string }> = {
   '风险': { icon: AlertTriangle, color: 'var(--danger)', label: '风险' },
   '机遇': { icon: Sparkles, color: 'var(--success)', label: '机遇' },
-  '线索': { icon: Search, color: '#3b82f6', label: '线索' },
+  '线索': { icon: Search, color: '#7f9cd6', label: '线索' },
   '关系': { icon: Shield, color: '#ec4899', label: '关系' },
   '地点': { icon: MapPin, color: '#06b6d4', label: '地点' },
   '物品': { icon: Package, color: '#84cc16', label: '物品' },
@@ -111,15 +111,9 @@ export default function NotebookPanel({ gameState }: Props) {
           return (
             <button
               key={type}
+              type="button"
+              aria-pressed={isActive}
               onClick={() => setFilter(type)}
-              style={{
-                padding: '2px 8px', fontSize: 'var(--font-size-xs)',
-                borderRadius: 'var(--radius-sm)',
-                background: isActive ? 'var(--text-primary)' : 'var(--bg-tertiary)',
-                color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border)',
-                cursor: 'pointer', fontWeight: isActive ? '600' : '400',
-              }}
             >
               {type}{count > 0 ? ` ${count}` : ''}
             </button>

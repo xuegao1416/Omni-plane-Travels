@@ -1,4 +1,5 @@
-import { themeEmblem } from '../../../data/themeEmblemCatalog';
+import type { LucideIcon } from 'lucide-react';
+import { UserRound,Users,Target,Swords,ScrollText,Variable,LibraryBig,Clapperboard,Brain,Puzzle,Settings2,FileQuestion,TriangleAlert } from 'lucide-react';
 
 export type DossierPanelId =
   | 'profile' | 'relations' | 'tasks' | 'chronicle' | 'variables'
@@ -9,23 +10,23 @@ export type DossierPanelId =
 export interface DossierPanelMeta {
   title: string;
   subtitle: string;
-  emblemSrc?: string;
+  icon: LucideIcon;
 }
 
 export const DOSSIER_META: Record<DossierPanelId, DossierPanelMeta> = {
-  profile: { title: '人物档案', subtitle: '身份、能力与随身行囊', emblemSrc: '/art/theme/emblems/emblem-25-v2.png' },
-  relations: { title: '角色关系', subtitle: '同行者、阵营与互动记录', emblemSrc: '/art/theme/emblems/emblem-17-v2.png' },
-  tasks: { title: '任务卷宗', subtitle: '目标、阶段与可领取回报', emblemSrc: '/art/theme/emblems/emblem-11-v2.png' },
-  profession: { title: '职业', subtitle: '按四阶道路查看前置关系与已掌握能力', emblemSrc: themeEmblem(33) },
-  chronicle: { title: '旅途纪事', subtitle: '按时间整理的世界日志', emblemSrc: themeEmblem(32) },
-  variables: { title: '变量档案', subtitle: '玩家、世界与资源状态', emblemSrc: '/art/theme/emblems/emblem-08-v2.png' },
-  worldbook: { title: '世界书', subtitle: '条目、目录与启用状态', emblemSrc: themeEmblem(34) },
-  dynamics: { title: '剧情导演', subtitle: '剧情计划、落实回执与幕后发展', emblemSrc: '/art/theme/emblems/emblem-20-v2.png' },
-  memory: { title: '记忆回廊', subtitle: '长期、短期与关键记忆', emblemSrc: '/art/theme/emblems/emblem-24-v2.png' },
-  modules: { title: '本局模块', subtitle: '只影响当前旅程的启用开关', emblemSrc: '/art/theme/emblems/emblem-13-v2.png' },
-  settings: { title: '旅途设置', subtitle: '主题、文字、显示与生成偏好', emblemSrc: '/art/theme/emblems/emblem-26-v2.png' },
-  empty: { title: '空卷宗', subtitle: '这里暂时没有可展示的旅途记录', emblemSrc: '/art/theme/emblems/emblem-05-v2.png' },
-  error: { title: '卷宗读取失败', subtitle: '可以重试或关闭当前卷宗', emblemSrc: '/art/theme/emblems/emblem-09-v2.png' },
+  profile: { title: '人物档案', subtitle: '身份、能力与随身行囊', icon: UserRound },
+  relations: { title: '角色关系', subtitle: '同行者、阵营与互动记录', icon: Users },
+  tasks: { title: '任务卷宗', subtitle: '目标、阶段与可领取回报', icon: Target },
+  profession: { title: '职业', subtitle: '按四阶道路查看前置关系与已掌握能力', icon: Swords },
+  chronicle: { title: '旅途纪事', subtitle: '按时间整理的世界日志', icon: ScrollText },
+  variables: { title: '变量档案', subtitle: '玩家、世界与资源状态', icon: Variable },
+  worldbook: { title: '世界书', subtitle: '条目、目录与启用状态', icon: LibraryBig },
+  dynamics: { title: '剧情导演', subtitle: '剧情计划、落实回执与幕后发展', icon: Clapperboard },
+  memory: { title: '记忆回廊', subtitle: '长期、短期与关键记忆', icon: Brain },
+  modules: { title: '本局模块', subtitle: '只影响当前旅程的启用开关', icon: Puzzle },
+  settings: { title: '旅途设置', subtitle: '主题、文字、显示与生成偏好', icon: Settings2 },
+  empty: { title: '空卷宗', subtitle: '这里暂时没有可展示的旅途记录', icon: FileQuestion },
+  error: { title: '卷宗读取失败', subtitle: '可以重试或关闭当前卷宗', icon: TriangleAlert },
 };
 
 export const DOSSIER_ALIASES: Record<string, DossierPanelId> = {

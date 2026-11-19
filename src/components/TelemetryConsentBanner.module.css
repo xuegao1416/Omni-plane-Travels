@@ -10,34 +10,23 @@
   gap: 24px;
   max-width: 920px;
   margin: 0 auto;
-  padding: 16px 18px;
-  border: 1px solid var(--creation-border, rgba(122, 166, 153, 0.42));
-  border-radius: 16px;
-  background: var(--creation-surface, rgba(248, 252, 242, 0.97));
-  color: var(--creation-text, #304d45);
-  box-shadow: 0 12px 40px rgba(18, 43, 36, 0.2);
-  backdrop-filter: blur(16px);
+  padding: 16px 20px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(var(--d-raise-bg, 20, 24, 44), .96), rgba(var(--d-night-bg, 9, 11, 22), .97));
+  color: var(--pk-text);
+  box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .42), inset 0 0 0 4px rgba(var(--d-deep, 4, 6, 14), .6), inset 0 0 0 5px rgba(var(--d-gold, 233, 207, 150), .14), 0 18px 40px rgba(var(--d-shade, 0, 0, 0), calc(.6 * var(--d-shade-k, 1)));
+  backdrop-filter: blur(14px);
+  animation: banner-in .6s var(--pk-spring) both;
 }
+@keyframes banner-in { from { opacity: 0; transform: translateY(18px); } }
 
-.copy { display: grid; gap: 5px; min-width: 0; }
-.copy strong { font-size: 15px; }
-.copy span { color: var(--creation-text-muted, #587068); font-size: 13px; line-height: 1.55; }
+.copy { display: grid; gap: 6px; min-width: 0; }
+.copy strong { color: rgb(var(--d-cream, 242, 227, 189)); font: 600 15px/1.3 var(--pl-font-serif); letter-spacing: .06em; }
+.copy span { color: var(--pk-text-2); font-size: 13px; line-height: 1.6; }
 .actions { display: flex; flex: none; gap: 10px; }
-.actions button {
-  min-height: 40px;
-  padding: 0 16px;
-  border-radius: 10px;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-.actions button:hover { transform: translateY(-1px); }
-.actions button:focus-visible { outline: 2px solid #5b927f; outline-offset: 2px; }
-.secondary { border: 1px solid var(--creation-border, rgba(122, 166, 153, 0.42)); background: transparent; color: inherit; }
-.primary { border: 1px solid #3f7766; background: #3f7766; color: #fff; box-shadow: 0 4px 12px rgba(63, 119, 102, 0.24); }
 
 @media (max-width: 680px) {
   .banner { align-items: stretch; flex-direction: column; gap: 14px; right: 12px; bottom: 12px; left: 12px; }
   .actions { display: grid; grid-template-columns: 1fr 1fr; }
 }
+@media (prefers-reduced-motion: reduce) { .banner { animation: none; } }

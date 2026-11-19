@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, afterAll } from 'bun:test';
 import { mock } from 'bun:test';
 
 // ── 模拟 Tauri invoke / event（在导入 eventApi 前注册） ──
@@ -74,129 +74,148 @@ mock.module('../../utils/nativeFetch', () => ({
 // eventApi 现以 window.__TAURI_INTERNALS__ 判定是否在 Tauri 运行时（@tauri-apps/api/core 内部亦依赖之）。
 // 测试环境已用 mock.module 替换 invoke，这里补上运行时标记，让 isTauri() 返回 true 以走 mock。
 const g = globalThis as unknown as { window?: Record<string, unknown> };
+const hadWindow = g.window !== undefined;
 g.window = g.window ?? {};
+const previousTauriMarker = g.window.__TAURI_INTERNALS__;
 g.window.__TAURI_INTERNALS__ = {};
+// 测试结束后撤掉 Tauri 运行时标记，避免后续测试文件误走原生 HTTP 通道。
+afterAll(() => {
+  if (!g.window) return;
+  if (previousTauriMarker === undefined) delete g.window.__TAURI_INTERNALS__;
+  else g.window.__TAURI_INTERNALS__ = previousTauriMarker;
+  if (!hadWindow && Object.keys(g.window).length === 0) delete g.window;
+});
 
-import { evaluate } from '../ruleEngine';
 import { parseManifest } from '../manifestSchema';
 import type { EventRule } from '../schema';
+import { clearEventCatalog, compileEventCatalog, setEventCatalog } from '../../events/catalog';
+import { readDirector } from '../../events/state';
+import type { GameState } from '../../schema/variables';
+import {
+  canonicalCardFiles, cardWorkflow, eventTestState, eventTestWorld, flagsOf, hostFor, playTurn, readPackCards, runtimePack,
+} from '../../__tests__/helpers/eventFixtures';
 
-describe('ruleEngine — 确定性', () => {
+// 规则不再由独立的规则引擎解释，而是编译进事件导演（events 模块）后按回合结算。
+// 以下沿用旧 ruleEngine 测试的场景：确定性、条件触发、权限白名单、安全上限、一次性规则。
+function rulePack(rules: EventRule[], permissions: string[]) {
+  const world = eventTestWorld('rule_engine_world');
+  const pack = runtimePack('test:rules', permissions, {
+    'schema/rules.json': JSON.stringify({ version: 1, rules }),
+    ...canonicalCardFiles('奇遇', [cardWorkflow('adventure', '奇遇', [{ label: '前往' }])]),
+  });
+  const compiled = compileEventCatalog(world, [pack], readPackCards);
+  setEventCatalog({ worldId: world.id, definitions: compiled.definitions, warnings: compiled.warnings, summary: '' });
+  return { world, warnings: compiled.warnings, definitions: compiled.definitions };
+}
+
+function runTurn(rules: EventRule[], permissions: string[], mutate?: (state: GameState) => void) {
+  const { world, warnings, definitions } = rulePack(rules, permissions);
+  const { host, state } = hostFor(world, eventTestState(mutate));
+  const turn = playTurn(host, state, 1);
+  return { host, input: state, ...turn, warnings: [...warnings, ...turn.ended.warnings], definitions };
+}
+
+const diceRule: EventRule = {
+  id: 'adventure-rule',
+  when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
+  then: [{ addEvent: { eventId: 'adventure' } }, { set: { path: 'flags.quest', value: 'active' } }],
+};
+const withRoll = (total: number) => (state: GameState) => {
+  (state as unknown as { dice: unknown }).dice = { lastRoll: { total } };
+  // 同样的输入包括同样的随机种子。
+  state.gameplay = { ...(state.gameplay ?? {}), rng: { seed: 'rule-determinism', counter: 0 } } as never;
+};
+
+describe('事件规则 — 确定性', () => {
   it('相同输入产生相同输出', () => {
-    const ctx = { dice: { lastRoll: { total: 5 } } };
-    const rules: EventRule[] = [
-      {
-        id: 'r1',
-        when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
-        then: [{ addEvent: { eventId: 'adventure' } }, { set: { path: 'world.quest', value: 'active' } }],
-      },
-    ];
-    const opts = { permissions: ['add_card', 'modify_world_state'] as const, tick: 1 };
-    const a = evaluate(ctx, rules, opts as any);
-    const b = evaluate(ctx, rules, opts as any);
-    expect(JSON.stringify(a.ctx)).toEqual(JSON.stringify(b.ctx));
-    expect(JSON.stringify(a.applied)).toEqual(JSON.stringify(b.applied));
+    const a = runTurn([diceRule], ['add_card', 'modify_world_state'], withRoll(5));
+    const b = runTurn([diceRule], ['add_card', 'modify_world_state'], withRoll(5));
+    expect(JSON.stringify(a.state)).toEqual(JSON.stringify(b.state));
+    expect(JSON.stringify(a.ended.changes)).toEqual(JSON.stringify(b.ended.changes));
+    clearEventCatalog();
   });
 
-  it('不污染入参上下文', () => {
-    const ctx: Record<string, unknown> = { hp: 10 };
-    const rules: EventRule[] = [{ id: 'r', when: { all: [] }, then: [{ set: { path: 'hp', value: 99 } }] }];
-    evaluate(ctx, rules, { permissions: ['modify_world_state'], tick: 1 });
-    expect(ctx.hp).toBe(10);
+  it('不污染入参状态', () => {
+    const result = runTurn([{ id: 'r', when: { all: [] }, then: [{ set: { path: 'flags.hp', value: 99 } }] }], ['modify_world_state']);
+    expect(flagsOf(result.input).hp).toBeUndefined();
+    expect(flagsOf(result.state).hp).toBe(99);
+    clearEventCatalog();
   });
 });
 
-describe('ruleEngine — AC-E1 骰子>4 触发奇遇卡片', () => {
+describe('事件规则 — AC-E1 骰子>4 触发奇遇卡片', () => {
   it('骰子得 5 时触发 addEvent 并改写世界状态', () => {
-    const ctx = { dice: { lastRoll: { total: 5 } }, world: {} as Record<string, unknown> };
-    const rules: EventRule[] = [
-      {
-        id: 'adventure-rule',
-        when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
-        then: [
-          { addEvent: { eventId: 'adventure' } },
-          { set: { path: 'world.quest', value: 'active' } },
-        ],
-      },
-    ];
-    const res = evaluate(ctx, rules, { permissions: ['add_card', 'modify_world_state'], tick: 3 });
-    expect(res.applied.some((a) => a.kind === 'addEvent' && (a.detail as any).eventId === 'adventure')).toBe(true);
-    expect((res.ctx.world as Record<string, unknown>).quest).toBe('active');
+    const result = runTurn([diceRule], ['add_card', 'modify_world_state'], withRoll(5));
+    expect(readDirector(result.state).queue.map(item => item.eventId)).toEqual(['adventure']);
+    expect(flagsOf(result.state).quest).toBe('active');
+    clearEventCatalog();
   });
 
   it('骰子得 3 时不触发', () => {
-    const ctx = { dice: { lastRoll: { total: 3 } }, world: {} as Record<string, unknown> };
-    const rules: EventRule[] = [
-      {
-        id: 'adventure-rule',
-        when: { state: { path: 'dice.lastRoll.total', op: '>', value: 4 } },
-        then: [{ addEvent: { eventId: 'adventure' } }],
-      },
-    ];
-    const res = evaluate(ctx, rules, { permissions: ['add_card'], tick: 1 });
-    expect(res.applied.length).toBe(0);
+    const result = runTurn([diceRule], ['add_card', 'modify_world_state'], withRoll(3));
+    expect(readDirector(result.state).queue).toEqual([]);
+    expect(flagsOf(result.state).quest).toBeUndefined();
+    clearEventCatalog();
   });
 });
 
-describe('ruleEngine — 权限 / 白名单', () => {
+describe('事件规则 — 权限 / 白名单', () => {
   it('缺少权限的动作被跳过并告警', () => {
-    const ctx = {};
-    const rules: EventRule[] = [{ id: 'r', when: { all: [] }, then: [{ addEvent: { eventId: 'x' } }] }];
-    const res = evaluate(ctx, rules, { permissions: ['modify_world_state'], tick: 1 });
-    expect(res.applied.length).toBe(0);
-    expect(res.warnings.some((w) => w.includes('缺少权限'))).toBe(true);
+    const result = runTurn([{ id: 'r', when: { all: [] }, then: [{ addEvent: { eventId: 'adventure' } }] }], ['modify_world_state']);
+    expect(readDirector(result.state).queue).toEqual([]);
+    expect(result.warnings.some(warning => warning.includes('缺少权限'))).toBe(true);
+    clearEventCatalog();
   });
 
-  it('未知动作被白名单拒绝', () => {
-    const ctx = {};
-    const rules: EventRule[] = [
-      { id: 'r', when: { all: [] }, then: [{ set: { path: 'a', value: 1 } }, { foo: { x: 1 } } as any] },
-    ];
-    const res = evaluate(ctx, rules, { permissions: ['modify_world_state'], tick: 1 });
-    expect(res.applied.length).toBe(1);
-    expect(res.warnings.some((w) => w.includes('无法识别'))).toBe(true);
+  it('未知动作被白名单拒绝，其余动作照常执行', () => {
+    const result = runTurn([
+      { id: 'r', when: { all: [] }, then: [{ set: { path: 'flags.a', value: 1 } }, { foo: { x: 1 } } as never] },
+    ], ['modify_world_state']);
+    expect(flagsOf(result.state).a).toBe(1);
+    expect(result.warnings.some(warning => warning.includes('无法识别'))).toBe(true);
+    clearEventCatalog();
   });
 });
 
-describe('ruleEngine — 硬性上限', () => {
+describe('事件规则 — 硬性上限', () => {
   it('单规则动作数超过 16 被截断', () => {
-    const ctx = {};
-    const then = Array.from({ length: 20 }, (_, i) => ({ set: { path: `v${i}`, value: i } })) as any;
-    const rules: EventRule[] = [{ id: 'r', when: { all: [] }, then }];
-    const res = evaluate(ctx, rules, { permissions: ['modify_world_state'], tick: 1 });
-    expect(res.applied.length).toBe(16);
-    expect(res.warnings.some((w) => w.includes('动作数'))).toBe(true);
+    const then = Array.from({ length: 20 }, (_, index) => ({ set: { path: `flags.v${index}`, value: index } }));
+    const result = runTurn([{ id: 'r', when: { all: [] }, then }], ['modify_world_state']);
+    const flags = flagsOf(result.state);
+    expect(Object.keys(flags).filter(key => key.startsWith('v'))).toHaveLength(16);
+    expect(flags.v16).toBeUndefined();
+    expect(result.warnings.some(warning => warning.includes('动作数'))).toBe(true);
+    clearEventCatalog();
   });
 
-  it('每 mod 规则数超过 128 被截断', () => {
-    const ctx = {};
-    const rules: EventRule[] = Array.from({ length: 200 }, (_, i) => ({
-      id: `r${i}`,
-      when: { all: [] },
-      then: [{ set: { path: `v${i}`, value: i } }],
+  it('每个事件包规则数超过 128 被截断', () => {
+    const rules: EventRule[] = Array.from({ length: 200 }, (_, index) => ({
+      id: `r${index}`, when: { all: [] }, then: [{ set: { path: `flags.v${index}`, value: index } }],
     }));
-    const res = evaluate(ctx, rules, { permissions: ['modify_world_state'], tick: 1 });
-    expect(res.applied.length).toBe(128);
+    const result = runTurn(rules, ['modify_world_state']);
+    expect(result.definitions.filter(def => def.kind === 'rule')).toHaveLength(128);
+    expect(Object.keys(flagsOf(result.state))).toHaveLength(128);
+    clearEventCatalog();
   });
 
-  it('条件树深超过 6 中止求值（AC-E2 防死循环）', () => {
-    let cond: any = { all: [] };
-    for (let i = 0; i < 8; i++) cond = { all: [cond] };
-    const rules: EventRule[] = [{ id: 'r', when: cond, then: [{ set: { path: 'x', value: 1 } }] }];
-    const res = evaluate({}, rules, { permissions: ['modify_world_state'], tick: 1 });
-    expect(res.aborted).toBe(true);
+  it('条件树深超过 6 的规则不加载（AC-E2 防死循环）', () => {
+    let condition: EventRule['when'] = { all: [] };
+    for (let index = 0; index < 8; index++) condition = { all: [condition] };
+    const result = runTurn([{ id: 'r', when: condition, then: [{ set: { path: 'flags.x', value: 1 } }] }], ['modify_world_state']);
+    expect(flagsOf(result.state).x).toBeUndefined();
+    expect(result.warnings.some(warning => warning.includes('条件树深'))).toBe(true);
+    clearEventCatalog();
   });
 
   it('once 规则仅触发一次', () => {
-    const ctx = {};
-    const rules: EventRule[] = [
-      { id: 'r', once: true, when: { all: [] }, then: [{ set: { path: 'x', value: 1 } }] },
-    ];
-    const runtime = { onceFired: {}, cooldownRemaining: {} };
-    const r1 = evaluate(ctx, rules, { permissions: ['modify_world_state'], runtime, tick: 1 });
-    expect(r1.applied.length).toBe(1);
-    const r2 = evaluate(ctx, rules, { permissions: ['modify_world_state'], runtime, tick: 2 });
-    expect(r2.applied.length).toBe(0);
+    const result = runTurn([{ id: 'r', once: true, when: { all: [] }, then: [{ set: { path: 'flags.x', value: 1 } }] }], ['modify_world_state']);
+    expect(flagsOf(result.state).x).toBe(1);
+    const reset = structuredClone(result.state);
+    (reset.flags as Record<string, unknown>).x = 0;
+    const second = playTurn(result.host, reset, 2);
+    expect(flagsOf(second.state).x).toBe(0);
+    expect(readDirector(second.state).fired['test:rules/r']?.count).toBe(1);
+    clearEventCatalog();
   });
 });
 

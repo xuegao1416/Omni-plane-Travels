@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import { getDevScreenshotTarget } from '../dev/screenshotPreset';
 import { getCreationDraftOwner } from './creationDraftOwner';
 import { WORLDS, type WorldDef } from '../data/worldLoader';
 import type { PlayerProfile } from '../storage/db';
@@ -15,7 +16,7 @@ interface UseWizardOptions {
 }
 
 export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
-  const [view, setView] = useState<'main' | 'wizard' | 'saves'>('main');
+  const [view, setView] = useState<'main' | 'wizard'>(() => getDevScreenshotTarget() === 'wizard' ? 'wizard' : 'main');
   const [hallWorld, setHallWorld] = useState(initialWorld);
   const creationDraftOwner = getCreationDraftOwner();
   const draft = useSyncExternalStore(creationDraftOwner.subscribe, creationDraftOwner.getSnapshot, creationDraftOwner.getSnapshot);
@@ -60,7 +61,7 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
   }, [createdWorlds]);
 
   // ─── 世界编辑器 ───
-  const [worldEditorOpen, setWorldEditorOpen] = useState(false);
+  const [worldEditorOpen, setWorldEditorOpen] = useState(() => getDevScreenshotTarget() === 'editor');
   const [editingWorld, setEditingWorld] = useState<WorldDef | null>(null);
   const [worldEditorInitialStep, setWorldEditorInitialStep] = useState<number | undefined>(undefined);
 

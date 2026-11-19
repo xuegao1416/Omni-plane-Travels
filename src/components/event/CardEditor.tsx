@@ -4,6 +4,7 @@
 //  CardEditor 只负责编辑事件内容。
 // ============================================================
 import { useEffect,useState,useCallback } from 'react';
+import '../../ui/screens/event-workbench.css';
 import { useIsPhone } from '../../hooks/useIsMobile';
 import {
 ArrowLeft,Save,Download,Trash2,Plus,Settings,Layers,Loader2,Lock,Check,AlertTriangle,LayoutDashboard
@@ -313,18 +314,17 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
 
   // ── 渲染 ──
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-primary)' }}>
+    <div className="pk-workbench" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 顶部工具栏 */}
-      <div className="event-toolbar-scroll" style={{
+      <div className="event-toolbar-scroll pk-workbench__bar" style={{
         padding: isPhone ? '6px 8px' : 'var(--space-2) var(--space-3)',
-        borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: isPhone ? 'var(--space-1)' : 'var(--space-2)',
         flexShrink: 0, overflow: 'hidden',
       }}>
         <button onClick={onBack} className="btn-ghost btn-sm" title="返回" style={{ minHeight: isPhone ? 36 : 'var(--touch-min)', minWidth: isPhone ? 36 : undefined, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, padding: isPhone ? '4px' : undefined }}>
           <ArrowLeft size={16} />{!isPhone && ' 返回'}
         </button>
-        <h1 style={{ fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-lg)', fontWeight: 600, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>
+        <h1 className="pk-workbench__title" style={{ fontSize: isPhone ? 'var(--font-size-sm)' : 'var(--font-size-lg)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>
           {manifest.name || '未命名事件包'}
         </h1>
         {issues.length > 0 && (
@@ -355,7 +355,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
           )}
           {/* 世界绑定 */}
           {worldBound && worldDef && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', color: 'var(--success)', padding: isPhone ? '2px 4px' : '4px 8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span className="pk-workbench__lock" style={{ display: 'inline-flex', alignItems: 'center', gap: isPhone ? 2 : 4, fontSize: 'var(--font-size-xs)', padding: isPhone ? '2px 4px' : '4px 8px', whiteSpace: 'nowrap', flexShrink: 0 }}>
               <Lock size={12} /> {isPhone ? worldDef.name.slice(0, 3) : worldDef.name}
             </span>
           )}
@@ -363,11 +363,11 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
       </div>
 
       {/* 主体：桌面端 三栏 / 手机端 纯画布 */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: isPhone ? '1fr' : '180px 1fr 220px', overflow: 'hidden', position: 'relative' }}>
+      <div className="pk-workbench__body" style={{ flex: 1, display: 'grid', gridTemplateColumns: isPhone ? '1fr' : '196px 1fr 228px', overflow: 'hidden', position: 'relative' }}>
         {/* 左侧：事件列表（桌面端内联 / 手机端隐藏） */}
         {!isPhone && (
-          <div style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: 'var(--space-2)', borderBottom: '1px solid var(--border)' }}>
+          <div className="pk-workbench__side" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="pk-workbench__side-head" style={{ padding: 'var(--space-2)' }}>
               <button onClick={handleNewEvent} className="btn-secondary btn-sm" style={{ width: '100%' }}>
                 <Plus size={14} /> 新事件
               </button>
@@ -377,11 +377,10 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
                 <div
                   key={entry.id}
                   onClick={() => handleSelectEvent(entry.id)}
-                  style={{
+                  className={`pk-workbench__row${selectedEventId === entry.id ? ' is-active' : ''}`}
+                    style={{
                     padding: 'var(--space-2) var(--space-3)',
                     cursor: 'pointer',
-                    background: selectedEventId === entry.id ? 'var(--bg-active)' : 'transparent',
-                    borderBottom: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                   }}
                 >
@@ -406,11 +405,9 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
         <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {/* 事件名（桌面端显示，手机端隐藏 — 手机端通过 FAB 切换事件） */}
           {!isPhone && (
-            <div style={{
+            <div className="pk-workbench__subbar" style={{
               padding: 'var(--space-2) var(--space-3)',
-              borderBottom: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-              background: 'var(--bg-secondary)', flexShrink: 0,
+              display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0,
             }}>
               <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>事件:</span>
               <input
@@ -444,7 +441,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <button
                 onClick={() => setMobileEventList(true)}
                 aria-label="事件列表"
-                style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+                className="pk-workbench__fab"
               >
                 <Layers size={20} />
               </button>
@@ -452,7 +449,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <button
                 onClick={() => setMobileNodePanel(true)}
                 aria-label="节点面板"
-                style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+                className="pk-workbench__fab"
               >
                 <Plus size={20} />
               </button>
@@ -460,7 +457,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
               <button
                 onClick={() => setShowSettings(true)}
                 aria-label="设置"
-                style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', cursor: 'pointer' }}
+                className="pk-workbench__fab"
               >
                 <Settings size={20} />
               </button>
@@ -470,7 +467,7 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
 
         {/* 右侧：节点面板（桌面端内联 / 手机端隐藏） */}
         {!isPhone && (
-          <div style={{ borderLeft: '1px solid var(--border)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+          <div className="pk-workbench__side pk-workbench__side--right" style={{ overflow: 'hidden' }}>
             <CardNodePalette onAddNode={handleAddNode} />
           </div>
         )}
@@ -507,11 +504,10 @@ export default function CardEditor({ eventPackId, onBack, gameState, onSaved, wo
                 <div
                   key={entry.id}
                   onClick={() => { handleSelectEvent(entry.id); setMobileEventList(false); }}
-                  style={{
+                  className={`pk-workbench__row${selectedEventId === entry.id ? ' is-active' : ''}`}
+                    style={{
                     padding: 'var(--space-3) var(--space-3)',
                     cursor: 'pointer',
-                    background: selectedEventId === entry.id ? 'var(--bg-active)' : 'transparent',
-                    borderBottom: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
                   }}
                 >

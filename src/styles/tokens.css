@@ -1,26 +1,26 @@
 /* ═══════════════════════════════════════════════
    设计 Token — 颜色 / 间距 / 排版 / 圆角 / 阴影 / 动画 / 布局
-   主题切换由 [data-theme] 属性驱动（configStore 设置 dataset.theme）
+   界面只有一套主题（星仪夜色），由 ui/planar/planar-base.css 覆盖到夜色值。
    ═══════════════════════════════════════════════ */
 
 :root {
-  /* ─── 主题色（light 默认，与 configStore light 一致）─── */
-  --bg-primary: #f0f4f8;
+  /* ─── 主题色基础值（全部被 planar-base.css 的夜色值覆盖，这里只作兜底）─── */
+  --bg-primary: rgb(var(--d-blue-bg, 240, 244, 248));
   --bg-secondary: #ffffff;
-  --bg-tertiary: #e2e8f0;
-  --bg-deep: #e8edf3;
+  --bg-tertiary: rgb(var(--d-blue-bg, 226, 232, 240));
+  --bg-deep: rgb(var(--d-blue-bg, 232, 237, 243));
   --bg-elevated: #ffffff;
-  --text-primary: #1e293b;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --accent: #3b82f6;
-  --accent-dim: rgba(59, 130, 246, 0.08);
-  --accent-glow: rgba(59, 130, 246, 0.12);
-  --border: #cbd5e1;
-  --danger: #dc2626;
-  --warning: #d97706;
-  --success: #16a34a;
-  --color-on-accent: #fff;
+  --text-primary: rgb(var(--d-raise, 30, 41, 59));
+  --text-secondary: rgb(var(--d-ink3, 71, 85, 105));
+  --text-muted: rgb(var(--d-ink2, 148, 163, 184));
+  --accent: rgb(var(--d-blue, 59, 130, 246));
+  --accent-dim: rgba(var(--d-blue, 59, 130, 246), 0.08);
+  --accent-glow: rgba(var(--d-blue, 59, 130, 246), 0.12);
+  --border: rgb(var(--d-ink2, 203, 213, 225));
+  --danger: rgb(var(--d-red, 220, 38, 38));
+  --warning: rgb(var(--d-brass, 217, 119, 6));
+  --success: rgb(var(--d-ok, 22, 163, 74));
+  --color-on-accent: rgb(var(--d-white-fg, 255, 255, 255));
 
   /* 语义色 tint 刻度（单一来源；color-mix 经 var(--danger/--warning/--success) 自动跟随主题。
      仅在 :root 定义，无需在 dark/metal/green 块重复。三档：soft 8% / 默认 12% / hover 28% */
@@ -65,10 +65,10 @@
   --radius-full: 50%;
 
   /* ─── 阴影 ─── */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --shadow-xs: 0 1px 2px rgba(var(--d-shade, 0, 0, 0), calc(0.05 * var(--d-shade-k, 1)));
+  --shadow-sm: 0 1px 3px rgba(var(--d-shade, 0, 0, 0), calc(0.08 * var(--d-shade-k, 1)));
+  --shadow-md: 0 4px 12px rgba(var(--d-shade, 0, 0, 0), calc(0.12 * var(--d-shade-k, 1)));
+  --shadow-lg: 0 8px 24px rgba(var(--d-shade, 0, 0, 0), calc(0.16 * var(--d-shade-k, 1)));
   --shadow-glow: 0 0 0 3px var(--accent-dim);
 
   /* ─── 动画 ─── */
@@ -110,14 +110,14 @@
   --difficulty-hard: var(--danger);
 
   /* 维度色：固定品牌标识色，不随主题变化 */
-  --dim-world-type: #6366f1;
-  --dim-tone: #f59e0b;
-  --dim-conflict: #ef4444;
-  --dim-geography: #10b981;
-  --dim-factions: #8b5cf6;
-  --dim-npcs: #ec4899;
-  --dim-culture: #14b8a6;
-  --dim-rules: #f97316;
+  --dim-world-type: rgb(var(--d-blue, 99, 102, 241));
+  --dim-tone: rgb(var(--d-warn, 245, 158, 11));
+  --dim-conflict: rgb(var(--d-red, 239, 68, 68));
+  --dim-geography: rgb(var(--d-ok, 16, 185, 129));
+  --dim-factions: rgb(var(--d-violet, 139, 92, 246));
+  --dim-npcs: rgb(var(--d-red, 236, 72, 153));
+  --dim-culture: rgb(var(--d-aether, 20, 184, 166));
+  --dim-rules: rgb(var(--d-brass, 249, 115, 22));
 
   /* 响应式布局 token */
   --drawer-width: clamp(280px, 80vw, 560px);
@@ -143,8 +143,8 @@
   --status-resolved-text: var(--success);
 
   /* 语义色：事件层级（mythic/political 为固定语义色，其余跟随主题） */
-  --event-level-mythic: #a855f7;
-  --event-level-political: #3b82f6;
+  --event-level-mythic: rgb(var(--d-violet, 168, 85, 247));
+  --event-level-political: rgb(var(--d-blue-bg, 59, 130, 246));
   --event-level-factional: var(--warning);
   --event-level-economic: var(--success);
   --event-level-civilian: var(--text-muted);
@@ -154,143 +154,4 @@
   --bp-sm: 480px;
   --bp-md: 768px;
   --bp-lg: 1024px;
-}
-
-/* ─── 主题：Dark ─── */
-[data-theme="dark"] {
-  --bg-primary: #0b0d13;
-  --bg-secondary: #111420;
-  --bg-tertiary: #1e2336;
-  --bg-deep: #08090e;
-  --bg-elevated: #252a3d;
-  --text-primary: #e8e4dc;
-  --text-secondary: #9a96a0;
-  --text-muted: #5c5966;
-  --accent: #c8a26c;
-  --accent-dim: rgba(200, 162, 108, 0.1);
-  --accent-glow: rgba(200, 162, 108, 0.15);
-  --border: #2a2f42;
-  --danger: #e05252;
-  --warning: #d4a24e;
-  --success: #5ab87a;
-}
-
-/* ─── 主题：Metal ─── */
-[data-theme="metal"] {
-  --bg-primary: #f4f5f7;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #e8eaef;
-  --bg-deep: #ecedf1;
-  --bg-elevated: #ffffff;
-  --text-primary: #2d3142;
-  --text-secondary: #5c6178;
-  --text-muted: #9a9eb0;
-  --accent: #6b7a94;
-  --accent-dim: rgba(107, 122, 148, 0.08);
-  --accent-glow: rgba(107, 122, 148, 0.12);
-  --border: #d4d7de;
-  --danger: #dc3545;
-  --warning: #c2860a;
-  --success: #28a76a;
-}
-
-/* ─── 主题：Green ─── */
-[data-theme="green"] {
-  --bg-primary: #f2f7f4;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #e0ede5;
-  --bg-deep: #e9f1ec;
-  --bg-elevated: #ffffff;
-  --text-primary: #1e3328;
-  --text-secondary: #4a6b58;
-  --text-muted: #8aab97;
-  --accent: #4a8c6a;
-  --accent-dim: rgba(74, 140, 106, 0.08);
-  --accent-glow: rgba(74, 140, 106, 0.12);
-  --border: #c8ddd0;
-  --danger: #dc3545;
-  --warning: #c2860a;
-  --success: #28a76a;
-}
-
-/* Dawn V4 journey surfaces: one semantic contract, four visual themes. */
-:root,
-[data-theme="light"] {
-  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-v1.png');
-  --creation-bg: #edf5f0;
-  --creation-surface: rgba(255, 255, 248, .74);
-  --creation-surface-muted: rgba(229, 242, 235, .76);
-  --creation-elevated: rgba(255, 255, 248, .88);
-  --creation-text: #294b45;
-  --creation-muted: #648078;
-  --creation-border: rgba(122, 166, 153, .42);
-  --creation-accent: #b39453;
-  --creation-glow: rgba(193, 220, 210, .48);
-  --creation-input: rgba(255, 255, 248, .82);
-  --creation-selected: rgba(229, 242, 235, .76);
-  --creation-disabled: rgba(100, 128, 120, .45);
-  --creation-focus: #b39453;
-  --creation-danger: #a85151;
-  --creation-overlay: rgba(20, 35, 44, .42);
-  --creation-button: #b39453;
-}
-
-[data-theme="dark"] {
-  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-nocturne-v1.png');
-  --creation-bg: #182035;
-  --creation-surface: rgba(27, 36, 58, .78);
-  --creation-surface-muted: rgba(77, 103, 130, .5);
-  --creation-elevated: rgba(35, 49, 79, .9);
-  --creation-text: #e8eee8;
-  --creation-muted: #b5c0c7;
-  --creation-border: rgba(166, 190, 203, .42);
-  --creation-accent: #d5b879;
-  --creation-glow: rgba(123, 168, 193, .36);
-  --creation-input: rgba(17, 25, 45, .7);
-  --creation-selected: rgba(77, 103, 130, .5);
-  --creation-disabled: rgba(181, 192, 199, .42);
-  --creation-focus: #f0cf88;
-  --creation-danger: #ef9b93;
-  --creation-overlay: rgba(8, 15, 32, .58);
-  --creation-button: #d5b879;
-}
-
-[data-theme="metal"] {
-  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-silver-v1.png');
-  --creation-bg: #e9edf2;
-  --creation-surface: rgba(248, 250, 252, .76);
-  --creation-surface-muted: rgba(222, 234, 242, .8);
-  --creation-elevated: rgba(248, 250, 252, .9);
-  --creation-text: #303b4d;
-  --creation-muted: #68788d;
-  --creation-border: rgba(126, 150, 173, .44);
-  --creation-accent: #a88750;
-  --creation-glow: rgba(172, 205, 229, .45);
-  --creation-input: rgba(255, 255, 255, .8);
-  --creation-selected: rgba(222, 234, 242, .8);
-  --creation-disabled: rgba(104, 120, 141, .42);
-  --creation-focus: #9e793e;
-  --creation-danger: #ad5b5b;
-  --creation-overlay: rgba(24, 38, 48, .4);
-  --creation-button: #a88750;
-}
-
-[data-theme="green"] {
-  --journey-backdrop: url('/art/theme/ui-kit/dawn-v4/backdrops/common-journey-backdrop-forest-v1.png');
-  --creation-bg: #e8f2eb;
-  --creation-surface: rgba(246, 252, 246, .74);
-  --creation-surface-muted: rgba(216, 239, 223, .8);
-  --creation-elevated: rgba(246, 252, 246, .88);
-  --creation-text: #264b39;
-  --creation-muted: #5f806d;
-  --creation-border: rgba(105, 153, 126, .44);
-  --creation-accent: #b39453;
-  --creation-glow: rgba(149, 199, 166, .42);
-  --creation-input: rgba(249, 255, 250, .8);
-  --creation-selected: rgba(216, 239, 223, .8);
-  --creation-disabled: rgba(95, 128, 109, .42);
-  --creation-focus: #8e6d36;
-  --creation-danger: #a55151;
-  --creation-overlay: rgba(18, 42, 33, .4);
-  --creation-button: #b39453;
 }

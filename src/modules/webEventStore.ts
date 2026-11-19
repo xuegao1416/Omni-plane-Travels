@@ -31,7 +31,6 @@ import type {
 import { EventPackFormatError, normalizeCardPackFiles, parseCanonicalEventIndex } from './eventPackFormat';
 import { ensureEventApiError, EventApiError } from './eventErrors';
 import type { EventApiErrorCode } from './eventErrors';
-import { WORLD_WORKFLOWS } from './worldWorkflows';
 import {
   putWebEvent,
   getWebEvent,
@@ -823,18 +822,6 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
         periodicRules: pack.periodicRules ?? [],
       };
       files['schema/rules.json'] = JSON.stringify(ruleFile, null, 2);
-      // 同时生成 workflow.json（新工作流格式）
-      try {
-        const workflowFn = WORLD_WORKFLOWS[world.id];
-        if (workflowFn) {
-          const cardPack = packs.find((candidate) => candidate.type === 'card');
-          const workflow = workflowFn(
-            cardPack?.id ?? pack.id,
-            (cardPack?.events ?? []).map(({ id, name }) => ({ id, name })),
-          );
-          files['schema/workflow.json'] = JSON.stringify(workflow, null, 2);
-        }
-      } catch { /* 世界工作流生成失败不影响旧规则 */ }
       // 规则包也使用 canonical v2 空索引。
       Object.assign(files, buildCanonicalCardPackFiles(manifest.name, []));
     } else if (packType === 'card') {
@@ -864,48 +851,12 @@ export async function installWorldEventPacks(world: WorldDef): Promise<void> {
     await putWebEvent(rec);
   }
 
-  // The six shipped worlds store card content in their world definition. Install
-  // the corresponding trigger graph as a separate rule pack so both layers are
-  // visible in the event archive and can be enabled independently.
-  const workflowFn = WORLD_WORKFLOWS[world.id];
-  const cardPack = packs.find((pack) => pack.type === 'card' && (pack.events?.length ?? 0) > 0);
-  const hasDeclaredRulePack = packs.some((pack) => pack.type === 'rule');
-  if (workflowFn && cardPack && !hasDeclaredRulePack) {
-    const id = `world:${world.id}:rules`;
-    const existing = await getWebEvent(id);
-    const manifest: Manifest = {
-      id,
-      name: `${world.name ?? world.id} · 触发工作流`,
-      version: '1.0.0',
-      author: '内置',
-      description: `负责调度「${cardPack.name ?? world.name ?? world.id}」中的事件内容`,
-      engine: 'opt-event',
-      schemaVersion: 1,
-      minAppVersion: '2.8.1',
-      type: 'rule',
-      coverColor: '#6366f1',
-      icon: 'Zap',
-      enabledByDefault: true,
-      loadOrder: 0,
-      permissions: ['add_card'],
-      worldId: world.id,
-    };
-    const workflow = workflowFn(cardPack.id, cardPack.events!.map(({ id: eventId, name }) => ({ id: eventId, name })));
-    const files: Record<string, string> = {
-      'manifest.json': JSON.stringify(manifest, null, 2),
-      'schema/rules.json': JSON.stringify({ version: 1, rules: [], periodicRules: [] }, null, 2),
-      'schema/workflow.json': JSON.stringify(workflow, null, 2),
-      ...buildCanonicalCardPackFiles(manifest.name, []),
-    };
-    await putWebEvent({
-      id,
-      manifest,
-      enabled: existing?.enabled ?? true,
-      status: existing?.enabled === false ? 'disabled' : 'enabled',
-      installedAt: existing?.installedAt ?? new Date().toISOString(),
-      builtin: true,
-      files,
-    });
+  // 旧版会为内置世界额外生成 `world:<id>:rules` 轮播工作流包；事件现在由事件导演按节奏牌堆调度，
+  // 这里清掉旧的自动生成包，避免事件档案里出现失效的条目。
+  const generatedId = `world:${world.id}:rules`;
+  if (!packs.some((pack) => pack.id === generatedId)) {
+    const stale = await getWebEvent(generatedId);
+    if (stale?.builtin) await deleteWebEvent(generatedId);
   }
 }
 

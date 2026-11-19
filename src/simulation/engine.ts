@@ -17,10 +17,8 @@ function sanitizeActivePresetId(raw: unknown): string {
 
 // ─── 引擎类 ───
 
-import { MechanicalRuntime } from '../gameplay/mechanicalRuntime';
-export { emitCanonicalEventCard } from '../gameplay/mechanicalRuntime';
-
-export class DirectorRuntime extends MechanicalRuntime {
+export class DirectorRuntime {
+  state: SimulationState;
   private apiConfig: ApiConfig | null = null;
   /** 推演专用 API 配置（完整独立，不继承主 API 的任何字段），未设置则回退主 API */
   private simApiOverride: ApiConfig | null = null;
@@ -30,7 +28,7 @@ export class DirectorRuntime extends MechanicalRuntime {
   onStateChange: ((state: SimulationState) => void) | null = null;
 
   constructor(state?: SimulationState) {
-    super(state ?? createEmptySimState());
+    this.state = state ?? createEmptySimState();
     migrateLegacySimulationToDirector(this.state);
     this.state.snapshots = shareSnapshotHistory(this.state.snapshots ?? []);
   }

@@ -1,4 +1,5 @@
 import { useRef,useEffect } from 'react';
+import type { DiceRollRequest } from '../../../../gameplay/modules/dice';
 import { createRoot,type Root } from 'react-dom/client';
 import type { ChatMessage } from '../../../../engine/types';
 import type { WorldSystemData,DiceRoll } from '../../../../modules/schema';
@@ -47,7 +48,7 @@ export function useInlinePortals(
   messageHtmlRef: React.RefObject<HTMLDivElement | null>,
   renderedContent: RenderedContent,
   worldSystem: WorldSystemData | null | undefined,
-  onDiceRoll: ((roll: DiceRoll) => void) | undefined,
+  onDiceRoll: ((request: DiceRollRequest) => DiceRoll | null) | undefined,
   isUser: boolean,
   message: ChatMessage,
 ) {

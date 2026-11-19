@@ -1,19 +1,29 @@
 import { useEffect,useState } from 'react';
-import { Megaphone,X } from 'lucide-react';
-import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
-import { EntrySlicedButton } from './EntrySurface';
+import { Megaphone } from 'lucide-react';
+import PlaneDialog from './orrery/PlaneDialog';
 import { APP_VERSION } from '../../config/version';
 import { trySetItem } from '../../storage/safeStorage';
 
 const UPDATE_LOG_STORAGE_KEY = `omni.update-notice.${APP_VERSION}.seen`;
 
+const ITEMS: Array<[string, string]> = [
+  ['位面星仪界面', '首页、大厅、游戏外壳、二级界面与事件工作台全部重绘；大厅六枚位面透镜环绕星盘，世界详情展开为全屏位面档案。'],
+  ['晨雾琉璃主题', '在设置「通常 → 主题」切换。首页与大厅是代码绘制的 3D 圆厅：水晶环绕的篝火与体积丁达尔光，进入大厅时镜头穿过光柱升空。'],
+  ['星仪战场', '战场随世界换景，单位改为立牌立绘，带行动轨迹、命中特效、行动顺序条与指令转盘（1–5 快捷键）。'],
+  ['玩法新内核', '变量、效果、事件、加成与周期统一结算；随机数随存档保存，回滚后结果一致。'],
+  ['资源与商号', '物资按世界时钟每日消耗，必需品见底进入匮乏；经营改为商号，有多市场行情、仓库、产业与订单，钱统一进钱袋。'],
+  ['事件导演', '事件卡的每个选项有自己的后果和 d20 检定，按节奏出卡（默认「偶尔」）；40 张内置卡接上物资、订单等联动。'],
+  ['成长与能力', '经验来自检定、事件、任务、订单与制作，关卡需手动突破；骰子结果可复现；天赋、技能与职业能力统一结算。'],
+  ['AI 生成更可靠', '变量提取改为逐条校验的意图格式；事件、规则包与模块数据生成后自动校验并修复一次。'],
+  ['创意工坊重建', '新增版本历史、评分、收藏与举报；按依赖安装、更新和卸载，失败整体回滚；冒险包与视觉主题可直接使用。'],
+  ['存档更轻', '账本与流水不再写进玩法日志，长局存档体积约减半。'],
+];
+
 export default function UpdateLogOverlay() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (window.localStorage.getItem(UPDATE_LOG_STORAGE_KEY) !== 'true') {
-      setOpen(true);
-    }
+    if (window.localStorage.getItem(UPDATE_LOG_STORAGE_KEY) !== 'true') setOpen(true);
   }, []);
 
   const dismiss = () => {
@@ -22,44 +32,27 @@ export default function UpdateLogOverlay() {
     setOpen(false);
   };
 
-  const trigger = (
-    <button type="button" className="entry-home-update-log-button" onClick={event => { event.stopPropagation(); setOpen(true); }}>
-      <Megaphone size={15} aria-hidden="true" />更新日志
-    </button>
-  );
-
-  if (!open) return trigger;
-
   return (
     <>
-      {trigger}
-      <div className="entry-update-log-overlay" role="dialog" aria-modal="true" aria-labelledby="entry-update-log-title" onClick={event => event.stopPropagation()}>
-      <button type="button" className="entry-update-log-backdrop" aria-label="关闭更新日志" onClick={dismiss} />
-      <DawnFrameV4 mode="panel" withFill className="entry-update-log-frame" ariaLabel={`${APP_VERSION} 更新日志`}>
-        <div className="entry-update-log-content">
-          <button type="button" className="entry-update-log-close" onClick={dismiss} aria-label="关闭更新日志"><X size={20} /></button>
-          <span className="entry-update-log-kicker">版本更新</span>
-          <h2 id="entry-update-log-title">{APP_VERSION} 更新日志</h2>
-          <p className="entry-update-log-lead">玩法模块工坊升级为原生工具调用共创 Agent，并集中修复桌面请求、数据库升级、剧情导演与设置页性能问题。</p>
-          <div className="entry-update-log-list">
-            <div><strong>新共创 Agent</strong><span>通过能力查询、草稿创建与局部修改、校验和真实试玩共同制作玩法模块；聊天、执行记录和模块版本分别管理。</span></div>
-            <div><strong>真实玩法能力</strong><span>模块可原子消耗或增加金币、背包物品和生存资源；资源不足、重复事件或规则失败不会产生部分结算。</span></div>
-            <div><strong>版本与存档</strong><span>支持版本差异、显式回退、绑定世界，以及对既有存档预览影响、手动应用和恢复点还原。</span></div>
-            <div><strong>旧共创迁移</strong><span>旧 V2 会话首次打开时保留聊天与有效草稿并迁入新工坊；无法转换的数据保留原件并给出提示。</span></div>
-            <div><strong>数据库升级</strong><span>数据库 v4～v9 可直接无损补齐到 v10，修复旧用户导入 TXT 时被版本门槛拦截的问题。</span></div>
-            <div><strong>请求与导演稳定性</strong><span>修复兼容接口鉴权头、短流式回答、工具 Schema 和导演降级提示等问题。</span></div>
-            <div><strong>设置页性能</strong><span>设置界面打开后暂停被遮挡页面的动画并移除大面积双层模糊，降低浏览器持续渲染负担。</span></div>
-            <div><strong>角色与界面细节</strong><span>完善人物迷雾、物品展示、世界大厅和玩法模块界面，并继续优化移动端布局。</span></div>
-          </div>
-          <div className="entry-update-log-next">
-            <span className="entry-update-log-kicker">开始新的旅程</span>
-            <p>旧共创会话会在首次打开对应世界的工坊时迁移；已有存档继续固定原模块定义，只有手动预览并应用后才会更新。</p>
-            <p>数据库升级会保留原有记录；若遇到早于 v4 的数据库，系统仍会停止升级并保留原数据，避免不安全改写。</p>
-          </div>
-          <EntrySlicedButton frame="dawn-v4-compact" tone="primary" emblemSrc="/art/theme/emblems/emblem-44-v2.png" icon={Megaphone} onClick={dismiss}>知道了，继续使用</EntrySlicedButton>
-        </div>
-      </DawnFrameV4>
-      </div>
+      <button type="button" className="pl-chip" onClick={event => { event.stopPropagation(); setOpen(true); }}>
+        <Megaphone size={14} aria-hidden="true" />更新日志
+      </button>
+      {open && (
+        <PlaneDialog
+          titleId="pl-update-log-title"
+          kicker="版本更新"
+          title={`${APP_VERSION} 更新日志`}
+          onClose={dismiss}
+          size="md"
+          footer={<button type="button" className="pl-button pl-button--primary" onClick={dismiss}>知道了，继续使用</button>}
+        >
+          <p className="pl-lead">3.0.0 是一次大版本更新：界面整体重铺为「位面星仪」，新增亮色主题「晨雾琉璃」，玩法逻辑按新内核重写，创意工坊重建。</p>
+          <ul className="pl-changelog">
+            {ITEMS.map(([name, text]) => <li key={name}><strong>{name}</strong><span>{text}</span></li>)}
+          </ul>
+          <p className="pl-note">旧存档读取时自动迁移：生存物资迁入资源模块，旧「经营资金」并入钱袋。3.0.0 写出的存档带新的玩法数据版本，2.8.4 及更早版本无法正确读取，请先把桌面端与安卓端升级到 3.0.0 再导入存档。</p>
+        </PlaneDialog>
+      )}
     </>
   );
 }

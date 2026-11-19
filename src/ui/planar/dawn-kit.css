@@ -1,0 +1,203 @@
+/* ═══════════════════════════════════════════════
+   晨雾琉璃 · kit materials (frames, seals, ribbons, buttons, inputs, canvases).
+   The heavy brass rail becomes a cut-glass plate: a 2px old-gold hairline
+   rail, a lit top-left edge, a slate seat on the lower right, and gold
+   L-brackets at the corners instead of the acanthus castings.
+   ═══════════════════════════════════════════════ */
+
+/* SVG paint servers (PlanarDefs / Ornaments): presentation attributes lose to CSS. */
+:root[data-ui-theme='dawn'] #pk-brass stop:nth-child(1), :root[data-ui-theme='dawn'] #pk-brass-v stop:nth-child(1) { stop-color: #f6ecc4; }
+:root[data-ui-theme='dawn'] #pk-brass stop:nth-child(2), :root[data-ui-theme='dawn'] #pk-brass-v stop:nth-child(2) { stop-color: #d3b36f; }
+:root[data-ui-theme='dawn'] #pk-brass stop:nth-child(3), :root[data-ui-theme='dawn'] #pk-brass-v stop:nth-child(3) { stop-color: #a78846; }
+:root[data-ui-theme='dawn'] #pk-brass stop:nth-child(4), :root[data-ui-theme='dawn'] #pk-brass-v stop:nth-child(4) { stop-color: #e6d197; }
+:root[data-ui-theme='dawn'] #pk-brass stop:nth-child(5) { stop-color: #b39453; }
+:root[data-ui-theme='dawn'] #pk-brass stop:nth-child(6) { stop-color: #8f7338; }
+:root[data-ui-theme='dawn'] #pk-brass-dark stop { stop-color: #f3f7f1; }
+:root[data-ui-theme='dawn'] #pk-brass-dark stop:nth-child(2) { stop-color: #e2ece6; }
+:root[data-ui-theme='dawn'] #pk-enamel stop:nth-child(1) { stop-color: #ffffff; }
+:root[data-ui-theme='dawn'] #pk-enamel stop:nth-child(2) { stop-color: #edf5f0; }
+:root[data-ui-theme='dawn'] #pk-enamel stop:nth-child(3) { stop-color: #d3e3dc; }
+:root[data-ui-theme='dawn'] #pk-enamel-danger stop:nth-child(1) { stop-color: #fbefeb; }
+:root[data-ui-theme='dawn'] #pk-enamel-danger stop:nth-child(2) { stop-color: #f0dcd6; }
+:root[data-ui-theme='dawn'] #pk-enamel-danger stop:nth-child(3) { stop-color: #e2c4bd; }
+:root[data-ui-theme='dawn'] #pk-velvet stop { stop-color: #a45454; }
+:root[data-ui-theme='dawn'] #pk-velvet stop:nth-child(2) { stop-color: #b86a63; }
+:root[data-ui-theme='dawn'] #pk-velvet-fold stop { stop-color: #7e3c3c; }
+:root[data-ui-theme='dawn'] #pk-mirror-glass stop:nth-child(1) { stop-color: #ffffff; }
+:root[data-ui-theme='dawn'] #pk-mirror-glass stop:nth-child(2) { stop-color: #e6f0eb; }
+:root[data-ui-theme='dawn'] #pk-mirror-glass stop:nth-child(3) { stop-color: #b9d0c6; }
+:root[data-ui-theme='dawn'] #pk-mirror-vignette stop { stop-color: #648078; }
+:root[data-ui-theme='dawn'] #pk-mirror-vignette stop:nth-child(2) { stop-opacity: .35; }
+:root[data-ui-theme='dawn'] #pk-mirror-figure stop:nth-child(1) { stop-color: #648078; stop-opacity: .5; }
+:root[data-ui-theme='dawn'] #pk-mirror-figure stop:nth-child(2), :root[data-ui-theme='dawn'] #pk-mirror-figure stop:nth-child(3) { stop-color: #648078; }
+:root[data-ui-theme='dawn'] #pk-emboss feDropShadow { flood-color: #29424a; flood-opacity: .18; }
+:root[data-ui-theme='dawn'] #pk-cloth-shadow feDropShadow { flood-color: #29424a; flood-opacity: .16; }
+:root[data-ui-theme='dawn'] #pk-emboss feSpecularLighting { lighting-color: #ffffff; }
+
+/* ─── Frame ─── */
+:root[data-ui-theme='dawn'] .pk-frame { --pk-rail: 2px; border-radius: 2px; box-shadow: var(--pk-shadow-deep); }
+:root[data-ui-theme='dawn'] .pk-frame--plate { --pk-rail: 1px; border-radius: 2px; box-shadow: 4px 8px 22px rgba(41, 66, 74, .1); }
+:root[data-ui-theme='dawn'] .pk-frame__rail { background: linear-gradient(135deg, #e6d197 0%, #b39453 40%, #c9b27a 70%, #8f7338 100%); box-shadow: none; }
+:root[data-ui-theme='dawn'] .pk-frame__rail::after { display: none; }
+:root[data-ui-theme='dawn'] .pk-frame__field { border-radius: 1px; box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 rgba(41, 66, 74, .1); }
+:root[data-ui-theme='dawn'] .pk-frame--cloth .pk-frame__field,
+:root[data-ui-theme='dawn'] .pk-frame--glass .pk-frame__field {
+  background:
+    radial-gradient(ellipse 70% 50% at 0% 0%, rgba(255, 252, 238, .9), transparent 70%),
+    var(--dw-grain),
+    linear-gradient(160deg, #fdfdf8 0%, #f4f8f3 55%, #e9f1ec 100%);
+  backdrop-filter: none;
+}
+:root[data-ui-theme='dawn'] .pk-frame--cloth .pk-frame__field::before { inset: 7px; border-radius: 0; border: 1px solid rgba(41, 66, 74, .08); }
+:root[data-ui-theme='dawn'] .pk-frame--parchment .pk-frame__field { background: radial-gradient(ellipse at 20% 10%, rgba(255, 252, 238, .9), transparent 60%), var(--dw-grain), #f3eedb; color: #29424a; }
+/* Ornaments: gold L-brackets drawn by --pk-ticks plus one faceted lozenge on the top edge */
+:root[data-ui-theme='dawn'] .pk-frame__corner,
+:root[data-ui-theme='dawn'] .pk-frame__stud,
+:root[data-ui-theme='dawn'] .pk-frame__crest,
+:root[data-ui-theme='dawn'] .dawn-frame-v4__border > svg { display: none; }
+:root[data-ui-theme='dawn'] .pk-frame__ornaments,
+:root[data-ui-theme='dawn'] .dawn-frame-v4__border { inset: -5px; background: var(--pk-ticks); }
+:root[data-ui-theme='dawn'] .pk-frame--plate .pk-frame__ornaments { inset: -3px; }
+:root[data-ui-theme='dawn'] .pk-frame--grand .pk-frame__ornaments::before,
+:root[data-ui-theme='dawn'] .dawn-frame-v4__border::before {
+  content: ''; position: absolute; top: 0; left: 50%; width: 12px; height: 12px;
+  transform: translate(-50%, -1px) rotate(45deg);
+  background: linear-gradient(135deg, #f6ecc4 0%, #d3b36f 50%, #8f7338 51%, #b39453 100%);
+  box-shadow: 0 0 0 3px #f6f9f4, 0 0 0 4px rgba(143, 115, 56, .5);
+}
+:root[data-ui-theme='dawn'] .dawn-frame-v4--with-underlay > .dawn-frame-v4__underlay { border-color: rgba(41, 66, 74, .08); border-radius: 0; }
+
+/* ─── Type ─── */
+:root[data-ui-theme='dawn'] .pk-title {
+  background: linear-gradient(175deg, #3c5d63 0%, #29424a 60%, #1f363c 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(1px 1px 0 rgba(255, 255, 255, .95));
+}
+:root[data-ui-theme='dawn'] .pk-kicker { color: #8f7338; font-family: var(--pl-font-num); letter-spacing: .3em; }
+:root[data-ui-theme='dawn'] .pk-kicker::before, :root[data-ui-theme='dawn'] .pk-kicker::after { background: linear-gradient(90deg, transparent, rgba(143, 115, 56, .6)); }
+:root[data-ui-theme='dawn'] .pk-rule { color: rgba(41, 66, 74, .3); }
+:root[data-ui-theme='dawn'] .pk-rule::before, :root[data-ui-theme='dawn'] .pk-rule::after { background: linear-gradient(90deg, transparent, rgba(41, 66, 74, .22), transparent); }
+:root[data-ui-theme='dawn'] .pk-rule > i { background: linear-gradient(135deg, #ecda97, #b39453); box-shadow: none; }
+
+/* ─── Seal / ribbon ─── */
+:root[data-ui-theme='dawn'] .pk-seal > svg { filter: drop-shadow(2px 3px 4px rgba(41, 66, 74, .16)); }
+:root[data-ui-theme='dawn'] .pk-seal__glyph { color: #8f7338; text-shadow: 1px 1px 0 #fff; }
+:root[data-ui-theme='dawn'] .pk-seal__glyph svg { filter: none; }
+:root[data-ui-theme='dawn'] .pk-seal--danger .pk-seal__glyph { color: #a45454; }
+:root[data-ui-theme='dawn'] .pk-ribbon { filter: drop-shadow(2px 4px 6px rgba(41, 66, 74, .16)); }
+:root[data-ui-theme='dawn'] .pk-ribbon__band { background: linear-gradient(180deg, #b0625d 0%, #a45454 100%); color: #fff8ee; text-shadow: none; box-shadow: none; }
+:root[data-ui-theme='dawn'] .pk-ribbon__band::before, :root[data-ui-theme='dawn'] .pk-ribbon__band::after { background: rgba(255, 244, 230, .55); }
+
+/* ─── Buttons: square with a cut top-left facet ─── */
+:root[data-ui-theme='dawn'] .pk-btn,
+:root[data-ui-theme='dawn'] .btn-primary,
+:root[data-ui-theme='dawn'] .btn-secondary,
+:root[data-ui-theme='dawn'] .btn-outline,
+:root[data-ui-theme='dawn'] .btn-danger { border-radius: 0; clip-path: polygon(7px 0, 100% 0, 100% 100%, 0 100%, 0 7px); }
+:root[data-ui-theme='dawn'] .pk-btn--primary,
+:root[data-ui-theme='dawn'] .btn-primary { filter: none; box-shadow: inset 1px 1px 0 rgba(255, 250, 230, .8), inset -1px -1px 0 rgba(110, 85, 36, .35); }
+:root[data-ui-theme='dawn'] .pk-btn--primary:hover:not(:disabled),
+:root[data-ui-theme='dawn'] .btn-primary:hover:not(:disabled) { filter: brightness(1.04); }
+:root[data-ui-theme='dawn'] .pk-btn--primary:active:not(:disabled),
+:root[data-ui-theme='dawn'] .btn-primary:active:not(:disabled) { filter: brightness(.96); }
+:root[data-ui-theme='dawn'] .pk-btn--secondary,
+:root[data-ui-theme='dawn'] .btn-secondary,
+:root[data-ui-theme='dawn'] .btn-outline { color: #29424a; background: #fffff8; box-shadow: inset 0 0 0 1px rgba(41, 66, 74, .32), inset 1px 1px 0 2px #fff; }
+:root[data-ui-theme='dawn'] .pk-btn--secondary:hover:not(:disabled),
+:root[data-ui-theme='dawn'] .btn-secondary:hover:not(:disabled),
+:root[data-ui-theme='dawn'] .btn-outline:hover:not(:disabled) { color: #1f363c; box-shadow: inset 0 0 0 1px rgba(143, 115, 56, .75), inset 1px 1px 0 2px #fff; }
+:root[data-ui-theme='dawn'] .pk-btn--danger,
+:root[data-ui-theme='dawn'] .btn-danger { color: #fff8f2; background: linear-gradient(180deg, #b0625d, #a45454); filter: none; text-shadow: none; }
+:root[data-ui-theme='dawn'] .pk-btn:disabled,
+:root[data-ui-theme='dawn'] .pk-btn--primary:disabled,
+:root[data-ui-theme='dawn'] .btn-primary:disabled { filter: saturate(.2) opacity(.55); }
+:root[data-ui-theme='dawn'] .pk-icon-btn { border-radius: 0; }
+:root[data-ui-theme='dawn'] .pk-icon-btn svg { filter: none; }
+
+/* ─── Inputs: mist groove, shadow on the top edge only ─── */
+:root[data-ui-theme='dawn'] .pk-input,
+:root[data-ui-theme='dawn'] .input-field,
+:root[data-ui-theme='dawn'] .settings-textarea { border-radius: 0; color: #29424a; }
+:root[data-ui-theme='dawn'] .pk-input::placeholder,
+:root[data-ui-theme='dawn'] .input-field::placeholder,
+:root[data-ui-theme='dawn'] .settings-textarea::placeholder { color: rgba(79, 106, 104, .6); }
+:root[data-ui-theme='dawn'] .pk-input:focus,
+:root[data-ui-theme='dawn'] .input-field:focus,
+:root[data-ui-theme='dawn'] .settings-textarea:focus { box-shadow: inset 0 2px 0 rgba(41, 66, 74, .12), inset 0 0 0 1px #b39453, 0 0 0 3px rgba(211, 179, 111, .22); }
+:root[data-ui-theme='dawn'] .segmented-control,
+:root[data-ui-theme='dawn'] .segmented-control-btn { border-radius: 0; }
+:root[data-ui-theme='dawn'] select option, :root[data-ui-theme='dawn'] select optgroup { background: #fffff8; color: #29424a; }
+
+/* Dialog backdrop: a mist wash rather than a black veil */
+:root[data-ui-theme='dawn'] .pk-dialog-overlay { background: rgba(214, 229, 222, .62); backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* ─── ReactFlow canvases: engraved slate on paper ─── */
+:root[data-ui-theme='dawn'] .react-flow.react-flow {
+  --xy-edge-stroke: rgba(41, 66, 74, .45);
+  --xy-edge-stroke-selected: #8f7338;
+  --xy-connectionline-stroke: #8f7338;
+  --xy-handle-background-color: #b39453;
+  --xy-handle-border-color: #fffff8;
+  --xy-minimap-background-color: #f4f8f3;
+  --xy-minimap-mask-background-color: rgba(214, 229, 222, .6);
+  --xy-minimap-mask-stroke-color: rgba(143, 115, 56, .6);
+  --xy-controls-button-background-color: #fffff8;
+  --xy-controls-button-background-color-hover: #edf5f0;
+  --xy-controls-button-color: #29424a;
+  --xy-controls-button-color-hover: #8f7338;
+}
+:root[data-ui-theme='dawn'] .pk-workbench .react-flow {
+  background:
+    radial-gradient(circle, rgba(41, 66, 74, .14) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    radial-gradient(ellipse 70% 60% at 0% 0%, rgba(255, 252, 238, .9), transparent 70%),
+    linear-gradient(160deg, #f6f9f4, #e6efea);
+}
+:root[data-ui-theme='dawn'] .react-flow .react-flow__minimap { box-shadow: 0 0 0 1px rgba(41, 66, 74, .2), 4px 8px 20px rgba(41, 66, 74, .12); }
+:root[data-ui-theme='dawn'] .react-flow .react-flow__handle { box-shadow: none; }
+:root[data-ui-theme='dawn'] .react-flow .react-flow__edge.selected .react-flow__edge-path,
+:root[data-ui-theme='dawn'] .react-flow .react-flow__edge:hover .react-flow__edge-path { filter: none; stroke-width: 2.2; }
+
+/* ─── Screen titles: gold-gradient lettering becomes slate ink with a white emboss ─── */
+:root[data-ui-theme='dawn'] .cb-header__title h1,
+:root[data-ui-theme='dawn'] .cb-formation__copy strong,
+:root[data-ui-theme='dawn'] .cb-result__card h2,
+:root[data-ui-theme='dawn'] .cb-result.is-defeat .cb-result__card h2,
+:root[data-ui-theme='dawn'] .combat-decision h2,
+:root[data-ui-theme='dawn'] .profession-library__title h2,
+:root[data-ui-theme='dawn'] .event-archive-heading h1,
+:root[data-ui-theme='dawn'] .event-archive-detail-heading h2,
+:root[data-ui-theme='dawn'] .pk-workbench__title,
+:root[data-ui-theme='dawn'] .journey-dossier__header h2,
+:root[data-ui-theme='dawn'] .game-journey__narrative-banner strong,
+:root[data-ui-theme='dawn'] .mobile-header-title span,
+:root[data-ui-theme='dawn'] .ml-treasury__funds strong,
+:root[data-ui-theme='dawn'] .mws-title h2,
+:root[data-ui-theme='dawn'] .world-editor-header > span:first-child,
+:root[data-ui-theme='dawn'] .pm-footer strong,
+:root[data-ui-theme='dawn'] .world-fork-select__header h2,
+:root[data-ui-theme='dawn'] .talent-codex-overlay__header h2,
+:root[data-ui-theme='dawn'] .profession-tarot-overlay__header h2,
+:root[data-ui-theme='dawn'] .settings-screen__title h1,
+:root[data-ui-theme='dawn'] .traveler-registry-heading h1,
+:root[data-ui-theme='dawn'] .structured-asset-editor > header h2,
+:root[data-ui-theme='dawn'] .profession-creation-step__header h2,
+:root[data-ui-theme='dawn'] .confirm-journey-strip__copy strong,
+:root[data-ui-theme='dawn'] .creation-ritual-shell__header h1,
+:root[data-ui-theme='dawn'] .world-weave-header-main h3,
+:root[data-ui-theme='dawn'] .world-weave-summary-link strong {
+  background: linear-gradient(175deg, #3c5d63 0%, #29424a 60%, #1f363c 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(1px 1px 0 rgba(255, 255, 255, .95));
+}
+
+/* ─── Avatars without an image: pale mineral tones, slate initial ─── */
+:root[data-ui-theme='dawn'] .pl-avatar { color: #29424a; box-shadow: inset 1px 1px 0 #fff, inset 0 0 0 1px rgba(41, 66, 74, .16); }
+:root[data-ui-theme='dawn'] .pl-avatar[data-tone='0'] { --pl-avatar-tone: linear-gradient(135deg, #e3ecf2, #c3d3de); }
+:root[data-ui-theme='dawn'] .pl-avatar[data-tone='1'] { --pl-avatar-tone: linear-gradient(135deg, #ebe6f0, #d0c8da); }
+:root[data-ui-theme='dawn'] .pl-avatar[data-tone='2'] { --pl-avatar-tone: linear-gradient(135deg, #f2e6e4, #dcc5c2); }
+:root[data-ui-theme='dawn'] .pl-avatar[data-tone='3'] { --pl-avatar-tone: linear-gradient(135deg, #e4efe8, #c3d9cb); }
+:root[data-ui-theme='dawn'] .pl-avatar[data-tone='4'] { --pl-avatar-tone: linear-gradient(135deg, #f3edde, #dccfae); }
+:root[data-ui-theme='dawn'] .pl-avatar[data-tone='5'] { --pl-avatar-tone: linear-gradient(135deg, #e2eeee, #c0d6d6); }
+
+/* Primary CTA: slate ink on old gold (the shade role is too faint for button text) */
+:root[data-ui-theme='dawn'] .pl-button--primary { color: #1f363c; }

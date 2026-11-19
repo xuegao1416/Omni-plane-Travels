@@ -194,13 +194,16 @@ test('successful engine turns own survival consumption without mounted page effe
   const unsubscribe = eventBus.on(EVENTS.MESSAGE_RECEIVED, () => engine.cancel());
   try {
     eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
-    expect(engine.variableManager.getState().玩家.生存资源?.water.数量).toBe(3);
+    // 旧字段 玩家.生存资源 在读档时迁移到资源模块（gameState.resources）。
+    const water = () => engine.variableManager.getState().resources?.stocks.water;
+    expect(engine.variableManager.getState().玩家.生存资源).toBeUndefined();
+    expect(water()).toBe(3);
     await engine.sendMessage('等待十分钟'); unsubscribe();
-    expect(engine.variableManager.getState().玩家.生存资源?.water.数量).toBe(3);
+    expect(water()).toBe(3);
     await engine.retryPipeline();
-    expect(engine.variableManager.getState().玩家.生存资源?.water.数量).toBe(2);
+    expect(water()).toBe(2);
     await engine.retryPipeline();
-    expect(engine.variableManager.getState().玩家.生存资源?.water.数量).toBe(2);
+    expect(water()).toBe(2);
   } finally { unsubscribe(); globalThis.fetch = oldFetch; restore(); }
 });
 

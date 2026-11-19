@@ -1,4 +1,6 @@
 import type { VariableManager } from './variableManager';
+import { createGameplayHost } from '../core/registry';
+import { formatAiCommands } from '../core/aiCommands';
 import type { WorldBookManager } from '../worldbook/index';
 import type { GameState } from '../schema/variables';
 import type { WorldDef } from '../data/worlds-schema';
@@ -7,6 +9,7 @@ import type { ApiConfig } from '../api/types';
 import { callAuxiliaryApi, extractVariableRules } from '../api/auxiliaryApi';
 import { eventBus, EVENTS } from './eventBus';
 import { buildVariableExtractionPrompt } from '../utils/prompts';
+import type { ExtractionGameplayContext } from '../utils/prompts/editor-prompts';
 import { findWorldDef } from '../data/worldLoader';
 import { apiPresetStore } from '../stores/apiPresetStore';
 import { STORAGE_KEYS } from '../config/storageKeys';
@@ -34,7 +37,7 @@ export function extractPlayerObservations(input: unknown): PlayerObservation[] {
 const COMBAT_ENCOUNTER_CONTRACT_PROMPT = `
 
 【可选 CombatEncounterRequest 契约（仅 v3 战斗模块开启时可用）】
-当正文已经把跨敌对阵营的实际攻击、伏击、围攻推进到“正在发生但尚未结算”，或玩家此刻仍在被追杀/追捕时，应在 GameplayTransaction 同层输出 combatEncounterRequest 元字段。正在持续的追杀本身就是敌对行为，不必等到第一次伤害出现；已经写明胜负、死亡、失去战斗能力、成功脱离的冲突必须省略，不能在正文杀死敌人后再触发第二场战斗。已知人物必须使用变量快照中的真实 ID；身份不明的袭击者使用 temporary=true 的本次遭遇单位：
+当正文已经把跨敌对阵营的实际攻击、伏击、围攻推进到“正在发生但尚未结算”，或玩家此刻仍在被追杀/追捕时，应在 intents 同层输出 combatEncounterRequest 元字段。正在持续的追杀本身就是敌对行为，不必等到第一次伤害出现；已经写明胜负、死亡、失去战斗能力、成功脱离的冲突必须省略，不能在正文杀死敌人后再触发第二场战斗。已知人物必须使用变量快照中的真实 ID；身份不明的袭击者使用 temporary=true 的本次遭遇单位：
 {
   "combatEncounterRequest": {
     "type": "variable.hostile-action",
@@ -54,9 +57,24 @@ combatEncounterRequest 只是触发元字段，不是 GameState 更新路径；�
 const ABILITY_PROPOSAL_CONTRACT_PROMPT = `
 
 【可选 AbilityProposal 契约（仅职业/能力模块开启时可用）】
-只有正文已经明确完成学习、训练、觉醒、获得宠物或完成召唤时，才可在 GameplayTransaction 同层输出 abilityProposals 数组。提案只描述语义，不能直接写入已掌握技能：
+只有正文已经明确完成学习、训练、觉醒、获得宠物或完成召唤时，才可在 intents 同层输出 abilityProposals 数组。提案只描述语义，不能直接写入已掌握技能：
 {"abilityProposals":[{"schemaVersion":2,"id":"稳定英文ID","name":"能力名","description":"叙事用途与限制","category":"free_skill|dynamic|pet|summon","rarity":"普通|精良|稀有|史诗|传说","target":"self|ally|enemy|area|none","tags":["语义标签"]}]}
 禁止输出伤害、治疗、消耗、冷却、倍率、状态回合或任何机械数字。玩家确认后，本地配平器才会生成能力定义；若正文只是提议、计划或尚未学会，完全省略该字段。每轮最多提出 3 项。`;
+
+/** 本回合本地规则已经结算的变化（玩家命令、回合结算、事件卡等），给变量 AI 防止重复加减。 */
+export function formatSettledChanges(state: GameState, limit = 12): string {
+  const turn = Math.trunc(Number(state.simulationRuntime?.tick) || 0);
+  const logs = (state.gameplay?.logs ?? []).filter(log => log.status === 'applied' && log.tick === turn && !String(log.source).startsWith('ai'));
+  if (!logs.length) return '（本回合还没有本地结算）';
+  const value = (input: unknown) => {
+    const text = typeof input === 'string' ? input : JSON.stringify(input);
+    return text === undefined ? '无' : text.length > 40 ? `${text.slice(0, 40)}…` : text;
+  };
+  return logs.slice(-limit).map(log => {
+    const changes = log.changes.slice(0, 6).map(change => `${change.path} ${value(change.before)}→${value(change.after)}`).join('；');
+    return `- ${log.label || log.transactionId}${changes ? `：${changes}` : ''}${log.changes.length > 6 ? ` 等 ${log.changes.length} 项` : ''}`;
+  }).join('\n');
+}
 
 function hasEnabledCombatModule(worldDef: WorldDef | undefined, state: GameState): boolean {
   return state.v3?.featureFlags?.combatEnabled === true
@@ -229,21 +247,29 @@ async function callAuxiliaryApiForEngine(
     }
   }
 
-  const variableUpdatePrompt = `${buildVariableExtractionPrompt(worldSystemFromDef, progressionConfig as Record<string, unknown>)}${
+  // 玩法宿主各模块自己给出变量说明与可用命令，和本地规则保持一致。
+  let gameplay: ExtractionGameplayContext | undefined;
+  try {
+    const host = createGameplayHost(worldDef, gameState);
+    gameplay = { summaries: host.summarize(gameState, 'extraction'), commands: formatAiCommands(host) };
+  } catch (error) {
+    console.warn('[变量提取] 玩法模块说明生成失败（使用旧规则）', error);
+  }
+  const variableUpdatePrompt = `${buildVariableExtractionPrompt(worldSystemFromDef, progressionConfig as Record<string, unknown>, gameplay)}${
     hasEnabledCombatModule(worldDef, gameState) ? COMBAT_ENCOUNTER_CONTRACT_PROMPT : ''
   }${hasEnabledAbilityModule(gameState) ? ABILITY_PROPOSAL_CONTRACT_PROMPT : ''}
 【玩家观察记录】
-在 GameplayTransaction 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"disclosed",introduces:false}]。
+在 intents 同层可输出 playerObservations:[{npcId,path,value,quote,mode:"disclosed",introduces:false}]。
 公开字段（姓名、种族、性别、人物分类、外貌、表性格、当前穿着、当前位置、当前状态、当前行动、关系数据）由系统按本轮正文自动同步，不必输出。
-自动同步的前提是人物档案已正确更新：亲自与玩家互动的角色必须在 effects 中设为“在场”，并按本轮实际行动更新位置和关系数据。人物档案中已有规范ID不等于玩家已经认识；首次见面时先输出 path:"姓名"、introduces:true 的有效观察，再输出其他字段。不要只输出关系观察却遗漏首次姓名登记，也不要把“无更新”作为已发生互动的替代。
+自动同步的前提是人物档案已正确更新：亲自与玩家互动的角色必须用意图把人物分类设为“在场”，并按本轮实际行动更新位置和关系数据。人物档案中已有规范ID不等于玩家已经认识；首次见面时先输出 path:"姓名"、introduces:true 的有效观察，再输出其他字段。不要只输出关系观察却遗漏首次姓名登记，也不要把“无更新”作为已发生互动的替代。
 例外（重要）：若你在正文里只用代称描写某个角色（"老头""老板娘""那位客人"等），而人物档案里用的是正式姓名，系统按姓名匹配不到，这个角色就不会进入角色关系面板。此时必须补一条出场声明，把正文代称和正式姓名连起来：
 playerObservations:[{"npcId":"人物档案中的规范ID","path":"姓名","value":"你在人物档案里写的正式姓名","quote":"本轮正文里该角色的代称原文（逐字）","mode":"observed","introduces":true}]
 首次登记该角色用 introduces:true；若该角色已经认识，则用 introduces:false，并在同一轮用同一段代称原文补上你更新过的公开字段（外貌、当前穿着、当前位置、当前状态、当前行动、关系数据.关系类型、关系数据.好感度）。
 这里还需要补充"正文明确向玩家披露的秘密"：当前想法、里性格、真实目标（短期/长期）、背景、备注、生存状态数值、技能与天赋等，mode 用 disclosed。
 quote 必须逐字引用正文并能够支持该字段；不能从变量快照、读者视角或幕后叙述补充玩家不知道的内容。人物必须使用人物档案中的规范 ID；不得直接修改 playerKnowledge。没有被披露的秘密则省略该字段。
 【机械结算只读边界】
-simulationRuntime 及其 effectLog 属于本地规则运行记录，不是允许修改的变量路径。下面是最近已结算记录，快照数值已包含这些变化，不得因为正文再次提及而重复加减。不要输出主线进度、候选事件或未来剧情为实际状态；只提取这轮正文已经发生且尚未结算的事实。
-${JSON.stringify(gameState.simulationRuntime?.effectLog?.slice(-12) ?? []).slice(0, 5000)}`;
+simulationRuntime、gameplay 属于本地规则运行记录，不是允许修改的变量路径。下面是本回合本地规则已经结算的变化，快照数值已包含这些变化，不得因为正文再次提及而重复加减。不要输出主线进度、候选事件或未来剧情为实际状态；只提取这轮正文已经发生且尚未结算的事实。
+${formatSettledChanges(gameState)}`;
 
   return callAuxiliaryApi(config, messages, variableUpdatePrompt, signal);
 }

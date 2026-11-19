@@ -31,11 +31,11 @@ export default memo(function BaseStatsCard({ data, title, derived = [], modifier
           color="var(--danger)"
         />
         <GaugeBar
-          icon={<Zap size={11} color="#3b82f6" />}
+          icon={<Zap size={11} color="#7f9cd6" />}
           label={data.attrB.name}
           value={data.attrB.current}
           max={data.attrB.max}
-          color="#3b82f6"
+          color="#7f9cd6"
         />
       </div>
       {derived.length > 0 && (
@@ -88,8 +88,8 @@ function GaugeBar({ icon, label, value, max, color }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '2px 0' }}>
       <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>{icon}</span>
       <span style={{ minWidth: '36px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{label}</span>
-      <div className="game-status-meter game-status-meter--module" style={{ background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '999px', transition: 'width 0.3s' }} />
+      <div className="game-status-meter game-status-meter--module">
+        <div style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: '999px', transition: 'width 0.3s' }} />
       </div>
       <span style={{ fontSize: 'var(--font-size-xs)', textAlign: 'right', color: 'var(--text-secondary)', minWidth: '60px' }}>{safeValue}/{safeMax}</span>
     </div>

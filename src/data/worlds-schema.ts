@@ -291,6 +291,9 @@ export interface WorldDef {
    *  存档导出时这些包会随存档一起打包，导入时排重写入。 */
   eventPacks?: EmbeddedEventPack[];
 
+  /** 新开局时随机事件的节奏：off 关闭、low 偶尔（默认）、normal 适中、high 频繁。玩家在游戏里还能再改。 */
+  eventPacing?: 'off' | 'low' | 'normal' | 'high';
+
   /** Optional presentation metadata for adaptive visual themes. */
   /** Optional custom world artwork; older worlds simply omit this field. */
   artwork?: WorldArtwork;
@@ -339,6 +342,12 @@ export interface EmbeddedEventPack {
     };
     /** 新格式：卡片工作流定义（CardWorkflowDefinition） */
     workflow?: import('../modules/schema').CardWorkflowDefinition;
+    /**
+     * 出现方式（事件导演读取）：`on: ['deck']` 进随机牌堆，`on: ['resources.low']` 等监听领域事件；
+     * 可加 when 条件、chance 概率、once 一次性、cooldownTurns 冷却、weight 牌堆权重。
+     * 不写时：被规则点名或作为后续的卡只随规则出现，其余进随机牌堆。
+     */
+    trigger?: import('../events/catalog').TriggerInput;
   }>;
   /** 拥有的权限（如 modify_world_state, add_card） */
   permissions?: Permission[];

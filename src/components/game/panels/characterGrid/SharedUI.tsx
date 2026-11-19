@@ -60,8 +60,7 @@ export function FieldDetailModal({ name, fields, onClose }: {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-lg)', padding: '20px', maxWidth: '360px', width: '90%',
+        padding: '20px', maxWidth: '360px', width: '90%',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
           <span style={{ fontWeight: '700', fontSize: 'var(--font-size-lg)' }}>{name}</span>

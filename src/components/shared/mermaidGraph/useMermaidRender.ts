@@ -1,4 +1,4 @@
-import { useState,useEffect,useRef,useCallback } from 'react';
+import { useState,useEffect,useLayoutEffect,useRef,useCallback } from 'react';
 import type { NodeDetail } from './types';
 import { ensureMermaidInit,getMermaid,getNodeKeyFromDomId } from './mermaidInit';
 
@@ -61,24 +61,7 @@ export function useMermaidRender({
         const id = `mermaid-graph-${currentId}-${Date.now()}`;
         const { svg } = await mermaid.default.render(id, graphDefinition);
 
-        if (!cancelled) {
-          setRenderedSvg(svg || '');
-          await new Promise(resolve => requestAnimationFrame(resolve));
-
-          if (!cancelled && svgContainerRef.current) {
-            const svgEl = svgContainerRef.current.querySelector('svg');
-            if (svgEl) {
-              svgEl.removeAttribute('width');
-              svgEl.removeAttribute('height');
-              svgEl.style.maxWidth = 'none';
-              svgEl.style.maxHeight = 'none';
-              svgEl.style.overflow = 'visible';
-              svgEl.style.display = 'block';
-              svgEl.setAttribute('preserveAspectRatio', 'xMinYMin meet');
-              setGraphSize(getGraphMetrics());
-            }
-          }
-        }
+        if (!cancelled) setRenderedSvg(svg || '');
       } catch (err) {
         if (!cancelled) {
           console.error('[MermaidGraphPanel] 渲染失败:', err);
@@ -92,7 +75,22 @@ export function useMermaidRender({
 
     render();
     return () => { cancelled = true; };
-  }, [graphDefinition, getGraphMetrics, svgContainerRef]);
+  }, [graphDefinition]);
+
+  // Once the SVG is in the DOM, size it to its own viewBox so pan/zoom works in real units.
+  useLayoutEffect(() => {
+    const svgEl = renderedSvg ? svgContainerRef.current?.querySelector('svg') : null;
+    if (!svgEl) return;
+    const viewBox = svgEl.viewBox?.baseVal;
+    svgEl.removeAttribute('width');
+    svgEl.removeAttribute('height');
+    svgEl.style.maxWidth = 'none';
+    svgEl.style.maxHeight = 'none';
+    svgEl.style.overflow = 'visible';
+    svgEl.style.display = 'block';
+    svgEl.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+    setGraphSize(viewBox && viewBox.width > 0 && viewBox.height > 0 ? { width: viewBox.width, height: viewBox.height } : getGraphMetrics());
+  }, [renderedSvg, getGraphMetrics, svgContainerRef]);
 
   useEffect(() => {
     if (!svgContainerRef.current || !renderedSvg) return;

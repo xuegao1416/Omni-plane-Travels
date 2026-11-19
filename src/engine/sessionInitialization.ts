@@ -13,6 +13,7 @@ import { normalizeGameStateV3 } from '../gameplay/protocols';
 
 export function createNewSessionManager(world: WorldDef | undefined): VariableManager {
   const manager = new VariableManager(undefined, undefined, getTimeSystemFromWorld(world));
+  manager.bindWorld(world);
   manager.initializeWorldAndNotebook();
   const state = manager.getState();
   ensureWorldClockOnGameState(state, world);

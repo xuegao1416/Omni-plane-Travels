@@ -58,16 +58,16 @@ export default function NodePalette({ onAddNode }: NodePaletteProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="pk-palette" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 搜索框 */}
-      <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
+      <div className="pk-palette__head" style={{ padding: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px' }} className="pk-palette__search">
           <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜索节点…"
-            style={{ border: 'none', background: 'none', outline: 'none', fontSize: '12px', color: 'var(--text-primary)', width: '100%' }}
+            style={{ border: 'none', background: 'none', outline: 'none', fontSize: '12px', width: '100%' }}
           />
         </div>
       </div>
@@ -95,11 +95,12 @@ export default function NodePalette({ onAddNode }: NodePaletteProps) {
               return (
                 <div key={cat}>
                   <button
+                    className="pk-palette__cat"
                     onClick={() => toggleCategory(cat)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6, width: '100%',
                       padding: '6px 10px', border: 'none', background: 'none',
-                      cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600,
+                      cursor: 'pointer', fontSize: '11px', fontWeight: 600,
                     }}
                   >
                     {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -124,16 +125,15 @@ function NodeItem({ def, onClick }: { def: NodeDefinition; onClick: () => void }
   const Icon = ICON_MAP[def.icon] ?? Zap;
   return (
     <button
+      className="pk-palette__item"
       onClick={onClick}
       title={def.description}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-        padding: '5px 10px 5px 24px', border: 'none', background: 'none',
-        cursor: 'pointer', color: 'var(--text-primary)', fontSize: '11px',
+        padding: '5px 10px 5px 24px', border: 'none',
+        cursor: 'pointer', fontSize: '11px',
         textAlign: 'left',
       }}
-      onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--bg-hover)'; }}
-      onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'none'; }}
     >
       <Icon size={13} style={{ color: def.color, flexShrink: 0 }} />
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def.name}</span>

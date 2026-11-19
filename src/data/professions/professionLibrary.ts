@@ -126,7 +126,7 @@ const EXTENSIONS: Record<string, ProfessionAbilityDef[]> = {
     branch('blade_shock', '震刀', 'active', '以刀背震开防御并夺取节奏。', 2, ['blade_foundation'], { activation: { combatAction: combat(3, 'enemy', { appliesStatus: { id: 'shaken', name: '震荡', durationRounds: 1, modifiers: { armor: -1 } } }) } }),
     branch('blade_chain', '连环劈斩', 'active', '刀势一重接一重，不给对手喘息。', 3, ['blade_fierce'], { activation: { combatAction: combat(5, 'enemy', { cooldownRounds: 2 }) } }),
     branch('blade_wait', '抱刀守一', 'passive', '收束心神，将力量留给真正的机会。', 3, ['blade_calm']),
-    branch('blade_breaker', '摧甲', 'active', '专门破坏护具与护体劲力。', 3, ['blade_cleave'], { activation: { combatAction: combat(4, 'enemy', { appliesStatus: { id: 'armor-broken', name: '破甲', durationRounds: 3, modifiers: { armor: -2 } } }) } }),
+    branch('blade_breaker', '摧甲', 'active', '专门破坏护具与护体劲力。', 3, ['blade_cleave'], { activation: { combatAction: combat(4, 'enemy', { appliesStatus: { id: 'armor-broken', name: '裂甲', durationRounds: 3, modifiers: { armor: -2 } } }) } }),
     branch('blade_tyrant', '霸刀之势', 'passive', '仅凭刀势便足以令寻常敌手迟疑。', 4, ['blade_pressure', 'blade_chain']),
     branch('blade_hidden', '藏锋百日', 'passive', '长久蓄势换来一瞬不可阻挡的锋芒。', 4, ['blade_wait', 'blade_breaker']),
     branch('blade_one', '刀意唯一', 'ultimate', '舍弃变化，将全部刀意化作唯一答案。', 5, ['blade_tyrant', 'blade_hidden'], { activation: { combatAction: combat(14, 'enemy', { accuracy: 12, cooldownRounds: 6 }) } }),

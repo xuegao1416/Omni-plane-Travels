@@ -38,7 +38,7 @@ export function MemoryFooter({ mode, onClose, onSave }: Props) {
         display: 'inline-flex', alignItems: 'center', gap: '6px',
         padding: btnPad, border: 'none',
         borderRadius: 'var(--radius-lg)',
-        background: 'var(--accent)', color: '#fff',
+        background: 'var(--accent)', color: '#2a1a04',
         fontSize: compact ? 'var(--font-size-sm)' : 'var(--font-size-base)', fontWeight: '600',
         cursor: 'pointer', transition: 'all 0.15s',
         boxShadow: '0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent)',

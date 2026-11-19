@@ -1,0 +1,163 @@
+/* ═══════════════════════════════════════════════
+   In-game shell — the traveller's observatory.
+   Desktop: brass instrument rail · reading column under the world's sky ·
+   status ledger. Mobile: header rail + full-height reading column + sheets.
+   Narrative, cards and dossiers live in game-story.css.
+   ═══════════════════════════════════════════════ */
+
+.game-journey {
+  --journey-rail: 68px;
+  --journey-right-width: clamp(286px, 23vw, 330px);
+  --journey-column: 780px;
+  /* Legacy contract kept for panels that still read --journey-* */
+  --journey-bg: rgb(var(--d-night-bg, 7, 10, 22));
+  --journey-surface: rgba(var(--d-night-bg, 14, 20, 38), .86);
+  --journey-surface-muted: rgba(var(--d-raise-bg, 22, 30, 54), .7);
+  --journey-text: var(--text-primary);
+  --journey-muted: var(--text-muted);
+  --journey-border: rgba(var(--d-gold, 233, 207, 150), .2);
+  --journey-accent: rgb(var(--d-gold, 227, 194, 126));
+  --journey-focus: rgb(var(--d-gold, 242, 212, 142));
+  --journey-dialogue: rgb(var(--d-gold, 240, 207, 138));
+  --journey-on-accent: #2a1a04;
+  position: relative; isolation: isolate;
+  display: grid; grid-template-columns: var(--journey-rail) minmax(0, 1fr) auto;
+  width: 100%; height: 100vh; height: 100dvh; overflow: hidden;
+  color: var(--text-primary); background: var(--pk-sky);
+}
+/* Faint orrery rings behind the reading column */
+.game-journey::before {
+  content: ''; position: absolute; z-index: -1; left: 50%; top: 48%; width: min(120vh, 1100px); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, transparent 49.7%, rgba(var(--d-gold-bg, 227, 194, 126), .07) 50%, transparent 50.3%), radial-gradient(circle, transparent 34.7%, rgba(var(--d-gold-bg, 227, 194, 126), .05) 35%, transparent 35.3%);
+}
+
+/* ── Instrument rail ── */
+.game-journey__nav {
+  position: relative; z-index: 40; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; padding: 14px 0 12px; overflow-y: auto; scrollbar-width: none;
+  background: linear-gradient(90deg, rgb(var(--d-night-bg, 11, 16, 34)), rgb(var(--d-night-bg, 7, 10, 22)));
+  box-shadow: inset -1px 0 0 rgba(var(--d-gold, 233, 207, 150), .1), 1px 0 0 rgb(var(--d-seat, 42, 26, 4)), 2px 0 0 rgba(var(--d-brass, 184, 136, 63), .55), 3px 0 0 rgb(var(--d-seat, 42, 26, 4)), 8px 0 24px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1)));
+}
+.game-journey__nav::-webkit-scrollbar { display: none; }
+@media (min-height: 700px) { .game-journey__nav { overflow: visible; } }
+.game-journey__nav-button {
+  position: relative; display: grid; place-items: center; flex-shrink: 0; width: 42px; height: 42px; padding: 0; border: 1.5px solid transparent; border-radius: 50%; cursor: pointer;
+  color: rgb(var(--d-gold, 205, 184, 138)); background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 26, 35, 66)), rgb(var(--d-night-bg, 9, 13, 28)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 143, 113, 64)), rgba(var(--d-shade-bg, 47, 32, 8), calc(1 * var(--d-shade-k, 1))), rgb(var(--d-bronze-bg, 110, 81, 38)), rgba(var(--d-shade-bg, 29, 19, 4), calc(1 * var(--d-shade-k, 1))), rgb(var(--d-brass-bg, 143, 113, 64))) border-box;
+  transition: color .2s, transform .3s var(--pk-spring), box-shadow .3s, background .3s;
+}
+.game-journey__nav-button:hover { color: rgb(var(--d-cream, 255, 243, 207)); transform: translateY(-1px); background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 34, 44, 80)), rgb(var(--d-night-bg, 11, 16, 34)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box; box-shadow: 0 0 14px rgba(var(--d-gold, 242, 212, 142), .25); }
+.game-journey__nav-button.is-active {
+  color: #2a1a04; background: radial-gradient(circle at 40% 34%, rgb(var(--d-ink-bg, 255, 246, 216)), rgb(var(--d-gold-bg, 227, 194, 126)) 45%, rgb(var(--d-bronze-bg, 138, 95, 36)) 100%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box;
+  box-shadow: 0 0 0 3px rgba(var(--d-night, 7, 10, 22), .9), 0 0 18px rgba(var(--d-gold, 242, 212, 142), .55);
+}
+.game-journey__nav-button.is-active::before { content: ''; position: absolute; left: -14px; top: 50%; width: 6px; height: 18px; transform: translateY(-50%); border-radius: 0 3px 3px 0; background: linear-gradient(180deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-brass-bg, 184, 136, 63))); box-shadow: 0 0 10px rgba(var(--d-gold, 242, 212, 142), .7); }
+.game-journey__nav-button--home { width: 46px; height: 46px; color: rgb(var(--d-gold, 242, 212, 142)); }
+.game-journey__nav-button--utility { width: 36px; height: 36px; color: var(--text-muted); }
+.game-journey__nav-rule { flex-shrink: 0; width: 30px; height: 9px; margin: 4px 0; background: linear-gradient(90deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .55), transparent) center / 100% 1px no-repeat, radial-gradient(circle, rgb(var(--d-gold-bg, 227, 194, 126)) 0 2px, transparent 2.5px) center / 9px 9px no-repeat; }
+.game-journey__nav-spacer { flex: 1; min-height: 10px; }
+.game-journey__nav-button[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: calc(100% + 14px); top: 50%; z-index: 60; padding: 6px 12px; border-radius: 3px; white-space: nowrap; pointer-events: none;
+  color: rgb(var(--d-cream, 242, 227, 189)); font: 500 12.5px/1 var(--pl-font-serif); letter-spacing: .1em; background: linear-gradient(180deg, rgb(var(--d-raise-bg, 21, 28, 54)), rgb(var(--d-night-bg, 10, 14, 30)));
+  box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .45), 0 6px 16px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1)));
+  opacity: 0; transform: translate(-4px, -50%); transition: opacity .18s, transform .25s var(--pk-ease);
+}
+.game-journey__nav-button[data-tip]:hover::after, .game-journey__nav-button[data-tip]:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
+
+/* ── Reading column ── */
+.game-journey__main { position: relative; display: flex; min-width: 0; min-height: 0; }
+.game-journey__reading-surface, .game-journey__frame-content { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; }
+.game-journey__reading-surface--main { width: 100%; }
+
+/* ── Status ledger (right) ── */
+.game-journey__right-panel {
+  position: relative; z-index: 10; width: var(--journey-right-width); min-width: 0; min-height: 0;
+  background: linear-gradient(270deg, rgb(var(--d-night-bg, 11, 16, 34)), rgba(var(--d-night-bg, 9, 13, 28), .92));
+  box-shadow: inset 1px 0 0 rgba(var(--d-gold, 233, 207, 150), .1), -1px 0 0 rgb(var(--d-seat, 42, 26, 4)), -2px 0 0 rgba(var(--d-brass, 184, 136, 63), .5), -3px 0 0 rgb(var(--d-seat, 42, 26, 4)), -8px 0 24px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1)));
+  transition: width .32s var(--pk-ease);
+}
+.game-journey__right-panel.is-collapsed { width: 0; border-left-color: transparent; overflow: hidden; box-shadow: none; }
+.game-journey__right-toggle {
+  position: absolute; z-index: 25; top: 14px; right: calc(var(--journey-right-width) + 14px); display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1.5px solid transparent; border-radius: 50%; cursor: pointer;
+  color: rgb(var(--d-gold, 233, 207, 150)); background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 30, 39, 72)), rgb(var(--d-night-bg, 10, 15, 32)) 70%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 201, 167, 102)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-brass-bg, 165, 120, 55)), rgb(var(--d-seat, 42, 26, 4)), rgb(var(--d-brass-bg, 201, 167, 102))) border-box;
+  box-shadow: 0 4px 12px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); transition: right .32s var(--pk-ease), color .2s, box-shadow .25s;
+}
+.game-journey__right-toggle:hover { color: rgb(var(--d-cream, 255, 243, 207)); box-shadow: 0 0 14px rgba(var(--d-gold, 242, 212, 142), .3); }
+.game-journey__right-toggle.is-collapsed { right: 14px; }
+
+.game-journey__status-panel { display: flex; flex-direction: column; gap: 16px; height: 100%; padding: 18px 16px 20px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(var(--d-gold, 233, 207, 150), .25) transparent; }
+.game-journey__status-panel > .surface-card, .game-journey__status-card.surface-card {
+  position: relative; padding: 14px 15px; border: 0; border-radius: 3px; background: var(--pk-plate); box-shadow: var(--pk-plate-edge);
+}
+.game-journey__status-panel > .surface-card::before { content: ''; position: absolute; inset: 4px; border-radius: 2px; background: var(--pk-ticks); opacity: .45; pointer-events: none; }
+.game-journey__status-panel h4 {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 10px;
+  color: rgb(var(--d-gold, 233, 207, 150)); font: 600 11px/1.2 var(--pl-font-display); letter-spacing: .26em; text-transform: none;
+}
+.game-journey__status-panel h4::before { content: ''; flex-shrink: 0; width: 6px; height: 6px; transform: rotate(45deg); background: linear-gradient(135deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-brass-bg, 184, 136, 63))); box-shadow: 0 0 6px rgba(var(--d-gold, 242, 212, 142), .6); }
+.game-journey__status-panel h4::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .4), transparent); }
+
+.game-status-meter { display: block; flex: 0 1 112px; width: clamp(72px, 24vw, 112px); height: 6px; border-radius: 999px; background: rgb(var(--d-deep-bg, 5, 8, 19)); box-shadow: inset 0 1px 3px rgba(var(--d-shade, 0, 0, 0), calc(.9 * var(--d-shade-k, 1))), 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .26); overflow: hidden; }
+/* Fill colour stays inline (data-driven); the highlight layers on top via background-image. */
+.game-status-meter > div { box-shadow: 0 0 8px currentColor; background-image: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 60%); transition: width .5s var(--pk-ease); }
+.game-status-meter--module { flex-basis: 124px; width: clamp(78px, 26vw, 124px); }
+
+/* Grid helpers still used by panels (were in the old layout sheet) */
+.grid-responsive { display: grid; gap: var(--space-2, 8px); grid-template-columns: repeat(auto-fill, minmax(var(--grid-card-min, 140px), 1fr)); }
+.grid-fixed-6 { display: grid; gap: 4px; grid-template-columns: repeat(6, 1fr); }
+.grid-fixed-4 { display: grid; gap: 8px; grid-template-columns: repeat(4, 1fr); }
+.grid-fixed-3 { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); }
+.grid-2 { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+.grid-3 { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1fr; }
+.grid-4 { display: grid; gap: 4px; grid-template-columns: repeat(4, 1fr); }
+.grid-label-value { display: grid; gap: 12px; grid-template-columns: 80px 1fr; }
+.grid-1-2 { display: grid; gap: 8px; grid-template-columns: 1fr 2fr; }
+@media (max-width: 768px) { .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .grid-2, .grid-3, .grid-4, .grid-label-value, .grid-1-2 { grid-template-columns: 1fr; } }
+
+/* Generic surface card used inside panels */
+.surface-card { position: relative; border-radius: 3px; background: var(--pk-plate); box-shadow: var(--pk-plate-edge); color: var(--text-primary); }
+
+/* ── Compact desktop: the ledger floats over the column ── */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .game-journey { grid-template-columns: var(--journey-rail) minmax(0, 1fr); }
+  .game-journey__right-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(330px, calc(100vw - 96px)); transform: none; transition: transform .32s var(--pk-ease); }
+  .game-journey__right-panel.is-collapsed { width: min(330px, calc(100vw - 96px)); transform: translateX(105%); }
+  .game-journey__right-toggle { position: fixed; z-index: 31; right: calc(min(330px, 100vw - 96px) + 14px); }
+  .game-journey__right-toggle.is-collapsed { right: 14px; }
+}
+
+/* ── Mobile shell ── */
+.game-journey--mobile { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.game-journey__mobile-header {
+  position: relative; z-index: 20; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) 10px 8px; background: linear-gradient(180deg, rgb(var(--d-night-bg, 11, 16, 34)), rgba(var(--d-night-bg, 9, 13, 28), .94));
+  box-shadow: 0 1px 0 rgb(var(--d-seat, 42, 26, 4)), 0 2px 0 rgba(var(--d-brass, 184, 136, 63), .55), 0 3px 0 rgb(var(--d-seat, 42, 26, 4)), 0 8px 20px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1)));
+}
+.mobile-header-btn {
+  display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1.5px solid transparent; border-radius: 50%; cursor: pointer;
+  color: rgb(var(--d-gold, 233, 207, 150)); background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 30, 39, 72)), rgb(var(--d-night-bg, 10, 15, 32)) 70%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 201, 167, 102)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-brass-bg, 165, 120, 55)), rgb(var(--d-seat, 42, 26, 4)), rgb(var(--d-brass-bg, 201, 167, 102))) border-box;
+}
+.mobile-header-btn svg { width: 18px; height: 18px; }
+.mobile-header-title { display: grid; justify-items: center; gap: 3px; min-width: 0; text-align: center; }
+.mobile-header-title small { color: rgba(var(--d-gold, 233, 207, 150), .7); font: 600 9.5px/1 var(--pl-font-display); letter-spacing: .3em; }
+.mobile-header-title span {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 16px/1.2 var(--pl-font-serif); letter-spacing: .16em;
+  background: linear-gradient(180deg, rgb(var(--d-ink-bg, 255, 250, 234)) 0%, rgb(var(--d-gold-bg, 242, 212, 142)) 46%, rgb(var(--d-brass-bg, 184, 141, 69)) 54%, rgb(var(--d-gold-bg, 240, 212, 149)) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.game-journey__mobile-actions { display: flex; gap: 6px; }
+.game-journey__mobile-main { display: flex; min-width: 0; min-height: 0; }
+.game-journey__mobile-nav { display: grid; gap: 4px; }
+.game-journey__mobile-nav-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 12px 0 6px; border: 0; border-radius: 3px; cursor: pointer; text-align: left;
+  color: var(--text-secondary); font: 500 14px/1.2 var(--pl-font-serif); letter-spacing: .1em; background: transparent; transition: color .2s, background .2s;
+}
+.game-journey__mobile-nav-item:hover, .game-journey__mobile-nav-item:active { color: rgb(var(--d-cream, 255, 243, 207)); background: var(--pk-lit); }
+.game-journey__mobile-nav-icon {
+  display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border: 1.5px solid transparent; border-radius: 50%;
+  color: rgb(var(--d-gold, 233, 207, 150)); background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 26, 35, 66)), rgb(var(--d-night-bg, 9, 13, 28)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 143, 113, 64)), rgba(var(--d-shade-bg, 47, 32, 8), calc(1 * var(--d-shade-k, 1))), rgb(var(--d-bronze-bg, 110, 81, 38)), rgba(var(--d-shade-bg, 29, 19, 4), calc(1 * var(--d-shade-k, 1))), rgb(var(--d-brass-bg, 143, 113, 64))) border-box;
+}
+.game-journey__mobile-nav-item.is-utility { color: var(--text-muted); }
+.game-journey__mobile-nav-item.is-utility:first-child { margin-bottom: 6px; padding-bottom: 6px; border-radius: 3px 3px 0 0; box-shadow: 0 1px 0 rgba(var(--d-gold, 233, 207, 150), .2); }
+
+@media (max-width: 640px) {
+  .game-journey__right-panel, .game-journey__right-panel.is-collapsed { display: none; }
+}

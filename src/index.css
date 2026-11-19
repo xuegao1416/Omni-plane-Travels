@@ -1,17 +1,34 @@
 /* ═══════════════════════════════════════════════
-   全局样式入口 — 通过 @import 按顺序加载各模块
+   全局样式入口 — 位面星仪（夜色 + 黄铜）前端
 
-   加载顺序（CSS 级联优先级由源码顺序决定）：
-   tokens → base → layout-wizard → layout-settings → layout-game → responsive
-   responsive 最后加载，确保移动端断点覆盖可生效
+   2026-11-16 FRONTEND RESET 后，前四代旧表皮（layout-* / entry-crystal /
+   creation-ritual / creation-tarot / game-journey / planar-surfaces /
+   custom-modules）已从仓库删除；需要对照可看提交 23f7c44。
+
+   加载顺序：
+     地基      tokens.css / base.css / responsive.css（复位、滚动条、:focus-visible、断点）
+     大厅封面  styles/planar.css / styles/planar-entry.css
+     新组件库  ui/planar/planar-base.css（夜色黄铜 token + 通用控件）
+               ui/planar/planar-kit.css（材质框、按钮、对话框、ReactFlow 主题）
+     各屏      ui/screens/*.css 由对应组件直接 import（overlays.css 是通用模态纸面，全局加载）
    ═══════════════════════════════════════════════ */
+
 @import './styles/tokens.css';
 @import './styles/base.css';
-@import './styles/layout-wizard.css';
-@import './styles/layout-settings.css';
-@import './styles/layout-game.css';
 @import './styles/responsive.css';
-@import './styles/entry-crystal.css';
-@import './styles/creation-ritual.css';
-@import './styles/creation-tarot.css';
-@import './styles/game-journey.css';
+
+@import './styles/planar.css';
+@import './styles/planar-entry.css';
+
+@import './ui/planar/planar-base.css';
+@import './ui/planar/planar-kit.css';
+@import './ui/screens/overlays.css';
+@import './ui/planar/dawn.css';
+@import './ui/planar/dawn-kit.css';
+@import './ui/dawn/dawn-entry.css';
+@import './ui/dawn/dawn-hall.css';
+@import './ui/dawn/dawn-backdrop.css';
+@import './ui/dawn/dawn-combat.css';
+
+/* 组件局部样式：CombatWireframe → styles/combat-*.css；ProfessionTree* → styles/profession-library.css；
+   ProfessionBook → styles/profession-book.css；其余屏各自 import ui/screens/*.css 或同目录 css。 */

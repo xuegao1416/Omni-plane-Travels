@@ -1,0 +1,128 @@
+/* ═══════════════════════════════════════════════
+   Descent rite (character creation wizard).
+   Title + step rail across the top, one brass grand frame below with an
+   anchor column (astrolabe / mirror / gate) and the scroll column, and a
+   footer rail of kit buttons. Part 1: shell. Part 2: wizard-steps.css.
+   ═══════════════════════════════════════════════ */
+
+.creation-ritual-shell {
+  position: fixed; inset: 0; z-index: 20;
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  padding: max(18px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+  background: var(--pk-sky); color: var(--text-primary); overflow: hidden;
+}
+.creation-ritual-shell__header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding: 0 6px 10px; }
+.creation-ritual-shell__kicker { font: 600 11px/1 var(--pl-font-display); letter-spacing: .3em; color: rgba(var(--d-gold, 233, 207, 150), .8); }
+.creation-ritual-shell__header h1 {
+  margin: 8px 0 4px; font: 700 28px/1.2 var(--pl-font-serif); letter-spacing: .28em;
+  background: linear-gradient(180deg, rgb(var(--d-ink-bg, 255, 250, 234)) 0%, rgb(var(--d-gold-bg, 242, 212, 142)) 46%, rgb(var(--d-brass-bg, 184, 141, 69)) 54%, rgb(var(--d-gold-bg, 240, 212, 149)) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(var(--d-shade, 30, 18, 2), calc(.9 * var(--d-shade-k, 1)))) drop-shadow(0 0 18px rgba(var(--d-gold, 242, 212, 142), .18));
+}
+.creation-ritual-shell__header p { margin: 0; color: var(--text-muted); font-size: 12.5px; }
+.creation-ritual-shell__header p[role='alert'] { margin-top: 8px; color: rgb(var(--d-redpale, 255, 210, 203)); }
+.creation-ritual-shell__header p[role='alert'] button { margin-left: 8px; border: 0; background: none; color: rgb(var(--d-gold, 242, 212, 142)); text-decoration: underline; cursor: pointer; }
+
+.creation-ritual-shell__body { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 14px; min-height: 0; }
+
+/* Step rail: brass studs on a thread */
+.creation-ritual-shell__steps { position: relative; display: grid; align-items: center; gap: 8px; padding: 6px 4px; }
+.creation-ritual-shell__steps::before { content: ''; position: absolute; left: 22px; right: 22px; top: 50%; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .1), rgba(var(--d-gold-bg, 233, 207, 150), .45), rgba(var(--d-gold-bg, 233, 207, 150), .1)); }
+.creation-ritual-step { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.creation-ritual-step__index {
+  display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  font: 700 12px/1 var(--pl-font-display); color: rgb(var(--d-gold, 233, 207, 150));
+  background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 30, 39, 72)), rgb(var(--d-night-bg, 10, 15, 32)) 70%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 201, 167, 102)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-brass-bg, 165, 120, 55)), rgb(var(--d-seat, 42, 26, 4)), rgb(var(--d-brass-bg, 201, 167, 102))) border-box;
+  border: 1.5px solid transparent; box-shadow: 0 0 0 4px rgb(var(--d-night, 7, 10, 22));
+  transition: box-shadow .3s, background .3s, color .3s;
+}
+.creation-ritual-step__label { padding: 4px 10px; border-radius: 999px; background: rgb(var(--d-night-bg, 7, 10, 22)); color: var(--text-muted); font: 500 13px/1 var(--pl-font-serif); letter-spacing: .1em; white-space: nowrap; transition: color .3s, background .3s; }
+.creation-ritual-step.is-completed .creation-ritual-step__index { color: rgb(var(--d-gold, 242, 212, 142)); }
+.creation-ritual-step.is-completed .creation-ritual-step__label { color: var(--text-secondary); }
+.creation-ritual-step.is-active .creation-ritual-step__index { color: #2a1a04; background: radial-gradient(circle at 40% 34%, rgb(var(--d-ink-bg, 255, 246, 216)), rgb(var(--d-gold-bg, 227, 194, 126)) 45%, rgb(var(--d-bronze-bg, 138, 95, 36)) 100%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box; box-shadow: 0 0 0 4px rgb(var(--d-night, 7, 10, 22)), 0 0 16px rgba(var(--d-gold, 242, 212, 142), .55); }
+.creation-ritual-step.is-active .creation-ritual-step__label { color: #2a1a04; font-weight: 700; background: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 50%), var(--pk-brass-face); box-shadow: 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+
+/* Paper: the grand frame */
+.creation-ritual-shell__paper { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+.creation-ritual-shell__paper-frame { min-height: 0; animation: pk-dialog-in .42s var(--pk-spring); }
+.creation-ritual-shell__paper-frame > .dawn-frame-v4__content { padding: calc(var(--pk-rail) + 8px); }
+.ambient-particle-layer { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.ambient-particle { position: absolute; border-radius: 50%; background: rgb(var(--d-cream-bg, 251, 231, 181)); box-shadow: 0 0 6px rgba(var(--d-cream, 251, 231, 181), .8); opacity: .5; animation: pk-drift var(--duration, 14s) linear infinite; }
+.ambient-particle-layer.is-paused .ambient-particle { animation-play-state: paused; }
+@keyframes pk-drift { from { transform: translateY(20px); opacity: 0; } 15% { opacity: .55; } 85% { opacity: .55; } to { transform: translateY(-120px); opacity: 0; } }
+
+.creation-ritual-shell__stage { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(220px, 30%) minmax(0, 1fr); width: 100%; min-height: 0; }
+.creation-ritual-shell__stage.is-step-1, .creation-ritual-shell__stage.is-step-3 { grid-template-columns: minmax(0, 1fr); }
+.creation-ritual-shell__anchor { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 0; padding: 24px 18px; }
+.creation-ritual-shell__anchor:empty { display: none; }
+.creation-ritual-shell__anchor::after { content: ''; position: absolute; top: 8%; bottom: 8%; right: 0; width: 1px; background: linear-gradient(180deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .38), transparent); }
+.creation-ritual-shell__anchor > span:last-child { color: rgb(var(--d-cream, 242, 227, 189)); font: 600 15px/1.3 var(--pl-font-serif); letter-spacing: .24em; text-align: center; }
+.pl-ritual-astro { display: block; width: min(86%, 300px); aspect-ratio: 1; filter: drop-shadow(0 0 30px rgba(var(--d-gold, 227, 194, 126), .14)); }
+.pl-ritual-astro svg { width: 100%; height: 100%; }
+
+/* Departure gate (confirm step): world scene under a brass arch */
+.departure-gate-preview { position: relative; display: grid; place-items: end center; width: min(90%, 300px); aspect-ratio: 3 / 4; padding-bottom: 0; margin-bottom: 34px; }
+.departure-gate-preview__scene { position: absolute; inset: 6% 8% 8%; border-radius: 999px 999px 6px 6px; background-size: cover; background-position: center; box-shadow: inset 0 0 40px rgba(var(--d-shade, 0, 0, 0), calc(.7 * var(--d-shade-k, 1))); filter: saturate(.9); }
+.departure-gate-preview__scene::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(var(--d-night-bg, 7, 10, 22), 0) 40%, rgba(var(--d-night-bg, 7, 10, 22), .85)); }
+.pl-gate { position: absolute; inset: 0; pointer-events: none; }
+.pl-gate__arch { position: absolute; inset: 4% 6% 7%; border-radius: 999px 999px 6px 6px; border: 4px solid transparent; background: linear-gradient(180deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-gold-bg, 226, 187, 114)) 18%, rgb(var(--d-bronze-bg, 138, 95, 36)) 46%, rgb(var(--d-gold-bg, 233, 201, 131)) 62%, rgb(var(--d-brass-bg, 165, 120, 55)) 82%, rgb(var(--d-bronze-bg, 77, 51, 15))) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) padding-box exclude, linear-gradient(#000 0 0); filter: drop-shadow(0 4px 10px rgba(var(--d-shade, 0, 0, 0), calc(.6 * var(--d-shade-k, 1)))); }
+.pl-gate__keystone { position: absolute; top: calc(4% - 9px); left: 50%; width: 20px; height: 24px; transform: translateX(-50%); clip-path: polygon(15% 0, 85% 0, 100% 100%, 0 100%); background: var(--pk-brass-face); filter: drop-shadow(0 2px 3px rgba(var(--d-shade, 0, 0, 0), calc(.6 * var(--d-shade-k, 1)))); }
+.pl-gate__keystone::after { content: ''; position: absolute; left: 50%; top: 45%; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 38% 32%, rgb(var(--d-ink-bg, 255, 251, 232)), rgb(var(--d-gold-bg, 255, 217, 138)) 25%, rgb(var(--d-brass-bg, 212, 138, 42)) 60%, rgb(var(--d-bronze-bg, 94, 44, 6))); box-shadow: 0 0 8px rgba(var(--d-gold, 255, 217, 138), .8); }
+.pl-gate__sill { position: absolute; left: 0; right: 0; bottom: 4%; height: 7px; border-radius: 3px; background: linear-gradient(180deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-brass-bg, 184, 136, 63)) 60%, rgb(var(--d-bronze-bg, 77, 51, 15))); box-shadow: 0 4px 10px rgba(var(--d-shade, 0, 0, 0), calc(.6 * var(--d-shade-k, 1))), 0 0 18px rgba(var(--d-gold, 242, 212, 142), .25); }
+.departure-gate-preview > span:last-child { position: absolute; top: calc(100% + 12px); left: 50%; z-index: 1; transform: translateX(-50%); color: rgb(var(--d-cream, 242, 227, 189)); font: 600 15px/1.3 var(--pl-font-serif); letter-spacing: .24em; white-space: nowrap; text-shadow: 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.8 * var(--d-ts-k, 1))); }
+
+.creation-ritual-shell__scroll { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 22px 26px 26px; animation: pk-step-in .45s var(--pk-ease); }
+@keyframes pk-step-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* Footer rail */
+.creation-ritual-shell__footer { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 6px 0; }
+.creation-ritual-shell__footer > div { display: flex; align-items: center; gap: 12px; }
+.creation-ritual-shell__footer > div > span:first-child { color: rgb(var(--d-gold, 242, 212, 142)); font: 700 13px/1 var(--pl-font-display); letter-spacing: .14em; }
+.creation-ritual-shell__next-reason { color: var(--text-muted); font-size: 12px; }
+.creation-ritual-shell__footer .pk-btn { min-width: 132px; }
+.creation-ritual-shell__footer.is-modal-blocked { opacity: .45; pointer-events: none; }
+
+@media (max-width: 900px) {
+  .creation-ritual-shell__stage { grid-template-columns: minmax(0, 1fr); }
+  .creation-ritual-shell__anchor { flex-direction: row; padding: 14px 16px 6px; }
+  .creation-ritual-shell__anchor::after { top: auto; bottom: 0; left: 10%; right: 10%; width: auto; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .38), transparent); }
+  .pl-ritual-astro { width: 72px; }
+  .departure-gate-preview { width: 96px; padding-bottom: 6px; }
+  .departure-gate-preview > span:last-child { display: none; }
+}
+@media (max-width: 640px) {
+  .creation-ritual-shell { padding: max(10px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+  .creation-ritual-shell__header { padding: 4px 6px 6px; }
+  .creation-ritual-shell__header h1 { font-size: 21px; letter-spacing: .2em; margin: 6px 0 2px; }
+  .creation-ritual-shell__header p { display: none; }
+  .creation-ritual-shell__body { gap: 8px; }
+  .creation-ritual-step { flex-direction: column; gap: 4px; }
+  .creation-ritual-step { min-width: 0; }
+  .creation-ritual-step__label { padding: 3px 8px; font-size: 11px; letter-spacing: .04em; }
+  .creation-ritual-step:not(.is-active) .creation-ritual-step__label { visibility: hidden; }
+  .creation-ritual-step.is-active { z-index: 1; }
+  .creation-ritual-step__index { width: 24px; height: 24px; font-size: 11px; }
+  .creation-ritual-shell__steps::before { top: 18px; }
+  .creation-ritual-shell__paper-frame.pk-frame { --pk-corner: 40px; }
+  .creation-ritual-shell__paper-frame > .dawn-frame-v4__content { padding: calc(var(--pk-rail) + 2px); }
+  .creation-ritual-shell__scroll { padding: 14px 12px 18px; }
+  .creation-ritual-shell__footer { padding-top: 10px; }
+  .creation-ritual-shell__footer .pk-btn { min-width: 0; padding: 0 16px; }
+  .creation-ritual-shell__footer > div > span:first-child, .creation-ritual-shell__next-reason { display: none; }
+}
+
+/* Exit control: always reachable, title centred beside it on phones */
+.creation-ritual-shell__header { justify-content: flex-start; }
+.creation-ritual-shell__heading { min-width: 0; }
+.creation-ritual-shell__exit {
+  flex: none; align-self: center; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 1px solid rgba(var(--d-gold, 227, 194, 126), .45); border-radius: 50%;
+  background: rgba(var(--d-night-bg, 10, 15, 28), .5); color: rgb(var(--d-gold, 242, 212, 142)); cursor: pointer;
+  transition: border-color .2s, transform .2s;
+}
+.creation-ritual-shell__exit:hover:not(:disabled) { border-color: rgb(var(--d-gold, 242, 212, 142)); transform: translateX(-2px); }
+.creation-ritual-shell__exit:disabled { opacity: .4; cursor: not-allowed; }
+.creation-ritual-shell__exit:focus-visible { outline: 2px solid rgb(var(--d-gold, 242, 212, 142)); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .creation-ritual-shell__header { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; align-items: center; gap: 8px; }
+  .creation-ritual-shell__heading { text-align: center; }
+}

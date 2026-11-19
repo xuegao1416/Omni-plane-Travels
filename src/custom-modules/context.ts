@@ -54,10 +54,23 @@ export function buildCustomModuleHostContext(
   for (let index = 1; index <= 6; index += 1) canonicalStats[`dim${index}`] = Number(stats[`dim${index}`] ?? 0);
 
   const survival: Record<string, { amount: number; max?: number }> = {};
-  for (const [id, resource] of Object.entries(gameState.玩家?.生存资源 ?? {})) {
-    survival[id] = { amount: Number(resource.数量 ?? 0), ...(resource.最大值 === undefined ? {} : { max: Number(resource.最大值) }) };
+  const ledger = gameState.resources;
+  if (ledger) {
+    // 资源模块（state.resources）：数量与运行时上限。
+    for (const [id, amount] of Object.entries(ledger.stocks ?? {})) {
+      if (ledger.retired?.includes(id)) continue;
+      const max = ledger.capacity?.[id];
+      survival[id] = { amount: Number(amount ?? 0), ...(max === undefined ? {} : { max: Number(max) }) };
+    }
+  } else {
+    for (const [id, resource] of Object.entries(gameState.玩家?.生存资源 ?? {})) {
+      survival[id] = { amount: Number(resource.数量 ?? 0), ...(resource.最大值 === undefined ? {} : { max: Number(resource.最大值) }) };
+    }
   }
-  const business = gameState.玩家?.经营资产;
+  // 经营资金已并入钱袋；产业数按经营模块里拥有的产业计算。
+  const business = gameState.economy
+    ? { 资金: Number(gameState.玩家?.货币资源?.主货币?.数量 ?? 0), 资产列表: Object.keys(gameState.economy.holdings ?? {}) }
+    : gameState.玩家?.经营资产;
   const event = options.event;
   return clone({
     game: {

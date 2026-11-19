@@ -33,6 +33,7 @@ validateProfessionPack,
 } from '../../data/professions';
 import ProfessionTreeCanvas from './ProfessionTreeCanvas';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
+import { useDialog } from '../shared/Dialog';
 import { describeProfessionMechanics } from '../../gameplay/profession';
 import { PROFESSION_ACCENT_KEYS,PROFESSION_EMBLEM_KEYS } from '../../data/professions/professionVisuals';
 
@@ -60,6 +61,7 @@ export default function ProfessionLibraryWorkspace({
   onClose: () => void;
   onGenerate?: (intent: string, basePack?: ProfessionPack) => Promise<ProfessionPack>;
 }) {
+  const dialog = useDialog();
   const [packs, setPacks] = useState(() => listProfessionPacks());
   const [activePackId, setActivePackId] = useState(() => binding.packIds[0] ?? listProfessionPacks()[0]?.manifest.id ?? '');
   const [activeProfessionId, setActiveProfessionId] = useState('');
@@ -140,9 +142,9 @@ export default function ProfessionLibraryWorkspace({
     setMessage('已创建职业包草稿；逐步编辑完成后点击“保存”');
   };
 
-  const requestClose = () => {
+  const requestClose = async () => {
     const hasUncommittedWork = Object.keys(drafts).length > 0 || pendingGeneratedPack !== null;
-    if (hasUncommittedWork && typeof window !== 'undefined' && !window.confirm('当前有未保存草稿或待确认的 AI 预览，关闭后将离开本次编辑。确定关闭吗？')) return;
+    if (hasUncommittedWork && !await dialog.confirm('当前有未保存草稿或待确认的 AI 预览，关闭后将离开本次编辑。确定关闭吗？', { title: '离开职业典藏', danger: true, confirmText: '仍要关闭' })) return;
     onClose();
   };
 
@@ -327,6 +329,7 @@ export default function ProfessionLibraryWorkspace({
 
   return (
     <>
+      {dialog.DialogUI}
       <div className="profession-library__backdrop" onClick={requestClose} aria-hidden="true" />
       <section className="profession-library" role="dialog" aria-modal="true" aria-label="职业典藏">
         <DawnFrameV4 mode="panel" withFill className="profession-library__frame" ariaLabel="职业典藏">

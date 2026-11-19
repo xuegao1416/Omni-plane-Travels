@@ -38,7 +38,8 @@ export function TemplateCard({ tpl, mode, onSelect, onDelete }: TemplateCardProp
   const timeStr = new Date(tpl.createdAt).toLocaleDateString();
 
   return (
-    <div className={s.templateCard} onClick={() => onSelect(tpl)}>
+    <div className={s.templateCard}>
+      <button type="button" className={s.templateMain} onClick={() => onSelect(tpl)}>
       <div className={s.templateIcon}>
         {getIcon(mode)}
       </div>
@@ -52,7 +53,10 @@ export function TemplateCard({ tpl, mode, onSelect, onDelete }: TemplateCardProp
           <Clock size={10} /> {timeStr}
         </div>
       </div>
+      </button>
       <button
+        type="button"
+        aria-label={`删除 ${tpl.name}`}
         className={s.deleteBtn}
         onClick={e => onDelete(e, tpl.id)}
         title="删除模板"

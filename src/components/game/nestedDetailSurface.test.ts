@@ -10,20 +10,23 @@ describe('nested game detail surface contract', () => {
     read('./panels/characterGrid/DeedsModal.tsx'),
     read('./panels/profilePanel/shared.tsx'),
     read('./panels/variableSnapshot/RollbackConfirm.tsx'),
-    read('./panels/BusinessOverlay.tsx'),
-    read('./panels/SurvivalOverlay.tsx'),
+    read('./panels/EconomyLedger.tsx'),
+    read('./panels/ResourcesLedger.tsx'),
     read('./panels/InGameWorldBookEditor.tsx'),
-    read('./chat/PipelineMonitorModal.tsx'),
   ];
+  // The pipeline monitor is a brass instrument dialog: shared veil, planar frame instead of the plain panel.
+  const pipelineMonitor = read('./chat/PipelineMonitorModal.tsx');
   const componentBundle = componentSources.join('\n');
   const worldBookStyles = read('./panels/inGameWorldBook/styles.module.css');
-  const journeyStyles = read('../../styles/game-journey.css');
+  const journeyStyles = read('../../ui/screens/game-dossier.css');
 
   test('all ordinary nested details use the shared veil and panel materials', () => {
     for (const source of componentSources) {
       expect(source).toContain('game-journey__nested-overlay');
       expect(source).toContain('game-journey__nested-panel');
     }
+    expect(pipelineMonitor).toContain('game-journey__nested-overlay');
+    expect(pipelineMonitor).toContain('<PlanarFrame');
   });
 
   test('ordinary data details do not restore black scrims', () => {

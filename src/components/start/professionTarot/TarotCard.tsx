@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { Compass,Sparkles } from 'lucide-react';
 import type { ProfessionDef } from '../../../modules/schema';
 import { professionEmblemSrc,resolveProfessionVisual } from '../../../data/professions/professionVisuals';
+import Astrolabe from '../orrery/Astrolabe';
 
 interface TarotCardProps {
   profession: ProfessionDef | null;
@@ -56,7 +57,7 @@ export default function TarotCard({
     >
       <span className="tarot-card__flipper" aria-hidden="true">
         <span className="tarot-card__back">
-          <img src="/art/theme/ui-kit/dawn-v4/ritual/talent-astrolabe-v1.png" alt="" draggable={false} />
+          <Astrolabe variant="ritual" className="tarot-card__astro" />
           <span className="tarot-card__seal"><Sparkles size={18} strokeWidth={1.5} /></span>
           <small>命运未揭</small>
         </span>

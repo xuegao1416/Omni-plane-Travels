@@ -11,10 +11,10 @@ interface EffectLogTabProps {
 
 /** 来源标签颜色 */
 const SOURCE_COLORS: Record<string, string> = {
-  rule: '#3b82f6',      // 蓝色
+  rule: '#7f9cd6',      // 蓝色
   periodic: 'var(--warning)',  // 橙色
-  ai: '#8b5cf6',        // 紫色
-  npc: '#10b981',       // 绿色
+  ai: '#a77ad0',        // 紫色
+  npc: '#8aa66a',       // 绿色
 };
 
 /** 来源标签文本 */
@@ -29,9 +29,9 @@ const SOURCE_LABELS: Record<string, string> = {
 const MODULE_COLORS: Record<string, string> = {
   survival: 'var(--danger)',    // 红色
   business: 'var(--warning)',    // 橙色
-  stats: '#3b82f6',       // 蓝色
-  progression: '#8b5cf6', // 紫色
-  worldState: '#6b7280',  // 灰色
+  stats: '#7f9cd6',       // 蓝色
+  progression: '#a77ad0', // 紫色
+  worldState: '#8a8170',  // 灰色
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -106,8 +106,8 @@ export function EffectLogTab({ effectLog, variableLabels = {} }: EffectLogTabPro
           {/* 来源标签 */}
           <span style={{
             padding: '1px 6px', borderRadius: '3px',
-            background: SOURCE_COLORS[entry.source] ?? '#6b7280',
-            color: '#fff', fontSize: '10px', fontWeight: 600,
+            background: SOURCE_COLORS[entry.source] ?? '#8a8170',
+            color: '#0a0e1e', fontSize: '10px', fontWeight: 600,
           }}>
             {localizedToken(entry.source, SOURCE_LABELS, '其他来源')}
           </span>
@@ -115,8 +115,8 @@ export function EffectLogTab({ effectLog, variableLabels = {} }: EffectLogTabPro
           {/* 模块标签 */}
           <span style={{
             padding: '1px 6px', borderRadius: '3px',
-            background: MODULE_COLORS[entry.module] ?? '#6b7280',
-            color: '#fff', fontSize: '10px',
+            background: MODULE_COLORS[entry.module] ?? '#8a8170',
+            color: '#0a0e1e', fontSize: '10px',
           }}>
             {localizedToken(entry.module, MODULE_LABELS, '其他模块')}
           </span>

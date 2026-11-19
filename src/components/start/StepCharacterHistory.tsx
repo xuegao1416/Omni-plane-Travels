@@ -6,6 +6,7 @@ BookMarked,ChevronDown,Save,Download,Upload,
 } from 'lucide-react';
 import TemplatePickerDialog from '../shared/TemplatePickerDialog';
 import { useDialog } from '../shared/Dialog';
+import DropdownItem from './stepPersonalInfo/DropdownItem';
 import {
 saveHistoryPreset,exportHistoryPresetJSON,downloadJSON,
 type HistoryPreset,
@@ -133,23 +134,17 @@ export default function StepCharacterHistory({
           />
           <span>包含成长经历</span>
         </label>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div className="ritual-inline-actions">
           {/* 预设下拉菜单 */}
-          <div ref={presetMenuRef} style={{ position: 'relative' }}>
+          <div ref={presetMenuRef} className="ritual-preset-menu">
             <button
               className="pi-ai-btn"
               onClick={() => setPresetMenuOpen(!presetMenuOpen)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
             >
-              <BookMarked size={12} /> 预设 <ChevronDown size={10} style={{ transform: presetMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              <BookMarked size={12} /> 预设 <ChevronDown size={10} className={presetMenuOpen ? 'is-open' : undefined} />
             </button>
             {presetMenuOpen && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: '4px',
-                background: 'var(--bg-primary)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
-                minWidth: '140px', zIndex: 200, overflow: 'hidden',
-              }}>
+              <div className="ritual-preset-menu__popup">
                 <DropdownItem icon={<Download size={13} />} label="导入预设" onClick={() => { setPresetMenuOpen(false); setPickerOpen(true); }} />
                 <DropdownItem icon={<Save size={13} />} label="保存预设" disabled={!hasContent} onClick={() => { setPresetMenuOpen(false); handleSavePreset(); }} />
                 <DropdownItem icon={<Upload size={13} />} label="导出 JSON" disabled={!hasContent} onClick={() => { setPresetMenuOpen(false); handleExportPreset(); }} />
@@ -181,7 +176,6 @@ export default function StepCharacterHistory({
                   className="btn-ghost pi-ai-btn"
                   onClick={() => onRegenerateSegment(activeId, activeContent)}
                   disabled={isGenerating}
-                  style={{ marginLeft: 'auto' }}
                 >
                   {isActiveRegenerating ? <><Loader size={12} className="animate-spin" /> 生成中</> : <><RefreshCw size={12} /> 重新生成</>}
                 </button>
@@ -202,7 +196,7 @@ export default function StepCharacterHistory({
                   onClick={() => onRegenerateSegment(activeId, activeContent)}
                   disabled={isGenerating}
                 ><Sparkles size={12} /> 根据草稿生成</button>}
-                {!hasApiConfig && <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>手写经历无需 API，也可留空直接启程</span>}
+                {!hasApiConfig && <span className="history-draft-hint">手写经历无需 API，也可留空直接启程</span>}
               </div>
             </div>
           </>
@@ -260,25 +254,3 @@ export default function StepCharacterHistory({
   );
 }
 
-// ─── 下拉菜单项 ─────────────────────────────────────
-function DropdownItem({ icon, label, onClick, disabled }: {
-  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={disabled ? undefined : onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-        padding: '8px 12px', border: 'none', background: 'none',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-        fontSize: 'var(--font-size-sm)', opacity: disabled ? 0.5 : 1,
-        transition: 'background 0.15s',
-      }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = 'var(--bg-secondary)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
-    >
-      {icon} {label}
-    </button>
-  );
-}

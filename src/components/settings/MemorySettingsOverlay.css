@@ -7,7 +7,7 @@
 /* ─── 全屏覆盖层 ─── */
 .ms-overlay {
   position: fixed; inset: 0; z-index: 1500;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(var(--d-shade-bg, 0, 0, 0), calc(0.5 * var(--d-shade-k, 1)));
   backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-body, sans-serif);
@@ -172,7 +172,7 @@
   cursor: pointer; transition: all var(--duration-fast); white-space: nowrap;
 }
 .ms-mode-btn:hover {
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: rgb(var(--d-white-fg, 255, 255, 255));
   transform: translateY(-1px);
 }
 
@@ -211,7 +211,7 @@
 .ms-toggle-thumb {
   position: absolute; top: 3px; left: 3px;
   width: 18px; height: 18px; border-radius: var(--radius-md);
-  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  background: #fff; box-shadow: 0 1px 3px rgba(var(--d-shade, 0, 0, 0), calc(0.2 * var(--d-shade-k, 1)));
   transition: left var(--duration-fast);
 }
 .ms-toggle-btn.active .ms-toggle-thumb { left: 23px; }
@@ -280,7 +280,7 @@
   background: var(--accent-dim);
 }
 .ms-action-btn.primary {
-  background: var(--accent); color: #fff; border-color: var(--accent);
+  background: var(--accent); color: rgb(var(--d-white-fg, 255, 255, 255)); border-color: var(--accent);
 }
 .ms-action-btn.primary:hover {
   filter: brightness(1.1); transform: translateY(-1px);
@@ -289,7 +289,7 @@
 /* ─── 编辑器覆盖层 ─── */
 .ms-editor-overlay {
   position: fixed; inset: 0; z-index: 1600;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(var(--d-shade-bg, 0, 0, 0), calc(0.5 * var(--d-shade-k, 1)));
   backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
   animation: ms-fade-in 0.2s ease;
@@ -342,8 +342,8 @@
   display: flex; justify-content: flex-end; gap: var(--space-2);
 }
 .ms-editor-save {
-  background: var(--accent) !important; color: #fff !important;
-  border-color: var(--accent) !important;
+  background: var(--accent); color: #2a1a04;
+  border-color: var(--accent);
 }
 .ms-editor-save:hover {
   filter: brightness(1.1);
@@ -377,7 +377,7 @@
   .ms-action-bar {
     position: sticky; bottom: 0;
     background: var(--bg-secondary);
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 -2px 8px rgba(var(--d-shade, 0, 0, 0), calc(0.1 * var(--d-shade-k, 1)));
   }
 }
 
@@ -390,15 +390,15 @@
 .game-journey__overlay-panel .ms-action-bar,
 .game-journey__overlay-panel .ms-editor-card,
 .game-journey__overlay-panel .ms-editor-header {
-  background: color-mix(in srgb, var(--journey-surface-muted) 32%, transparent) !important;
-  box-shadow: none !important;
+  background: color-mix(in srgb, var(--journey-surface-muted) 32%, transparent);
+  box-shadow: none;
 }
 .game-journey__overlay-panel .ms-textarea {
-  background: color-mix(in srgb, var(--journey-input) 48%, transparent) !important;
+  background: color-mix(in srgb, var(--journey-surface) 48%, transparent);
   box-shadow: none;
 }
 .game-journey__overlay-panel .ms-textarea:focus {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--journey-focus) 22%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--journey-focus) 22%, transparent);
 }
 
 /* Stage 4 — deep memory surface: keep the long mobile settings page readable

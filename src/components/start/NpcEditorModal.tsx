@@ -183,7 +183,7 @@ export default function NpcEditorModal({
     <OverlayPortal className="world-editor-overlay" ariaLabel={initial ? '编辑 NPC' : '创建 NPC'} onClose={() => { void requestClose(); }}>
       <div className="world-editor-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: '720px' }}>
         <div className="world-editor-header">
-          <span style={{ fontWeight: '600', fontSize: '1rem' }}>
+          <span>
             {initial ? '编辑NPC' : '创建NPC'}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>

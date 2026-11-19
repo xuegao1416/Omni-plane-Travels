@@ -1,3 +1,4 @@
+import '../../ui/screens/combat.css';
 import { useEffect,useMemo,useRef } from 'react';
 import { Check,Sparkles,X } from 'lucide-react';
 import type { AbilityProposal } from '../../gameplay/protocols';

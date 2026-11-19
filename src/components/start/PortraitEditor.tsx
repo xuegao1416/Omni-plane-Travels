@@ -1,21 +1,16 @@
 import { useEffect,useRef,useState,type PointerEvent } from 'react';
 import { Check,RotateCcw,Trash2,X } from 'lucide-react';
 import type { PlayerProfile,PortraitSettings } from '../../storage/db';
+import { silhouetteForGender } from '../../ui/planar/silhouettes';
+import { MirrorBezel } from '../../ui/planar/Ornaments';
 
-const PORTRAIT_DEFAULTS = {
-  male: '/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-male-v1.png',
-  female: '/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-female-v1.png',
-  neutral: '/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-neutral-v1.png',
-} as const;
 
 export const DEFAULT_PORTRAIT_SETTINGS: PortraitSettings = {
   source: 'default', zoom: 1, positionX: 0, positionY: 0,
 };
 
 export function getDefaultPortraitSource(gender: string): string {
-  if (gender.includes('男')) return PORTRAIT_DEFAULTS.male;
-  if (gender.includes('女')) return PORTRAIT_DEFAULTS.female;
-  return PORTRAIT_DEFAULTS.neutral;
+  return silhouetteForGender(gender);
 }
 
 export function getPortraitSource(profile: Pick<PlayerProfile, 'gender' | 'portrait'>): string {
@@ -121,7 +116,7 @@ export default function PortraitEditor({ personalInfo, onChange }: PortraitEdito
     <div className="portrait-editor">
       <button type="button" className="portrait-editor__mirror" onClick={() => { if (!didDragRef.current) openPicker(); didDragRef.current = false; }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} aria-label={editing ? '拖动调整人物形象，点击更换图片' : '更换人物形象'}>
         <span className="portrait-editor__frame">
-          <img className="portrait-editor__frame-art" src="/art/theme/ui-kit/dawn-v4/ritual/identity-mirror-v1.png" alt="" aria-hidden="true" />
+          <MirrorBezel className="portrait-editor__frame-art" />
           <span className="portrait-editor__ellipse">
             <img src={source} alt="当前人物剪影" style={{ transform }} />
           </span>

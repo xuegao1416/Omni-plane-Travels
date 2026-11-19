@@ -4,6 +4,7 @@
 
 import type { D1Database } from '@cloudflare/workers-types';
 import type { WorkshopAssetType } from '../workshopCatalog';
+import type { WorkshopDependency, WorkshopItemSummary, WorkshopStatus } from '../workshop/protocol';
 
 export interface Bindings {
   /** D1 数据库（users / save_slots / workshop_items / sessions / email_codes）。 */
@@ -16,17 +17,13 @@ export interface Bindings {
   EMAIL_FROM: string;
   /** 允许跨域（桌面端 Bearer）的 Origin 列表，逗号分隔。 */
   ALLOWED_ORIGINS?: string;
+  /** 创意工坊管理员的用户 id，逗号分隔（处理举报、设精选）。 */
+  WORKSHOP_ADMIN_IDS?: string;
 }
 
 export type WorkshopItemType = WorkshopAssetType;
 
-export interface WorkshopDependency {
-  id: string;
-  type?: WorkshopItemType;
-  version?: string;
-  optional?: boolean;
-  reason?: string;
-}
+export type { WorkshopDependency };
 
 export interface SessionData {
   userId: string;
@@ -40,6 +37,7 @@ export interface UserRow {
   id: string;
   email: string;
   username: string;
+  display_name?: string | null;
   password_hash: string | null;
   created_at: number;
 }
@@ -57,55 +55,48 @@ export interface SaveSlotRow {
   updated_at: number;
 }
 
-/** workshop_items 表行（所有数据存 JSON，不需要 R2）。 */
+/** workshop_items 表行（0010 起 type 即真实类型；content_type 只出现在迁移前的旧行里）。 */
 export interface WorkshopItemRow {
   id: string;
   owner_id: string;
   type: WorkshopItemType;
   content_type?: string | null;
+  content_id?: string | null;
   version?: string | null;
   title: string;
   description: string | null;
+  changelog?: string | null;
   tags: string | null;
   data_json: string;
-  status: 'draft' | 'published' | 'archived';
+  data_size?: number | null;
+  status: WorkshopStatus | "draft";
   download_count: number;
+  favorite_count?: number | null;
+  rating_count?: number | null;
+  rating_sum?: number | null;
   created_at: number;
   updated_at: number;
+  deleted_at?: number | null;
   category?: string | null;
   dependencies_json?: string | null;
   min_app_version?: string | null;
   compatibility_json?: string | null;
-  featured?: number;
+  featured?: number | null;
   screenshots_json?: string | null;
   recommendations_json?: string | null;
+  search_text?: string | null;
+  /** LEFT JOIN users.display_name。 */
+  author_name?: string | null;
 }
 
 /** 对外暴露的工坊条目。 */
-export interface WorkshopItemPublic {
-  id: string;
-  ownerId: string;
-  type: WorkshopItemType;
-  contentType?: string;
-  version: string;
-  title: string;
-  description: string | null;
-  tags: string[];
-  downloadCount: number;
-  createdAt: number;
-  updatedAt: number;
-  category?: string | null;
-  dependencies: WorkshopDependency[];
-  recommendations: WorkshopDependency[];
-  minAppVersion?: string | null;
-  compatibility: Record<string, unknown>;
-  featured: boolean;
-  screenshots: string[];
-}
+export type WorkshopItemPublic = WorkshopItemSummary;
 
 /** 对外暴露的用户信息。 */
 export interface PublicUser {
   id: string;
   username: string;
   email: string;
+  displayName?: string | null;
+  workshopAdmin?: boolean;
 }

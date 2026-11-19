@@ -18,7 +18,7 @@ interface InlineTalentCardProps {
 const RARITY_COLORS: Record<string, string> = {
   '普通': '#9ca3af',
   '精良': '#16a34a',
-  '稀有': '#3b82f6',
+  '稀有': '#7f9cd6',
   '史诗': '#a855f7',
   '传说': '#d97706',
 };
@@ -43,9 +43,7 @@ export default function InlineTalentCard({ name, rarity, description, effects }:
       className="inline-talent-card"
       style={{
         border: `1px solid ${rarityColor}40`,
-        borderRadius: 8,
         padding: '10px 14px',
-        margin: '8px 0',
         background: rarityBg,
         cursor: 'pointer',
         transition: 'all 0.2s ease',

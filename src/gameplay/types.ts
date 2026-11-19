@@ -135,31 +135,14 @@ export interface GameplayRuntimeState {
   stat?: GameplayStatRuntime;
   survival?: GameplaySurvivalRuntime;
   business?: GameplayBusinessRuntime;
+  /** 统一加成系统里有时效的修正器（core/modifiers）。 */
+  modifiers?: Record<string, import('../core/modifiers').ModifierRecord>;
+  /** 存档内种子随机（core/rng）。 */
+  rng?: import('../core/rng').RngState;
+  /** 待写入下一轮正文的结算备注（core/host）。 */
+  notes?: Array<import('../core/ops').NarrativeNote & { turn: number }>;
 }
 
 export type GameplayStateRoot = object & {
   gameplay?: GameplayRuntimeState;
 };
-
-export interface GameplayExecutionContext {
-  tick: number;
-  enabledModules?: readonly string[];
-  events?: readonly GameplayEventInput[];
-  /** Explicit calendar rules for gameplay clock writes. */
-  worldClockConfig?: import('../time/worldClock').WorldClockConfig;
-  /**
-   * 当为 true 时，事务中的单个 effect/cost 失败不会导致整个事务失败，
-   * 而是记录为警告并继续应用剩余内容。用于 AI 变量更新等模糊来源。
-   */
-  bestEffort?: boolean;
-}
-
-export interface GameplayExecutionResult<TState extends GameplayStateRoot = GameplayStateRoot> {
-  state: TState;
-  status: 'applied' | 'blocked' | 'failed';
-  reason?: string;
-  changes: GameplayChange[];
-  events: GameplayEvent[];
-  warnings: string[];
-  log: GameplayLogEntry;
-}

@@ -1,89 +1,37 @@
+import { useEffect,useRef,useState } from 'react';
 import { useStartScreen } from './useStartScreen';
 import MainMenuView from './MainMenuView';
-import SavesView from './SavesView';
 import WizardShell from './WizardShell';
 import CustomModuleAgentWorkspace from './CustomModuleAgentWorkspace';
-import EntryTransition from './EntryTransition';
 import WorldHallView from './WorldHallView';
 import WorldEditorForm from './WorldEditorForm';
-import { useState,useEffect,useRef } from 'react';
+import Starfield from './orrery/Starfield';
+import DawnScene from '../../ui/dawn/DawnScene';
+import { useUITheme } from '../../hooks/useUITheme';
 import { reportDepth } from '../../modules/playTracker';
-import { useConfigStore } from '../../stores/configStore';
-import { Volume2,VolumeX } from 'lucide-react';
-import { STORAGE_KEYS } from '../../config/storageKeys';
-import { trySetItem } from '../../storage/safeStorage';
+import { WORLD_ARTWORK_PRESETS } from '../../data/worldArtwork';
 
-/** 大厅背景音乐 — 仅在 WorldHallView 可见时播放，首页/过场/向导/游戏过程不播放 */
-function HallMusic() {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const theme = useConfigStore(s => s.settings.theme);
-  const musicSrc = theme === 'dark' ? '/audio/omni-hall-dawn-original.mp3' : '/scarborough-fair.mp3';
-  const [muted, setMuted] = useState(() => {
-    return typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEYS.HALL_MUSIC_MUTED) === 'true';
-  });
+type EntryPhase = 'home' | 'warp' | 'hall';
 
-  useEffect(() => {
-    const audio = new Audio(musicSrc);
-    audio.loop = true;
-    audio.volume = muted ? 0 : 0.45;
-    audio.play().catch(() => { /* autoplay blocked — user gesture needed */ });
-    audioRef.current = audio;
-    return () => { audio.pause(); audio.src = ''; };
-  }, [musicSrc]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = muted ? 0 : 0.45;
-    }
-    // 音量偏好属于尽力而为：存储写不进去也不该让大厅整页报错。
-    trySetItem(STORAGE_KEYS.HALL_MUSIC_MUTED, String(muted));
-  }, [muted]);
-
-  return (
-    <button
-      className="entry-hall-music-toggle"
-      onClick={() => setMuted(m => !m)}
-      aria-label={muted ? '取消静音' : '静音'}
-      title={muted ? '大厅音乐已静音' : '大厅音乐播放中'}
-      style={{
-        zIndex: 100,
-        width: '36px',
-        height: '36px',
-        borderRadius: '50%',
-        border: '1px solid var(--creation-border, rgba(122,166,153,.38))',
-        background: 'var(--creation-surface, rgba(248,252,242,.86))',
-        color: 'var(--creation-text, #304d45)',
-        fontSize: '16px',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 3px 10px rgba(0,0,0,.1)',
-        opacity: 0.7,
-        transition: 'opacity .2s',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
-      onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
-    >
-      {muted ? <VolumeX size={17} strokeWidth={1.7} aria-hidden="true" /> : <Volume2 size={17} strokeWidth={1.7} aria-hidden="true" />}
-    </button>
-  );
-}
+const RETURN_TARGET_KEY = 'omni.start.returnTarget';
+const WARP_MS = 1700;
 
 export default function StartScreen() {
   const h = useStartScreen();
   const [customModuleOpen, setCustomModuleOpen] = useState(false);
-  const [entryPhase, setEntryPhase] = useState<'home' | 'transition' | 'hall'>(() => {
-    const returnedFromHall = typeof window !== 'undefined' && sessionStorage.getItem('omni.start.returnTarget') === 'hall';
+  const [entryPhase, setEntryPhase] = useState<EntryPhase>(() => {
+    const returnedFromHall = typeof window !== 'undefined' && sessionStorage.getItem(RETURN_TARGET_KEY) === 'hall';
     // 设置/事件等页面会先在返回前挂载一个底层 StartScreen；此时不能消费标记，
     // 否则保存设置后重新挂载 StartScreen 会丢失大厅入口状态并回到首页。
     return returnedFromHall || h.state.selectedWorld !== 'default' ? 'hall' : 'home';
   });
+  const warpTimer = useRef<number | null>(null);
+  const [arrival, setArrival] = useState(false);
 
   // 只在真正回到 StartScreen 后消费返回标记；设置页底层的 StartScreen 仍处于 settings 路由。
   useEffect(() => {
-    if (h.state.currentScreen === 'start' && sessionStorage.getItem('omni.start.returnTarget') === 'hall') {
-      sessionStorage.removeItem('omni.start.returnTarget');
+    if (h.state.currentScreen === 'start' && sessionStorage.getItem(RETURN_TARGET_KEY) === 'hall') {
+      sessionStorage.removeItem(RETURN_TARGET_KEY);
     }
   }, [h.state.currentScreen]);
 
@@ -91,117 +39,128 @@ export default function StartScreen() {
   useEffect(() => {
     if (entryPhase === 'hall' && h.view === 'main') reportDepth('lobby');
     else if (h.view === 'wizard') reportDepth('wizard');
-    // 存档页与首页不提高深度。
   }, [entryPhase, h.view]);
 
-  const enterHall = () => setEntryPhase('transition');
+  useEffect(() => () => { if (warpTimer.current !== null) window.clearTimeout(warpTimer.current); }, []);
+  // 到达动画的类名必须一直保留到离开大厅：中途摘掉会让大厅换回普通入场动画并从头重播。
+  useEffect(() => { if (entryPhase !== 'hall') setArrival(false); }, [entryPhase]);
+
+  // 大厅的六张世界图各 2~3MB；若等大厅挂载再解码，会正好卡在穿梭落地的那几帧。
+  // 停在首页时就提前解码好，进入大厅时直接用缓存。
+  useEffect(() => {
+    if (entryPhase !== 'home') return;
+    const images = WORLD_ARTWORK_PRESETS.map(preset => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = preset.src;
+      image.decode?.().catch(() => undefined);
+      return image;
+    });
+    return () => { images.length = 0; };
+  }, [entryPhase]);
+
+  const enterHall = () => {
+    if (entryPhase !== 'home') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setEntryPhase('hall'); return; }
+    setEntryPhase('warp');
+    warpTimer.current = window.setTimeout(() => {
+      setEntryPhase('hall');
+      warpTimer.current = null;
+      setArrival(true);
+    }, WARP_MS);
+  };
   const enterCharacterCreation = async () => {
     if (h.hasCreationDraft && !await h.confirmReplaceCreationDraft()) return;
     h.resetForNewJourney();
     h.setView('wizard');
     setEntryPhase('home');
   };
-
   const resumeCharacterCreation = () => {
     h.resumeCreationDraft();
     setEntryPhase('home');
   };
+  const leaveHallTo = (screen: 'events' | 'settings' | 'user-center') => {
+    sessionStorage.setItem(RETURN_TARGET_KEY, 'hall');
+    h.navigate(screen);
+  };
 
-  const content = (() => {
-    if (h.view === 'main') {
-      if (entryPhase === 'transition') return <EntryTransition onComplete={() => setEntryPhase('hall')} />;
-      if (entryPhase === 'hall') {
-        return (
-          <WorldHallView
-            allWorlds={h.allWorlds}
-            allSaves={h.allSaves}
-            currentSaveId={h.currentSaveId}
-            selectedWorld={h.selectedWorld}
-            setSelectedWorld={h.setSelectedWorld}
-            onBackToHome={() => setEntryPhase('home')}
-            onStartWizard={enterCharacterCreation}
-            creationDraftName={h.personalInfo.name}
-            onResumeCreation={h.hasCreationDraft ? resumeCharacterCreation : undefined}
-            onOpenEvents={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('events'); }}
-            onOpenCustomModules={() => setCustomModuleOpen(true)}
-            onOpenSettings={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('settings'); }}
-            onOpenUserCenter={() => { sessionStorage.setItem('omni.start.returnTarget', 'hall'); h.navigate('user-center'); }}
-              onOpenEditor={(world, step = 1) => { h.setEditingWorld(world); h.setWorldEditorInitialStep(step); h.setWorldEditorOpen(true); }}
-            onDeleteWorld={h.handleDeleteWorld}
-            onImportWorld={h.handleImportWorld}
-            onLoadSave={h.handleLoadSave}
-            onDeleteSave={h.handleDeleteSave}
-            onImportSave={h.handleImportSave}
-            onExportSave={h.handleExportSave}
-          />
-        );
-      }
-      return (
-        <MainMenuView
-          onStartWizard={enterHall}
-          onResumeCreation={h.hasCreationDraft ? resumeCharacterCreation : undefined}
-          title={h.t('start.title')}
-          subtitle={h.t('start.subtitle')}
-        />
-      );
-    }
-
-    if (h.view === 'saves') {
-      return (
-        <SavesView
-          allSaves={h.allSaves}
-          locale={h.locale}
-          currentSaveId={h.currentSaveId}
-          onBack={() => h.setView('main')}
-          onLoadSave={h.handleLoadSave}
-          onDeleteSave={h.handleDeleteSave}
-          onForceDeleteSave={h.handleForceDeleteSave}
-          onRenameSave={h.handleRenameSave}
-          onImportSave={h.handleImportSave}
-          onExportSave={h.handleExportSave}
-        />
-      );
-    }
-
-    return (
-      <WizardShell
-        step={h.step} setStep={h.setStep}
-        onBackToMenu={() => { h.setView('main'); setEntryPhase('hall'); }}
-        title={h.t('start.title')} subtitle={h.t('start.subtitle')}
-        selectedWorld={h.selectedWorld}
-        allWorlds={h.allWorlds} createdWorlds={h.createdWorlds} worldEntry={h.worldEntry}
-        personalInfo={h.personalInfo} setPersonalInfo={h.setPersonalInfo}
-        isFilling={h.isFilling} fillElapsed={h.fillElapsed} onAiFill={h.handleAiFill} onCancelFill={h.cancelFill}
-        segments={h.segments} setSegments={h.setSegments}
-        isGenerating={h.isGenerating} regeneratingId={h.regeneratingId}
-        includeAgeStages={h.includeAgeStages} setIncludeAgeStages={h.setIncludeAgeStages}
-        hasApiConfig={!!h.apiConfig}
-        onGenerateAll={h.handleGenerateAll} onRegenerateSegment={h.handleRegenerateSegment}
-        onLoadPreset={h.handleLoadPreset}
-        onStartGame={h.handleStartGame}
-        isCreatingJourney={h.isCreatingJourney} onCancelCreation={h.cancelJourneyCreation}
-        onCancelGeneration={h.cancelHistoryGeneration}
-        draftWarning={h.draftWarning} onRetryDraftSave={h.retryDraftSave}
-        onSaveWorld={h.handleSaveWorld}
-        apiConfig={h.apiConfig}
-      />
-    );
-  })();
+  const onEntry = h.view === 'main';
+  const uiTheme = useUITheme();
 
   return (
     <>
-      {content}
-      {entryPhase === 'hall' && h.view === 'main' && <HallMusic />}
+      {onEntry && (
+        <div className={`pl-entry-root is-${entryPhase}`}>
+          {uiTheme === 'dawn' ? <DawnScene phase={entryPhase} /> : <Starfield warp={entryPhase === 'warp' ? 1 : 0} spin={entryPhase === 'hall' ? 0.5 : 0.9} />}
+          {entryPhase === 'warp' && <div className="pl-entry-flash" aria-hidden="true" />}
+          {entryPhase !== 'hall' ? (
+            <MainMenuView
+              onStartWizard={enterHall}
+              onResumeCreation={h.hasCreationDraft ? resumeCharacterCreation : undefined}
+              title={h.t('start.title')}
+              subtitle={h.t('start.subtitle')}
+              departing={entryPhase === 'warp'}
+            />
+          ) : (
+            <WorldHallView
+              arrival={arrival}
+              allWorlds={h.allWorlds}
+              allSaves={h.allSaves}
+              currentSaveId={h.currentSaveId}
+              selectedWorld={h.selectedWorld}
+              setSelectedWorld={h.setSelectedWorld}
+              onBackToHome={() => setEntryPhase('home')}
+              onStartWizard={enterCharacterCreation}
+              creationDraftName={h.personalInfo.name}
+              onResumeCreation={h.hasCreationDraft ? resumeCharacterCreation : undefined}
+              onOpenEvents={() => leaveHallTo('events')}
+              onOpenCustomModules={() => setCustomModuleOpen(true)}
+              onOpenSettings={() => leaveHallTo('settings')}
+              onOpenUserCenter={() => leaveHallTo('user-center')}
+              onOpenEditor={(world, step = 1) => { h.setEditingWorld(world); h.setWorldEditorInitialStep(step); h.setWorldEditorOpen(true); }}
+              onDeleteWorld={h.handleDeleteWorld}
+              onImportWorld={h.handleImportWorld}
+              onLoadSave={h.handleLoadSave}
+              onDeleteSave={h.handleDeleteSave}
+              onImportSave={h.handleImportSave}
+              onExportSave={h.handleExportSave}
+            />
+          )}
+        </div>
+      )}
+
+      {h.view === 'wizard' && (
+        <WizardShell
+          step={h.step} setStep={h.setStep}
+          onBackToMenu={() => { h.setView('main'); setEntryPhase('hall'); }}
+          title={h.t('start.title')} subtitle={h.t('start.subtitle')}
+          selectedWorld={h.selectedWorld}
+          allWorlds={h.allWorlds} createdWorlds={h.createdWorlds} worldEntry={h.worldEntry}
+          personalInfo={h.personalInfo} setPersonalInfo={h.setPersonalInfo}
+          isFilling={h.isFilling} fillElapsed={h.fillElapsed} onAiFill={h.handleAiFill} onCancelFill={h.cancelFill}
+          segments={h.segments} setSegments={h.setSegments}
+          isGenerating={h.isGenerating} regeneratingId={h.regeneratingId}
+          includeAgeStages={h.includeAgeStages} setIncludeAgeStages={h.setIncludeAgeStages}
+          hasApiConfig={!!h.apiConfig}
+          onGenerateAll={h.handleGenerateAll} onRegenerateSegment={h.handleRegenerateSegment}
+          onLoadPreset={h.handleLoadPreset}
+          onStartGame={h.handleStartGame}
+          isCreatingJourney={h.isCreatingJourney} onCancelCreation={h.cancelJourneyCreation}
+          onCancelGeneration={h.cancelHistoryGeneration}
+          draftWarning={h.draftWarning} onRetryDraftSave={h.retryDraftSave}
+          onSaveWorld={h.handleSaveWorld}
+          apiConfig={h.apiConfig}
+        />
+      )}
+
       {customModuleOpen && <CustomModuleAgentWorkspace onClose={() => setCustomModuleOpen(false)} />}
       {h.worldEditorOpen && (
         <WorldEditorForm
           initialWorld={h.editingWorld}
-            initialStep={h.worldEditorInitialStep}
+          initialStep={h.worldEditorInitialStep}
           onSave={h.handleSaveWorld}
           onCancel={h.handleCancelWorldEditor}
           apiConfig={h.apiConfig}
-         
-         
         />
       )}
       {h.DialogUI}

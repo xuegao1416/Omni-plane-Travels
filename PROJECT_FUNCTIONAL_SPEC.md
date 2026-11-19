@@ -67,7 +67,7 @@ IndexedDB save + module state + optional Cloudflare services
 - 世界叙事条目唯一来源：`WorldDef.worldBookEntries`。
 - `WorldDef.entryId` 历史模式已经退出当前基线。
 - 世界模块 canonical 形态：`moduleConfig + initialState`。
-- 旧 `WorldModule.data` 只在 `src/modules/normalizeModule.ts` 作为**直接上一代导入边界**读取；加载后运行时代码只读 `moduleConfig`。
+- 旧 `WorldModule.data` 兼容**已退役**：`src/modules/normalizeModule.ts:9-15` 注释原文「Historical `WorldModule.data` support has been retired. Runtime/editor code consumes only `moduleConfig + initialState`」。该文件当前只做形状规范化（progression config 归一），不再提供 `data → moduleConfig + initialState` 转换入口。
 - `worldLoader.ts` 在内置世界和 localStorage 自建世界进入运行时前统一执行模块规范化。
 
 ### 3.2 事件包
@@ -91,21 +91,21 @@ IndexedDB save + module state + optional Cloudflare services
 
 ### 3.5 内部存档
 
-- 当前 `SAVE_SCHEMA_VERSION = 4`，消息使用独立 store 分片持久化。
-- 只保留直接上一代 **v3（内联 messages）→ v4（分片）**。
-- v0/v1/v2 内部 IndexedDB 存档不再串联经过多代迁移进入当前运行时。
+- 当前 `SAVE_SCHEMA_VERSION = 5`（`src/storage/db.ts:715`），消息使用独立 store 分片持久化。
+- 只保留直接上一代 **v4 → v5**（`planV4ToV5Migration`，`src/storage/db.ts:745`）；含内联 `messages` 的 v3 已彻底不支持（`:759` `if ('messages' in record) return null`，`:748` 抛 `不支持的内部存档格式；仅保留 v4 → v5`）。
+- v0/v1/v2/v3 内部 IndexedDB 存档不再串联经过多代迁移进入当前运行时（v3 因内联 messages 已无迁移路径）。
 - 外部导出 JSON 走独立 import normalization，不等同于内部 IndexedDB schema 迁移。
 
 ### 3.6 仍应保留的兼容类型
 
 以下属于直接上一代或外部协议，当前仍有意义：
 
-- `WorldModule.data` → `moduleConfig + initialState`（集中在 normalize 边界）
+- `WorldModule` 旧 `data` 字段（已退役，仅历史存档数据形态）
 - event pack v1 indexed → v2
 - world clock v1 → v2
 - profession pack v1 → v2
 - combat / GameState V2 语义 → V3
-- internal save v3 → v4
+- internal save v4 → v5
 - SillyTavern 世界书 / 预设的外部字段别名
 
 ## 4. 仓库结构

@@ -1,0 +1,66 @@
+/* Module cards in the game right panel (resources, economy).
+   Colours come from shared tokens, which both the night and dawn themes remap. */
+
+.mc-stack { display: flex; flex-direction: column; gap: 8px; font-size: var(--font-size-sm); }
+
+.mc-alerts { display: grid; gap: 4px; }
+.mc-alerts span { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: var(--radius-sm); color: var(--danger); font-size: var(--font-size-xs); background: var(--danger-bg-soft); }
+
+.mc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.mc-chip { padding: 1px 8px; border-radius: var(--radius-full); color: var(--text-secondary); font-size: 11px; background: var(--bg-tertiary); box-shadow: inset 0 0 0 1px var(--border); }
+.mc-chip.is-major { color: var(--warning); box-shadow: inset 0 0 0 1px currentColor; }
+.mc-chip.is-critical { color: var(--danger); background: var(--danger-bg-soft); box-shadow: inset 0 0 0 1px currentColor; }
+
+.mc-rows { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.mc-row { --tone: var(--success); display: grid; gap: 3px; }
+.mc-row.is-scarce { --tone: var(--warning); }
+.mc-row.is-low, .mc-row.is-empty { --tone: var(--danger); }
+.mc-row__head { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.mc-row__head svg { flex: none; color: var(--tone); }
+.mc-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-row.is-low .mc-row__name, .mc-row.is-empty .mc-row__name { color: var(--danger); }
+.mc-row__value { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.mc-row__value small { color: var(--text-muted); font-weight: 400; }
+.mc-meter { position: relative; display: block; height: 4px; overflow: hidden; border-radius: var(--radius-full); background: var(--bg-tertiary); }
+.mc-meter i { position: absolute; inset: 0; transform: scaleX(var(--fill, 0)); transform-origin: 0 50%; border-radius: inherit; background: var(--tone); transition: transform var(--duration-normal) var(--ease-out); }
+.mc-row__foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 18px; }
+.mc-row__foot small { color: var(--text-muted); font-size: 11px; }
+
+.mc-mini { display: inline-flex; flex: none; align-items: center; gap: 3px; height: 20px; padding: 0 7px; border: 0; border-radius: var(--radius-sm); color: var(--accent); font: inherit; font-size: 11px; background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); cursor: pointer; transition: box-shadow var(--duration-fast), color var(--duration-fast); }
+.mc-mini:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--accent); }
+.mc-mini:disabled { color: var(--text-muted); cursor: not-allowed; opacity: .75; }
+.mc-mini.is-ghost { color: var(--text-muted); background: transparent; box-shadow: none; }
+
+.mc-compose { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: var(--radius-md); background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); }
+.mc-compose input { flex: 1; min-width: 0; border: 0; outline: none; color: var(--text-primary); font: inherit; font-size: var(--font-size-xs); background: transparent; }
+
+.mc-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.mc-link { display: inline-flex; align-items: center; gap: 3px; padding: 2px 4px; border: 0; color: var(--text-muted); font: inherit; font-size: var(--font-size-xs); background: none; cursor: pointer; }
+.mc-link:hover { color: var(--text-primary); }
+.mc-link.is-primary { margin-left: auto; color: var(--accent); }
+
+.mc-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.mc-figure { display: grid; gap: 1px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); }
+.mc-figure small { color: var(--text-muted); font-size: 11px; }
+.mc-figure strong { color: var(--text-primary); font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
+.mc-figure.is-gain strong { color: var(--success); }
+.mc-figure.is-loss strong { color: var(--danger); }
+.mc-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.mc-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-secondary); font-size: var(--font-size-xs); }
+.mc-list li b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.mc-list li .is-up { color: var(--success); }
+.mc-list li .is-down { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) { .mc-meter i { transition: none; } }
+:root[data-effects='off'] .mc-meter i { transition: none; }
+
+/* Field with a segmented control (event pacing). */
+.mc-field { display: grid; gap: 4px; }
+.mc-field > small:first-child { color: var(--text-muted); font-size: 11px; }
+.mc-field__hint { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.mc-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 2px; border-radius: var(--radius-md); background: var(--bg-tertiary); box-shadow: inset 0 0 0 1px var(--border); }
+.mc-seg button { min-width: 0; padding: 4px 0; border: 0; border-radius: var(--radius-sm); color: var(--text-muted); font: inherit; font-size: 11.5px; background: transparent; cursor: pointer; transition: color var(--duration-fast), background var(--duration-fast), box-shadow var(--duration-fast); }
+.mc-seg button:hover:not(:disabled) { color: var(--text-primary); }
+.mc-seg button[aria-pressed='true'] { color: var(--accent); background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--accent); }
+.mc-seg button:disabled { cursor: default; }
+.mc-seg button:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }

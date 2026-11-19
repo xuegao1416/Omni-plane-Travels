@@ -7,6 +7,7 @@ import { CustomModuleView } from '../../custom-modules/viewRenderer';
 import { createCustomModulePreview, simulateCustomModule } from '../../custom-modules/preview';
 import { buildCustomModuleHostContext } from '../../custom-modules/context';
 import { WorkshopSaveApplication } from './WorkshopSaveApplication';
+import { Seal } from '../../ui/planar/Ornaments';
 import { createDefaultSimulationRuntimeState } from '../../modules/schema';
 
 const lifecycleNames: Record<string, string> = { onGameStart: '开始游戏', onTurnEnd: '回合结束', onTick: '世界推进', onChoice: '玩家选择', onButton: '点击按钮' };
@@ -63,7 +64,7 @@ export function WorkshopModulePanel({ worldId, revision, revisions, disabled, on
   const module = validation?.normalized;
   const previous = revisions.find(item => item.id === compareId);
   const diff = useMemo(() => module ? collectDiff(previous?.module, module) : [], [previous, module]);
-  if (!module || !revision) return <div className="mws-empty-module"><FlaskConical size={34} /><h3>在这里看见你的玩法</h3><p>Agent 创建草稿后，可直接试玩、查看规则和版本，再决定何时应用。</p></div>;
+  if (!module || !revision) return <div className="mws-empty-module"><Seal size={68}><FlaskConical size={26} /></Seal><h3>在这里看见你的玩法</h3><p>Agent 创建草稿后，可直接试玩、查看规则和版本，再决定何时应用。</p></div>;
   return <><div className="mws-module-summary"><strong>{module.name}</strong><p>{module.description || '暂无模块说明'}</p><small>{module.id} · {module.version}</small></div>
     <nav className="mws-panel-tabs" aria-label="模块查看方式">{[['preview', '试玩'], ['rules', '规则'], ['validation', '校验'], ['history', '版本'], ['saves', '存档'], ['json', 'JSON']].map(([id, title]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>{title}</button>)}</nav>
     <div className="mws-panel-content">

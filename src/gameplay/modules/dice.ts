@@ -1,11 +1,5 @@
 import type { GameState } from '../../schema/variables';
 import type { DiceAdvantageMode, DiceModuleSchema, DiceRoll, TalentModuleSchema } from '../../modules/schema';
-import {
-  executeGameplayTransaction,
-  type GameplayExecutionContext,
-  type GameplayExecutionResult,
-  type GameplayStateRoot,
-} from '../kernel';
 
 export interface DiceRollRequest {
   requestId?: string;
@@ -17,6 +11,8 @@ export interface DiceRollRequest {
   advantageMode?: DiceAdvantageMode;
   talentModifier?: number;
   bonuses?: Array<{ source: string; value: number }>;
+  /** 已按属性量纲换算好的修正（骰子模块按属性范围计算时传入）；缺省按 modifierBase/modifierStep 计算。 */
+  attributeModifier?: number;
 }
 
 export function getTalentDiceBonuses(state: GameState, config: TalentModuleSchema): Array<{ source: string; value: number }> {
@@ -54,7 +50,9 @@ export function createDiceRoll(
   const die = secondDie === undefined
     ? firstDie
     : mode === 'advantage' ? Math.max(firstDie, secondDie) : Math.min(firstDie, secondDie);
-  const attributeModifier = Math.floor((Number(request.attributeValue) - base) / step);
+  const attributeModifier = Number.isFinite(request.attributeModifier)
+    ? Math.trunc(Number(request.attributeModifier))
+    : Math.floor((Number(request.attributeValue) - base) / step);
   const bonuses = request.bonuses ?? [];
   const talentModifier = Number(request.talentModifier ?? 0) + bonuses.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
   const modifier = attributeModifier + talentModifier;
@@ -85,33 +83,4 @@ export function createDiceRoll(
     talentModifier,
     ...(bonuses.length ? { bonuses } : {}),
   };
-}
-
-export function recordDiceRoll(
-  state: GameState,
-  roll: DiceRoll,
-  config: DiceModuleSchema,
-  context: GameplayExecutionContext,
-): GameplayExecutionResult<GameState & GameplayStateRoot> {
-  const limit = Math.max(1, Math.min(100, Math.trunc(config.historyLimit ?? 10)));
-  const history = [...(state.dice?.history ?? []), roll].slice(-limit);
-  return executeGameplayTransaction(state, {
-    id: `dice:${context.tick}:${history.length}`,
-    moduleId: 'dice',
-    source: 'player',
-    label: `${roll.attributeName}检定`,
-    effects: [
-      { set: { path: 'dice.lastRoll', value: roll as unknown as Record<string, never> } },
-      { set: { path: 'dice.history', value: history as unknown as Array<Record<string, never>> } },
-    ],
-    events: [{
-      type: 'dice.resolved',
-      payload: {
-        attributeId: roll.attributeId ?? '', attributeName: roll.attributeName,
-        die: roll.d20, modifier: roll.modifier, total: roll.total, dc: roll.dc,
-         success: roll.success, criticalSuccess: roll.isNatural20, criticalFailure: roll.isNatural1,
-         resultTier: roll.resultTier ?? (roll.success ? 'success' : 'failure'),
-      },
-    }],
-  }, context);
 }

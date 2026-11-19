@@ -5,7 +5,7 @@ import { simulateCustomModule } from './preview';
 import { normalizeCustomGameplayModule } from './normalize';
 import { createInitialCustomModuleState, migrateCustomModuleState } from './stateStore';
 import type { CustomGameplayModuleV3 } from './schema';
-import { revertGameplayTransaction } from '../gameplay/kernel';
+import { revertTransaction } from '../core/transaction';
 
 export const craftingModule: CustomGameplayModuleV3 = {
   kind: 'custom-gameplay-module', schemaVersion: 3, id: 'crafting-demo', name: '工坊', version: '1.0.0', author: 'test', scope: 'world',
@@ -36,7 +36,7 @@ describe('V3 atomic host runtime', () => {
     const result = executeCustomModuleInGame(original, craftingModule, 'onButton', { eventId: 'compact' });
     const log = result.gameState.gameplay!.logs.at(-1)!;
     expect(JSON.stringify(log)).not.toContain('own-state-only');
-    const undo = revertGameplayTransaction(result.gameState, log.transactionId, { tick: 0 });
+    const undo = revertTransaction(result.gameState, log.transactionId, { tick: 0 });
     expect(undo.status).toBe('applied');
     expect(undo.state.customModules).toEqual(original.customModules);
     expect(undo.state.玩家).toEqual(original.玩家);
@@ -157,5 +157,26 @@ describe('V3 atomic host runtime', () => {
       expect(result.data.schemaVersion).toBe(3);
       expect(result.data.logic.onButton[0].id).toBe('onButton-1');
     }
+  });
+});
+
+describe('自创模块与资源/经营模块', () => {
+  test('资源模块的存档：读取库存与上限，消耗写回资源账本', () => {
+    const game = state();
+    delete (game.玩家 as unknown as Record<string, unknown>).生存资源;
+    game.resources = { version: 2, stocks: { energy: 10 }, capacity: { energy: 10 }, discovered: {}, retired: [], unlockedRecipes: [], customRecipes: [], statuses: {}, evolved: [], ledger: [] };
+    game.customModules = { [craftingModule.id]: createInitialCustomModuleState(craftingModule) };
+    const result = executeCustomModuleInGame(game, craftingModule, 'onButton', { eventId: 'ledger' });
+    expect(result.warnings).toEqual([]);
+    expect(result.gameState.resources?.stocks.energy).toBe(7);
+    expect(result.gameState.玩家.货币资源.主货币.数量).toBe(5);
+  });
+
+  test('经营资金已并入钱袋：自创模块读到的 business.funds 就是钱袋', async () => {
+    const { buildCustomModuleHostContext } = await import('./context');
+    const game = state();
+    game.economy = { version: 2, holdings: { stall: {} } } as never;
+    const context = buildCustomModuleHostContext(game);
+    expect(context.player.business).toEqual({ funds: 30, assetCount: 1 });
   });
 });

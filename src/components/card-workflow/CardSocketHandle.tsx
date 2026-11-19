@@ -3,17 +3,9 @@
 // ============================================================
 import { Handle,Position } from '@xyflow/react';
 import type { CardSocketType } from '../../modules/schema';
+import { CARD_SOCKET_COLORS } from '../../modules/workflowSchema';
 
-const SOCKET_COLORS: Record<CardSocketType, string> = {
-  flow:     '#a78bfa',
-  number:   '#60a5fa',
-  string:   '#34d399',
-  boolean:  '#fbbf24',
-  stat:     '#38bdf8',
-  resource: '#fb923c',
-  flag:     '#e879f9',
-  any:      '#94a3b8',
-};
+const SOCKET_COLORS: Record<CardSocketType, string> = CARD_SOCKET_COLORS;
 
 interface Props {
   type: CardSocketType;
@@ -24,7 +16,7 @@ interface Props {
 }
 
 export default function CardSocketHandle({ type, id, label, position, isConnectable = true }: Props) {
-  const color = SOCKET_COLORS[type] ?? '#94a3b8';
+  const color = SOCKET_COLORS[type] ?? SOCKET_COLORS.any;
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4, [position === Position.Left ? 'flexDirection' : 'flexDirection']: 'row' as const }}>
       <Handle

@@ -26,7 +26,9 @@ import type {
 } from './protocols';
 import { balanceAbilityProposal, ensureCombatAbilityDefaults } from './abilitySystem';
 import { canRollbackCombat, normalizeCombatEncounterProposal, normalizeCombatEncounterRequest, normalizeCombatRiskMode } from './protocols';
-import { executeGameplayTransaction, getGameplayPath, setGameplayPath } from './kernel';
+import { getGameplayPath, setGameplayPath } from '../core/state';
+import { commitTransaction } from '../core/transaction';
+import { gameplayEffectToOp } from '../core/legacy';
 
 export interface CombatStatRanges {
   attrA?: [number, number];
@@ -1402,10 +1404,13 @@ export function settleCombatResult(stateInput: GameState, sessionInput: CombatSe
     ? restoreCombatCheckpoint(session.preCombatCheckpoint).gameState
     : clone(state);
   if (!easyDefeatRestores) applyCombatConsequences(consequenceState, session);
-  const execution = result.rewardEffects.length > 0
-    ? executeGameplayTransaction(consequenceState, { id: transactionId, moduleId: 'combat', source: 'combat.result', effects: result.rewardEffects }, { tick: session.round, enabledModules: ['combat'] })
-    : { state: consequenceState, status: 'applied' as const };
-  if (execution.status !== 'applied') return { state, result, alreadyApplied: false };
+  // 奖励与「战斗结束」事件作为一笔内部事务提交；事件在下一回合开始时交给成长、事件等模块。
+  const execution = commitTransaction(consequenceState, {
+    id: transactionId, moduleId: 'combat', source: 'combat.result', label: '战斗结算',
+    ops: result.rewardEffects.flatMap(effect => { const op = gameplayEffectToOp(effect); return op ? [op] : []; }),
+    events: [{ type: 'combat.ended', payload: { status: result.status, sessionId: session.id, rounds: session.round, riskMode: session.riskMode } }],
+  });
+  if (execution.status === 'failed') return { state, result, alreadyApplied: false };
   const next = clone(execution.state);
   const settledResult: CombatResult = { ...result, rewardsApplied: true, terminalTransactionId: transactionId };
   session.result = settledResult;

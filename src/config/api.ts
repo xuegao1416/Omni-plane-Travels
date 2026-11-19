@@ -2,8 +2,37 @@
  * 后端 API 配置
  */
 
-// 后端 API 基础 URL（同源部署时用相对路径）
-export const API_BASE_URL = '';
+/**
+ * 后端 API 基础 URL。网页版同源部署用相对路径；桌面版打包时用环境变量 OMNI_API_BASE
+ * 指向已部署的站点（build.ts 会把它写进产物，见 docs/workshop-ops.md）。
+ */
+function readApiBase(): string {
+  try {
+    return String(process.env.OMNI_API_BASE || '').replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+export const API_BASE_URL = readApiBase();
+
+const AUTH_TOKEN_KEY = 'omni.auth.token.v1';
+
+/** 桌面端登录返回的 Bearer 令牌（网页版用 HttpOnly Cookie，不会有值）。 */
+export function getAuthToken(): string | null {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; }
+}
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch { /* 存储不可用时只能依赖 Cookie */ }
+}
+
+export function authHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // API 端点
 export const API_ENDPOINTS = {
@@ -15,6 +44,7 @@ export const API_ENDPOINTS = {
     resetPassword: `${API_BASE_URL}/api/auth/reset-password`,
     logout: `${API_BASE_URL}/api/auth/logout`,
     me: `${API_BASE_URL}/api/me`,
+    profile: `${API_BASE_URL}/api/me/profile`,
   },
   // 云存档
   saves: {
@@ -23,15 +53,9 @@ export const API_ENDPOINTS = {
     put: (slotId: number) => `${API_BASE_URL}/api/saves/${slotId}`,
     delete: (slotId: number) => `${API_BASE_URL}/api/saves/${slotId}`,
   },
-  // 创意工坊
+  // 创意工坊（完整的请求封装见 src/workshop/api.ts）
   workshop: {
-    list: `${API_BASE_URL}/api/workshop`,
-    get: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}`,
-    installPlan: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}/install-plan`,
-    download: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}/download`,
-    create: `${API_BASE_URL}/api/workshop`,
-    update: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}`,
-    delete: (itemId: string) => `${API_BASE_URL}/api/workshop/${itemId}`,
+    root: `${API_BASE_URL}/api/workshop`,
   },
 } as const;
 
@@ -48,6 +72,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
   const response = await fetch(url, {
     ...REQUEST_CONFIG,
     ...options,
+    headers: { ...REQUEST_CONFIG.headers, ...authHeaders(), ...(options.headers as Record<string, string> | undefined) },
   });
 
   if (response.status === 401) {

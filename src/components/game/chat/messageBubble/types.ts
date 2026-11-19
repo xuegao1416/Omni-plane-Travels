@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../../engine/types';
+import type { DiceRollRequest } from '../../../../gameplay/modules/dice';
 import type { WorldSystemData,DiceRoll } from '../../../../modules/schema';
 
 export interface Props {
@@ -13,5 +14,5 @@ export interface Props {
   /** 世界系统数据（用于内联骰子卡片） */
   worldSystem?: WorldSystemData | null;
   /** 骰子掷骰结果回调 */
-  onDiceRoll?: (roll: DiceRoll) => void;
+  onDiceRoll?: (request: DiceRollRequest) => DiceRoll | null;
 }

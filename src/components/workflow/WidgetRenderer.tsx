@@ -22,8 +22,6 @@ const inputStyle: React.CSSProperties = {
   padding: '2px 4px',
   minHeight: 20,
   borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--border)',
-  background: 'var(--bg-primary)',
   color: 'var(--text-primary)',
   fontSize: '9px',
   fontFamily: 'var(--font-body)',

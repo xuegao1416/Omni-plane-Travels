@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import Astrolabe from '../orrery/Astrolabe';
 
 interface LoadingViewProps {
   title: string;
@@ -19,7 +20,7 @@ export function LoadingView({ title, subtitle, spinnerMessage, onClose }: Loadin
         </div>
       </div>
       <div className="guided-choice-loading">
-        <img src="/art/theme/ui-kit/dawn-v4/ritual/talent-astrolabe-v1.png" alt="" aria-hidden="true" />
+        <Astrolabe variant="ritual" className="guided-choice-loading__astro" />
         <strong>{title}</strong>
         <span>{spinnerMessage}</span>
       </div>

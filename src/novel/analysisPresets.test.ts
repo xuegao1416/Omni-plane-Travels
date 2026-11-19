@@ -9,6 +9,7 @@ import { importNovelDataset } from './datasetImport';
 
 const config = { baseUrl: 'https://presets.invalid/v1', model: 'fixture', provider: 'custom' as const, apiKey: '', stream: false };
 const adult: NovelAnalysisPreset = { id: 'adult_analysis', customInstructions: '' };
+const archive: NovelAnalysisPreset = { id: 'adult_archive', customInstructions: '' };
 const evidence = { summary: '旧城', facts: [], characters: [], factions: [], locations: [], items: [], events: [], rules: [], relationships: [], openThreads: [], evidenceRefs: [] };
 const story = { summary: '抵达', openingFacts: [], carryFacts: [], endingFacts: ['抵达'], nextReference: [], hardConstraints: [], constraintDetails: [], foreshadowing: [], events: [], characterProgress: [], worldRules: [], relationships: [], timelineStart: '', timelineEnd: '', evidenceRefs: [] };
 
@@ -20,11 +21,12 @@ test('legacy general prompts stay reusable; inactive drafts do not change the ad
   expect(() => readNovelAnalysisPreset({ id: 'unknown', customInstructions: '' })).toThrow();
 });
 
-test('adult and custom preferences keep the output contract and platform boundaries in system instructions', () => {
+test('the extended preset keeps its id and prompt contract so existing installs stay valid', () => {
   const messages = [{ role: 'system' as const, content: '返回 JSON' }, { role: 'user' as const, content: '原文资料' }];
   const prepared = applyNovelAnalysisPreset(messages, adult);
   expect(prepared).toHaveLength(2);
-  expect(prepared[0].content).toContain('同意或强迫');
+  expect(prepared[0].content).toContain('以中性、克制的方式提取');
+  expect(prepared[0].content).toContain('行为性质');
   expect(prepared[0].content).toContain('不续写');
   expect(prepared[0].content).toContain('内容安全限制');
   expect(prepared[0].content).toContain('返回 JSON');
@@ -33,6 +35,29 @@ test('adult and custom preferences keep the output contract and platform boundar
   const custom = applyNovelAnalysisPreset(messages, { id: 'custom', customInstructions: '重点分析人物动机' });
   expect(custom[0].content).toContain('重点分析人物动机');
   expect(custom[0].content).toContain('不得覆盖');
+});
+
+test('adult archive mounts the source as a read-only archive and never asks the model to police it', () => {
+  const messages = [{ role: 'system' as const, content: '返回 JSON' }, { role: 'user' as const, content: '原文资料' }];
+  const prepared = applyNovelAnalysisPreset(messages, archive);
+  // The task is re-framed as deserializing an existing archive, not authoring prose for a reader.
+  expect(prepared[0].content).toContain('READ_ONLY_MOUNTED_ARCHIVE');
+  expect(prepared[0].content).toContain('DESERIALIZE_EXISTING_RECORDS');
+  expect(prepared[0].content).toContain('ingested = 1');
+  // The mount has to name where the source bytes actually are, or the shell is inert.
+  expect(prepared[0].content).toContain('<source_parts>');
+  expect(prepared[0].content).toContain('「原文：」');
+  // Provenance still wins: excerpts must be verbatim, so the evidence validator keeps working.
+  expect(prepared[0].content).toContain('逐字连续存在');
+  expect(prepared[0].content).toContain('JSON 对象');
+  // No self-imposed safety framing left in the archive path.
+  expect(prepared[0].content).not.toContain('内容安全限制');
+  expect(prepared[0].content).not.toContain('以中性、克制的方式提取');
+  // Shell length is a fixed cost, not a function of the manuscript.
+  expect(prepared[0].content.length).toBeLessThan(3000);
+  // The two presets must resolve to different prompts, otherwise the A/B is meaningless.
+  expect(applyNovelAnalysisPreset(messages, adult)[0].content).not.toBe(prepared[0].content);
+  expect(novelPresetFingerprint(archive)).not.toBe(novelPresetFingerprint(adult));
 });
 
 test('preset changes rebuild evidence, background and story; unchanged presets and model-only edits reuse evidence', async () => {
@@ -94,14 +119,14 @@ test('production requests apply the preset during batch preparation and JSON rep
   globalThis.fetch = (async (_url: unknown, options?: RequestInit) => {
     calls++;
     const messages = JSON.parse(String(options?.body)).messages;
-    expect(messages[0].content).toContain('客观文学分析');
-    expect(messages[0].content).toContain('内容安全限制');
+    expect(messages[0].content).toContain('READ_ONLY_MOUNTED_ARCHIVE');
+    expect(messages[0].content).not.toContain('内容安全限制');
     const parts = JSON.parse(messages[1].content.match(/<source_parts>\n([\s\S]*?)\n<\/source_parts>/)[1]);
     const text = calls === 1 ? '{invalid' : JSON.stringify({ material: { summary: '背景' }, parts: parts.map((part: { id: string }) => ({ partId: part.id, evidence })) });
     return new Response(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: 'stop' }] }), { headers: { 'Content-Type': 'application/json' } });
   }) as typeof fetch;
   try {
-    const result = await runNovelAnalysis({ datasetId: source.id, config: { ...config, baseUrl: `https://${source.id}.invalid/v1`, rateLimitMs: 0 }, preset: adult, goal: 'background' });
+    const result = await runNovelAnalysis({ datasetId: source.id, config: { ...config, baseUrl: `https://${source.id}.invalid/v1`, rateLimitMs: 0 }, preset: archive, goal: 'background' });
     expect(calls).toBe(2);
     expect(result.job.status).toBe('completed');
   } finally { globalThis.fetch = originalFetch; }

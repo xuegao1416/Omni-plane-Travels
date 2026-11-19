@@ -1,11 +1,11 @@
 > 本文档是 `PROJECT_FUNCTIONAL_SPEC.md` 的拆分子文件（9、UI 组件系统 — `src/components/`）。
-> 总索引见 `../PROJECT_FUNCTIONAL_SPEC.md`。
+> 总索引见仓库根目录的 `PROJECT_FUNCTIONAL_SPEC.md`（相对本文件为 `../../PROJECT_FUNCTIONAL_SPEC.md`）。
 
 ## 9、UI 组件系统 — `src/components/`
 
 ### 9.1 游戏主界面 — `src/components/game/GameScreen.tsx`
 
-**布局组件位置**:`DesktopLayout` / `MobileLayout` / `DrawerPanel` / `navConfig.ts` / `types.ts` 均在 `src/components/game/gameScreen/`;`ChatPanel` 在 `game/chat/`;`RightPanel` / `WorldDynamicsPanel` 在 `game/panels/`;`JourneyDossierContent` 在 `game/shared/`。
+**布局组件位置**:`DesktopLayout` / `MobileLayout` / `DrawerPanel` / `navConfig.ts` / `types.ts` 均在 `src/components/game/gameScreen/`(该目录 10 个文件,另含 `mobileTitleContract.test.ts` 与 `hooks/useSimulation.ts`、`hooks/useSurvivalCraft.ts`(+test)、`hooks/useSurvivalSettlement.ts`);`ChatPanel` 在 `game/chat/`;`RightPanel` / `WorldDynamicsPanel` 在 `game/panels/`;`JourneyDossierContent` 在 `game/shared/`。
 
 **三栏桌面布局**:
 
@@ -17,20 +17,24 @@ DesktopLayout (gameScreen/DesktopLayout.tsx)
 │     / variables / worldbook / dynamics / memory / modules
 ├── children = chatPanelEl (ChatPanel)
 ├── DrawerPanel (gameScreen/DrawerPanel.tsx) ← drawerContent 由 GameScreen 传入 JourneyDossierContent
-└── rightPanel (可折叠, rightCollapsed / onToggleRightPanel) → RightPanel / WorldDynamicsPanel
+└── rightPanel (可折叠, rightCollapsed / onToggleRightPanel) → RightPanel
 ```
+
+注:`WorldDynamicsPanel` **不在** `rightPanelEl` 里——它是 `GameScreen.tsx:982 renderPanelContent` 的 `case 'dynamics'`(`:998`)分支,通过 `DrawerPanel`(桌面)或 `MobileLayout` 左侧面板(移动端)作为覆盖层渲染。
 
 **移动端布局**:
 
 ```
-MobileLayout (gameScreen/MobileLayout.tsx)
-├── 左滑出面板
-├── 中央聊天区域 (children = chatPanelEl)
-├── 右滑出面板
-└── 中栏覆盖层 → JourneyDossierContent
+MobileLayout (gameScreen/MobileLayout.tsx, 166 行)
+├── <main> 中央聊天区域 (children = chatPanelEl)
+├── MobileOverlay side="left"  width={260}  ← 左侧导航 (:99-138, showLeftOverlay)
+├── MobileOverlay side="left"  width={300}  ← 左侧面板 (:141-152, mobileActivePanel, 内容 = panelContent)
+└── MobileOverlay side="right" width={320}  ← 右侧信息面板 (:155-163, showRightOverlay, 内容 = rightPanel)
 ```
 
-移动端导航由 `navConfig.ts` 的工厂函数生成 12 项(比桌面多 `settings`),每项带 `action` 回调直接 `setMobileActivePanel(...)` 或 `navigate('settings')`。
+**不存在「中栏覆盖层」**:`JourneyDossierContent` 不在此层,它是 `GameScreen.tsx:1003` 在 `renderPanelContent` 末尾对抽屉内容做的一层包装(`panel && content ? <JourneyDossierContent panel={normalizeDossierPanel(panel)}>{content}</JourneyDossierContent> : content`)。
+
+移动端导航由 `navConfig.ts:46 buildMobileNavItems({ navigate, setShowLeftOverlay, setMobileActivePanel })` 生成 **12 项**(桌面 `navButtons`(:5-17) 是 11 项,移动端多 `settings`),每项带 `action` 回调:导航类先 `setShowLeftOverlay(false)` 再 `setMobileActivePanel('profile' | 'characters' | ...)`(`:54-64`),`home` 走 `navigate('start')`(`:54`),`settings` 走 `navigate('settings')`(`:65`)。
 
 **战斗 V3 集成**:
 
@@ -40,7 +44,7 @@ useEffect(() => {
   return off;
 }, [handleTypedCombatRequest]);
 
-// 敌人自动行动（GameScreen.tsx:910-916）
+// 敌人自动行动（GameScreen.tsx:864-870）
 useEffect(() => {
   const session = gameState.v3?.combatSession;
   const actor = session?.participants.find(unit => unit.id === session.activeUnitId);
@@ -52,9 +56,9 @@ useEffect(() => {
 
 ### 9.2 聊天面板 — `src/components/game/chat/ChatPanel.tsx`
 
-**ChatPanel 子组件**(ChatPanel.tsx:1-10 导入):`MessageBubble`、`ErrorBoundary`、`InputArea`、`PipelineMonitorModal`,以及 `messageWindow.ts` 的 `getInitialMessageStart` / `getPreviousMessageStart`。
+**ChatPanel 子组件**(ChatPanel.tsx:1-10 导入):`MessageBubble`、`ErrorBoundary`、`InputArea`、`PipelineMonitorModal`,以及 `messageWindow.ts` 的 `getInitialMessageStart` / `getPreviousMessageStart`。发送回调类型是 `import('./draftSubmission').ActionSender`(`ChatPanel.tsx:15`)。
 
-**`src/components/game/chat/` 文件**:`ChatPanel.tsx`、`MessageBubble.tsx`、`InputArea.tsx`、`PipelineMonitorModal.tsx`、`ContextMenu.tsx`、`InlineDiceCard.tsx`、`InlineTalentCard.tsx`、`InlineImageGenButton.tsx`、`messageWindow.ts`、`pipelineUI.ts`、`messageBubble/` 子目录(`BubbleContent.tsx` / `EditMode.tsx` / `InlinePortals.tsx` / `renderPipeline.ts` / `types.ts` / `useMenuItems.tsx`)+ 3 个测试。
+**`src/components/game/chat/` 文件**(顶层 15 个):`ChatPanel.tsx`、`MessageBubble.tsx`、`InputArea.tsx`、`PipelineMonitorModal.tsx`、`ContextMenu.tsx`、`InlineDiceCard.tsx`、`InlineTalentCard.tsx`、`InlineImageGenButton.tsx`、`messageWindow.ts`、`pipelineUI.ts`、`draftSubmission.ts`,+ **4 个测试**(`dialoguePipeline.test.ts` / `draftSubmission.test.ts` / `messageWindow.test.ts` / `PipelineMonitorModal.mobile.test.ts`);另有 `messageBubble/` 子目录 6 个文件(`BubbleContent.tsx` / `EditMode.tsx` / `InlinePortals.tsx` / `renderPipeline.ts` / `types.ts` / `useMenuItems.tsx`)。
 
 **消息渲染管线**:
 
@@ -92,14 +96,14 @@ export function getPreviousMessageStart(currentStart: number): number {
 
 - 初始:最近 `MESSAGE_BATCH_SIZE = 80` 条
 - 上滑加载历史(锚点保留),每次再放开一个 80 条批次
-- 存档替换检测(ChatPanel.tsx:52)完整条件是**两个或条件**:
+- 存档替换检测(ChatPanel.tsx:56)完整条件是**两个或条件**:
     
   `previousHistory.firstId !== messages[0]?.id || messages.length < previousHistory.length` → `historyWasReplaced` → 重置窗口
-- 历史指纹存在 `messageHistoryRef = useRef({ firstId: messages[0]?.id, length: messages.length })`(:41)
+- 历史指纹存在 `messageHistoryRef = useRef({ firstId: messages[0]?.id, length: messages.length })`(:45)
 
 ### 9.3~9.9 (其他 UI 组件目录)
 
-7 个子目录(内容见上方 §9.3~9.9):
+`src/components/` 顶层共 **8 个子目录**:`game/`(已在 §9.1–§9.2 说明)、`card-workflow/`、`event/`、`workflow/`、`profession/`、`settings/`、`shared/`、`start/`;另有 `SettingsScreen.tsx`、`UserCenterPage.tsx`、`ErrorBoundary.tsx`、`TelemetryConsentBanner.tsx` 等散落文件。逐条说明见下方:
 
 - §9.3 卡片工作流 UI — `card-workflow/`
 - §9.4 事件组件 — `event/`
@@ -117,16 +121,18 @@ export function getPreviousMessageStart(currentStart: number): number {
 | ----------- | ------------------------------------------------------------------ | ---------------------- |
 | 左侧导航        | 内联 `<nav className="game-journey__nav">`(CSS 类控制宽度,源码无 `52px` 字面量) | 桌面端                    |
 | ChatPanel   | `flex: 1`                                                          | 始终显示                   |
-| RightPanel  | 可折叠                                                                | ≤900px 自动折叠            |
+| RightPanel  | 可折叠(`RightPanel.tsx`,位于 `game/panels/`)                             | ≤1100px 自动折叠          |
 | DrawerPanel | 覆盖 ChatPanel                                                       | `overlay !== null` 时滑出 |
 
 #### 9.10.2 移动端断点
 
-| 断点        | 行为                       |
-| --------- | ------------------------ |
-| ≤640px    | 渲染 MobileLayout          |
-| 641-900px | DesktopLayout + 右侧面板自动折叠 |
-| >900px    | DesktopLayout + 右侧面板默认展开 |
+断点常量见 `src/components/game/GameScreen.tsx`:`:123 const isMobile = useMediaQuery('(max-width: 640px)');` 与 `:167 const mq = window.matchMedia('(max-width: 1100px)');`(创建后立即以 `handler(mq)` 赋初值)。
+
+| 断点         | 行为                       |
+| ---------- | ------------------------ |
+| ≤640px     | 渲染 MobileLayout          |
+| 641-1100px | DesktopLayout + 右侧面板自动折叠 |
+| >1100px    | DesktopLayout + 右侧面板默认展开 |
 
 #### 9.10.3 事件包二级开关
 
@@ -143,24 +149,51 @@ if (sessionActivePacks !== undefined) {
 #### 9.10.4 worldSystem 融合
 
 ```typescript
-const worldSystem = useMemo(() => ({
-  stat: { ...worldDef.modules.stat, ...gameState.current },
-  profession: resolveProfessionBinding(worldDef, gameState),
-  combat: resolveCombatRuleset(worldDef, gameState),
-  dice: { ...config, runtime: runtimeData },
-}), [worldDef, gameState]);
+const worldSystem = useMemo((): WorldSystemData => {
+  if (!worldDef?.modules) return {};
+  const keyMap: Record<string, string> = {
+    stat: '数值属性', progression: '成长体系', survival: '生存资源',
+    business: '经营资产', dice: '骰子检定', talent: '天赋体系',
+    profession: '职业体系', combat: '战斗系统',
+  };
+  const result: WorldSystemData = {};
+  for (const mod of worldDef.modules) {
+    if (!mod.enabled) continue;
+    if (mod.moduleId === 'profession' && !isProfessionModuleEnabled(worldDef)) continue;
+    const key = keyMap[mod.moduleId];
+    if (!key || (!mod.moduleConfig && mod.moduleId !== 'dice')) continue;
+    const config = (mod.moduleConfig || createDefaultDiceModule()) as Record<string, any>;
+    if (mod.moduleId === 'stat') {
+      const live = gameState.玩家?.生存状态 ?? {};
+      // attrA/attrB 取 live.血量 / live.体力值；dim1..dim6 与 special[] 用 live[id] 覆盖 config 值
+      ...
+      (result as any)[key] = statConfig;
+    } else if (mod.moduleId === 'profession') {
+      (result as any)[key] = resolveProfessionBinding(config);
+    } else if (mod.moduleId === 'combat') {
+      (result as any)[key] = resolveCombatRuleset(config);
+    } else if (mod.moduleId === 'dice') {
+      (result as any)[key] = { ...config, ...(gameState.dice ?? {}) };
+    } else {
+      (result as any)[key] = config;
+    }
+  }
+  // 末尾把 resolveProfessionBonuses(gameState, professionConfig).checks 塞进骰子模块的 runtimeBonuses
+  return result;
+}, [worldDef, gameState, stateVersion]);
 ```
+
+要点:数值属性把玩家实时值(`gameState.玩家.生存状态`)合并进配置;`profession` 走 `resolveProfessionBinding(config)`、`combat` 走 `resolveCombatRuleset(config)`、`dice` 用 `gameState.dice` 覆盖;依赖是 `[worldDef, gameState, stateVersion]`。**不存在 `gameState.current` 或 `runtimeData`**。
 
 #### 9.10.5 CombatWireframe 显示条件
 
+`src/components/game/GameScreen.tsx:1139`:
+
 ```typescript
-combatV3Enabled &&
-gameState.v3?.combatSession &&
-(
-  gameState.v3.combatSession.lifecycle !== 'terminal'
-  || gameState.v3.combatSession.result?.narration.status !== 'succeeded'
-)
+{combatV3Enabled && gameState.v3?.combatSession && (gameState.v3.combatSession.lifecycle !== 'terminal' || gameState.v3.combatSession.result?.narration.status !== 'succeeded') && <CombatWireframe ... />}
 ```
+
+即:战斗特性开启、存在战斗会话,且「未终结」或「已终结但叙事尚未成功」时显示。紧随其后 `:1155` 是待决遭遇卡 `CombatEncounterDecisionCard`(条件 `combatV3Enabled && !readOnly && gameState.v3?.pendingEncounterRequest`)。
 
 ### 9.11 ChatPanel 虚拟滚动实现 (散节整合)
 
@@ -179,29 +212,40 @@ useLayoutEffect 追加消息后
 
 **首次加载**: `getInitialMessageStart(messages.length)` 默认返回最近 80 条。
 
-**存档替换检测**: `previousHistory.firstId !== messages[0]?.id` → 重置窗口。
+**存档替换检测**(ChatPanel.tsx:55-57):`const previousHistory = messageHistoryRef.current;` → `const historyWasReplaced = previousHistory.firstId !== messages[0]?.id || messages.length < previousHistory.length;` → `renderedStart = historyWasReplaced ? getInitialMessageStart(messages.length) : visibleStart`。**两个条件是或关系**——首条 id 变化或消息数变少都判定为存档被替换。
 
-#### 9.11.2 Inline Portals 渲染层
+#### 9.11.2 Inline Portals 渲染层（组件层）
 
-`MessageBubble` 使用 `ReactDOM.createPortal`:
+`MessageBubble` 不使用 `ReactDOM.createPortal`。内联卡片由 `messageBubble/InlinePortals.tsx` 用 **`react-dom/client` 的 `createRoot`** 就地挂载:
 
-- `.dice-roll-placeholder` → `InlineDiceCard`
-- `.talent-gain-placeholder` → `InlineTalentCard`
-- `.inline-image-gen-placeholder` → `InlineImageGenButton`
-- `.inline-dialogue-card` → 头像补水(portraitStore)
+```typescript
+import { createRoot, type Root } from 'react-dom/client';   // InlinePortals.tsx:2
+```
+
+挂载流程:`BubbleContent.tsx:35` 调用 `useInlinePortals(messageHtmlRef, ...)` → 在 `messageHtmlRef.current` 上按选择器 `querySelectorAll` 找占位符 → 逐个 `createRoot(el)` 渲染(`:78` / `:122` / `:167`)。
+
+- `.dice-roll-placeholder` → `InlineDiceCard`(`:65-78`)
+- `.talent-gain-placeholder` → `InlineTalentCard`(`:110-122`)
+- `.inline-image-gen-placeholder` → `InlineImageGenButton`(`:156-167`)
+- `.inline-dialogue-card` → 头像补水(`:188` 起):走 `stores/imageStore` + `storage/imageDb` + `storage/imageUrls`,以 `portrait-<id>` 为 key `await imageUrls.acquire(...)`(`:202`)、`imageDb.findPortraitKeyByName(name)`(`:204`)、并 `imageUrls.subscribe(...)`(`:225`)订阅后续变更。**`portraitStore` 不存在**。
 
 #### 9.11.3 输入处理
 
 ```typescript
-const handleOptionClick = (optionText: string) => {
-  setInputText(prev => prev.trim() ? `${prev} ${optionText}` : optionText);
-};
+// ChatPanel.tsx:88
+const handleOptionClick = useCallback((optionText: string) => {
+  setInputText(prev => {
+    const trimmed = prev.trim()
+    if (!trimmed) return optionText
+    return `${trimmed} ${optionText}`
+  })
+}, [])
 
+// ChatPanel.tsx:49-53
 useEffect(() => {
-  if (externalDraft?.id !== lastDraftIdRef.current) {
-    setInputText(externalDraft.text);
-    lastDraftIdRef.current = externalDraft.id;
-  }
+  if (!externalDraft?.text || externalDraft.id === lastDraftIdRef.current) return;
+  lastDraftIdRef.current = externalDraft.id;
+  setInputText(externalDraft.text);
 }, [externalDraft]);
 ```
 

@@ -1,0 +1,167 @@
+/* ═══════════════════════════════════════════════
+   In-game dossiers (drawers / mobile sheets / nested details) and the
+   cards embedded in the narrative (dice, talent, dialogue, event).
+   ═══════════════════════════════════════════════ */
+
+/* ── Dossier: a brass-rimmed cloth folio ── */
+.journey-dossier { position: fixed; z-index: 1201; min-width: 0; min-height: 0; color: var(--text-primary); outline: none; }
+.journey-dossier__frame {
+  position: relative; display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; border-radius: 6px;
+  background: radial-gradient(ellipse 90% 35% at 50% 0%, rgba(var(--d-gold-bg, 227, 194, 126), .08), transparent 70%), var(--pk-weave, none), linear-gradient(180deg, rgb(var(--d-night-bg, 14, 20, 40)), rgb(var(--d-night-bg, 7, 10, 23)));
+  box-shadow: 0 0 0 1px rgb(var(--d-seat, 42, 26, 4)), 0 0 0 4px rgb(var(--d-rail, 184, 136, 63)), 0 0 0 5px rgb(var(--d-rail-lo, 77, 51, 15)), inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .14), 0 30px 80px rgba(var(--d-shade, 0, 0, 0), calc(.65 * var(--d-shade-k, 1)));
+}
+.journey-dossier__frame::before { content: ''; position: absolute; inset: 9px; border-radius: 3px; background: var(--pk-ticks); opacity: .6; pointer-events: none; }
+.journey-dossier__content { position: relative; display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; box-sizing: border-box; padding: 20px 24px 16px; }
+.journey-dossier__header { position: relative; display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding-bottom: 14px; }
+.journey-dossier__header::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .55), rgba(var(--d-gold-bg, 233, 207, 150), .15) 70%, transparent); }
+.journey-dossier__heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.journey-dossier__heading > div { min-width: 0; }
+.journey-dossier__emblem {
+  position: relative; display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 2px solid transparent; border-radius: 50%;
+  color: rgb(var(--d-gold, 242, 212, 142)); background: radial-gradient(circle at 50% 36%, rgb(var(--d-raise-bg, 38, 48, 90)), rgb(var(--d-night-bg, 11, 16, 34)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box;
+  box-shadow: 0 0 0 3px rgba(var(--d-night, 7, 10, 22), .9), 0 0 0 4px rgba(var(--d-brass, 184, 136, 63), .45), 0 4px 10px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1)));
+}
+.journey-dossier__header h2, .journey-dossier__header p { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.journey-dossier__header h2 {
+  font: 700 clamp(18px, 1.5vw, 21px)/1.25 var(--pl-font-serif); letter-spacing: .2em;
+  background: linear-gradient(180deg, rgb(var(--d-ink-bg, 255, 250, 234)) 0%, rgb(var(--d-gold-bg, 242, 212, 142)) 46%, rgb(var(--d-brass-bg, 184, 141, 69)) 54%, rgb(var(--d-gold-bg, 240, 212, 149)) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(var(--d-shade, 30, 18, 2), calc(.9 * var(--d-shade-k, 1))));
+}
+.journey-dossier__header p { margin-top: 5px; color: var(--text-muted); font-size: 12px; letter-spacing: .06em; }
+.journey-dossier__close {
+  display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; padding: 0; border: 1.5px solid transparent; border-radius: 50%; cursor: pointer;
+  color: rgb(var(--d-gold, 233, 207, 150)); background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 30, 39, 72)), rgb(var(--d-night-bg, 10, 15, 32)) 70%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 201, 167, 102)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-brass-bg, 165, 120, 55)), rgb(var(--d-seat, 42, 26, 4)), rgb(var(--d-brass-bg, 201, 167, 102))) border-box;
+  transition: color .2s, transform .3s var(--pk-spring), box-shadow .25s;
+}
+.journey-dossier__close:hover { color: rgb(var(--d-cream, 255, 243, 207)); transform: rotate(90deg); box-shadow: 0 0 12px rgba(var(--d-gold, 242, 212, 142), .3); }
+.journey-dossier__body { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 16px 4px 8px 2px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(var(--d-gold, 233, 207, 150), .25) transparent; }
+.journey-dossier__body > * { min-width: 0; }
+
+.journey-dossier-content { min-width: 0; color: var(--text-primary); }
+.journey-dossier-section { min-width: 0; margin: 0; padding: 0 0 18px; }
+.journey-dossier-section + .journey-dossier-section { position: relative; padding-top: 16px; }
+.journey-dossier-section + .journey-dossier-section::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--d-gold-bg, 233, 207, 150), .3) 20%, rgba(var(--d-gold-bg, 233, 207, 150), .3) 80%, transparent); }
+.journey-dossier-section h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: rgb(var(--d-gold, 233, 207, 150)); font: 600 12px/1.2 var(--pl-font-display); letter-spacing: .24em; }
+.journey-dossier-section h3 svg { color: rgb(var(--d-gold, 242, 212, 142)); }
+.journey-dossier-section__body { min-width: 0; }
+.journey-dossier-value-list { display: grid; gap: 6px; margin: 0; }
+.journey-dossier-value-list > div { display: grid; grid-template-columns: minmax(92px, .34fr) minmax(0, 1fr); gap: 12px; padding: 4px 0; box-shadow: inset 0 -1px 0 rgba(var(--d-gold, 233, 207, 150), .08); }
+.journey-dossier-value-list dt { color: var(--text-muted); font-size: 12px; }
+.journey-dossier-value-list dd { margin: 0; color: var(--text-primary); font-size: 13px; overflow-wrap: anywhere; }
+
+/* Desktop drawer slides out from the rail */
+.game-journey__drawer-backdrop { position: fixed; inset: 0; z-index: 1200; opacity: 0; pointer-events: none; background: rgba(var(--d-deep-bg, 2, 3, 8), .5); backdrop-filter: blur(2px); transition: opacity .26s ease; }
+.game-journey__drawer-backdrop.is-visible { opacity: 1; pointer-events: auto; }
+.game-journey__drawer.journey-dossier {
+  top: 14px; bottom: 14px; left: calc(var(--journey-rail) + 16px); width: min(700px, calc(100vw - var(--journey-rail) - 40px));
+  opacity: 0; transform: translateX(-22px); transition: opacity .26s var(--pk-ease), transform .38s var(--pk-spring);
+}
+.game-journey__drawer.journey-dossier.is-open { opacity: 1; transform: none; }
+
+/* Mobile sheets */
+.game-journey__overlay { position: fixed; inset: 0; z-index: 1100; overflow: hidden; background: rgba(var(--d-deep-bg, 2, 3, 8), .6); backdrop-filter: blur(2px); animation: pk-fade .2s ease-out both; overscroll-behavior: contain; }
+.mobile-overlay-panel.journey-dossier { top: max(10px, env(safe-area-inset-top)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(var(--game-journey-overlay-width, 344px), calc(100vw - 20px)); }
+.mobile-overlay-panel.journey-dossier.mobile-overlay-left { left: 10px; animation: pk-sheet-left .32s var(--pk-spring) both; }
+.mobile-overlay-panel.journey-dossier.mobile-overlay-right { right: 10px; animation: pk-sheet-right .32s var(--pk-spring) both; }
+.mobile-overlay-panel.journey-dossier .journey-dossier__content { padding: 16px 14px 12px; }
+.game-journey__overlay-panel .game-journey__status-panel { padding: 0; height: auto; overflow: visible; }
+@keyframes pk-sheet-left { from { opacity: 0; transform: translateX(-20px); } }
+@keyframes pk-sheet-right { from { opacity: 0; transform: translateX(20px); } }
+
+/* Nested details (NPC detail, deeds, rollback, business, survival, pipeline) */
+.game-journey__nested-overlay { background: rgba(var(--d-deep-bg, 2, 3, 8), .62); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.game-journey__nested-overlay--contained { contain: paint; }
+.game-journey__nested-panel {
+  --bg-primary: color-mix(in srgb, rgb(var(--d-night-bg, 11, 16, 34)) 92%, rgb(var(--d-gold-bg, 227, 194, 126)) 0%);
+  --bg-secondary: color-mix(in srgb, rgb(var(--d-raise-bg, 17, 24, 50)) 94%, rgb(var(--d-gold-bg, 227, 194, 126)) 6%);
+  --bg-tertiary: color-mix(in srgb, rgb(var(--d-raise-bg, 24, 33, 66)) 90%, rgb(var(--d-gold-bg, 227, 194, 126)) 10%);
+  border: 0; border-radius: 6px; color: var(--text-primary);
+  background: radial-gradient(ellipse 90% 35% at 50% 0%, rgba(var(--d-gold-bg, 227, 194, 126), .08), transparent 70%), linear-gradient(180deg, rgb(var(--d-night-bg, 14, 20, 40)), rgb(var(--d-night-bg, 7, 10, 23)));
+  box-shadow: 0 0 0 1px rgb(var(--d-seat, 42, 26, 4)), 0 0 0 4px rgb(var(--d-rail, 184, 136, 63)), 0 0 0 5px rgb(var(--d-rail-lo, 77, 51, 15)), inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .14), 0 30px 80px rgba(var(--d-shade, 0, 0, 0), calc(.65 * var(--d-shade-k, 1)));
+  max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); box-sizing: border-box; animation: pk-dialog-in .34s var(--pk-spring);
+}
+.game-journey__nested-panel.game-journey__nested-panel--side { border-radius: 0; animation: pk-sheet-right .34s var(--pk-spring); }
+
+@media (max-width: 760px) {
+  .journey-dossier__header h2 { font-size: 17px; letter-spacing: .14em; }
+  .journey-dossier__emblem { flex-basis: 36px; width: 36px; height: 36px; }
+  .journey-dossier__heading { gap: 10px; }
+}
+
+/* ── Cards embedded in the narrative ── */
+.game-journey-card {
+  position: relative; min-width: 0; margin: 16px 0; border-radius: 4px; color: var(--text-primary); text-shadow: none;
+  background: var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .3), inset 0 1px 0 rgba(var(--d-cream, 255, 243, 207), .08), 0 8px 22px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1)));
+  animation: pk-dialog-in .42s var(--pk-spring) both;
+}
+.game-journey-card::before { content: ''; position: absolute; inset: 5px; border-radius: 2px; background: var(--pk-ticks); opacity: .55; pointer-events: none; }
+.game-journey-card--panel { background: radial-gradient(ellipse 70% 90% at 0% 0%, rgba(var(--d-gold-bg, 227, 194, 126), .09), transparent 70%), var(--pk-plate); }
+.game-journey-card__content { position: relative; min-width: 0; padding: 14px 18px; }
+.game-journey-card--talent .game-journey-card__content { padding: 6px 8px; }
+.game-journey-card--event { width: min(460px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); margin: 0; overflow: auto; background: linear-gradient(180deg, rgb(var(--d-night-bg, 14, 20, 40)), rgb(var(--d-night-bg, 7, 10, 23))); box-shadow: 0 0 0 1px rgb(var(--d-seat, 42, 26, 4)), 0 0 0 4px rgb(var(--d-rail, 184, 136, 63)), 0 0 0 5px rgb(var(--d-rail-lo, 77, 51, 15)), 0 30px 80px rgba(var(--d-shade, 0, 0, 0), calc(.65 * var(--d-shade-k, 1))); }
+.game-journey-card--event > .game-journey-card__content { padding: 0; }
+.game-journey-card__event-content { width: 100%; min-width: 0; box-sizing: border-box; padding: 20px; }
+
+/* Dice check: an engraved brass d20 medallion */
+.inline-dice-card { margin: 0; color: var(--text-primary); }
+.inline-dice-header { position: relative; display: flex; align-items: center; gap: 8px; padding-bottom: 10px; color: rgb(var(--d-cream, 242, 227, 189)); font: 600 13.5px/1.2 var(--pl-font-serif); letter-spacing: .12em; }
+.inline-dice-header::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .5), transparent); }
+.inline-dice-header > svg { color: rgb(var(--d-gold, 242, 212, 142)); }
+.inline-dice-dc { margin-left: auto; padding: 4px 11px; border-radius: 999px; color: #2a1a04; font: 700 11px/1 var(--pl-font-display); letter-spacing: .1em; background: var(--pk-brass-face); box-shadow: 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+.inline-dice-body { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 16px; padding: 12px 0 4px; }
+.inline-dice-core {
+  position: relative; display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; color: #2a1a04;
+  background: radial-gradient(circle at 38% 30%, rgb(var(--d-ink-bg, 255, 246, 216)), rgb(var(--d-gold-bg, 227, 194, 126)) 42%, rgb(var(--d-bronze-bg, 138, 95, 36)) 85%, rgb(var(--d-bronze-bg, 77, 51, 15)));
+  box-shadow: 0 0 0 3px rgba(var(--d-shade, 26, 18, 6), calc(1 * var(--d-shade-k, 1))), 0 0 0 4px rgba(var(--d-brass, 184, 136, 63), .6), inset 0 -4px 10px rgba(var(--d-bronze, 77, 51, 15), .7), 0 8px 18px rgba(var(--d-shade, 0, 0, 0), calc(.55 * var(--d-shade-k, 1))), 0 0 22px rgba(var(--d-gold, 242, 212, 142), .2);
+}
+.inline-dice-core::before { content: ''; position: absolute; inset: 7px; border-radius: 50%; border: 1px dashed rgba(42, 26, 4, .45); }
+.inline-dice-core svg { position: absolute; right: 8px; bottom: 8px; opacity: .35; }
+.inline-dice-core__value { position: relative; z-index: 1; font: 700 23px/1 var(--pl-font-display); text-shadow: 0 1px 0 rgba(var(--d-ink, 255, 246, 216), calc(.6 * var(--d-ts-k, 1))); }
+.inline-dice-core.is-rolling { animation: pk-dice-roll .5s linear infinite; }
+@keyframes pk-dice-roll { to { transform: rotate(360deg); } }
+.inline-dice-controls { display: grid; gap: 4px; min-width: 0; }
+.inline-dice-controls strong { color: rgb(var(--d-cream, 255, 243, 207)); font: 600 15px/1.3 var(--pl-font-serif); letter-spacing: .08em; }
+.inline-dice-modifier { color: var(--text-secondary); font-size: 12.5px; }
+.inline-dice-controls small { color: var(--text-muted); font-size: 11.5px; line-height: 1.5; }
+.inline-dice-no-attr { color: var(--text-muted); font-size: 13px; }
+.inline-dice-result { margin-top: 12px; padding: 10px 14px; border-left: 3px solid rgb(var(--d-gold, 227, 194, 126)); border-radius: 0 3px 3px 0; background: var(--pk-well); box-shadow: var(--pk-well-edge); animation: pk-step-in .35s var(--pk-ease) both; }
+.inline-dice-result-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.inline-dice-result-attr { color: rgb(var(--d-gold, 233, 207, 150)); font-size: 12.5px; letter-spacing: .08em; }
+.inline-dice-result-status { display: inline-flex; align-items: center; gap: 5px; font: 700 14px/1 var(--pl-font-serif); letter-spacing: .14em; }
+.inline-dice-result-status svg { flex: 0 0 auto; }
+.inline-dice-result-formula { color: var(--text-muted); font: 12px/1.6 var(--pl-font-ui); }
+.inline-dice-result-formula strong { color: rgb(var(--d-cream, 255, 243, 207)); font-family: var(--pl-font-display); }
+
+.inline-talent-card { margin: 0; border-radius: 3px; color: var(--text-primary); }
+
+/* Inline dialogue: speaker medallion + speech scroll */
+.inline-dialogue-card { margin: 18px 0; color: var(--text-primary); text-shadow: none; animation: pk-step-in .4s var(--pk-ease) both; }
+.inline-dialogue-card__identity { display: inline-flex; align-items: center; gap: 11px; margin-bottom: 9px; }
+.inline-dialogue-card__avatar {
+  position: relative; display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; overflow: hidden; border: 2px solid transparent; border-radius: 50%;
+  background: radial-gradient(circle at 50% 36%, rgb(var(--d-raise-bg, 38, 48, 90)), rgb(var(--d-night-bg, 11, 16, 34)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box;
+  box-shadow: 0 0 0 3px rgba(var(--d-night, 7, 10, 22), .9), 0 4px 10px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)));
+}
+.inline-dialogue-card__initial { color: rgb(var(--d-gold, 242, 212, 142)); font: 700 16px/1 var(--pl-font-serif); }
+.inline-dialogue-card__avatar-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.inline-dialogue-card__speaker { display: flex; align-items: baseline; gap: 8px; }
+.inline-dialogue-card__name { color: rgb(var(--d-gold, 242, 212, 142)); font: 700 15px/1.2 var(--pl-font-serif); letter-spacing: .12em; }
+.inline-dialogue-card__title { color: var(--text-muted); font-size: 12px; }
+.inline-dialogue-card__bubble, .inline-dialogue-card > div:last-child {
+  position: relative; max-width: 100%; margin-left: 20px; padding: 13px 18px; border: 0; border-radius: 2px 4px 4px; color: var(--text-primary);
+  background: var(--pk-lit), var(--pk-plate); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .32), inset 2px 0 0 rgb(var(--d-brass, 184, 136, 63)), 0 6px 16px rgba(var(--d-shade, 0, 0, 0), calc(.4 * var(--d-shade-k, 1)));
+}
+.inline-dialogue-card > div:last-child > div:last-child { color: var(--text-primary); }
+.inline-dialogue-card__tail { position: absolute; top: 0; left: -8px; width: 8px; height: 9px; background: rgb(var(--d-brass-bg, 184, 136, 63)); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.inline-dialogue-card__text { color: rgb(var(--d-ink, 236, 227, 204)); font-size: var(--body-font-size, 15px); line-height: var(--body-line-height, 1.8); white-space: pre-wrap; }
+.inline-dialogue-card__action { margin-top: 9px; padding-top: 9px; color: var(--text-muted); font-size: 13px; font-style: italic; line-height: 1.55; box-shadow: inset 0 1px 0 rgba(var(--d-gold, 233, 207, 150), .18); }
+
+@media (max-width: 640px) {
+  .inline-dice-body { grid-template-columns: 58px minmax(0, 1fr); gap: 12px; }
+  .inline-dice-core { width: 54px; height: 54px; }
+  .inline-dice-core__value { font-size: 18px; }
+  .game-journey-card__content { padding: 12px 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-journey-card, .inline-dialogue-card, .inline-dice-result, .game-journey__nested-panel { animation: none; }
+}

@@ -47,9 +47,9 @@ describe('portrait persistence round-trip', () => {
       await deleteSave(saveId);
     }
 
-    expect(getDefaultPortraitSource('男')).toBe('/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-male-v1.png');
-    expect(getDefaultPortraitSource('女')).toBe('/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-female-v1.png');
-    expect(getDefaultPortraitSource('其他')).toBe('/art/theme/ui-kit/dawn-v4/portraits/portrait-silhouette-neutral-v1.png');
+    expect(getDefaultPortraitSource('男')).toStartWith('data:image/svg+xml');
+    expect(getDefaultPortraitSource('女')).toStartWith('data:image/svg+xml');
+    expect(new Set([getDefaultPortraitSource('男'), getDefaultPortraitSource('女'), getDefaultPortraitSource('其他')]).size).toBe(3);
     expect(getPortraitSource({ gender: '男' } as any)).toBe(getDefaultPortraitSource('男'));
   });
 });

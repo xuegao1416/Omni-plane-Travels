@@ -60,9 +60,9 @@ export function RegexEntry({ script, expanded, builtin, onToggleExpand, onUpdate
           </Field>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>通道：</span>
-            <button disabled={builtin} onClick={() => onUpdate({ markdownOnly: false, promptOnly: false })} style={{ ...chipStyle, background: (!script.markdownOnly && !script.promptOnly) ? 'var(--accent)' : 'var(--bg-tertiary)', color: (!script.markdownOnly && !script.promptOnly) ? '#fff' : 'var(--text-secondary)' }}>全部</button>
-            <button disabled={builtin} onClick={() => onUpdate({ markdownOnly: true, promptOnly: false })} style={{ ...chipStyle, background: script.markdownOnly ? 'var(--accent)' : 'var(--bg-tertiary)', color: script.markdownOnly ? '#fff' : 'var(--text-secondary)' }}>仅显示</button>
-            <button disabled={builtin} onClick={() => onUpdate({ promptOnly: true, markdownOnly: false })} style={{ ...chipStyle, background: script.promptOnly ? 'var(--accent)' : 'var(--bg-tertiary)', color: script.promptOnly ? '#fff' : 'var(--text-secondary)' }}>仅API</button>
+            <button disabled={builtin} onClick={() => onUpdate({ markdownOnly: false, promptOnly: false })} style={{ ...chipStyle, background: (!script.markdownOnly && !script.promptOnly) ? 'var(--accent)' : 'var(--bg-tertiary)', color: (!script.markdownOnly && !script.promptOnly) ? '#2a1a04' : 'var(--text-secondary)' }}>全部</button>
+            <button disabled={builtin} onClick={() => onUpdate({ markdownOnly: true, promptOnly: false })} style={{ ...chipStyle, background: script.markdownOnly ? 'var(--accent)' : 'var(--bg-tertiary)', color: script.markdownOnly ? '#2a1a04' : 'var(--text-secondary)' }}>仅显示</button>
+            <button disabled={builtin} onClick={() => onUpdate({ promptOnly: true, markdownOnly: false })} style={{ ...chipStyle, background: script.promptOnly ? 'var(--accent)' : 'var(--bg-tertiary)', color: script.promptOnly ? '#2a1a04' : 'var(--text-secondary)' }}>仅API</button>
           </div>
         </div>
       )}

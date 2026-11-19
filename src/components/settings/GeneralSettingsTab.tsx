@@ -1,5 +1,5 @@
 import { Globe,Palette,Type } from 'lucide-react';
-import { useUISettings,type Theme,type FontFamily,type FontSize,type LineHeight } from '../../context/UISettingsContext';
+import { useUISettings,type FontFamily,type FontSize,type LineHeight,type UITheme } from '../../context/UISettingsContext';
 import { Section,SettingRow,SegmentedControl,Select,Toggle } from './SettingsUIComponents';
 
 export default function GeneralSettingsTab() {
@@ -18,16 +18,11 @@ export default function GeneralSettingsTab() {
       </Section>
 
       <Section variant="paper" icon={<Palette size={15} />} title={t('settings.theme')}>
-        <SettingRow label={t('settings.theme')}>
+        <SettingRow label={t('settings.theme')} desc={t('theme.desc')}>
           <SegmentedControl
-            options={[
-              { label: t('theme.light'), value: 'light' },
-              { label: t('theme.dark'), value: 'dark' },
-              { label: t('theme.metal'), value: 'metal' },
-              { label: t('theme.green'), value: 'green' },
-            ]}
-            value={ui.theme}
-            onChange={v => update('theme', v as Theme)}
+            options={[{ label: t('theme.night'), value: 'night' }, { label: t('theme.dawn'), value: 'dawn' }]}
+            value={ui.uiTheme}
+            onChange={v => update('uiTheme', v as UITheme)}
           />
         </SettingRow>
         <SettingRow label={t('settings.disableEffects')} desc={t('settings.disableEffects.desc')}>

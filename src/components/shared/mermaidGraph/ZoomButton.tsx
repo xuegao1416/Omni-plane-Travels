@@ -7,7 +7,7 @@ export function ZoomButton({ onClick, title, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <button className={s.btn} onClick={onClick} title={title}>
+    <button type="button" className={s.btn} onClick={onClick} title={title} aria-label={title}>
       {children}
     </button>
   );

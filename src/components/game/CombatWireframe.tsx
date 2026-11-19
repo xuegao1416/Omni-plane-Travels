@@ -1,11 +1,4 @@
 import { useEffect,useMemo,useRef,useState } from 'react';
-import {
-Footprints,
-Package,
-Shield,
-Sparkles,
-Target,
-} from 'lucide-react';
 import type {
 AbilityDefinition,
 AbilityProposalTarget,
@@ -16,17 +9,18 @@ CombatSessionV2,
 import { getCombatAbilityCostsV2,previewCombatAbilityV2,type CombatAutoStrategy } from '../../gameplay/combatV2';
 import { buildCombatViewModel,type CombatUnitCardModel } from '../../gameplay/combatViewModel';
 import CombatBattlefield from './combat/CombatBattlefield';
-import CombatCommandDeck from './combat/CombatCommandDeck';
+import CombatCommandDeck,{ CommandGlyph } from './combat/CombatCommandDeck';
 import CombatFormation from './combat/CombatFormation';
 import CombatHeader from './combat/CombatHeader';
 import CombatResult from './combat/CombatResult';
-import '../../styles/combat-wireframe.css';
-import '../../styles/combat-battle-v3.css';
-import '../../styles/combat-formal.css';
+import { resolveBattleScene,type BattleWorldHint } from './combat/battleScene';
+import '../../ui/screens/combat.css';
 
 interface Props {
   session: CombatSessionV2;
   worldSceneUrl?: string;
+  /** Name / tags / description of the current world; picks the painted battlefield. */
+  world?: BattleWorldHint | null;
   statLabels?: { health: string; resource: string };
   portraits?: Record<string, { src?: string; gender?: string }>;
   saving?: boolean;
@@ -56,6 +50,7 @@ const itemPurposeLabels: Record<string, string> = {
 export default function CombatWireframe({
   session,
   worldSceneUrl,
+  world,
   statLabels: statLabelsProp,
   portraits = {},
   saving = false,
@@ -97,11 +92,16 @@ export default function CombatWireframe({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) onLeave();
+      if (event.key === 'Escape' && !saving) { onLeave(); return; }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const kinds: CombatActionKind[] = ['attack', 'skill', 'item', 'defend', 'flee'];
+      const index = Number(event.key) - 1;
+      if (index >= 0 && index < kinds.length && session.lifecycle === 'active') setActionMode(kinds[index]);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onLeave, saving]);
+  }, [onLeave, saving, session.lifecycle]);
 
   const abilities = useMemo(() => Object.values(actor?.abilityDefinitions ?? {}).filter(definition => {
     const instance = actor?.abilityInstances?.[definition.id] ?? session.abilityInstances[definition.id];
@@ -220,93 +220,71 @@ export default function CombatWireframe({
     if (session.lifecycle === 'active' && isManualTurn && targetIds.has(unit.id)) setSelectedTarget(unit.id);
   };
 
-  const activeAlly = view.allyUnits.find(unit => unit.isActive);
-  const activeEnemy = view.enemyUnits.find(unit => unit.isActive);
-  const allyFocus = view.allyUnits.find(unit => unit.id === (activeAlly?.id ?? allyFocusId)) ?? view.allyUnits[0];
-  const enemyFocus = view.enemyUnits.find(unit => unit.id === (effectiveTarget || activeEnemy?.id || enemyFocusId)) ?? view.enemyUnits[0];
   const recentActions = session.actionSequence.filter(action => action.resolved).slice(-8).reverse();
-  const initiativeNames = session.initiativeOrder.map(id => session.participants.find(unit => unit.id === id)?.identity ?? id);
+
+  const optionCard = ({ key, kind, title, meta, chips, selected, reason, onClick }: { key: string; kind: CombatActionKind; title: string; meta: string; chips: { label: string; tone?: string }[]; selected: boolean; reason: string; onClick: () => void }) => (
+    <button key={key} type="button" className={`cb-option is-${kind}${selected ? ' is-selected' : ''}${reason ? ' is-disabled' : ''}`} onClick={onClick} disabled={Boolean(reason)} title={reason || undefined}>
+      <span className="cb-option__glyph"><CommandGlyph kind={kind} /></span>
+      <span className="cb-option__copy"><strong>{title}</strong><small>{reason || meta}</small></span>
+      {chips.length > 0 && <span className="cb-option__chips">{chips.map(chip => <em key={chip.label} className={chip.tone ? `is-${chip.tone}` : ''}>{chip.label}</em>)}</span>}
+    </button>
+  );
 
   const renderActionOptions = () => {
     if (actionMode === 'skill') {
-      if (!abilities.length) return <p className="combat-wireframe__empty-action">当前单位没有可用主动技能。</p>;
+      if (!abilities.length) return <p className="cb-deck__empty">当前单位没有可用主动技能。</p>;
       return abilities.map(ability => {
         const state = abilityState(ability);
         const reason = actionDisabledReason('skill', ability.id);
         const preview = actor ? previewCombatAbilityV2({ ...session, statLabels }, actor.id, ability.id, effectiveTarget || undefined) : undefined;
-        const costText = state.costs.length
-          ? `消耗 ${state.costs.map(cost => `${cost.label} ${cost.amount}`).join(' + ')}`
-          : '无额外消耗';
-        const effectText = [
-          preview?.hitChance === undefined ? '' : `命中 ${Math.round(preview.hitChance * 100)}%`,
-          preview?.damage === undefined ? '' : `${preview.targetCount > 1 ? '每目标' : ''}伤害 ${preview.damage}${preview.criticalDamage === undefined ? '' : `（暴击 ${preview.criticalDamage}）`}`,
-          preview?.healing === undefined ? '' : `${preview.targetCount > 1 ? '每目标' : ''}治疗 ${preview.healing}`,
-          costText,
-          state.cooldown > 0 ? `剩余冷却 ${state.cooldown} 轮` : `冷却 ${ability.mechanics?.cooldownRounds ?? ability.mechanics?.combatAction?.cooldownRounds ?? 0} 轮`,
-        ].filter(Boolean).join(' · ');
-        return (
-          <div key={ability.id} className={`combat-wireframe__action-strip${selectedAbility === ability.id ? ' is-selected' : ''}${reason ? ' is-disabled' : ''}`}>
-            <img src="/art/theme/ui-kit/dawn-v4/combat/battle-action-strip-v1.png" alt="" aria-hidden="true" />
-            <button type="button" className="combat-wireframe__action-choice" onClick={() => { setSelectedAbility(ability.id); send('skill', ability.id); }} disabled={Boolean(reason)} title={reason || undefined}>
-              <span><strong>{ability.name}</strong><small>{effectText}</small></span>
-              <Sparkles size={18} aria-hidden="true" />
-            </button>
-          </div>
-        );
+        const chips: { label: string; tone?: string }[] = [];
+        if (preview?.damage !== undefined) chips.push({ label: `${preview.targetCount > 1 ? '每目标 ' : ''}伤害 ${preview.damage}${preview.criticalDamage === undefined ? '' : `/${preview.criticalDamage}`}`, tone: 'dmg' });
+        if (preview?.healing !== undefined) chips.push({ label: `治疗 ${preview.healing}`, tone: 'heal' });
+        if (preview?.hitChance !== undefined) chips.push({ label: `命中 ${Math.round(preview.hitChance * 100)}%` });
+        for (const cost of state.costs) chips.push({ label: `${cost.label} ${cost.amount}`, tone: 'cost' });
+        const cooldownRounds = ability.mechanics?.cooldownRounds ?? ability.mechanics?.combatAction?.cooldownRounds ?? 0;
+        if (state.cooldown > 0) chips.push({ label: `冷却 ${state.cooldown}`, tone: 'cd' });
+        else if (cooldownRounds) chips.push({ label: `CD ${cooldownRounds}` });
+        return optionCard({ key: ability.id, kind: 'skill', title: ability.name, meta: ability.description || '主动能力', chips, selected: selectedAbility === ability.id, reason, onClick: () => { setSelectedAbility(ability.id); send('skill', ability.id); } });
       });
     }
     if (actionMode === 'item') {
-      if (!items.length) return <p className="combat-wireframe__empty-action">当前单位没有可用于战斗的道具。</p>;
+      if (!items.length) return <p className="cb-deck__empty">当前单位没有可用于战斗的道具。</p>;
       return items.map(item => {
         const reason = actionDisabledReason('item', item.id);
-        return (
-          <div key={item.id} className={`combat-wireframe__action-strip${selectedItem === item.id ? ' is-selected' : ''}${reason ? ' is-disabled' : ''}`}>
-            <img src="/art/theme/ui-kit/dawn-v4/combat/battle-action-strip-v1.png" alt="" aria-hidden="true" />
-            <button type="button" className="combat-wireframe__action-choice" onClick={() => { setSelectedItem(item.id); send('item', item.id); }} disabled={Boolean(reason)} title={reason || undefined}>
-              <span><strong>{item.definition?.name ?? item.id}</strong><small>{item.definition?.narrativeOnly ? '叙事物品 · 无战斗用途标记' : itemPurposeLabels[item.definition?.purpose ?? ''] ?? '叙事物品'} · {item.definition?.description ?? '未识别的战斗道具'} · 剩余 {item.quantity}</small></span>
-              <Package size={18} aria-hidden="true" />
-            </button>
-          </div>
-        );
+        const purpose = item.definition?.narrativeOnly ? '叙事物品' : itemPurposeLabels[item.definition?.purpose ?? ''] ?? '叙事物品';
+        return optionCard({ key: item.id, kind: 'item', title: item.definition?.name ?? item.id, meta: item.definition?.description ?? '未识别的战斗道具', chips: [{ label: purpose, tone: item.definition?.purpose === 'heal' ? 'heal' : item.definition?.purpose === 'damage' ? 'dmg' : undefined }, { label: `×${item.quantity}` }], selected: selectedItem === item.id, reason, onClick: () => { setSelectedItem(item.id); send('item', item.id); } });
       });
     }
-    const Icon = actionMode === 'attack' ? Target : actionMode === 'defend' ? Shield : Footprints;
     const title = actionMode === 'attack' ? '普通攻击' : actionMode === 'defend' ? '架势防御' : '尝试脱离';
-    const reason = actionDisabledReason(actionMode);
-    return (
-      <button type="button" className="combat-wireframe__action-strip is-single" onClick={() => send(actionMode)} disabled={Boolean(reason)} title={reason || undefined}>
-        <img src="/art/theme/ui-kit/dawn-v4/combat/battle-action-strip-v1.png" alt="" aria-hidden="true" />
-        <span><strong>{title}</strong><small>{actionDescriptions[actionMode]}</small></span>
-        <Icon size={18} aria-hidden="true" />
-      </button>
-    );
+    const target = actionMode === 'attack' ? session.participants.find(unit => unit.id === effectiveTarget)?.identity : undefined;
+    return optionCard({ key: actionMode, kind: actionMode, title, meta: actionDescriptions[actionMode], chips: target ? [{ label: `目标 · ${target}` }] : [], selected: true, reason: actionDisabledReason(actionMode), onClick: () => send(actionMode) });
   };
 
-  const sceneStyle = {
-    ...(worldSceneUrl ? { '--combat-scene-image': `url("${worldSceneUrl}")` } : {}),
-  } as React.CSSProperties;
+  const turnBanner = session.lifecycle === 'active' && actor
+    ? { key: `${session.round}:${actor.id}`, label: actor.side === 'enemy' ? `${actor.identity} 的回合` : actor.id === 'player' ? '你的回合' : `${actor.identity} 的回合`, side: actor.side === 'enemy' ? 'enemy' as const : 'ally' as const }
+    : null;
+  const allUnits = [...view.allyUnits, ...view.enemyUnits];
+  const actorCard = allUnits.find(unit => unit.id === session.activeUnitId);
+
+  const scene = useMemo(() => resolveBattleScene(world), [world]);
 
   return (
     <section
       ref={dialogRef}
       tabIndex={-1}
-      className="combat-wireframe"
-      style={sceneStyle}
+      className={`cb-root is-${session.lifecycle} is-scene-${scene}`}
+      data-world-scene={worldSceneUrl ? 'artwork' : undefined}
       role="dialog"
       aria-modal="true"
       aria-label="图形化战斗场"
     >
-      <div className="combat-wireframe__scene" aria-hidden="true" />
-      <div className="combat-wireframe__veil" aria-hidden="true" />
-
-      <div className={`combat-wireframe__arena is-${session.lifecycle}`}>
-        <CombatHeader session={session} saving={saving} error={error} readOnly={readOnly} initiativeNames={initiativeNames} onLeave={onLeave} />
-        {view.emptyState && <div className="combat-wireframe__empty" role="status">{view.emptyState}。请检查编队后再继续。</div>}
-        <CombatBattlefield allyUnits={view.allyUnits} enemyUnits={view.enemyUnits} allyFocus={allyFocus} enemyFocus={enemyFocus} effectiveTarget={effectiveTarget} targetIds={targetIds} selectedRoster={selectedRoster} preparing={preparing} statLabels={statLabels} onChoose={chooseUnit} />
-        {session.lifecycle === "preparing" && <CombatFormation units={view.allyUnits} selectedRoster={selectedRoster} hasNoEnemies={view.hasNoEnemies} readOnly={readOnly} saving={saving} onToggleRoster={toggleRoster} onStart={onStart} />}
-        {session.lifecycle === "active" && <CombatCommandDeck session={session} actorIdentity={actor?.identity} actorSide={actor?.side} actionMode={actionMode} actionDescription={actionDescriptions[actionMode]} autoStrategy={autoStrategy} readOnly={readOnly} actionOptions={renderActionOptions()} recentActions={recentActions} onSetAutoStrategy={onSetAutoStrategy} onSetActionMode={setActionMode} />}
-        {session.lifecycle === "terminal" && <CombatResult session={session} saving={saving} readOnly={readOnly} onContinueNarration={onContinueNarration} onRetry={onRetry} />}
-      </div>
+      <CombatHeader session={session} saving={saving} error={error} readOnly={readOnly} units={allUnits} scene={scene} onLeave={onLeave} />
+      {view.emptyState && <div className="cb-root__empty" role="status">{view.emptyState}。请检查编队后再继续。</div>}
+      <CombatBattlefield session={session} scene={scene} allyUnits={view.allyUnits} enemyUnits={view.enemyUnits} effectiveTarget={effectiveTarget} targetIds={targetIds} selectedRoster={selectedRoster} preparing={preparing} statLabels={statLabels} turnBanner={turnBanner} onChoose={chooseUnit} />
+      {session.lifecycle === 'preparing' && <CombatFormation scene={scene} units={view.allyUnits} selectedRoster={selectedRoster} hasNoEnemies={view.hasNoEnemies} readOnly={readOnly} saving={saving} onToggleRoster={toggleRoster} onStart={onStart} />}
+      {session.lifecycle === 'active' && <CombatCommandDeck scene={scene} session={session} actor={actorCard} actionMode={actionMode} actionDescription={actionDescriptions[actionMode]} autoStrategy={autoStrategy} readOnly={readOnly} manual={isManualTurn} statLabels={statLabels} actionOptions={renderActionOptions()} recentActions={recentActions} onSetAutoStrategy={onSetAutoStrategy} onSetActionMode={setActionMode} />}
+      {session.lifecycle === 'terminal' && <CombatResult session={session} saving={saving} readOnly={readOnly} onContinueNarration={onContinueNarration} onRetry={onRetry} />}
     </section>
   );
 }

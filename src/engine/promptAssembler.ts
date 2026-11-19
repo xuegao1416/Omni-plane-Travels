@@ -59,6 +59,8 @@ export interface AssemblerContext {
   compiledMemoryContext?: string;
   /** 剧情导演指导；只描述未来意图和限制，不代表事实。 */
   directorBrief?: string;
+  /** 玩法宿主已结算的事实、线索与模块状态（与导演无关，导演失败时照样注入）。 */
+  settledFacts?: string;
   /** 玩家决策记录（选择卡路径 C 的 aiNote，喂给下一轮 AI 叙事） */
   playerDecisionContext?: string;
   /** 世界书 atDepth 条目（需要插入到聊天历史中的指定深度） */
@@ -99,6 +101,7 @@ export interface AssembleResult {
  * 3. 角色认知防火墙 (firewall)
  * 4. 编译后的记忆上下文 (compiledMemoryContext)
  * 5. 剧情导演指导 (directorBrief) — 未来意图，不是已发生事实
+ * 5b. 已结算事实 (settledFacts) — 玩法宿主算好的结果，正文必须承认
  * 6. 预设提示词条目（按 order 排序，过滤 enabled + 触发模式）
  *
  * 每个条目的 content 在拼接前通过 macroEngine.resolve() 解析宏
@@ -234,6 +237,11 @@ export function assembleSystemPrompt(
   // 注入剧情导演指导。指导不是事实，放在记忆之后、玩家决策之前。
   if (ctx.directorBrief) {
     parts.push(ctx.directorBrief);
+  }
+
+  // 已结算事实紧跟导演指导（原先拼在导演指导末尾，位置与文本不变）。
+  if (ctx.settledFacts) {
+    parts.push(ctx.settledFacts);
   }
 
   // 注入玩家决策记录（选择卡路径 C 的 aiNote，不影响既有人格/世界书逻辑）

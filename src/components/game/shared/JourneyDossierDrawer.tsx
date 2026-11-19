@@ -1,13 +1,13 @@
 import { useEffect,useRef } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { X } from 'lucide-react';
-import DawnFrameV4 from '../../shared/dawn/DawnFrameV4';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input:not([disabled]), select, [tabindex]:not([tabindex="-1"])';
 
 export interface JourneyDossierDrawerProps {
   title: string;
   subtitle?: string;
-  emblemSrc?: string;
+  icon?: LucideIcon;
   onClose: () => void;
   children: React.ReactNode;
   className?: string;
@@ -15,11 +15,11 @@ export interface JourneyDossierDrawerProps {
   style?: React.CSSProperties;
 }
 
-/** Shared presentation shell for every in-game journey dossier. Business data stays in the child panel. */
+/** Shared presentation shell for every in-game dossier. Business data stays in the child panel. */
 export default function JourneyDossierDrawer({
   title,
   subtitle,
-  emblemSrc,
+  icon: Icon,
   onClose,
   children,
   className = '',
@@ -74,11 +74,11 @@ export default function JourneyDossierDrawer({
       onKeyDown={onKeyDown}
       style={style}
     >
-      <DawnFrameV4 mode="panel" withFill className={`journey-dossier__frame${panelClassName ? ` ${panelClassName}` : ''}`} ariaLabel={title}>
+      <div className={`journey-dossier__frame${panelClassName ? ` ${panelClassName}` : ''}`}>
         <div className="journey-dossier__content">
           <header className="journey-dossier__header">
             <div className="journey-dossier__heading">
-              {emblemSrc && <img src={emblemSrc} alt="" aria-hidden="true" className="journey-dossier__emblem" />}
+              {Icon && <span className="journey-dossier__emblem" aria-hidden="true"><Icon size={17} strokeWidth={1.6} /></span>}
               <div>
                 <h2>{title}</h2>
                 {subtitle && <p>{subtitle}</p>}
@@ -90,7 +90,7 @@ export default function JourneyDossierDrawer({
           </header>
           <div className="journey-dossier__body">{children}</div>
         </div>
-      </DawnFrameV4>
+      </div>
     </div>
   );
 }

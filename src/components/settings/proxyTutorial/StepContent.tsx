@@ -42,7 +42,7 @@ export function StepContent({ step, copiedCode, onCopyCode }: {
     <>
       {step.content.steps?.map((s, i) => (
         <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <div style={{ width: '24px', height: '24px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-xs)', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>{i + 1}</div>
+          <div style={{ width: '24px', height: '24px', borderRadius: 'var(--radius-md)', background: 'var(--accent)', color: '#2a1a04', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-xs)', fontWeight: '600', flexShrink: 0, marginTop: '2px' }}>{i + 1}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 'var(--font-size-sm)', lineHeight: 1.6 }}>
               {s.text}
@@ -60,7 +60,7 @@ export function StepContent({ step, copiedCode, onCopyCode }: {
               <div style={{ marginTop: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: 'none' }}>
                   <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>代理代码（点击复制）</span>
-                  <button onClick={onCopyCode} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copiedCode ? 'var(--success-bg)' : 'var(--accent)', border: 'none', borderRadius: '6px', color: copiedCode ? 'var(--success)' : '#fff', fontSize: 'var(--font-size-xs)', fontWeight: '500', cursor: 'pointer' }}>
+                  <button onClick={onCopyCode} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copiedCode ? 'var(--success-bg)' : 'var(--accent)', border: 'none', borderRadius: '6px', color: copiedCode ? 'var(--success)' : '#2a1a04', fontSize: 'var(--font-size-xs)', fontWeight: '500', cursor: 'pointer' }}>
                     {copiedCode ? <><Check size={14} /> 已复制！</> : <><Copy size={14} /> 复制代码</>}
                   </button>
                 </div>

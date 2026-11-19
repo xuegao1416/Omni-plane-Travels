@@ -1,32 +1,28 @@
-import { ChevronLeft,ChevronRight,Minimize2,Maximize2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Maximize2,Minimize2,PanelRightClose,PanelRightOpen,Settings2 } from 'lucide-react';
 import DrawerPanel from './DrawerPanel';
-import type { NavButton,OverlayPanel,Screen } from './types';
+import type { NavButton,OverlayPanel } from './types';
 import { getNavLabel } from './navConfig';
 
 interface DesktopLayoutProps {
-  // Nav
   navButtons: NavButton[];
   overlay: OverlayPanel;
   onOverlayChange: (panel: OverlayPanel) => void;
   onNavigate: (screen: 'start' | 'settings') => void;
 
-  // Fullscreen
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
 
-  // Drawer
   drawerTitle: string;
-  drawerEmblemSrc?: string;
+  drawerSubtitle?: string;
+  drawerIcon?: LucideIcon;
   drawerContent: React.ReactNode;
 
-  // Right panel
   rightCollapsed: boolean;
   onToggleRightPanel: () => void;
   rightPanel: React.ReactNode;
 
-  // ChatPanel (passed as children)
   children: React.ReactNode;
-  worldName: string;
 }
 
 export default function DesktopLayout({
@@ -37,34 +33,46 @@ export default function DesktopLayout({
   isFullscreen,
   onToggleFullscreen,
   drawerTitle,
-  drawerEmblemSrc,
+  drawerSubtitle,
+  drawerIcon,
   drawerContent,
   rightCollapsed,
   onToggleRightPanel,
   rightPanel,
   children,
-  worldName,
 }: DesktopLayoutProps) {
+  const [home, ...panels] = navButtons;
+  const HomeIcon = home?.icon;
   return (
-    <div
-      className="full-height game-journey game-journey--desktop"
-    >
-      {/* 左侧图标导航栏 */}
-      <nav className="game-journey__nav" aria-label="游戏导航">
-        {navButtons.map(btn => {
+    <div className="full-height game-journey game-journey--desktop">
+      <nav className="game-journey__nav" aria-label="旅程仪表">
+        {home && HomeIcon && (
+          <button
+            type="button"
+            onClick={() => onNavigate('start')}
+            title={getNavLabel('home')}
+            aria-label={getNavLabel('home')}
+            className="game-journey__nav-button game-journey__nav-button--home"
+          >
+            <HomeIcon size={19} strokeWidth={1.5} />
+          </button>
+        )}
+        <span className="game-journey__nav-rule" aria-hidden="true" />
+        {panels.map(btn => {
           const Icon = btn.icon;
+          const active = overlay === btn.id;
+          const label = getNavLabel(btn.id ?? '');
           return (
             <button
+              type="button"
               key={btn.id}
-              onClick={() => {
-                if (btn.id === 'home') { onNavigate('start'); return; }
-                onOverlayChange(overlay === btn.id ? null : btn.id);
-              }}
-              title={getNavLabel(btn.id ?? '')}
-              aria-label={getNavLabel(btn.id ?? '')}
-              className={`game-journey__nav-button${overlay === btn.id ? ' is-active' : ''}`}
+              onClick={() => onOverlayChange(active ? null : btn.id as OverlayPanel)}
+              aria-label={label}
+              aria-pressed={active}
+              data-tip={label}
+              className={`game-journey__nav-button${active ? ' is-active' : ''}`}
             >
-              {btn.emblemSrc ? <img src={btn.emblemSrc} alt="" aria-hidden="true" /> : <Icon size={18} strokeWidth={1.5} />}
+              <Icon size={18} strokeWidth={1.5} />
             </button>
           );
         })}
@@ -72,60 +80,55 @@ export default function DesktopLayout({
         <div className="game-journey__nav-spacer" />
 
         <button
+          type="button"
           onClick={onToggleFullscreen}
-          title={isFullscreen ? '退出全屏' : '全屏'}
           aria-label={isFullscreen ? '退出全屏' : '全屏'}
-          className="btn-ghost btn-icon game-journey__nav-button game-journey__nav-button--utility"
+          data-tip={isFullscreen ? '退出全屏' : '全屏'}
+          className="game-journey__nav-button game-journey__nav-button--utility"
         >
-          {isFullscreen ? <Minimize2 size={18} strokeWidth={1.5} /> : <Maximize2 size={18} strokeWidth={1.5} />}
+          {isFullscreen ? <Minimize2 size={17} strokeWidth={1.5} /> : <Maximize2 size={17} strokeWidth={1.5} />}
         </button>
-
         <button
+          type="button"
           onClick={() => onNavigate('settings')}
-          title={getNavLabel('settings')}
           aria-label={getNavLabel('settings')}
-          className="btn-ghost btn-icon game-journey__nav-button game-journey__nav-button--utility"
+          data-tip={getNavLabel('settings')}
+          className="game-journey__nav-button game-journey__nav-button--utility"
         >
-          <img src="/art/theme/emblems/emblem-26-v2.png" alt="" aria-hidden="true" />
+          <Settings2 size={17} strokeWidth={1.5} />
         </button>
       </nav>
 
-      {/* 中间主区域 */}
       <main className="game-journey__main">
-        <header className="game-journey__world-bar">
-          <span className="game-journey__world-bar-mark" aria-hidden="true" />
-          <strong>{worldName || '世界漫游指南'}</strong>
-          <span>旅程卷宗</span>
-        </header>
         <div className="game-journey__reading-surface game-journey__reading-surface--main">
           <div className="game-journey__frame-content">
             {children}
           </div>
         </div>
 
-        {/* 侧滑抽屉面板 */}
         <DrawerPanel
           open={overlay !== null}
           title={drawerTitle}
-          emblemSrc={drawerEmblemSrc}
+          subtitle={drawerSubtitle}
+          icon={drawerIcon}
           onClose={() => onOverlayChange(null)}
         >
           {drawerContent}
         </DrawerPanel>
       </main>
 
-      {/* 右侧信息栏 */}
-      <aside className={`game-journey__right-panel${rightCollapsed ? ' is-collapsed' : ''}`}>
+      <aside className={`game-journey__right-panel${rightCollapsed ? ' is-collapsed' : ''}`} aria-label="旅程状态">
         {!rightCollapsed && rightPanel}
       </aside>
 
-      {/* 右侧折叠按钮 */}
       <button
+        type="button"
         onClick={onToggleRightPanel}
         aria-label={rightCollapsed ? '展开右侧信息栏' : '折叠右侧信息栏'}
+        aria-expanded={!rightCollapsed}
         className={`game-journey__right-toggle${rightCollapsed ? ' is-collapsed' : ''}`}
       >
-        {rightCollapsed ? <ChevronLeft size={12} /> : <ChevronRight size={12} />}
+        {rightCollapsed ? <PanelRightOpen size={16} strokeWidth={1.6} /> : <PanelRightClose size={16} strokeWidth={1.6} />}
       </button>
     </div>
   );

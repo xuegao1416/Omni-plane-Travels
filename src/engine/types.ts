@@ -1,3 +1,4 @@
+import type { PlayerCommandResult } from '../core/playerCommands';
 import type { ReactNode } from 'react';
 import type { VariableManager } from './variableManager';
 import type { WorldBookManager } from '../worldbook/index';
@@ -55,6 +56,11 @@ export interface GameEngine {
   readonly isReadOnly: boolean;
   /** Accept a synchronous player result and refresh its complete rollback checkpoint. */
   commitPlayerState: (state: GameState) => boolean;
+  /**
+   * 界面发起的玩法命令（如 resources.craft、economy.sell、dice.roll）：先查旅程是否可操作，
+   * 再交给玩法宿主结算，成功后一次性提交并刷新最新检查点；失败时不改状态。
+   */
+  dispatch: (command: string, args?: Record<string, unknown>, label?: string) => PlayerCommandResult;
   preparePlayerStateJSON: (json: string) => GameState | null;
   prepareSaveCapture: () => void;
   isGenerating: boolean;

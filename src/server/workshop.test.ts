@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { checkDependencies, resolveInstallPlan, toPublic, validateWorkshopContent } from './workshop';
+import { resolveInstallPlan, toPublic, validateWorkshopContent } from './workshop';
+import { checkInstalledDependencies } from '../workshop/protocol';
 import type { WorkshopItemRow } from './types';
 
 function row(overrides: Partial<WorkshopItemRow> = {}): WorkshopItemRow {
   return {
-    id: 'item', owner_id: 'owner', type: 'world_package', content_type: 'gameplay_module',
+    id: 'item', owner_id: 'owner', type: 'gameplay_module',
     title: 'Module', description: null, tags: '[]', data_json: '{}', status: 'published',
     download_count: 3, created_at: 1, updated_at: 2, category: 'rules',
     dependencies_json: '[{"id":"core","version":"2.9.0"}]', recommendations_json: '[]', version: '1.0.0', min_app_version: '3.0.0',
@@ -29,8 +30,8 @@ describe('workshop v2 metadata', () => {
       gameplay_module: { kind: 'custom-gameplay-module', schemaVersion: 1, id: 'mod', name: 'M', version: '1.0.0', author: 'a', scope: 'world', state: {}, logic: { onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [] }, permissions: { read: [], write: 'own-state-only' } },
       event_pack: { manifest: { id: 'events', name: 'Events', version: '1.0.0', type: 'rule' }, rules: [] },
       workflow_pack: { id: 'flow', name: 'Flow', version: 1, nodes: [], connections: [] },
-      adventure_pack: { id: 'adventure', name: 'Adventure', scenes: [] },
-      visual_theme: { id: 'theme', name: 'Theme', tokens: {} },
+      adventure_pack: { id: 'adventure', name: 'Adventure', scenes: [{ id: 'gate', text: '门前', options: [{ label: '进去' }] }] },
+      visual_theme: { id: 'theme', name: 'Theme', tokens: { '--d-gold': '#aa8844' } },
     };
 
     for (const [type, data] of Object.entries(valid)) {
@@ -40,18 +41,22 @@ describe('workshop v2 metadata', () => {
     expect(validateWorkshopContent('character_preset', { id: 'player' }).ok).toBe(false);
     expect(validateWorkshopContent('history_preset', { id: 'history', name: 'History', segments: { prologue: '开始' } }).ok).toBe(false);
   });
-  test('maps the public content type and discovery metadata', () => {
+  test('maps the stored type and discovery metadata (legacy content_type rows included)', () => {
     const item = toPublic(row());
     expect(item.type).toBe('gameplay_module');
+    expect(toPublic(row({ type: 'world_package', content_type: 'event_pack' })).type).toBe('event_pack');
+    expect(item.author.name).toBe('旅者·owner');
     expect(item.dependencies[0]?.id).toBe('core');
     expect(item.screenshots).toEqual(['https://example.com/shot.webp']);
     expect(item.featured).toBe(true);
   });
 
-  test('compares dependency versions lexicographically', () => {
-    expect(checkDependencies(row(), { core: '3.0.0' }).ok).toBe(true);
-    expect(checkDependencies(row(), { core: '2.8.9' }).incompatible).toHaveLength(1);
-    expect(checkDependencies(row(), {}).missing).toHaveLength(1);
+  test('compares dependency versions numerically against installed versions', () => {
+    const dependencies = toPublic(row()).dependencies;
+    expect(checkInstalledDependencies(dependencies, { core: '3.0.0' }).ok).toBe(true);
+    expect(checkInstalledDependencies(dependencies, { core: '2.10.0' }).ok).toBe(true);
+    expect(checkInstalledDependencies(dependencies, { core: '2.8.9' }).incompatible).toHaveLength(1);
+    expect(checkInstalledDependencies(dependencies, {}).missing).toHaveLength(1);
   });
 
   test('builds a recursive install plan in dependency order', async () => {
@@ -81,12 +86,13 @@ describe('workshop v2 metadata', () => {
   test('keeps world recommendations in the structured plan', async () => {
     const root = row({
       id: 'world',
-      content_type: 'world_package',
+      type: 'world_package',
       dependencies_json: '[]',
       recommendations_json: '[{"id":"npc-1","type":"npc_template","optional":true,"reason":"推荐角色"}]',
     });
     const result = await resolveInstallPlan('world', async id => id === 'world' ? root : null);
-    expect(result.recommendations).toEqual([{ id: 'npc-1', type: 'npc_template', optional: true, reason: '推荐角色' }]);
+    expect(result.recommendations).toEqual([{ id: 'npc-1', type: 'npc_template', optional: true, reason: '推荐角色', available: false }]);
+    expect(result.items.map(item => item.id)).toEqual(['world']);
     expect(result.errors).toEqual([]);
   });
 
@@ -109,5 +115,25 @@ describe('workshop v2 metadata', () => {
     expect(result.errors).toContainEqual(expect.objectContaining({
       code: 'INCOMPATIBLE', id: 'shared', requiredVersion: '3.0.0', actualVersion: '2.0.0',
     }));
+  });
+});
+
+describe('workshop content rules for adventures and themes', () => {
+  test('adventure scenes need unique ids, text, labelled options and links to existing scenes', () => {
+    const scene = (id: string, options: unknown[] = []) => ({ id, text: `${id} 的场景`, options });
+    expect(validateWorkshopContent('adventure_pack', { id: 'a', name: 'A', scenes: [scene('gate', [{ label: '进门', next: 'hall' }]), scene('hall')] }).ok).toBe(true);
+    expect(validateWorkshopContent('adventure_pack', { id: 'a', name: 'A', chapters: [scene('one')] }).ok).toBe(true);
+    const broken = validateWorkshopContent('adventure_pack', { id: 'a', name: 'A', scenes: [scene('gate', [{ label: '进门', next: 'nowhere' }])] });
+    expect(broken).toMatchObject({ ok: false, code: 'INVALID_ADVENTURE_LINK' });
+    expect(validateWorkshopContent('adventure_pack', { id: 'a', name: 'A', scenes: [scene('gate'), scene('gate')] })).toMatchObject({ ok: false, code: 'INVALID_ADVENTURE_SCENE' });
+    expect(validateWorkshopContent('adventure_pack', { id: 'a', name: 'A', scenes: [{ id: 'x', text: '' }] }).ok).toBe(false);
+    expect(validateWorkshopContent('adventure_pack', { id: 'a', name: 'A', scenes: [scene('x', [{ next: 'x' }])] }).ok).toBe(false);
+  });
+
+  test('visual themes only accept --d- colour tokens with plain colour values', () => {
+    expect(validateWorkshopContent('visual_theme', { id: 't', name: 'T', themes: { night: { '--d-gold': '240, 200, 120' }, dawn: { '--d-ink': '#223344' } } }).ok).toBe(true);
+    expect(validateWorkshopContent('visual_theme', { id: 't', name: 'T', tokens: { '--d-gold': 'url(https://evil.test/x.png)' } }).ok).toBe(false);
+    expect(validateWorkshopContent('visual_theme', { id: 't', name: 'T', tokens: { 'background': '#fff' } }).ok).toBe(false);
+    expect(validateWorkshopContent('visual_theme', { id: 't', name: 'T', themes: { neon: { '--d-gold': '#fff' } } }).ok).toBe(false);
   });
 });

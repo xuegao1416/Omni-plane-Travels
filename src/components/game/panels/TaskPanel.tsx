@@ -40,7 +40,7 @@ const TASK_TYPE_CONFIG: Record<TaskType, { icon: typeof Target; color: string; l
 function priorityColor(p: string) {
   if (p === '紧急') return 'var(--danger)';
   if (p === '高') return 'var(--warning)';
-  if (p === '中') return 'var(--info, #3b82f6)';
+  if (p === '中') return 'var(--info, #7f9cd6)';
   return 'var(--text-muted)';
 }
 
@@ -76,7 +76,7 @@ function StageIndicator({ stages }: { stages: TaskStage[] }) {
               fontSize: 'var(--font-size-xs)',
               padding: '2px 6px', borderRadius: 'var(--radius-sm)',
               background: done ? 'var(--success)' : active ? 'var(--primary)' : 'var(--bg-tertiary)',
-              color: done || active ? '#fff' : 'var(--text-muted)',
+              color: done || active ? '#2a1a04' : 'var(--text-muted)',
               opacity: done ? 0.7 : 1,
             }}>
               {done ? '✓' : active ? '⏳' : '·'} {toDisplayText(stage.名称, `阶段 ${i + 1}`)}
@@ -410,23 +410,15 @@ export default function TaskPanel({ gameState, professionConfig }: Props) {
       </div>
 
       {/* 过滤标签 */}
-      <div style={{
-        display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginBottom: '10px',
-      }}>
+      <div className="game-notebook-filters">
         {filters.map(f => {
           const isActive = filter === f;
           return (
             <button
               key={f}
+              type="button"
+              aria-pressed={isActive}
               onClick={() => setFilter(f)}
-              style={{
-                padding: '2px 8px', fontSize: 'var(--font-size-xs)',
-                borderRadius: 'var(--radius-sm)',
-                background: isActive ? 'var(--text-primary)' : 'var(--bg-tertiary)',
-                color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border)',
-                cursor: 'pointer', fontWeight: isActive ? '600' : '400',
-              }}
             >
               {f}
             </button>

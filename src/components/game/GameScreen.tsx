@@ -14,8 +14,11 @@ import ProfessionTreePanel from './panels/ProfessionTreePanel';
 import VariableSnapshotPanel from './panels/VariableSnapshotPanel';
 import WorldBookPanel from './panels/WorldBookPanel';
 import RightPanel from './panels/RightPanel';
-import BusinessOverlay from './panels/BusinessOverlay';
-import SurvivalOverlay from './panels/SurvivalOverlay';
+import EconomyLedger from './panels/EconomyLedger';
+import { buildEconomyViewModel } from '../../domains/economy/viewModel';
+import { useEconomyActions } from './gameScreen/hooks/useEconomyActions';
+import ResourcesLedger from './panels/ResourcesLedger';
+import { buildResourcesViewModel } from '../../domains/resources/viewModel';
 import CombatWireframe from './CombatWireframe';
 import CombatEncounterDecisionCard,{ type CombatEncounterDecision } from './CombatEncounterDecisionCard';
 import AbilityProposalCard from './AbilityProposalCard';
@@ -23,13 +26,14 @@ import { MemorySettingsOverlay } from '../settings/memory/MemorySettingsOverlay'
 import WorldDynamicsPanel from './panels/WorldDynamicsPanel';
 import { findWorldDef } from '../../data/worldLoader';
 import { resolveWorldArtwork } from '../../data/worldArtwork';
+import '../../ui/screens/game.css';
+import '../../ui/screens/game-story.css';
+import '../../ui/screens/game-dossier.css';
+import '../../ui/screens/game-panels.css';
 import { eventBus,EVENTS } from '../../engine/eventBus';
-import type { WorldSystemData,DiceRoll,BusinessModuleSchema,ProfessionModuleSchema,ProgressionConfig,StatModuleSchema,WorldDynamicsConfig,PeriodicRule,EventRule,RuleFile } from '../../modules/schema';
-import { recordDiceRoll } from '../../gameplay/modules/dice';
-import { allocateStatPoints } from '../../gameplay/modules/stat';
-import { breakthroughProgression } from '../../gameplay/modules/progression';
-import { awakenAbility,equipAbility,learnSkill,respecAbilities,unequipAbility,unlockTalent,useSkill } from '../../gameplay/modules/talent';
-import { resolveProfessionBonuses,synchronizeProfessionAbilities,unlockProfessionAbility,useProfessionAbility } from '../../gameplay/profession';
+import type { WorldSystemData,DiceRoll,BusinessModuleSchema,ProfessionModuleSchema,ProgressionConfig,StatModuleSchema,WorldDynamicsConfig } from '../../modules/schema';
+import type { DiceRollRequest } from '../../gameplay/modules/dice';
+import { resolveProfessionBonuses,synchronizeProfessionAbilities } from '../../gameplay/profession';
 import { resolveProfessionBinding } from '../../data/professions';
 import { isProfessionModuleEnabled } from '../../gameplay/profession/featureGate';
 import { resolveCombatRuleset } from '../../gameplay/combatRulesets';
@@ -39,11 +43,9 @@ import { LeaveJourney, type JourneyDestination } from '../../context/journeyNavi
 import { useDialog } from '../shared/Dialog';
 import { encodeSaveFile } from '../../storage/saveFileCodec';
 import { exportSaveCapture } from '../../storage/db';
-import { eventWorldEvolution } from '../../modules/eventIntegration';
-import { installWorldEventPacks } from '../../modules/webEventStore';
-import { getRuntimePack,listPacks,type EventRuntimePack } from '../../modules/eventApi';
-import { selectRuntimePacksForWorld } from '../../modules/eventRuntime';
-import { installWorldCardWorkflows } from '../../modules/cardWorldBindings';
+import { loadEventCatalog } from '../../events/catalog';
+import { buildEventsPanelView } from '../../events/viewModel';
+import { setEventPacing } from '../../events/playerActions';
 import CardOverlay from '../event/CardOverlay';
 import EventConfigPanel from '../event/EventConfigPanel';
 import type { OverlayPanel } from './gameScreen/types';
@@ -51,10 +53,7 @@ import { navButtons,buildMobileNavItems } from './gameScreen/navConfig';
 import DesktopLayout from './gameScreen/DesktopLayout';
 import MobileLayout from './gameScreen/MobileLayout';
 import { useSimulation } from './gameScreen/hooks/useSimulation';
-import { useSurvivalCraft } from './gameScreen/hooks/useSurvivalCraft';
-import { useSurvivalSettlement } from './gameScreen/hooks/useSurvivalSettlement';
-import { assignBusinessStaff,purchaseBusinessAsset,upgradeBusinessAsset } from '../../gameplay/modules/business';
-import { normalizeAssetStatus } from './panels/businessOverlay/utils';
+import { useResourceActions } from './gameScreen/hooks/useResourceActions';
 import JourneyDossierContent from './shared/JourneyDossierContent';
 import { DOSSIER_META,normalizeDossierPanel } from './shared/journeyDossierMeta';
 import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
@@ -69,6 +68,10 @@ import { applyNarrativeDecision,createNarrativeDecisionRecord,type NarrativeDeci
 import { resolveAbilityProposalOnGameState } from '../../gameplay/abilitySystem';
 import { chooseAutomaticCommand,prepareCombatEncounterRequest,type CombatAutoStrategy,type CombatStatRanges } from '../../gameplay/combatV2';
 import { CombatNarrationCoordinator,applyV3CombatCommand,buildLocalCombatContinuation,isCombatFeatureEnabled,isCombatInteractionPaused,preserveCombatOwnedState,requestFromNarrativeAction,retryV3Combat,startV3Combat } from '../../gameplay/combatRuntime';
+
+const ABILITY_COMMANDS = {
+  talent: 'unlockTalent', learn: 'learnSkill', use: 'useSkill', awaken: 'awaken', equip: 'equip', unequip: 'unequip', respec: 'respec',
+} as const;
 
 export default function GameScreen() {
   const { state, navigate, engine } = useGame();
@@ -528,99 +531,18 @@ export default function GameScreen() {
     }).catch((error) => console.warn('[CustomModules] onButton failed:', error));
   }, [engine, state.selectedWorld, bumpVersion]);
 
-  // ── 事件包注册（二级开关：sessionActivePacks 优先，否则用全局已启用列表） ──
+  // ── 事件目录：世界内置事件 + 本局启用的事件包（二级开关 sessionActivePacks 优先，否则用全局已启用列表） ──
+  // 事件的触发、抽卡与结算都由玩法宿主里的事件导演完成；这里只负责把目录加载好。
   const sessionActivePacks = useSaveStore(s => s.sessionActivePacks);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      // 1. 安装世界关联的事件包进 IndexedDB（幂等，已存在跳过）
-      if (worldDef) {
-        try {
-          await installWorldEventPacks(worldDef);
-          await installWorldCardWorkflows(worldDef);
-        } catch (e) {
-          console.warn('[事件包] 世界事件包安装失败（已跳过）:', e);
-        }
-      }
-      if (cancelled) return;
-
-      // 2. 确定本局要注册的事件包列表（二级开关优先，否则用全局已启用列表）
-      let enabledIds: string[];
-      if (sessionActivePacks !== undefined) {
-        enabledIds = sessionActivePacks;
-      } else {
-        try {
-          const entries = await listPacks(true);
-          enabledIds = entries.filter((entry) => entry.enabled).map((entry) => entry.meta.id);
-        } catch {
-          enabledIds = [];
-        }
-      }
-      // 所有包必须绑定当前世界才加载（防止跨世界污染）
-      if (cancelled) return;
-
-      // 防残留：先清空再按当前绑定注册
-      eventWorldEvolution.clear();
-
-      const runtimePacks: EventRuntimePack[] = [];
-      for (const id of enabledIds) {
-        if (cancelled) break;
-        try {
-          runtimePacks.push(await getRuntimePack(id));
-        } catch (e) {
-          console.warn(`[event pack] runtime read failed: ${id}`, e);
-        }
-      }
-
-      for (const rec of selectRuntimePacksForWorld(runtimePacks, worldDef?.id)) {
-        if (cancelled) break;
-        const id = rec.id;
-        try {
-          const rules: EventRule[] = [];
-          const periodicRules: PeriodicRule[] = [];
-          let workflow: import('../../modules/workflowSchema').WorkflowDefinition | undefined;
-          // 优先读工作流格式
-          const wfRaw = rec.files['schema/workflow.json'];
-          if (typeof wfRaw === 'string') {
-            try { workflow = JSON.parse(wfRaw); } catch { /* 损坏 */ }
-          }
-          // 回退读规则格式
-          if (!workflow) {
-            const raw = rec.files['schema/rules.json'];
-            if (typeof raw === 'string') {
-              const rf = JSON.parse(raw) as RuleFile;
-              if (rf.rules) rules.push(...rf.rules);
-              if (rf.periodicRules) periodicRules.push(...rf.periodicRules);
-            }
-          }
-          if (workflow || rules.length > 0 || periodicRules.length > 0) {
-            const savedRuntime = gameState.simulationRuntime?.eventRuntimes?.[id];
-            eventWorldEvolution.registerPack({
-              eventPackId: id,
-              rules,
-              periodicRules,
-              workflow,
-              permissions: rec.manifest.permissions ?? [],
-              runtime: savedRuntime ?? { onceFired: {}, cooldownRemaining: {} },
-              source: 'user',
-            });
-          }
-        } catch (e) {
-          console.warn(`[事件包] 规则注册失败（已跳过）: ${id}`, e);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-      eventWorldEvolution.clear();
-    };
+    void loadEventCatalog(worldDef, sessionActivePacks !== undefined ? { activePackIds: sessionActivePacks } : {})
+      .then(() => { if (!cancelled) bumpVersion(); })
+      .catch(error => console.warn('[事件] 事件目录加载失败，仅使用世界内置事件', error));
+    return () => { cancelled = true; };
   }, [worldDef?.id, sessionActivePacks]);
-  const {
-    runtimeRecipes, isGeneratingRecipe,
-    handleSurvivalCraft, handleSurvivalUnlockRecipe, handleSurvivalGather, handleSurvivalGenerateRecipe, handleSurvivalDeleteRecipe,
-    cancelSurvivalRecipeGeneration,
-  } = useSurvivalCraft(engine, apiConfig, worldDef, setNotification, bumpVersion);
-  const { getChangeLog: getSurvivalChangeLog } = useSurvivalSettlement(engine, worldDef, bumpVersion);
+  const resourceActions = useResourceActions(engine, apiConfig, worldDef, setNotification, bumpVersion);
+  const isGeneratingRecipe = resourceActions.isGeneratingRecipe;
   // ── Event effects ──
   useEffect(() => {
     const onUpdate = () => setStateVersion(v => v + 1);
@@ -630,119 +552,46 @@ export default function GameScreen() {
     return () => { eventBus.off(EVENTS.VARIABLE_UPDATE_ENDED, onUpdate); eventBus.off(EVENTS.VARIABLE_EXTRACTION_FAILED, onFail); };
   }, []);
   // ── Callbacks ──
-  const handleDiceRoll = useCallback((roll: DiceRoll) => {
-    if (engine.isReadOnly) return;
-    const current = engine.variableManager.getState();
-    const diceConfig = worldDef?.modules?.find(module => module.moduleId === 'dice' && module.enabled)?.moduleConfig as import('../../modules/schema').DiceModuleSchema | undefined;
-    const result = recordDiceRoll(current, roll, diceConfig ?? {}, {
-      tick: current.simulationRuntime?.tick ?? 0,
-      enabledModules: ['dice'],
-    });
-    if (result.status !== 'applied') return;
-    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
+  // 骰子、属性点、突破都交给玩法宿主的对应模块结算，成功后一次性提交。
+  const handleDiceRoll = useCallback((request: DiceRollRequest): DiceRoll | null => {
+    if (engine.isReadOnly) return null;
+    const result = engine.dispatch('dice.roll', {
+      ...(request.requestId ? { requestId: request.requestId } : {}),
+      ...(request.attributeId ? { attributeId: request.attributeId } : {}),
+      attribute: request.attributeName,
+      dc: request.dc,
+      timestamp: request.timestamp,
+      ...(request.advantageMode ? { advantageMode: request.advantageMode } : {}),
+    }, '骰子检定');
+    if (!result.ok) return null;
     bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
+    return result.outcome?.state.dice?.lastRoll ?? null;
   }, [engine, worldDef, bumpVersion]);
   const handleAllocateStat = useCallback((statId: string) => {
-    if (engine.isReadOnly) return;
-    const config = worldDef?.modules?.find(module => module.moduleId === 'stat' && module.enabled)?.moduleConfig as StatModuleSchema | undefined;
-    if (!config) return;
-    const current = engine.variableManager.getState();
-    const result = allocateStatPoints(current, config, { [statId]: 1 }, {
-      tick: current.simulationRuntime?.tick ?? 0,
-      enabledModules: ['stat'],
-    });
-    if (result.status !== 'applied') {
-      setNotification(result.reason ?? '属性点不足');
-      return;
-    }
-    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
+    const result = engine.dispatch('stats.allocate', { stat: statId, amount: 1 }, '分配属性点');
+    if (!result.ok) { setNotification(result.feedback); return; }
     bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
   }, [engine, worldDef, bumpVersion]);
   const handleBreakthrough = useCallback((targetTier: number) => {
-    if (engine.isReadOnly) return;
-    const config = worldDef?.modules?.find(module => module.moduleId === 'progression' && module.enabled)?.moduleConfig as ProgressionConfig | undefined;
-    if (!config) return;
-    const professionConfig = worldSystem.职业体系 as ProfessionModuleSchema | undefined;
-    const current = engine.variableManager.getState();
-    const result = breakthroughProgression(current, config, targetTier, {
-      tick: current.simulationRuntime?.tick ?? 0,
-      enabledModules: ['progression'],
-    }, { professionAbilityPointsPerTier: professionConfig?.abilityPointsPerTier });
-    if (result.status !== 'applied') {
-      setNotification(result.reason ?? '突破条件未满足');
-      return;
-    }
-    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
-    bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
-  }, [engine, worldDef, worldSystem.职业体系, bumpVersion]);
+    const result = engine.dispatch('progression.breakthrough', { targetTier }, '突破');
+    setNotification(result.feedback);
+    if (result.ok) bumpVersion();
+  }, [engine, worldDef, bumpVersion]);
+  // 天赋、技能与职业能力交给玩法宿主的能力模块（domains/abilities）结算，成功后一次性提交。
   const applyAbilityAction = useCallback((action: 'talent' | 'learn' | 'use' | 'awaken' | 'equip' | 'unequip' | 'respec', id = '', slotId = '') => {
     if (engine.isReadOnly) return;
-    const config = worldDef?.modules?.find(module => module.moduleId === 'talent' && module.enabled)?.moduleConfig as import('../../modules/schema').TalentModuleSchema | undefined;
-    if (!config) return;
-    const current = engine.variableManager.getState();
-    const context = { tick: current.simulationRuntime?.tick ?? 0, enabledModules: ['talent'] };
-    const result = action === 'talent'
-      ? unlockTalent(current, config, id, context)
-      : action === 'learn'
-        ? learnSkill(current, config, id, context)
-        : action === 'use'
-          ? useSkill(current, config, id, context)
-          : action === 'awaken'
-            ? awakenAbility(current, config, id, context)
-            : action === 'equip'
-              ? equipAbility(current, config, id, slotId, context)
-              : action === 'unequip'
-                ? unequipAbility(current, id, context)
-                : respecAbilities(current, config, context);
-    if (result.status !== 'applied') {
-      setNotification(result.reason ?? '当前条件不满足');
-      return;
-    }
-    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
+    const command = ABILITY_COMMANDS[action];
+    const result = engine.dispatch(`abilities.${command}`, { id, slotId });
+    if (!result.ok) { setNotification(result.feedback); return; }
     bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
-  }, [engine, worldDef, bumpVersion]);
+  }, [engine, bumpVersion]);
   const applyProfessionAction = useCallback((action: 'unlock' | 'use', id: string) => {
     if (engine.isReadOnly) return;
-    const config = worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined;
-    if (!config) return;
-    const current = engine.variableManager.getState();
-    const context = { tick: current.simulationRuntime?.tick ?? 0, enabledModules: ['profession'] };
-    const result = action === 'unlock'
-      ? unlockProfessionAbility(current, config, id, context)
-      : useProfessionAbility(current, config, id, context);
-    if (result.status !== 'applied') {
-      setNotification(result.reason ?? '当前条件不满足');
-      return;
-    }
-    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
+    const result = engine.dispatch(action === 'unlock' ? 'abilities.unlockProfession' : 'abilities.useProfession', { id });
+    if (!result.ok) { setNotification(result.feedback); return; }
     bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
-  }, [engine, worldSystem, bumpVersion]);
-  const businessConfig = useMemo(() => worldDef?.modules?.find(module => module.moduleId === 'business' && module.enabled)?.moduleConfig as BusinessModuleSchema | undefined, [worldDef]);
-  const commitBusinessResult = useCallback((result: ReturnType<typeof purchaseBusinessAsset>) => {
-    if (engine.isReadOnly) return;
-    if (result.status !== 'applied') {
-      setNotification(result.reason ?? '经营操作未执行');
-      return;
-    }
-    if (!engine.commitPlayerState(result.state)) { setNotification('请等待当前回合完成，再执行此操作。'); return; }
-    bumpVersion();
-    useSaveStore.getState().scheduleAutoSave();
   }, [engine, bumpVersion]);
-  const businessContext = useCallback(() => ({ tick: engine.variableManager.getState().simulationRuntime?.tick ?? 0, enabledModules: ['business'] as const }), [engine]);
-  const handleBusinessPurchase = useCallback((assetId: string) => {
-    if (businessConfig) commitBusinessResult(purchaseBusinessAsset(engine.variableManager.getState(), businessConfig, assetId, businessContext()));
-  }, [businessConfig, engine, businessContext, commitBusinessResult]);
-  const handleBusinessUpgrade = useCallback((assetId: string) => {
-    if (businessConfig) commitBusinessResult(upgradeBusinessAsset(engine.variableManager.getState(), businessConfig, assetId, businessContext()));
-  }, [businessConfig, engine, businessContext, commitBusinessResult]);
-  const handleBusinessStaff = useCallback((assetId: string, count: number, efficiency?: number) => {
-    commitBusinessResult(assignBusinessStaff(engine.variableManager.getState(), assetId, count, efficiency, businessContext()));
-  }, [engine, businessContext, commitBusinessResult]);
+  const economyActions = useEconomyActions(engine, worldDef, setNotification, bumpVersion);
 
 
   const continueCombatNarration = useCallback(async () => {
@@ -849,7 +698,7 @@ export default function GameScreen() {
       void continueCombatNarration();
       return;
     }
-    combatAutomationTimerRef.current = setTimeout(runCombatAutomationStep, 260);
+    combatAutomationTimerRef.current = setTimeout(runCombatAutomationStep, 800);
   }, [engine, commitV3CombatState, continueCombatNarration]);
 
   const handleV3AutoStrategy = useCallback((strategy: CombatAutoStrategy | null) => {
@@ -871,7 +720,7 @@ export default function GameScreen() {
     const session = gameState.v3?.combatSession;
     const actor = session?.participants.find(unit => unit.id === session.activeUnitId);
     if (!readOnly && combatV3Enabled && session?.lifecycle === 'active' && actor?.side === 'enemy' && !combatAutomationTimerRef.current) {
-      combatAutomationTimerRef.current = setTimeout(runCombatAutomationStep, 0);
+      combatAutomationTimerRef.current = setTimeout(runCombatAutomationStep, 900);
     }
   }, [gameState, combatV3Enabled, readOnly, runCombatAutomationStep]);
 
@@ -1006,66 +855,34 @@ export default function GameScreen() {
     if (!panel) return '';
     return DOSSIER_META[normalizeDossierPanel(panel)].title;
   };
-  const getPanelEmblem = (panel: OverlayPanel): string | undefined => panel ? DOSSIER_META[normalizeDossierPanel(panel)].emblemSrc : undefined;
+  const getPanelMeta = (panel: OverlayPanel) => panel ? DOSSIER_META[normalizeDossierPanel(panel)] : undefined;
   const activeNavButtons = useMemo(() => navButtons.filter(button => button.id !== 'profession' || hasProfessionModule), [hasProfessionModule]);
   const mobileNavItems = useMemo(() => buildMobileNavItems({
     navigate: handleNavigate, setShowLeftOverlay, setMobileActivePanel,
   }).filter(item => item.id !== 'profession' || hasProfessionModule), [handleNavigate, hasProfessionModule]);
   // ── Shared elements ──
-  const bizData = (() => {
-    const bizConfig = businessConfig;
-    if (!bizConfig) return undefined;
-    // 优先从当前渲染的 gameState 读取，其次从 VariableManager 实时读取（防止渲染间隙丢失更新）
-    const runtimeBiz = gameState.玩家?.经营资产
-      ?? (engine.variableManager.getVar('玩家.经营资产') as { 资金: number; 资产列表: any[]; 交易日志?: any[] } | undefined);
-    if (!runtimeBiz) return bizConfig;
-    return {
-      ...bizConfig,
-      funds: runtimeBiz.资金,
-      assets: (runtimeBiz.资产列表 ?? []).map(a => {
-        const definition = bizConfig.assets?.find(item => item.id === a.id);
-        return {
-          ...definition,
-          id: a.id || `asset-${a.名称 || a.类型 || 'runtime'}`,
-          name: a.名称 || a.类型 || a.id || '未命名资产',
-          type: a.类型 || '',
-          level: a.等级 ?? 1,
-          maxLevel: a.最高等级 ?? 3,
-          description: a.描述 || '',
-          status: normalizeAssetStatus(a.状态),
-          income: {
-            base: a.基础收益 ?? 0,
-            perLevel: a.每级收益 ?? 0,
-            cycle: bizConfig.cycleName || '天',
-          },
-          maintenance: a.维护费 ?? 0,
-          staff: a.员工效率 !== undefined || a.员工人数 !== undefined ? { current: a.员工人数 ?? definition?.staff?.current ?? 0, max: definition?.staff?.max ?? Math.max(1, a.员工人数 ?? 1), efficiency: a.员工效率 ?? definition?.staff?.efficiency ?? 1 } : undefined,
-          marketTags: a.市场标签,
-          risk: a.风险等级 ? { level: a.风险等级, description: '' } : undefined,
-          upgradeCost: a.升级费用,
-        };
-      }),
-      transactionLog: (runtimeBiz.交易日志 || []).map((t, i) => ({
-        cycle: i + 1, type: t.类型, description: t.描述, amount: t.金额,
-      })),
-    } as BusinessModuleSchema;
-  })();
+  const economyView = buildEconomyViewModel(gameState, worldDef, worldDef?.modules?.find(module => module.moduleId === 'business' && module.enabled)?.name);
 
+  const resourcesView = buildResourcesViewModel(gameState, worldDef, worldDef?.modules?.find(module => module.moduleId === 'survival' && module.enabled)?.name);
+  const eventsView = buildEventsPanelView(gameState, worldDef);
   const rightPanelEl = (
     <RightPanel
       gameState={gameState} worldId={state.selectedWorld}
-      onSurvivalGenerateRecipe={readOnly ? undefined : handleSurvivalGenerateRecipe}
-      onSurvivalCancelRecipeGeneration={readOnly ? undefined : cancelSurvivalRecipeGeneration}
-      onSurvivalCraft={readOnly ? undefined : handleSurvivalCraft}
-      onSurvivalUnlock={readOnly ? undefined : handleSurvivalUnlockRecipe}
-      unlockedRecipeIds={gameState.gameplay?.survival?.unlockedRecipes ?? []}
-      onSurvivalGather={readOnly ? undefined : handleSurvivalGather}
-      onSurvivalDeleteRecipe={readOnly ? undefined : handleSurvivalDeleteRecipe}
-      isGeneratingRecipe={isGeneratingRecipe} runtimeRecipes={runtimeRecipes}
-      onOpenBusinessOverlay={readOnly ? undefined : () => setBusinessOverlayOpen(true)}
-      onOpenSurvivalOverlay={readOnly ? undefined : () => setSurvivalOverlayOpen(true)}
-      survivalChangeLog={getSurvivalChangeLog()}
-      businessData={bizData}
+      resourcesView={resourcesView}
+      onResourceGather={readOnly ? undefined : resourceActions.gather}
+      onResourceGenerateRecipe={readOnly ? undefined : resourceActions.generateRecipe}
+      onResourceCancelRecipeGeneration={readOnly ? undefined : resourceActions.cancelRecipeGeneration}
+      isGeneratingRecipe={isGeneratingRecipe}
+      economyView={economyView}
+      onOpenEconomyLedger={() => setBusinessOverlayOpen(true)}
+      eventsView={eventsView}
+      onSetEventPacing={readOnly ? undefined : level => {
+        const result = setEventPacing(engine, worldDef, level);
+        setNotification(result.feedback);
+        if (result.ok) bumpVersion();
+      }}
+      onOpenEventCard={() => eventBus.emit(EVENTS.EVENT_CARD_OPEN)}
+      onOpenResourcesLedger={() => setSurvivalOverlayOpen(true)}
       onAllocateStat={handleAllocateStat}
       onBreakthrough={handleBreakthrough}
       onUnlockTalent={id => applyAbilityAction('talent', id)}
@@ -1096,10 +913,6 @@ export default function GameScreen() {
       externalBlockedReason={isLeaving ? '正在保存旅程，请稍候。' : undefined}
     />
   );
-  // 生存资源数据（供 SurvivalOverlay 使用）
-  const survivalData = (() => {
-    return worldDef?.modules?.find(m => m.moduleId === 'survival' && m.enabled)?.moduleConfig as import('../../modules/schema').SurvivalModuleSchema | undefined;
-  })();
   // ── Render ──
   navigationPorts.current.blocked = combatSaving || abilitySaving || isSimulating || isGeneratingRecipe || combatNarrationInFlightRef.current;
   return (
@@ -1114,7 +927,8 @@ export default function GameScreen() {
           showRightOverlay={showRightOverlay} onShowRightOverlay={setShowRightOverlay}
           mobileActivePanel={mobileActivePanel} onMobileActivePanelChange={setMobileActivePanel}
           panelTitle={getPanelTitle(mobileActivePanel)}
-          panelEmblemSrc={getPanelEmblem(mobileActivePanel)}
+          panelSubtitle={getPanelMeta(mobileActivePanel)?.subtitle}
+          panelIcon={getPanelMeta(mobileActivePanel)?.icon}
           panelContent={renderPanelContent(mobileActivePanel, () => setMobileActivePanel(null))}
           rightPanel={rightPanelEl}
         >{chatPanelEl}</MobileLayout>
@@ -1124,31 +938,31 @@ export default function GameScreen() {
           onNavigate={handleNavigate}
           isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen}
           drawerTitle={getPanelTitle(overlay)}
-          drawerEmblemSrc={getPanelEmblem(overlay)}
+          drawerSubtitle={getPanelMeta(overlay)?.subtitle}
+          drawerIcon={getPanelMeta(overlay)?.icon}
           drawerContent={renderPanelContent(overlay, () => setOverlay(null))}
           rightCollapsed={rightCollapsed} onToggleRightPanel={() => setRightCollapsed(c => !c)}
           rightPanel={rightPanelEl}
-          worldName={worldDef?.name || '世界漫游指南'}
         >{chatPanelEl}</DesktopLayout>
       )}
-      {!readOnly && bizData && <BusinessOverlay open={businessOverlayOpen} data={bizData} config={businessConfig} onPurchase={handleBusinessPurchase} onUpgrade={handleBusinessUpgrade} onAssignStaff={handleBusinessStaff} onClose={() => setBusinessOverlayOpen(false)} />}
-      {!readOnly && survivalData && <SurvivalOverlay
-        open={survivalOverlayOpen} data={survivalData}
-        runtimeResources={gameState.玩家?.生存资源 as any}
-        inventory={gameState.玩家?.物品栏}
-        recipes={[...(survivalData.recipes ?? []), ...runtimeRecipes]}
-        stamina={gameState.玩家?.生存状态?.体力值}
-        worldTime={gameState.世界?.时间系统?.当前时间}
-        onGather={handleSurvivalGather}
-        onCraft={handleSurvivalCraft}
-        onDeleteRecipe={handleSurvivalDeleteRecipe}
-        changeLog={getSurvivalChangeLog()}
+      {economyView && <EconomyLedger
+        open={businessOverlayOpen} view={economyView}
+        {...(readOnly ? {} : economyActions)}
+        onClose={() => setBusinessOverlayOpen(false)}
+      />}
+      {resourcesView && <ResourcesLedger
+        open={survivalOverlayOpen} view={resourcesView}
+        onGather={readOnly ? undefined : resourceActions.gather}
+        onCraft={readOnly ? undefined : resourceActions.craft}
+        onUnlock={readOnly ? undefined : resourceActions.unlockRecipe}
+        onDeleteRecipe={readOnly ? undefined : resourceActions.removeRecipe}
         onClose={() => setSurvivalOverlayOpen(false)}
       />}
       {combatV3Enabled && gameState.v3?.combatSession && (gameState.v3.combatSession.lifecycle !== 'terminal' || gameState.v3.combatSession.result?.narration.status !== 'succeeded') && <CombatWireframe
         session={gameState.v3.combatSession}
         statLabels={combatStatLabels}
         worldSceneUrl={worldArtwork}
+        world={worldDef}
         portraits={combatPortraits}
         saving={combatSaving}
         error={combatError}
@@ -1174,7 +988,7 @@ export default function GameScreen() {
         error={abilityError}
         onResolve={handleAbilityProposal}
       />}
-      {!readOnly && !isCombatInteractionPaused(gameState) && <CardOverlay gameState={gameState} apiConfig={apiConfig} onChoice={handleCustomModuleChoice} onDecisionApplied={handleNarrativeDecisionApplied} />}
+      {!readOnly && !isCombatInteractionPaused(gameState) && <CardOverlay engine={engine} world={worldDef} gameState={gameState} apiConfig={apiConfig} onChoice={handleCustomModuleChoice} onDecisionApplied={handleNarrativeDecisionApplied} onNotify={setNotification} />}
       {readOnly && <div className="game-readonly-banner" role="status">此旅程已在炼狱风险中封存：可以回顾与导出，但不能继续、编辑或回滚。</div>}
       {notification && (
         <button type="button" aria-label="关闭提示" onClick={() => setNotification(null)} style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 20px', fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 200, animation: 'fadeIn 0.2s ease', cursor: 'pointer' }}>

@@ -1,12 +1,13 @@
 import type { GameState } from '../schema/variables';
-import { executeGameplayTransaction, type GameplayEffect } from '../gameplay/kernel';
+import { commitTransaction } from '../core/transaction';
+import type { Op } from '../core/ops';
 import { evaluateDependency } from '../director/align';
 import { evolutionFactVersion } from '../simulation/turnCoordinator';
 import type { DirectorReadContext, DirectorState, OffscreenEventProposal, OffscreenEventReceipt } from '../director/types';
 import { isNpcDead } from '../utils/npcHelpers';
 import { executeAuthoredEffects } from '../director/authoredEffects';
 
-/** The variable owner rechecks current facts and commits through the normal transaction kernel. */
+/** 变量层按当前事实重新核对，再作为一笔内部事务提交。 */
 export function acceptOffscreenEvent(proposal: OffscreenEventProposal, gameState: GameState, director: DirectorState, currentStateVersion: string, context?: DirectorReadContext): { state: GameState; receipt: OffscreenEventReceipt } {
   const result = (status: OffscreenEventReceipt['status'], reason?: string, state = gameState): { state: GameState; receipt: OffscreenEventReceipt } => ({ state, receipt: {
     id: `offscreen_receipt:${proposal.logicalEventKey}`, proposalId: proposal.proposalId, logicalEventKey: proposal.logicalEventKey,
@@ -33,19 +34,19 @@ export function acceptOffscreenEvent(proposal: OffscreenEventProposal, gameState
     const npc = gameState.人物档案[id];
     if (npc.人物分类 !== '离场' || isNpcDead(npc)) return result('rejected', 'subject_present_or_dead');
   }
-  const effects: GameplayEffect[] = [];
+  const effects: Op[] = [];
   if (proposal.kind === 'character_moved' || proposal.kind === 'character_injured') {
     if (proposal.subjectIds.length !== 1) return result('rejected', 'invalid_subject_count');
     const value = proposal.kind === 'character_moved' ? proposal.payload.location : proposal.payload.status;
     if (typeof value !== 'string' || !value.trim() || value.length > 500 || /死亡|身亡|复活/.test(value)) return result('rejected', 'invalid_payload');
-    effects.push({ set: { path: `人物档案.${proposal.subjectIds[0]}.个人信息.${proposal.kind === 'character_moved' ? '当前位置' : '当前状态'}`, value } });
+    effects.push({ op: 'set', path: `人物档案.${proposal.subjectIds[0]}.个人信息.${proposal.kind === 'character_moved' ? '当前位置' : '当前状态'}`, value });
   } else if (proposal.kind !== 'world_event') return result('rejected', 'unsupported_event_kind');
   if (proposal.kind === 'world_event' && plan.authorEffects?.length) {
     const authored = executeAuthoredEffects(gameState, plan, director, { eventId: proposal.logicalEventKey });
     if (!authored.success) return result('rejected', authored.reason ?? 'authored_effects_rejected');
     return result('accepted', undefined, authored.state);
   }
-  const transaction = executeGameplayTransaction(gameState, { id: `offscreen:${proposal.logicalEventKey}`, source: 'pipeline:offscreen', label: proposal.description, effects, events: [{ type: 'world.offscreen.accepted', payload: { eventId: proposal.logicalEventKey } }] }, { tick: gameState.simulationRuntime?.tick ?? 0, bestEffort: false });
+  const transaction = commitTransaction(gameState, { id: `offscreen:${proposal.logicalEventKey}`, source: 'pipeline:offscreen', label: proposal.description, ops: effects, events: [{ type: 'world.offscreen.accepted', payload: { eventId: proposal.logicalEventKey } }] });
   if (transaction.status !== 'applied') return result('rejected', 'variable_transaction_rejected');
   return result('accepted', undefined, transaction.state as GameState);
 }

@@ -2,11 +2,7 @@ import type { WorldModule } from '../data/worlds-schema';
 import type { ProfessionModuleSchema } from '../modules/schema';
 import { resolveProfessionBinding } from '../data/professions';
 import type { GameState } from '../schema/variables';
-import {
-  createDefaultGameplayRuntime,
-  ensureGameplayRuntime,
-  GAMEPLAY_SCHEMA_VERSION,
-} from './kernel';
+import { createDefaultGameplayRuntime, ensureGameplayRuntime, GAMEPLAY_SCHEMA_VERSION } from '../core/state';
 
 export type GameplayPrepareMode = 'new' | 'load';
 
@@ -181,100 +177,6 @@ function initializeDice(state: GameState, mode: GameplayPrepareMode): void {
   if (state.dice.history.length > 20) state.dice.history = state.dice.history.slice(-20);
 }
 
-function initializeSurvival(state: GameState, module: WorldModule, mode: GameplayPrepareMode): void {
-  const config = moduleSource(module);
-  const definitions = Array.isArray(config.resources) ? config.resources : [];
-  const existing = state.玩家.生存资源 && typeof state.玩家.生存资源 === 'object'
-    ? state.玩家.生存资源
-    : {};
-  const resources: NonNullable<GameState['玩家']['生存资源']> = mode === 'new' ? {} : existing;
-  for (const raw of definitions) {
-    const definition = record(raw);
-    const id = typeof definition.id === 'string' ? definition.id : '';
-    if (!id) continue;
-    if (mode === 'load' && resources[id]) continue;
-    resources[id] = {
-      数量: Math.max(0, finite(definition.amount, 0)),
-      最大值: Math.max(0, finite(definition.max, 0)),
-      name: typeof definition.name === 'string' ? definition.name : id,
-      symbol: typeof definition.symbol === 'string' ? definition.symbol : '',
-      scarce: definition.scarce === true,
-      description: typeof definition.description === 'string' ? definition.description : '',
-      gatherRate: typeof definition.gatherRate === 'string' ? definition.gatherRate : undefined,
-      usage: typeof definition.usage === 'string' ? definition.usage : undefined,
-    };
-  }
-  state.玩家.生存资源 = resources;
-  if (mode === 'new') state.玩家.生存配方 = [];
-}
-
-function normalizeAssetStatus(value: unknown): 'active' | 'idle' | 'damaged' | 'destroyed' {
-  return value === 'idle' || value === 'damaged' || value === 'destroyed' ? value : 'active';
-}
-
-function initializeBusiness(state: GameState, module: WorldModule, mode: GameplayPrepareMode): void {
-  if (mode === 'load' && state.玩家.经营资产 && typeof state.玩家.经营资产 === 'object') {
-    if (!state.玩家.经营资产.库存) state.玩家.经营资产.库存 = {};
-    if (!Array.isArray(state.玩家.经营资产.资产列表)) state.玩家.经营资产.资产列表 = [];
-    if (!Array.isArray(state.玩家.经营资产.交易日志)) state.玩家.经营资产.交易日志 = [];
-    return;
-  }
-  const config = moduleSource(module);
-  const assets = Array.isArray(config.assets) ? config.assets : [];
-  const transactionLog = Array.isArray(config.transactionLog) ? config.transactionLog : [];
-  const inventory = record(config.inventory);
-  state.玩家.经营资产 = {
-    资金: Math.max(0, finite(config.funds, 0)),
-    资产列表: assets.filter(raw => record(raw).initiallyOwned !== false).map((raw, index) => {
-      const asset = record(raw);
-      const income = record(asset.income);
-      const staff = record(asset.staff);
-      const risk = record(asset.risk);
-      const marketTags = Array.isArray(asset.marketTags)
-        ? asset.marketTags.filter((tag): tag is string => typeof tag === 'string')
-        : [];
-      return {
-        id: typeof asset.id === 'string' && asset.id ? asset.id : `asset-${index + 1}`,
-        名称: typeof asset.name === 'string' ? asset.name : '未命名资产',
-        类型: typeof asset.type === 'string' ? asset.type : '',
-        等级: Math.max(1, Math.trunc(finite(asset.level, 1))),
-        最高等级: Math.max(1, Math.trunc(finite(asset.maxLevel, 3))),
-        描述: typeof asset.description === 'string' ? asset.description : '',
-        状态: normalizeAssetStatus(asset.status),
-        基础收益: finite(income.base, 0),
-        每级收益: finite(income.perLevel, 0),
-        维护费: Math.max(0, finite(asset.maintenance, 0)),
-        ...(Object.keys(staff).length > 0 ? {
-          员工人数: Math.max(0, Math.trunc(finite(staff.current, 0))),
-          员工效率: Math.max(0, finite(staff.efficiency, 1)),
-        } : {}),
-        ...(marketTags.length > 0 ? { 市场标签: marketTags } : {}),
-        ...(risk.level === 'low' || risk.level === 'medium' || risk.level === 'high'
-          ? { 风险等级: risk.level }
-          : {}),
-        ...(asset.upgradeCost !== undefined ? { 升级费用: Math.max(0, finite(asset.upgradeCost, 0)) } : {}),
-      };
-    }),
-    交易日志: transactionLog.map(raw => {
-      const entry = record(raw);
-      const type = entry.type;
-      return {
-        类型: type === 'expense' || type === 'upgrade' || type === 'event'
-          ? type
-          : type === 'acquire' ? 'purchase'
-            : 'income',
-        描述: typeof entry.description === 'string' ? entry.description : '',
-        金额: finite(entry.amount, 0),
-      };
-    }),
-    库存: Object.fromEntries(Object.entries(inventory).map(([key, value]) => [key, Math.max(0, finite(value, 0))])),
-  };
-}
-
-/**
- * Normalize one GameState to the unified gameplay runtime and initialize the six
- * built-in modules without overwriting existing progress during load.
- */
 export function prepareGameplayState(
   stateIn: GameState,
   modules: readonly WorldModule[] = [],
@@ -293,8 +195,8 @@ export function prepareGameplayState(
       case 'talent': initializeAbilities(state, module, options.mode); break;
       case 'profession': initializeProfession(state, module, options.mode); break;
       case 'dice': initializeDice(state, options.mode); break;
-      case 'survival': initializeSurvival(state, module, options.mode); break;
-      case 'business': initializeBusiness(state, module, options.mode); break;
+      // survival：由资源模块（domains/resources）在 GameplayHost.prepare 中初始化与迁移。
+      // business：由经营模块（domains/economy）在 GameplayHost.prepare 中初始化与迁移。
     }
   }
 

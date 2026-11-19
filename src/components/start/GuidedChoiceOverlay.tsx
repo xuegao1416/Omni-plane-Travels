@@ -7,6 +7,7 @@ import { StepIndicator } from './guidedChoice/StepIndicator';
 import { ChoiceCard,CustomCard } from './guidedChoice/ChoiceCard';
 import { CustomEditArea } from './guidedChoice/CustomEditArea';
 import { BottomNav } from './guidedChoice/BottomNav';
+import '../../ui/screens/world-weave.css';
 
 interface GuidedChoiceOverlayProps {
   visible: boolean;

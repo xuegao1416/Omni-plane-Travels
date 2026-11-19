@@ -2,12 +2,16 @@
  * 用户认证状态管理（邮箱 + 密码 / 验证码注册）
  */
 import { create } from 'zustand';
-import { API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS, authHeaders, setAuthToken } from '../config/api';
 
 export interface User {
   id: string;
   username: string;
   email: string;
+  /** 创意工坊公开昵称；未设置时工坊显示“旅者·id 片段”。 */
+  displayName?: string | null;
+  /** 当前账号是否是创意工坊管理员（服务端 WORKSHOP_ADMIN_IDS）。 */
+  workshopAdmin?: boolean;
 }
 
 interface AuthState {
@@ -22,11 +26,14 @@ interface AuthState {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   resetPassword: (email: string, code: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
+  setDisplayName: (displayName: string) => Promise<string | null>;
 }
 
 async function handleAuthResponse(res: Response): Promise<{ ok: boolean; error?: string; user?: User }> {
   const data = await res.json();
   if (res.ok && data.ok) {
+    // 桌面端（Tauri）不走 Cookie，服务端把令牌放在响应体里。
+    if (typeof data.token === 'string') setAuthToken(data.token);
     return { ok: true, user: data.user };
   }
   return { ok: false, error: data.message || '操作失败' };
@@ -39,7 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   checkAuth: async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.auth.me, { credentials: 'include' });
+      const response = await fetch(API_ENDPOINTS.auth.me, { credentials: 'include', headers: authHeaders() });
       if (response.ok) {
         const data = await response.json();
         set({ user: data.user, isAuthenticated: true, isLoading: false });
@@ -110,10 +117,26 @@ export const useAuthStore = create<AuthState>((set) => ({
       await fetch(API_ENDPOINTS.auth.logout, {
         method: 'POST',
         credentials: 'include',
+        headers: authHeaders(),
       });
     } catch {
       // 忽略错误，本地状态照样清理
     }
+    setAuthToken(null);
     set({ user: null, isAuthenticated: false });
+  },
+
+  setDisplayName: async (displayName: string) => {
+    const res = await fetch(API_ENDPOINTS.auth.profile, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      credentials: 'include',
+      body: JSON.stringify({ displayName }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || '保存昵称失败');
+    const saved = typeof data.displayName === 'string' ? data.displayName : null;
+    set(state => ({ user: state.user ? { ...state.user, displayName: saved } : state.user }));
+    return saved;
   },
 }));

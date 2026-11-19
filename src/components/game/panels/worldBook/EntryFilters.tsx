@@ -15,7 +15,7 @@ export function EntryFilters({ search, onSearchChange, showDisabled, onToggleDis
           value={search}
           onChange={e => onSearchChange(e.target.value)}
           placeholder="搜索条目..."
-          style={{ width: '100%', paddingLeft: '28px' }}
+          style={{ width: '100%' }}
         />
       </div>
       <button

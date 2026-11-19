@@ -7,7 +7,7 @@ describe('mobile journey title contract', () => {
   test('keeps the header title and hides the duplicate narrative banner on mobile', () => {
     const mobileLayout = read('./MobileLayout.tsx');
     const chatPanel = read('../chat/ChatPanel.tsx');
-    const styles = read('../../../styles/game-journey.css');
+    const styles = read('../../../ui/screens/game-story.css');
 
     expect(mobileLayout).toContain('mobile-header-title');
     expect(chatPanel).toContain('game-journey__narrative-banner');

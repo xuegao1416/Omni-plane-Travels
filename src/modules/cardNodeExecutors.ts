@@ -118,6 +118,15 @@ registerCardNodeExecutor('narrative.dialog', (_node, _ctx, inputs) => {
 //  交互节点执行器
 // ═══════════════════════════════════════════════════════════
 
+/** 事件模块认识的选项字段（多效果、检定分支、后续事件、可选条件）。 */
+function optionExtras(opt: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of ['effects', 'check', 'success', 'failure', 'next', 'requires'] as const) {
+    if (opt[key] !== undefined) out[key] = opt[key];
+  }
+  return out;
+}
+
 registerCardNodeExecutor('choice.static', (_node, _ctx, inputs) => {
   const w = _node.widgetValues ?? {};
   let options: CardNodeExecutionResult['choices'] = [];
@@ -186,7 +195,9 @@ registerCardNodeExecutor('choice.conditional', (_node, ctx, inputs) => {
   });
 
   return {
+    // 保留选项上的其余字段（多效果、检定、后续事件），由事件模块结算。
     choices: filtered.map(opt => ({
+      ...optionExtras(opt),
       label: String(opt.label ?? ''),
       aiNote: opt.aiNote as string | undefined,
       effect: opt.effect as { statId?: string; resourcePath?: string; delta: number } | undefined,
@@ -221,6 +232,7 @@ registerCardNodeExecutor('choice.weighted', (_node, _ctx, inputs) => {
 
   return {
     choices: selected.map(opt => ({
+      ...optionExtras(opt),
       label: String(opt.label ?? ''),
       aiNote: opt.aiNote as string | undefined,
       effect: opt.effect as { statId?: string; resourcePath?: string; delta: number } | undefined,

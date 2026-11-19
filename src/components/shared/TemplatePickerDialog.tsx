@@ -1,8 +1,9 @@
 /** 模板选择弹窗 — 子组件拆分至 ./templatePicker/ */
 import { useState,useRef,useCallback } from 'react';
-import { Plus,FileJson,Users,User,BookOpen } from 'lucide-react';
+import { Plus,FileJson,Users,User,BookOpen,ArrowLeft } from 'lucide-react';
 import { useDialog } from './Dialog';
 import OverlayPortal from './OverlayPortal';
+import PlanarFrame from '../../ui/planar/PlanarFrame';
 import type { TemplatePickerProps } from './templatePicker/types';
 import type { NpcTemplate,PlayerPreset,HistoryPreset } from '../../storage/templateStore';
 import { getNpcTemplates,importNpcFromTemplate,parseNpcTemplateJSON,getPlayerPresets,parsePlayerPresetJSON,applyPresetToProfile,deleteNpcTemplate,deletePlayerPreset,getHistoryPresets,parseHistoryPresetJSON,deleteHistoryPreset } from '../../storage/templateStore';
@@ -70,12 +71,13 @@ export default function TemplatePickerDialog(props: TemplatePickerProps) {
   const tplLabel = mode === 'npc' ? 'NPC模板' : mode === 'history' ? '经历预设' : '预设';
 
   return (
-    <OverlayPortal className={s.overlay} ariaLabel={view === 'main' ? title : listTitle} onClose={onClose}>
-      <div className={s.dialog} onClick={e => e.stopPropagation()}>
-        <div className={s.dialogHeader}>
-          <h3 className={s.dialogTitle}>{view === 'main' ? title : listTitle}</h3>
-          <p className={s.dialogSubtitle}>{view === 'main' ? (mode === 'npc' ? '选择创建方式' : '选择导入来源') : '点击选择，右侧删除'}</p>
-        </div>
+    <OverlayPortal className="pk-dialog-overlay" ariaLabel={view === 'main' ? title : listTitle} onClose={onClose}>
+      <PlanarFrame className={`pk-dialog ${s.dialog}`} onClick={e => e.stopPropagation()}>
+        <header className={s.dialogHeader}>
+          <small className={s.dialogKicker}>{view === 'main' ? (mode === 'npc' ? '同行者' : mode === 'history' ? '前尘编年' : '降临身份') : '档案库'}</small>
+          <h2 className={`pk-title ${s.dialogTitle}`}>{view === 'main' ? title : listTitle}</h2>
+          <p className={s.dialogSubtitle}>{view === 'main' ? (mode === 'npc' ? '选择创建方式' : '选择导入来源') : '点击条目载入，右侧可删除'}</p>
+        </header>
 
         <div className={s.dialogBody}>
           {view === 'main' ? (
@@ -86,18 +88,18 @@ export default function TemplatePickerDialog(props: TemplatePickerProps) {
             </div>
           ) : (
             <div className={s.templateList}>
-              <button className={s.backBtn} onClick={() => setView('main')}>← 返回</button>
               {templates.map(tpl => <TemplateCard key={tpl.id} tpl={tpl} mode={mode} onSelect={handleSelect} onDelete={handleDelete} />)}
             </div>
           )}
         </div>
 
-        <div className={s.dialogFooter}>
-          <button className={s.cancelBtn} onClick={onClose}>取消</button>
+        <div className="pk-dialog__actions">
+          {view === 'list' && <button type="button" className="pk-btn pk-btn--secondary" onClick={() => setView('main')}><ArrowLeft />返回</button>}
+          <button type="button" className="pk-btn pk-btn--ghost" onClick={onClose}>取消</button>
         </div>
         <input ref={fileInputRef} type="file" accept=".json" className={s.hiddenInput} onChange={handleFileImport} />
         {DialogUI}
-      </div>
+      </PlanarFrame>
     </OverlayPortal>
   );
 }

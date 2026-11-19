@@ -18,7 +18,7 @@ describe('world artwork compatibility', () => {
   test('old custom worlds without artwork use the neutral fallback', () => {
     const resolved = resolveWorldArtwork({ id: 'custom_old', artwork: undefined });
     expect(resolved.source).toBe('fallback');
-    expect(resolved.src).toContain('common-journey-backdrop-v1.png');
+    expect(resolved.src).toContain('common-journey-backdrop-nocturne-v1.png');
   });
 
   test('artwork survives WorldDef form serialization', () => {
