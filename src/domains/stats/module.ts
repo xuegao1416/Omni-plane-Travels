@@ -2,7 +2,8 @@
  * 属性模块（stats）：生命/体力、六维与特色属性的变量定义。
  *
  * - 范围：按世界配置的上下限，有成长体系时上限随段位/等级提高；已经超出上限的旧值不会被写回压低。
- * - 有效值：基础值叠加加成（`stat.<id>` 目标的修正器）后的数值，检定与派生属性都读有效值。
+ * - 有效值：基础值叠加加成（`stat.<id>` 目标的修正器）与装备加成后的数值，检定、派生属性与战斗都读有效值。
+ * - 装备（domains/equipment）：穿戴中的装备按 属性加成 计入；生命/体力的装备加成提高上限。
  * - 派生属性：按配置公式计算，结果快照写入 gameplay.stat.derived 供界面显示。
  * - 命令：stats.allocate 分配属性点。
  */
@@ -15,6 +16,7 @@ import type { ModifierQuery } from '../../core/modifiers';
 import { getCurrentLevelCap } from '../../modules/xpAlgorithm';
 import { ensureGameplayRuntime } from '../../core/state';
 import type { GameplayStateRoot } from '../../gameplay/types';
+import { equipmentStatBonus } from '../equipment/bonus';
 
 export const STATS_MODULE_ID = 'stats';
 const WRITERS: readonly WriteSource[] = ['ai', 'event', 'custom'];
@@ -67,12 +69,32 @@ export function findStat(config: StatModuleSchema, key: string): StatDefinition 
   return statDefinitions(config).find(def => def.id === alias || def.field === alias || def.name === alias);
 }
 
-/** 当前段位/等级下的上限（没有成长体系时就是配置范围上限）。 */
-export function statCap(config: StatsConfig, state: GameState, def: StatDefinition): number {
+/** 装备体系随数值属性启用，属性配置里写 equipment.enabled = false 才关闭。 */
+export function isEquipmentEnabled(stat: StatModuleSchema | undefined): boolean {
+  return Boolean(stat) && stat?.equipment?.enabled !== false;
+}
+
+/** 穿戴中的装备对这一属性的加成（装备体系关闭时为 0）。 */
+export function equipmentBonus(config: StatsConfig, state: GameState, def: StatDefinition): number {
+  if (!isEquipmentEnabled(config.stat)) return 0;
+  return equipmentStatBonus(state.玩家?.装备栏, def);
+}
+
+/** 成长体系给的上限（没有成长体系时就是配置范围上限），不含装备。 */
+export function baseStatCap(config: StatsConfig, state: GameState, def: StatDefinition): number {
   if (!config.progression || !def.capKey) return def.range[1];
   const caps = getCurrentLevelCap({ ...config.progression, currentTierIndex: Math.max(0, Math.trunc(Number(state.玩家?.当前段位索引) || 0)) } as never);
   const cap = Number(caps?.[def.capKey]);
   return Number.isFinite(cap) && cap > 0 ? cap : def.range[1];
+}
+
+/**
+ * 当前上限。生命、体力这类槽位属性的装备加成提高上限（不直接加当前值）；
+ * 六维与特色属性的上限只随成长变化，装备加成算进有效值、可以越过这个上限。
+ */
+export function statCap(config: StatsConfig, state: GameState, def: StatDefinition): number {
+  const cap = baseStatCap(config, state, def);
+  return def.kind === 'vital' ? Math.max(1, cap + equipmentBonus(config, state, def)) : cap;
 }
 
 export function statBounds(config: StatsConfig, state: GameState, def: StatDefinition): FactBounds {
@@ -99,13 +121,18 @@ function legacyModifiers(state: GameState, id: string): { flat: number; percent:
   return { flat, percent };
 }
 
-/** 有效值：基础值 + 加成，钳制在范围内。modifiers 为空时只计存档里的修正器。 */
+/**
+ * 有效值：基础值 + 修正器，钳制在范围内，再加上装备加成（六维、特色属性的装备加成可以越过成长上限）。
+ * modifiers 为空时只计存档里的修正器。
+ */
 export function effectiveStat(config: StatsConfig, state: GameState, def: StatDefinition, modifiers?: ModifierQuery): number {
   const legacy = legacyModifiers(state, def.id);
   const base = (baseStat(state, def) + legacy.flat) * (1 + legacy.percent / 100);
   const boosted = modifiers ? modifiers.apply(`stat.${def.id}`, base) : base + storedFlat(state, `stat.${def.id}`);
   const bounds = statBounds(config, state, def);
-  return Math.round(Math.min(bounds.max ?? Infinity, Math.max(bounds.min ?? -Infinity, boosted)) * 100) / 100;
+  const capped = Math.min(bounds.max ?? Infinity, Math.max(bounds.min ?? -Infinity, boosted));
+  const gear = def.kind === 'vital' ? 0 : equipmentBonus(config, state, def);
+  return Math.round(Math.max(bounds.min ?? -Infinity, capped + gear) * 100) / 100;
 }
 
 function storedFlat(state: GameState, target: string): number {
@@ -229,7 +256,8 @@ export const statsModule: GameplayModule<StatsConfig> = {
   summarize: (state, context, audience) => {
     const defs = statDefinitions(context.config.stat);
     if (audience === 'extraction') {
-      return `属性变量 player.stats.<id>：${defs.map(def => `${def.id}=${def.name}（${def.range[0]}~${statCap(context.config, state, def)}）`).join('，')}。受伤、消耗、恢复用 add 增减，超出范围会被钳制。`;
+      const geared = isEquipmentEnabled(context.config.stat) ? '这里写的是基础值，装备加成由本地另算，不要把装备加成写进属性。' : '';
+      return `属性变量 player.stats.<id>：${defs.map(def => `${def.id}=${def.name}（${def.range[0]}~${statCap(context.config, state, def)}）`).join('，')}。受伤、消耗、恢复用 add 增减，超出范围会被钳制。${geared}`;
     }
     if (audience !== 'main') return undefined;
     const parts = defs.map(def => {

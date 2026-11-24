@@ -9,11 +9,28 @@ interface SixDimCardProps {
   data: StatModuleSchema;
   /** 自定义标题（世界创建时设置的模块名称） */
   title?: string;
+  /** 穿戴中的装备带来的加成（属性 id → 数值），显示为有效值 + 加成标记。 */
+  bonuses?: Record<string, number>;
 }
 
 const DIM_KEYS = ['dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'] as const;
 
-export default memo(function SixDimCard({ data, title }: SixDimCardProps) {
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** 有装备加成时显示有效值，并在旁边标出加成。 */
+function GearValue({ base, bonus, accent }: { base: number; bonus?: number; accent?: boolean }) {
+  if (!bonus) return <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: accent ? 'var(--accent)' : 'var(--text-primary)' }}>{base}</span>;
+  return (
+    <span title={`基础 ${base}，装备 ${bonus > 0 ? '+' : ''}${bonus}`} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: accent ? 'var(--accent)' : 'var(--text-primary)' }}>{round(base + bonus)}</span>
+      <small style={{ fontSize: 9.5, fontWeight: 700, color: bonus > 0 ? 'var(--success)' : 'var(--danger)' }}>{bonus > 0 ? '▲' : '▼'}{Math.abs(bonus)}</small>
+    </span>
+  );
+}
+
+export default memo(function SixDimCard({ data, title, bonuses = {} }: SixDimCardProps) {
   const dims = DIM_KEYS.flatMap(key => data[key] ? [{ key, data: data[key]! }] : []);
   const hasDims = dims.length > 0;
   const specials = Array.isArray(data.special) ? data.special : [];
@@ -30,7 +47,7 @@ export default memo(function SixDimCard({ data, title }: SixDimCardProps) {
             return (
               <div key={key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 4, alignItems: 'center' }} title={dim.description || getSixDimSemantic(key, dim).label}>
                 <span style={{ minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{dim.name}<small style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 9, opacity: .72 }}>{getSixDimSemantic(key, dim).label}</small></span>
-                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--text-primary)' }}>{safeValue}</span>
+                <GearValue base={safeValue} bonus={bonuses[key]} />
               </div>
             );
           })}
@@ -53,7 +70,7 @@ export default memo(function SixDimCard({ data, title }: SixDimCardProps) {
                 title={sp.description}
               >
                 <span style={{ color: 'var(--text-muted)' }}>{sp.name}</span>
-                <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{safeValue}</span>
+                <GearValue base={safeValue} bonus={bonuses[sp.id]} accent />
                 <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>/ {safeMax}</span>
               </div>
             );

@@ -240,6 +240,7 @@ export function useStartScreen() {
     worldEditorOpen: wizard.worldEditorOpen, setWorldEditorOpen: wizard.setWorldEditorOpen,
     editingWorld: wizard.editingWorld, setEditingWorld: wizard.setEditingWorld,
     worldEditorInitialStep: wizard.worldEditorInitialStep, setWorldEditorInitialStep: wizard.setWorldEditorInitialStep,
+    worldEditorWorkspace: wizard.worldEditorWorkspace, setWorldEditorWorkspace: wizard.setWorldEditorWorkspace,
     handleSaveWorld: wizard.handleSaveWorld,
     handleDeleteWorld,
     handleCancelWorldEditor: wizard.handleCancelWorldEditor,

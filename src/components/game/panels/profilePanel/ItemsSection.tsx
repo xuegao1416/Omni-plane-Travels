@@ -1,131 +1,37 @@
-import { useState } from 'react';
-import { Backpack,Trash2 } from 'lucide-react';
+import { Backpack } from 'lucide-react';
 import { Collapsible } from '../../../shared/Collapsible';
-import { getQualityColor } from '../../../shared/qualityUtils';
-import { DetailModal,DetailRow } from './shared';
-import { getItemIcon } from '../../../shared/itemIcons';
-import type { InventoryItem,ItemSelection } from './types';
-import type { VariableManager } from '../../../../engine/variableManager';
-import { eventBus,EVENTS } from '../../../../engine/eventBus';
-import { useSaveStore } from '../../../../stores/saveStore';
+import type { InventoryLayout } from '../../../../domains/inventory/capacity';
+import { itemSlotKind } from '../../../../domains/equipment/slots';
+import { InventoryPack } from '../../inventory/InventoryPack';
+import type { useGearActions } from './useGearActions';
 
-interface Props {
-  items: Record<string, InventoryItem>;
-  variableManager?: VariableManager;
-}
+type Gear = ReturnType<typeof useGearActions>;
 
-export function ItemsSection({ items, variableManager }: Props) {
-  const [selectedItem, setSelectedItem] = useState<ItemSelection | null>(null);
-  const scheduleAutoSave = useSaveStore(s => s.scheduleAutoSave);
-
+/**
+ * 人物档案 · 行囊：格子数就是容量（随身格 + 背包扩充），不再铺满 48 格。
+ * 点物品看详情、装备或丢弃；装备体系启用时，可穿戴的物品能直接拖到上方的纸娃娃上。
+ */
+export function ItemsSection({ layout, gear, equipmentEnabled }: { layout: InventoryLayout; gear: Gear; equipmentEnabled: boolean }) {
+  const { sheet, open, drag, setDrag, feedback, run, canAct } = gear;
   return (
-    <>
-      <Collapsible icon={<Backpack size={15} />} title="物品栏">
-        <div className="inventory-grid grid-fixed-6">
-          {/* 生成 48 格 (6×8) */}
-          {Array.from({ length: 48 }).map((_, i) => {
-            const entry = Object.entries(items)[i];
-            if (entry) {
-              const [name, item] = entry;
-              if (item == null) return null;
-              const qColor = getQualityColor(item?.品质 ?? '普通');
-              const IconComp = getItemIcon(item);
-              return (
-                <div
-                  key={name}
-                  onClick={() => setSelectedItem({ name, data: item })}
-                  style={{
-                    aspectRatio: '1',
-                    padding: '6px 4px',
-                    border: `1px solid ${qColor}40`,
-                    background: `linear-gradient(135deg, ${qColor}08, ${qColor}03)`,
-                    cursor: 'pointer',
-                    transition: 'all 0.12s',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    minWidth: 0,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = qColor; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = `${qColor}40`; }}
-                >
-                  {item.数量 > 1 && (
-                    <span style={{
-                      position: 'absolute', top: '2px', right: '3px',
-                      fontSize: '9px', fontWeight: '700', color: qColor,
-                      lineHeight: 1,
-                    }}>×{item.数量}</span>
-                  )}
-                  <IconComp size={16} color={qColor} />
-                  <div style={{
-                    fontSize: '9px', fontWeight: '500', marginTop: '2px',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', textAlign: 'center',
-                  }}>{name}</div>
-                </div>
-              );
-            }
-            // 空格子
-            return (
-              <div
-                key={`empty-${i}`}
-                style={{
-                  aspectRatio: '1',
-                  border: '1px dashed var(--border)',
-                  background: 'var(--bg-primary)',
-                }}
-              />
-            );
-          })}
-        </div>
-      </Collapsible>
-
-      {/* 物品详情弹窗 */}
-      {selectedItem && (
-        <DetailModal title={selectedItem.name} quality={selectedItem.data?.品质 ?? '普通'} onClose={() => setSelectedItem(null)}>
-          <DetailRow label="数量" value={selectedItem.data?.数量 ?? 1} />
-          {selectedItem.data?.类型 && <DetailRow label="类型" value={selectedItem.data.类型} />}
-          {selectedItem.data?.备注 && <DetailRow label="备注" value={selectedItem.data.备注} />}
-          {variableManager && (
-            <div style={{ marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-              <button
-                onClick={() => {
-                  const removed = variableManager.removeInventoryItem(selectedItem.name);
-                  if (removed) {
-                    // 实时刷新：GameScreen 监听该事件 bumpVersion，物品格立即消失
-                    eventBus.emit(EVENTS.VARIABLE_UPDATE_ENDED);
-                    scheduleAutoSave();
-                    setSelectedItem(null);
-                  }
-                }}
-                style={{
-                  width: '100%', padding: '8px 12px',
-                  background: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#e53e3e';
-                  (e.currentTarget as HTMLButtonElement).style.color = '#e53e3e';
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
-                }}
-              >
-                <Trash2 size={13} />
-                丢弃物品
-              </button>
-            </div>
-          )}
-        </DetailModal>
-      )}
-    </>
+    <Collapsible icon={<Backpack size={15} />} title="行囊" count={layout.used}>
+      <div className="eq-section">
+        {feedback?.at === 'pack' && <div className="eq-feedback" data-tone={feedback.tone} role="status"><span>{feedback.text}</span></div>}
+        <InventoryPack
+          layout={layout}
+          title="容量"
+          selectedKey={sheet?.kind === 'item' || sheet?.kind === 'bag' ? sheet.key : null}
+          onSelect={cell => open({ kind: 'item', key: cell.key })}
+          onSelectBag={bag => open({ kind: 'bag', key: bag.key })}
+          equipKind={equipmentEnabled ? cell => itemSlotKind(cell.key, cell.item) : undefined}
+          draggable={equipmentEnabled && canAct}
+          draggingKey={drag?.kind === 'item' ? drag.key : null}
+          onDragItem={(cell, kind) => setDrag(cell && kind ? { kind: 'item', key: cell.key, slotKind: kind } : null)}
+          slotDragActive={drag?.kind === 'slot'}
+          onDropSlot={slot => { setDrag(null); run('equipment.unequip', { slot }, '卸下装备', 'pack', false); }}
+          emptyNote="行囊空空如也。"
+        />
+      </div>
+    </Collapsible>
   );
 }

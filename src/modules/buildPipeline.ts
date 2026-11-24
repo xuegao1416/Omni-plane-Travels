@@ -35,6 +35,10 @@ import { countErrors, generateWithRepair } from '../api/generateWithRepair';
 import { GENERATED_MODULE_LABELS, buildModuleRepairPrompt, validateGeneratedModule, type ModuleIssue } from './moduleValidation';
 import { buildSpecialConfig } from './normalizeModule';
 import { normalizeProgressionConfig } from './xpAlgorithm';
+import { buildMapGenerationPrompt, buildMapRepairPrompt, finalizeGeneratedMap, parseMapJson, sketchMapFromLocations, validateGeneratedMap, type MapGenerationInput } from '../domains/map/generation';
+import { normalizeEconomyConfig } from '../domains/economy/config';
+import { normalizeResourcesConfig } from '../domains/resources/config';
+import { LOCATION_KIND_LABELS } from '../domains/map/types';
 export { normalizeProgressionConfig } from './xpAlgorithm';
 
 export interface PipelineConfig {
@@ -256,6 +260,28 @@ export async function executeBuildPipeline(
           skill: Math.max(0, Number(ctx.talentData.pointRules.skillPointsPerTier) || 0),
         };
       }
+    }
+  }
+
+  // 2f. 世界地图：把世界书里的地点放上地图，补齐地区、坐标与路网；能挂接的市场、物资、属性一并告诉 AI。
+  if (hasModule('map')) {
+    await waitForRateLimit();
+    onProgress?.('阶段2', '绘制世界地图...');
+    const input: MapGenerationInput = { ...(ctx.mapSeed ?? { locations: [] }), description: ctx.description, links: mapLinksOf(ctx) };
+    try {
+      const result = await generateWithRepair({
+        messages: [{ role: 'user', content: buildMapGenerationPrompt(input) }],
+        request: messages => callAI(messages),
+        parse: text => parseMapJson(text),
+        validate: value => validateGeneratedMap(value, input.locations.map(item => item.name)),
+        repairPrompt: issues => buildMapRepairPrompt(issues),
+        onRepair: ({ reason, detail }) => onProgress?.('阶段2', `世界地图${reason === 'format' ? '格式有误' : `校验发现 ${detail}`}，正在请 AI 修正...`),
+      });
+      ctx.mapData = finalizeGeneratedMap(result.value, input);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      console.warn('[BuildPipeline] 世界地图生成失败，按地点排一张草图:', err instanceof Error ? err.message : String(err));
+      ctx.mapData = sketchMapFromLocations(input);
     }
   }
 
@@ -509,6 +535,9 @@ function synthesizeResult(ctx: BuildContext): Record<string, unknown> {
   if (ctx.combatData) {
     result.战斗系统 = { config: ctx.combatData };
   }
+  if (ctx.mapData) {
+    result.世界地图 = { config: ctx.mapData };
+  }
 
   // 世界书条目
   if (ctx.worldBookEntries && ctx.worldBookEntries.length > 0) {
@@ -525,6 +554,28 @@ function synthesizeResult(ctx: BuildContext): Record<string, unknown> {
  * 蓝灯：底层架构，常驻注入
  * 绿灯：详细规则，关键词触发（使用该世界自定义的名称）
  */
+const MAP_RULES = '本世界启用了世界地图：地点、路线、当前位置与赶路由本地维护。主角去了地图上的另一个地点时，正文写清楚到了哪里，用地图上的地名；玩家在地图上点「前往」后，路上的时间、体力与补给已经按路况结算，正文承接【玩法结算】里的结果即可，不要另算时长或改数值。出现地图上没有的新地点时，交代它在哪个已知地点附近、什么方向。';
+
+/** 地图生成时可以挂接的其他模块条目（只列已经生成出来的模块）。 */
+function mapLinksOf(ctx: BuildContext): MapGenerationInput['links'] {
+  const links: NonNullable<MapGenerationInput['links']> = {};
+  if (ctx.businessData) {
+    const economy = normalizeEconomyConfig(ctx.businessData);
+    if (economy.markets.length) links.markets = economy.markets.map(market => ({ id: market.id, name: market.name }));
+    if (economy.holdings.length) links.holdings = economy.holdings.map(holding => ({ id: holding.id, name: holding.name }));
+  }
+  if (ctx.survivalData) {
+    const resources = normalizeResourcesConfig(ctx.survivalData).resources;
+    if (resources.length) links.resources = resources.map(resource => ({ id: resource.id, name: resource.name }));
+  }
+  if (ctx.statData) {
+    const stats = (['dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'] as const).flatMap(dim => ctx.statData?.[dim]?.name ? [{ id: dim, name: ctx.statData[dim]!.name }] : []);
+    if (stats.length) links.stats = stats;
+  }
+  if (ctx.progressionData?.mode !== 'level' && ctx.progressionData?.tiers?.length) links.tiers = ctx.progressionData.tiers.map(tier => tier.name);
+  return links;
+}
+
 export function generateWorldBookEntries(ctx: BuildContext): WorldBookEntryDef[] {
   const entries: WorldBookEntryDef[] = [];
 
@@ -783,6 +834,22 @@ ${assetLines}${marketLines}
       constant: false,
       key: combatKeywords,
       order: 59,
+      position: 'after_char',
+    });
+  }
+
+  // ─── 世界地图（绿灯：地名触发）───
+  if (ctx.mapData?.locations.length) {
+    const map = ctx.mapData;
+    const regionName = new Map(map.regions.map(region => [region.id, region.name] as const));
+    const places = map.locations.slice(0, 40).map(location => `${location.name}（${LOCATION_KIND_LABELS[location.kind]}${location.regionId && regionName.get(location.regionId) ? `·${regionName.get(location.regionId)}` : ''}）`).join('、');
+    entries.push({
+      uid: -5012,
+      comment: '[模块] 世界地图 - 规则',
+      content: `${MAP_RULES}\n\n─── 地图上的地点 ───\n${places}`,
+      constant: false,
+      key: [...map.locations.slice(0, 40).map(location => location.name), '地图', '赶路', '前往', '出发'],
+      order: 56,
       position: 'after_char',
     });
   }

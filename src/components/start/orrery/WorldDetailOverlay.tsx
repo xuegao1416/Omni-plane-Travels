@@ -1,6 +1,6 @@
 import { useEffect,useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowLeft,ArrowRight,ExternalLink,Pencil,Trash2 } from 'lucide-react';
+import { ArrowLeft,ArrowRight,ExternalLink,MapPinned,Pencil,Trash2 } from 'lucide-react';
 import type { WorldDef } from '../../../data/worldLoader';
 import OverlayPortal from '../../shared/OverlayPortal';
 import { resolveWorldIcon } from '../../shared/worldIcons';
@@ -16,15 +16,18 @@ interface WorldDetailOverlayProps {
   onClose: () => void;
   onStart: () => void;
   onEdit: () => void;
+  /** 直接打开这个世界的地图编辑器（没有地图时是「添加地图」）。 */
+  onEditMap?: () => void;
   onDelete: () => void;
 }
 
 /** Diving into a plane: the lens expands into a full-bleed view of the world. */
-export default function WorldDetailOverlay({ world, code, origin, isCustom, onClose, onStart, onEdit, onDelete }: WorldDetailOverlayProps) {
+export default function WorldDetailOverlay({ world, code, origin, isCustom, onClose, onStart, onEdit, onEditMap, onDelete }: WorldDetailOverlayProps) {
   const lex = useEntryLexicon();
   const [phase, setPhase] = useState<'opening' | 'open' | 'closing'>('opening');
   const visual = getWorldVisual(world);
   const Icon = resolveWorldIcon(world.icon);
+  const hasMap = Boolean(world.modules?.some(module => module.moduleId === 'map' && module.enabled && Array.isArray((module.moduleConfig as { locations?: unknown[] } | undefined)?.locations) && ((module.moduleConfig as { locations: unknown[] }).locations.length > 0)));
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => setPhase('open')));
@@ -75,6 +78,7 @@ export default function WorldDetailOverlay({ world, code, origin, isCustom, onCl
                 降临此界<ArrowRight size={18} aria-hidden="true" />
               </button>
               {isCustom && <button type="button" className="pl-button" onClick={onEdit}><Pencil size={15} aria-hidden="true" />编辑世界</button>}
+              {isCustom && onEditMap && <button type="button" className="pl-button" onClick={onEditMap}><MapPinned size={15} aria-hidden="true" />{hasMap ? '编辑地图' : '添加地图'}</button>}
               {isCustom && <button type="button" className="pl-button pl-button--danger entry-detail-delete-world" onClick={onDelete}><Trash2 size={15} aria-hidden="true" />删除世界定义</button>}
             </div>
           </section>

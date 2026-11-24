@@ -69,6 +69,10 @@ export function StatModuleEditor({ data, onChange }: { data: StatModuleSchema; o
       {specials.length < 4 && (
         <button className="btn-ghost" onClick={addSpecial} style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px' }}>+ 添加特色属性</button>
       )}
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 6, fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+        <input type="checkbox" checked={data.equipment?.enabled !== false} onChange={e => set('equipment.enabled', e.target.checked)} style={{ marginTop: 2 }} />
+        <span>装备体系：武器、头部、手部、胸部、腿部、脚部与两件饰品，穿戴加成计入属性（生命/能量的加成提高上限）</span>
+      </label>
       <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: 4 }}>派生属性</div>
       {(data.derived || []).map((item, i) => <div key={item.id} style={{ border: '1px solid var(--border)', borderRadius: 5, padding: 5, display: 'grid', gridTemplateColumns: '90px 1fr 82px 1fr auto', gap: 4, alignItems: 'center' }}>
         <input style={inputStyle} value={item.id} placeholder="ID" onChange={e => set(`derived.${i}.id`, e.target.value)} />

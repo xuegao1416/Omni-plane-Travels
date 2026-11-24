@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react';
 import {
-BarChart3,TrendingUp,Leaf,Briefcase,Dice6,Star,Swords,
+BarChart3,TrendingUp,Leaf,Briefcase,Dice6,Star,Swords,Map as MapIcon,
 type LucideIcon,
 } from 'lucide-react';
 
@@ -66,6 +66,12 @@ export const MODULE_OPTIONS: ModuleOption[] = [
     name: '战斗规则',
     description: '选择稳定的内置规则模板；战斗行动会读取已解锁职业能力',
     icon: Swords,
+  },
+  {
+    id: 'map',
+    name: '世界地图',
+    description: '2D / 3D 舆图与当前位置；赶路联动属性、成长、物资、经营、检定与职业',
+    icon: MapIcon,
   },
 ];
 

@@ -1,5 +1,3 @@
-import type { LucideIcon } from 'lucide-react';
-
 export function TagList({ items, accent }: { items: string[]; accent?: boolean }) {
   if (!items || items.length === 0) return <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>无</span>;
   return (
@@ -11,36 +9,6 @@ export function TagList({ items, accent }: { items: string[]; accent?: boolean }
           color: accent ? 'var(--accent)' : 'var(--text-secondary)',
         }}>{t}</span>
       ))}
-    </div>
-  );
-}
-
-export function RecordGrid({ data, label }: { data: Record<string, unknown> | undefined; label?: string }) {
-  if (!data || Object.keys(data).length === 0) return null;
-  return (
-    <div>
-      {label && <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '4px' }}>{label}</div>}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {Object.entries(data).map(([k, v]) => (
-          <span key={k} style={{
-            padding: '3px 10px', borderRadius: '6px', fontSize: 'var(--font-size-sm)',
-            background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
-          }}>
-            {k}: <strong style={{ color: 'var(--text-primary)' }}>{String(v)}</strong>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function Section({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontWeight: '600', fontSize: 'var(--font-size-base)' }}>
-        <Icon size={15} strokeWidth={1.5} style={{ color: 'var(--text-muted)' }} />{title}
-      </div>
-      {children}
     </div>
   );
 }

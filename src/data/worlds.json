@@ -40,6 +40,361 @@
             "allowCreateResources": false
           }
         }
+      },
+      {
+        "moduleId": "map",
+        "name": "世界地图",
+        "description": "樱丘高校的校园地图：教学楼、社团楼、旧校舍，校门外的樱坂通，以及河川敷、神社与海边。",
+        "enabled": true,
+        "moduleConfig": {
+          "version": 1,
+          "title": "樱丘校园图",
+          "theme": "modern",
+          "landform": "inland",
+          "scale": "city",
+          "seed": 20240408,
+          "width": 1000,
+          "height": 700,
+          "fog": true,
+          "startLocationId": "gate",
+          "regions": [
+            {
+              "id": "campus",
+              "name": "樱丘校园",
+              "terrain": "urban",
+              "x": 420,
+              "y": 360,
+              "radius": 200,
+              "danger": 0,
+              "color": "#3a7bd5",
+              "description": "被围墙圈起来的一片校区，教学楼、社团楼与操场挤在一起。"
+            },
+            {
+              "id": "sakurazaka",
+              "name": "樱坂通",
+              "terrain": "urban",
+              "x": 690,
+              "y": 470,
+              "radius": 175,
+              "danger": 0,
+              "color": "#d9822b",
+              "description": "校门外的三百米商业街，放学时最热闹。"
+            },
+            {
+              "id": "riverside",
+              "name": "河川敷",
+              "terrain": "plains",
+              "x": 430,
+              "y": 585,
+              "radius": 180,
+              "danger": 0,
+              "color": "#2f9e6f",
+              "description": "沿河的堤坝与草地，樱花季节整条河岸都是粉的。"
+            },
+            {
+              "id": "shrinehill",
+              "name": "神社之丘",
+              "terrain": "hills",
+              "x": 245,
+              "y": 175,
+              "radius": 160,
+              "danger": 0,
+              "color": "#8e5bd8",
+              "description": "小镇北侧的小山丘，顶上是一座安静的神社。"
+            },
+            {
+              "id": "bay",
+              "name": "幼海湾",
+              "terrain": "sea",
+              "x": 800,
+              "y": 630,
+              "radius": 205,
+              "danger": 1,
+              "color": "#2aa3b8",
+              "description": "夏季开放的海水浴场，傍晚能看见远处的灯塔。"
+            },
+            {
+              "id": "backyard",
+              "name": "旧校舍后庭",
+              "terrain": "forest",
+              "x": 205,
+              "y": 430,
+              "radius": 145,
+              "danger": 1,
+              "color": "#7a8a3a",
+              "description": "常年没人打理的后院，草长到小腿，旧校舍就立在这里。"
+            }
+          ],
+          "locations": [
+            {
+              "id": "gate",
+              "name": "校门",
+              "kind": "landmark",
+              "regionId": "campus",
+              "x": 432,
+              "y": 432,
+              "known": true,
+              "description": "一道铁门，早上七点半开，傍晚六点关。门前是一条长长的坡道，两旁种满樱花。"
+            },
+            {
+              "id": "main",
+              "name": "樱丘高校主教学楼",
+              "kind": "academy",
+              "regionId": "campus",
+              "x": 396,
+              "y": 344,
+              "known": true,
+              "services": [
+                "train"
+              ],
+              "description": "四层 L 形教学楼，外墙爬满常春藤。一楼东侧是图书馆，走廊尽头是保健室；二楼走廊东侧是学生会室；四楼是音乐室、美术室与电脑室，四楼与天台之间还有一处半层平台，被学生叫作「告白角」。"
+            },
+            {
+              "id": "club",
+              "name": "社团活动楼",
+              "kind": "academy",
+              "regionId": "campus",
+              "x": 330,
+              "y": 400,
+              "services": [
+                "train"
+              ],
+              "description": "三层旧建筑，二层三层是文化系社团的活动室。二楼尽头那间废弃的「神秘研究部」门上还贴着褪色的封条，戏剧部也在这栋楼里。"
+            },
+            {
+              "id": "old",
+              "name": "旧校舍",
+              "kind": "ruin",
+              "regionId": "backyard",
+              "x": 238,
+              "y": 442,
+              "danger": 1,
+              "description": "校园西北角的两层木造建筑，早已停用，窗户玻璃碎了一半，是不良少年聚集的地方。"
+            },
+            {
+              "id": "field",
+              "name": "操场",
+              "kind": "landmark",
+              "regionId": "campus",
+              "x": 492,
+              "y": 300,
+              "description": "红色塑胶跑道围着一片草地，跑道边有一棵大樱花树。棒球部、足球部都在这里练习。"
+            },
+            {
+              "id": "pool",
+              "name": "游泳池",
+              "kind": "landmark",
+              "regionId": "campus",
+              "x": 562,
+              "y": 286,
+              "description": "操场东侧的二十五米露天泳池，只有夏天开放，池边的水泥地被晒得发白。"
+            },
+            {
+              "id": "sakura",
+              "name": "樱坂商店街",
+              "kind": "market",
+              "regionId": "sakurazaka",
+              "x": 645,
+              "y": 466,
+              "services": [
+                "trade",
+                "supply"
+              ],
+              "description": "校门外约三百米的商业街，便利店、文具店、可丽饼店、二手书店和卡拉OK挤成一排。每月第二个周日有樱坂集市。",
+              "aliases": [
+                "樱坂通"
+              ]
+            },
+            {
+              "id": "konbini",
+              "name": "便利店",
+              "kind": "market",
+              "regionId": "sakurazaka",
+              "x": 682,
+              "y": 430,
+              "services": [
+                "supply"
+              ],
+              "description": "二十四小时亮着灯的便利店，关东煮的香气从门口一直飘到街对面。"
+            },
+            {
+              "id": "crepe",
+              "name": "可丽饼店 Sugar Bloom",
+              "kind": "town",
+              "regionId": "sakurazaka",
+              "x": 706,
+              "y": 470,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 6,
+              "description": "只有三个座位的可丽饼小店，橱窗里摆着当季限定的样品，放学后总要排一会儿队。"
+            },
+            {
+              "id": "bookoff",
+              "name": "Book Off 二手书店",
+              "kind": "town",
+              "regionId": "sakurazaka",
+              "x": 726,
+              "y": 510,
+              "services": [
+                "trade"
+              ],
+              "description": "一百日元一本的旧书堆到天花板，靠窗的角落永远坐着同一个看漫画的人。"
+            },
+            {
+              "id": "karaoke",
+              "name": "Melody 卡拉OK",
+              "kind": "town",
+              "regionId": "sakurazaka",
+              "x": 750,
+              "y": 548,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 12,
+              "description": "招牌是按小时计费的霓虹灯，包厢里总是有点闷，隔音并不好。"
+            },
+            {
+              "id": "river",
+              "name": "河川敷",
+              "kind": "landmark",
+              "regionId": "riverside",
+              "x": 430,
+              "y": 585,
+              "description": "沿河的堤坝，两旁种满樱花树，尽头有一座小桥。放学后常有人坐在这里发呆，看水面被夕阳染红。"
+            },
+            {
+              "id": "shrine",
+              "name": "神社",
+              "kind": "temple",
+              "regionId": "shrinehill",
+              "x": 245,
+              "y": 175,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 0,
+              "description": "小山丘上的神社，境内有一棵大银杏。绘马架上挂着各种愿望，赛钱箱旁边放着签筒。"
+            },
+            {
+              "id": "beach",
+              "name": "海边",
+              "kind": "port",
+              "regionId": "bay",
+              "x": 790,
+              "y": 645,
+              "description": "金色沙滩，夏天是海水浴场，夜里偶尔放烟花。沙滩尽头有一家开了很久的小旅馆。"
+            },
+            {
+              "id": "inn",
+              "name": "海边小旅馆",
+              "kind": "home",
+              "regionId": "bay",
+              "x": 846,
+              "y": 612,
+              "services": [
+                "rest",
+                "supply"
+              ],
+              "restPrice": 30,
+              "description": "木造的两层小旅馆，门口挂着褪色的暖帘，老板娘总在柜台后面看电视。"
+            }
+          ],
+          "routes": [
+            {
+              "from": "gate",
+              "to": "main",
+              "kind": "road",
+              "name": "正门坡道"
+            },
+            {
+              "from": "gate",
+              "to": "sakura",
+              "kind": "road",
+              "name": "校前通"
+            },
+            {
+              "from": "main",
+              "to": "club",
+              "kind": "trail",
+              "name": "连廊"
+            },
+            {
+              "from": "main",
+              "to": "old",
+              "kind": "trail",
+              "name": "后庭小径"
+            },
+            {
+              "from": "main",
+              "to": "field",
+              "kind": "trail",
+              "name": "操场侧门"
+            },
+            {
+              "from": "field",
+              "to": "pool",
+              "kind": "trail"
+            },
+            {
+              "from": "main",
+              "to": "river",
+              "kind": "trail",
+              "name": "后门小路"
+            },
+            {
+              "from": "club",
+              "to": "old",
+              "kind": "trail"
+            },
+            {
+              "from": "sakura",
+              "to": "konbini",
+              "kind": "road"
+            },
+            {
+              "from": "konbini",
+              "to": "crepe",
+              "kind": "road"
+            },
+            {
+              "from": "crepe",
+              "to": "bookoff",
+              "kind": "road"
+            },
+            {
+              "from": "bookoff",
+              "to": "karaoke",
+              "kind": "road"
+            },
+            {
+              "from": "sakura",
+              "to": "river",
+              "kind": "trail",
+              "name": "河堤斜坡"
+            },
+            {
+              "from": "river",
+              "to": "shrine",
+              "kind": "mountain",
+              "name": "神社参道",
+              "danger": 1
+            },
+            {
+              "from": "sakura",
+              "to": "beach",
+              "kind": "highway",
+              "name": "沿海公路"
+            },
+            {
+              "from": "beach",
+              "to": "inn",
+              "kind": "trail",
+              "name": "沙滩小径"
+            }
+          ]
+        }
       }
     ],
     "eventPacks": [
@@ -1936,6 +2291,377 @@
             "allowCreateResources": false
           }
         }
+      },
+      {
+        "moduleId": "map",
+        "name": "世界地图",
+        "description": "焰城的城区地图：出租屋所在的旧城住区、写字楼与商圈组成的中央商务区、夜市与滨江，地铁三站串起整座城。",
+        "enabled": true,
+        "moduleConfig": {
+          "version": 1,
+          "title": "焰城测绘图",
+          "theme": "modern",
+          "landform": "coast",
+          "scale": "city",
+          "seed": 20240416,
+          "width": 1000,
+          "height": 700,
+          "fog": false,
+          "startLocationId": "home",
+          "regions": [
+            {
+              "id": "oldtown",
+              "name": "老城住区",
+              "terrain": "urban",
+              "x": 300,
+              "y": 430,
+              "radius": 210,
+              "danger": 0,
+              "color": "#3a7bd5",
+              "description": "楼龄二十年往上的住宅区，楼道声控灯常年坏着，楼下永远有人在遛狗。"
+            },
+            {
+              "id": "cbd",
+              "name": "中央商务区",
+              "terrain": "urban",
+              "x": 650,
+              "y": 320,
+              "radius": 215,
+              "danger": 0,
+              "color": "#8e5bd8",
+              "description": "玻璃幕墙扎堆的地方，午休时整条街都是西装和外卖箱。"
+            },
+            {
+              "id": "nightquarter",
+              "name": "夜市街区",
+              "terrain": "plains",
+              "x": 520,
+              "y": 570,
+              "radius": 190,
+              "danger": 0,
+              "color": "#d9822b",
+              "description": "入夜才活过来的地方，油烟与霓虹一起飘到凌晨两点。"
+            },
+            {
+              "id": "northgreen",
+              "name": "城北绿地",
+              "terrain": "forest",
+              "x": 215,
+              "y": 290,
+              "radius": 170,
+              "danger": 0,
+              "color": "#2f9e6f",
+              "description": "城区里少见的成片树荫，周末早上全是跑步的人。"
+            },
+            {
+              "id": "river",
+              "name": "焰江",
+              "terrain": "sea",
+              "x": 855,
+              "y": 520,
+              "radius": 240,
+              "danger": 1,
+              "color": "#2aa3b8",
+              "description": "穿城而过的江，两岸是灯火通明的堤岸。"
+            }
+          ],
+          "locations": [
+            {
+              "id": "home",
+              "name": "出租屋",
+              "kind": "home",
+              "regionId": "oldtown",
+              "x": 300,
+              "y": 430,
+              "services": [
+                "rest"
+              ],
+              "description": "一室一厅，或者合租的单间。窗帘遮光性一般，冰箱里通常只有两罐啤酒。"
+            },
+            {
+              "id": "konbini",
+              "name": "楼下便利店",
+              "kind": "market",
+              "regionId": "oldtown",
+              "x": 348,
+              "y": 464,
+              "services": [
+                "supply",
+                "trade"
+              ],
+              "description": "深夜补给站。泡面、冰可乐、关东煮，老板记得你常买的那个牌子的烟。"
+            },
+            {
+              "id": "foodmarket",
+              "name": "菜市场",
+              "kind": "market",
+              "regionId": "oldtown",
+              "x": 470,
+              "y": 470,
+              "services": [
+                "trade",
+                "supply"
+              ],
+              "description": "早上六点到晚上八点，卖菜的大姐会给你抹零，熟客能赊账一周。"
+            },
+            {
+              "id": "metro",
+              "name": "地铁站",
+              "kind": "station",
+              "regionId": "oldtown",
+              "x": 430,
+              "y": 372,
+              "services": [
+                "supply"
+              ],
+              "description": "早高峰七点半到九点是沙丁鱼罐头，站台上永远有人在奔跑。三站之内能到全城主要的地方。",
+              "effects": [
+                {
+                  "target": "map.travel.time",
+                  "mode": "mult",
+                  "value": 0.85,
+                  "label": "地铁换乘"
+                }
+              ]
+            },
+            {
+              "id": "office",
+              "name": "写字楼",
+              "kind": "city",
+              "regionId": "cbd",
+              "x": 640,
+              "y": 300,
+              "description": "你的第二战场。开放式办公区、茶水间的消息集散地、以及等电梯时那种说不出的尴尬。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "overtime",
+                    "packId": "world:desire_metropolis:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "mall",
+              "name": "商圈",
+              "kind": "market",
+              "regionId": "cbd",
+              "x": 620,
+              "y": 330,
+              "services": [
+                "trade",
+                "rest"
+              ],
+              "restPrice": 40,
+              "description": "地下一层是美食广场，顶楼是电影院。周末人多到要取号才能吃饭。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "colleague_dinner",
+                    "packId": "world:desire_metropolis:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "cafe",
+              "name": "咖啡店",
+              "kind": "town",
+              "regionId": "northgreen",
+              "x": 215,
+              "y": 300,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 25,
+              "description": "独立小店，美式二十五，拿铁三十。WiFi 密码是 zhuangbi123，周末有读书会。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "date",
+                    "packId": "world:desire_metropolis:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "gym",
+              "name": "健身房",
+              "kind": "town",
+              "regionId": "northgreen",
+              "x": 252,
+              "y": 340,
+              "services": [
+                "train"
+              ],
+              "restPrice": 30,
+              "description": "连锁健身房，月卡三百。晚上七点以后跑步机全满，教练会在你练完最后一组时精准出现。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "gym",
+                    "packId": "world:desire_metropolis:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "park",
+              "name": "城市公园",
+              "kind": "landmark",
+              "regionId": "nightquarter",
+              "x": 330,
+              "y": 600,
+              "description": "湿地公园，免费开放。傍晚有人在广场上跳舞，门口奶茶店柠檬水十五一杯。"
+            },
+            {
+              "id": "nightmarket",
+              "name": "夜市",
+              "kind": "market",
+              "regionId": "nightquarter",
+              "x": 545,
+              "y": 565,
+              "services": [
+                "trade",
+                "rest"
+              ],
+              "restPrice": 60,
+              "description": "烧烤、小龙虾、臭豆腐，人均五十到八十。塑料凳子矮得让人不想站起来。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "colleague_dinner",
+                    "packId": "world:desire_metropolis:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "hospital",
+              "name": "医院",
+              "kind": "temple",
+              "regionId": "cbd",
+              "x": 700,
+              "y": 470,
+              "services": [
+                "heal"
+              ],
+              "restPrice": 120,
+              "description": "三甲。挂号要提前一周，问诊三分钟，走廊的座椅永远坐满。"
+            },
+            {
+              "id": "petclinic",
+              "name": "宠物医院",
+              "kind": "temple",
+              "regionId": "cbd",
+              "x": 742,
+              "y": 506,
+              "services": [
+                "heal"
+              ],
+              "restPrice": 80,
+              "description": "猫疫苗一百二，狗驱虫八十。候诊区里笼子叠笼子，此起彼伏地叫。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "pet_sick",
+                    "packId": "world:desire_metropolis:events"
+                  }
+                ]
+              }
+            }
+          ],
+          "routes": [
+            {
+              "from": "home",
+              "to": "konbini",
+              "kind": "trail",
+              "name": "楼道口"
+            },
+            {
+              "from": "home",
+              "to": "foodmarket",
+              "kind": "road",
+              "name": "早市巷"
+            },
+            {
+              "from": "home",
+              "to": "metro",
+              "kind": "trail",
+              "name": "小区后门"
+            },
+            {
+              "from": "metro",
+              "to": "office",
+              "kind": "rail",
+              "name": "地铁一号线",
+              "minutes": 18
+            },
+            {
+              "from": "metro",
+              "to": "cafe",
+              "kind": "trail",
+              "name": "绿地小径"
+            },
+            {
+              "from": "metro",
+              "to": "park",
+              "kind": "road",
+              "name": "二号线站前街",
+              "minutes": 20
+            },
+            {
+              "from": "office",
+              "to": "mall",
+              "kind": "road",
+              "name": "中心大道"
+            },
+            {
+              "from": "mall",
+              "to": "cafe",
+              "kind": "road"
+            },
+            {
+              "from": "mall",
+              "to": "hospital",
+              "kind": "road",
+              "name": "医院路"
+            },
+            {
+              "from": "hospital",
+              "to": "petclinic",
+              "kind": "trail"
+            },
+            {
+              "from": "cafe",
+              "to": "gym",
+              "kind": "trail"
+            },
+            {
+              "from": "foodmarket",
+              "to": "nightmarket",
+              "kind": "trail",
+              "name": "夜市口"
+            },
+            {
+              "from": "park",
+              "to": "foodmarket",
+              "kind": "road"
+            },
+            {
+              "from": "nightmarket",
+              "to": "metro",
+              "kind": "road",
+              "name": "滨江路"
+            },
+            {
+              "from": "mall",
+              "to": "nightmarket",
+              "kind": "road",
+              "name": "过江隧道"
+            }
+          ]
+        }
       }
     ],
     "eventPacks": [
@@ -3789,6 +4515,548 @@
             "setAllowedVars": [],
             "allowCreateResources": false
           }
+        }
+      },
+      {
+        "moduleId": "map",
+        "name": "世界地图",
+        "description": "江湖全图：塞外大漠与沙城、中原的洛阳与少林、江南的金陵与栖霞巷、两湖的洞庭与望江楼，以及六大剑派所在的名山。",
+        "enabled": true,
+        "moduleConfig": {
+          "version": 1,
+          "title": "九霄山河图",
+          "theme": "ancient",
+          "landform": "continent",
+          "scale": "world",
+          "seed": 77031,
+          "width": 1000,
+          "height": 700,
+          "fog": true,
+          "startLocationId": "jinling",
+          "travel": {
+            "minutesPerUnit": 2.4
+          },
+          "regions": [
+            {
+              "id": "mobei",
+              "name": "塞外大漠",
+              "terrain": "desert",
+              "x": 130,
+              "y": 330,
+              "radius": 215,
+              "danger": 4,
+              "color": "#8a6a1f",
+              "description": "中原以西的流沙之地，白日灼人，夜里能冻裂水囊。",
+              "effects": [
+                {
+                  "target": "map.travel.time",
+                  "mode": "mult",
+                  "value": 1.25,
+                  "label": "风沙迷道"
+                }
+              ]
+            },
+            {
+              "id": "beijiang",
+              "name": "北疆群山",
+              "terrain": "mountains",
+              "x": 395,
+              "y": 105,
+              "radius": 205,
+              "danger": 4,
+              "color": "#29507a",
+              "description": "终年积雪的连绵山脊，玄冥谷藏在最深处。"
+            },
+            {
+              "id": "zhongyuan",
+              "name": "中原平野",
+              "terrain": "farmland",
+              "x": 460,
+              "y": 300,
+              "radius": 250,
+              "danger": 1,
+              "color": "#8c2f1c",
+              "description": "九朝古都所在，官道纵横，村镇相望。"
+            },
+            {
+              "id": "jiangnan",
+              "name": "江南水乡",
+              "terrain": "plains",
+              "x": 700,
+              "y": 420,
+              "radius": 210,
+              "danger": 1,
+              "color": "#2f5d50",
+              "description": "六朝金粉之地，秦淮河两岸楼台不断。"
+            },
+            {
+              "id": "lianghu",
+              "name": "两湖泽地",
+              "terrain": "lake",
+              "x": 515,
+              "y": 570,
+              "radius": 200,
+              "danger": 2,
+              "color": "#4f6b26",
+              "description": "八百里洞庭，水气终年不散，芦苇荡里什么都能藏。"
+            },
+            {
+              "id": "nanhai",
+              "name": "南海",
+              "terrain": "sea",
+              "x": 860,
+              "y": 600,
+              "radius": 230,
+              "danger": 4,
+              "color": "#7a2f4f",
+              "description": "烟波浩渺，孤岛零星，海寇与隐世高人各占一处。"
+            },
+            {
+              "id": "zhongnan",
+              "name": "终南余脉",
+              "terrain": "forest",
+              "x": 300,
+              "y": 435,
+              "radius": 170,
+              "danger": 2,
+              "color": "#6b3f8a",
+              "description": "道家圣地所在，云雾缭绕，问道阶三千六百级。"
+            }
+          ],
+          "locations": [
+            {
+              "id": "mobei",
+              "name": "大漠流沙",
+              "kind": "wild",
+              "regionId": "mobei",
+              "x": 122,
+              "y": 322,
+              "danger": 4,
+              "description": "沙丘一层压一层，走了半日景色都不变。风起时连脚印都会立刻被抹平。",
+              "aliases": [
+                "塞外大漠"
+              ]
+            },
+            {
+              "id": "shacheng",
+              "name": "沙城",
+              "kind": "city",
+              "regionId": "mobei",
+              "x": 158,
+              "y": 358,
+              "danger": 3,
+              "services": [
+                "rest",
+                "supply"
+              ],
+              "restPrice": 10,
+              "description": "大漠里唯一像样的城。城主「大漠孤烟」一手大漠刀法，城中水比酒贵。"
+            },
+            {
+              "id": "xuanming",
+              "name": "玄冥谷",
+              "kind": "wild",
+              "regionId": "beijiang",
+              "x": 396,
+              "y": 106,
+              "danger": 5,
+              "description": "北疆群山最深处，天道教总坛。谷口毒瘴弥漫，机关遍布，外人十去九不回。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "poison",
+                    "packId": "world:wuxia_world:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "feiyun",
+              "name": "飞云绝顶",
+              "kind": "landmark",
+              "regionId": "beijiang",
+              "x": 562,
+              "y": 172,
+              "danger": 4,
+              "description": "飞云派后山的万丈绝壁，顶上是一片古战场遗迹。独孤云常在此独自潜修。"
+            },
+            {
+              "id": "huashan",
+              "name": "华山",
+              "kind": "landmark",
+              "regionId": "zhongyuan",
+              "x": 506,
+              "y": 252,
+              "danger": 4,
+              "description": "西岳，论剑之地。三十年一次的华山论剑就在这里，上届胜者是独孤云。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "duel",
+                    "packId": "world:wuxia_world:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "biluo",
+              "name": "碧落峰",
+              "kind": "landmark",
+              "regionId": "zhongyuan",
+              "x": 602,
+              "y": 236,
+              "danger": 3,
+              "description": "碧落派所在。峰后那片竹林里，藏着「碧落黄泉剑」的剑意。"
+            },
+            {
+              "id": "canglang",
+              "name": "沧浪峰",
+              "kind": "landmark",
+              "regionId": "zhongyuan",
+              "x": 756,
+              "y": 292,
+              "danger": 3,
+              "description": "六派盟主司徒桓的驻地，楼阁森严，山门前常年有弟子轮值。"
+            },
+            {
+              "id": "luoyang",
+              "name": "洛阳城",
+              "kind": "city",
+              "regionId": "zhongyuan",
+              "x": 432,
+              "y": 300,
+              "danger": 1,
+              "services": [
+                "rest",
+                "trade",
+                "supply"
+              ],
+              "restPrice": 8,
+              "description": "九朝古都。白马寺钟声、龙门石窟的《易筋经》残刻、以及四月的牡丹。"
+            },
+            {
+              "id": "shaolin",
+              "name": "少林寺",
+              "kind": "temple",
+              "regionId": "zhongyuan",
+              "x": 500,
+              "y": 352,
+              "danger": 2,
+              "services": [
+                "train",
+                "rest",
+                "heal"
+              ],
+              "restPrice": 0,
+              "description": "嵩山少室山，藏经阁藏有《易筋经》与《洗髓经》，空闻方丈坐镇。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "breakthrough",
+                    "packId": "world:wuxia_world:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "zhongnan",
+              "name": "终南山",
+              "kind": "temple",
+              "regionId": "zhongnan",
+              "x": 298,
+              "y": 436,
+              "danger": 2,
+              "services": [
+                "heal",
+                "train"
+              ],
+              "restPrice": 0,
+              "description": "道家圣地。活死人墓、药王的草庐、三千六百级问道阶都在这一带。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "secret_realm",
+                    "packId": "world:wuxia_world:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "chixia",
+              "name": "赤霞山",
+              "kind": "landmark",
+              "regionId": "zhongnan",
+              "x": 375,
+              "y": 527,
+              "danger": 3,
+              "description": "赤霞派与赤霞宫所在，山下的赤水河终年温热，冬天也不结冰。"
+            },
+            {
+              "id": "jinling",
+              "name": "金陵城",
+              "kind": "city",
+              "regionId": "jiangnan",
+              "x": 690,
+              "y": 422,
+              "danger": 1,
+              "services": [
+                "rest",
+                "trade",
+                "supply"
+              ],
+              "restPrice": 10,
+              "description": "六朝古都，秦淮河穿城而过。城中三大禁地：灵枢阁旧址、锦衣卫南镇抚司、以及秦淮河底的「水月洞天」。"
+            },
+            {
+              "id": "qixia",
+              "name": "栖霞巷",
+              "kind": "market",
+              "regionId": "jiangnan",
+              "x": 736,
+              "y": 456,
+              "danger": 2,
+              "services": [
+                "trade"
+              ],
+              "description": "金陵城里一条不起眼的巷陌，灵枢阁旧部的暗桩与消息贩子在这里交易。"
+            },
+            {
+              "id": "lingshu",
+              "name": "灵枢旧宅",
+              "kind": "ruin",
+              "regionId": "jiangnan",
+              "x": 662,
+              "y": 392,
+              "danger": 3,
+              "description": "金陵城柳氏祖宅，如今只剩半进院落。书房的暗格里据说藏着《九霄剑经》全本。"
+            },
+            {
+              "id": "bailian",
+              "name": "白莲庵",
+              "kind": "temple",
+              "regionId": "jiangnan",
+              "x": 560,
+              "y": 470,
+              "danger": 1,
+              "services": [
+                "heal",
+                "rest"
+              ],
+              "restPrice": 0,
+              "description": "玄霜派女尼清修之所，静虚师太在此。庵后竹林里练的是霜华剑法。"
+            },
+            {
+              "id": "yueyang",
+              "name": "望江楼",
+              "kind": "landmark",
+              "regionId": "lianghu",
+              "x": 548,
+              "y": 588,
+              "danger": 1,
+              "services": [
+                "rest",
+                "trade"
+              ],
+              "restPrice": 6,
+              "description": "洞庭湖畔岳阳城的酒楼，江湖客汇聚之地。中秋的「水月大会」就在这里开。"
+            },
+            {
+              "id": "nanhai",
+              "name": "南海孤岛",
+              "kind": "wild",
+              "regionId": "nanhai",
+              "x": 838,
+              "y": 592,
+              "danger": 5,
+              "description": "天道教四海四老镇守的孤岛，岛上石牢囚着前教主殷九州，礁石间暗流湍急。"
+            }
+          ],
+          "routes": [
+            {
+              "from": "mobei",
+              "to": "shacheng",
+              "kind": "trail",
+              "name": "沙海驼道",
+              "danger": 4,
+              "check": {
+                "stat": "dim6",
+                "dc": 14
+              }
+            },
+            {
+              "from": "mobei",
+              "to": "zhongnan",
+              "kind": "mountain",
+              "name": "陇右山道",
+              "danger": 4,
+              "check": {
+                "stat": "dim3",
+                "dc": 14
+              }
+            },
+            {
+              "from": "zhongnan",
+              "to": "luoyang",
+              "kind": "road",
+              "name": "函谷官道"
+            },
+            {
+              "from": "luoyang",
+              "to": "shaolin",
+              "kind": "road",
+              "name": "嵩山道"
+            },
+            {
+              "from": "luoyang",
+              "to": "huashan",
+              "kind": "mountain",
+              "name": "西岳险道",
+              "danger": 3,
+              "check": {
+                "stat": "dim3",
+                "dc": 13
+              }
+            },
+            {
+              "from": "luoyang",
+              "to": "biluo",
+              "kind": "road",
+              "name": "汴洛大道"
+            },
+            {
+              "from": "huashan",
+              "to": "biluo",
+              "kind": "trail",
+              "name": "峰间仄径",
+              "danger": 3
+            },
+            {
+              "from": "biluo",
+              "to": "canglang",
+              "kind": "trail",
+              "danger": 2
+            },
+            {
+              "from": "canglang",
+              "to": "jinling",
+              "kind": "road",
+              "name": "江南驿道"
+            },
+            {
+              "from": "jinling",
+              "to": "qixia",
+              "kind": "trail",
+              "name": "巷口"
+            },
+            {
+              "from": "jinling",
+              "to": "lingshu",
+              "kind": "trail",
+              "name": "柳宅后巷"
+            },
+            {
+              "from": "lingshu",
+              "to": "qixia",
+              "kind": "secret",
+              "name": "夹墙密道",
+              "hidden": true,
+              "danger": 2
+            },
+            {
+              "from": "jinling",
+              "to": "yueyang",
+              "kind": "river",
+              "name": "长江水路",
+              "danger": 2,
+              "cost": {
+                "currency": 8
+              }
+            },
+            {
+              "from": "jinling",
+              "to": "bailian",
+              "kind": "road",
+              "name": "城外小径"
+            },
+            {
+              "from": "bailian",
+              "to": "chixia",
+              "kind": "mountain",
+              "name": "赤水峡",
+              "danger": 3,
+              "check": {
+                "stat": "dim3",
+                "dc": 13
+              }
+            },
+            {
+              "from": "chixia",
+              "to": "zhongnan",
+              "kind": "mountain",
+              "name": "秦岭古道",
+              "danger": 3,
+              "check": {
+                "stat": "dim3",
+                "dc": 13
+              }
+            },
+            {
+              "from": "yueyang",
+              "to": "bailian",
+              "kind": "trail",
+              "name": "湖东小道"
+            },
+            {
+              "from": "feiyun",
+              "to": "huashan",
+              "kind": "mountain",
+              "name": "绝顶栈道",
+              "danger": 4,
+              "check": {
+                "stat": "dim3",
+                "dc": 15
+              }
+            },
+            {
+              "from": "xuanming",
+              "to": "feiyun",
+              "kind": "mountain",
+              "name": "雪岭险径",
+              "danger": 5,
+              "check": {
+                "stat": "dim3",
+                "dc": 17
+              }
+            },
+            {
+              "from": "xuanming",
+              "to": "luoyang",
+              "kind": "mountain",
+              "name": "北疆古道",
+              "danger": 4,
+              "check": {
+                "stat": "dim3",
+                "dc": 14
+              }
+            },
+            {
+              "from": "nanhai",
+              "to": "jinling",
+              "kind": "sea",
+              "name": "南海洋流",
+              "danger": 4,
+              "cost": {
+                "currency": 40
+              }
+            },
+            {
+              "from": "biluo",
+              "to": "feiyun",
+              "kind": "trail",
+              "name": "绝壁索桥",
+              "danger": 3
+            }
+          ]
         }
       }
     ],
@@ -6123,6 +7391,517 @@
             "allowCreateResources": false
           }
         }
+      },
+      {
+        "moduleId": "map",
+        "name": "世界地图",
+        "description": "废土区域图：铁锈镇、地下十三号线、红雾荒原与旧费城废墟群，辐射区与变异森林标得很清楚——活着回来的人才知道哪里不该去。",
+        "enabled": true,
+        "moduleConfig": {
+          "version": 1,
+          "title": "废土生存图",
+          "theme": "modern",
+          "landform": "inland",
+          "scale": "region",
+          "seed": 20870419,
+          "width": 1000,
+          "height": 700,
+          "fog": true,
+          "startLocationId": "rusttown",
+          "travel": {
+            "minutesPerUnit": 0.6
+          },
+          "regions": [
+            {
+              "id": "rusttown",
+              "name": "铁锈镇聚落",
+              "terrain": "urban",
+              "x": 430,
+              "y": 380,
+              "radius": 200,
+              "danger": 2,
+              "color": "#d9822b",
+              "description": "三层防御围起来的幸存者聚落，八十来口人靠变异薯类和过滤地下水活着。"
+            },
+            {
+              "id": "under",
+              "name": "地下动脉",
+              "terrain": "urban",
+              "x": 490,
+              "y": 465,
+              "radius": 185,
+              "danger": 2,
+              "color": "#2aa3b8",
+              "description": "十三号线隧道，深埋地下二十米。十四个废弃车站里有七个被改成了聚落。"
+            },
+            {
+              "id": "redmist",
+              "name": "红雾荒原",
+              "terrain": "wasteland",
+              "x": 250,
+              "y": 200,
+              "radius": 220,
+              "danger": 5,
+              "color": "#d64f6a",
+              "description": "核爆下风沉降带。辐射尘雾把能见度压到十五米，罗盘在这里基本没用。",
+              "effects": [
+                {
+                  "target": "map.travel.time",
+                  "mode": "mult",
+                  "value": 1.3,
+                  "label": "辐射尘雾"
+                }
+              ]
+            },
+            {
+              "id": "oldcity",
+              "name": "旧费城废墟",
+              "terrain": "wasteland",
+              "x": 700,
+              "y": 330,
+              "radius": 235,
+              "danger": 3,
+              "color": "#7a8a3a",
+              "description": "塌了一半的楼群，钢筋从混凝土里翘出来，像什么动物的骨头。"
+            },
+            {
+              "id": "mutant",
+              "name": "变异森林",
+              "terrain": "forest",
+              "x": 620,
+              "y": 600,
+              "radius": 205,
+              "danger": 4,
+              "color": "#2f9e6f",
+              "description": "树叶是紫色和蓝色的，发光真菌挂在枝上。孢子雾吸多了会看见不存在的东西。"
+            },
+            {
+              "id": "military",
+              "name": "军事禁区",
+              "terrain": "wasteland",
+              "x": 830,
+              "y": 175,
+              "radius": 195,
+              "danger": 5,
+              "color": "#8e5bd8",
+              "description": "旧费城军械库周围，钢铁黎明的装甲车在围墙外绕圈。"
+            }
+          ],
+          "locations": [
+            {
+              "id": "rusttown",
+              "name": "铁锈镇",
+              "kind": "town",
+              "regionId": "rusttown",
+              "x": 430,
+              "y": 380,
+              "known": true,
+              "danger": 1,
+              "services": [
+                "rest",
+                "trade",
+                "supply"
+              ],
+              "restPrice": 5,
+              "description": "三层防御：外层钢筋尖桩、中层五米高的汽车钢板墙、内层混凝土预制块。镇中心是两层集装箱搭的「集议厅」，兼诊所、仓库和避难所。以工易物，不收旧钞。"
+            },
+            {
+              "id": "tavern",
+              "name": "锈蚀酒馆",
+              "kind": "town",
+              "regionId": "rusttown",
+              "x": 402,
+              "y": 350,
+              "danger": 1,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 3,
+              "description": "铁锈镇的中立区，老板是个独眼老兵。酒是自酿的，消息比酒贵。"
+            },
+            {
+              "id": "purify",
+              "name": "净化站",
+              "kind": "station",
+              "regionId": "rusttown",
+              "x": 468,
+              "y": 406,
+              "services": [
+                "supply"
+              ],
+              "description": "退伍老兵汉克守着这套过滤装置，每天五十升净水，刚好够八十个人分。"
+            },
+            {
+              "id": "line13",
+              "name": "十三号线入口",
+              "kind": "station",
+              "regionId": "under",
+              "x": 500,
+              "y": 432,
+              "danger": 2,
+              "description": "被撬开的卷帘门后面是一段斜向下的楼梯，墙面上的线路图还认得出半张。"
+            },
+            {
+              "id": "rustmarket",
+              "name": "七号站·锈市",
+              "kind": "market",
+              "regionId": "under",
+              "x": 520,
+              "y": 470,
+              "danger": 2,
+              "services": [
+                "trade",
+                "supply"
+              ],
+              "description": "十三号线改造出的最大地下交易市场，从子弹到抗生素都能换到。柴油发电机的味道混着烤肉的香味。"
+            },
+            {
+              "id": "clinic",
+              "name": "三号站·诊所站",
+              "kind": "temple",
+              "regionId": "under",
+              "x": 452,
+              "y": 512,
+              "danger": 2,
+              "services": [
+                "heal"
+              ],
+              "restPrice": 8,
+              "description": "前军医「老白」在这里接诊，缝合用钓鱼线，麻醉靠半瓶烧酒。"
+            },
+            {
+              "id": "redmist",
+              "name": "红雾荒原",
+              "kind": "wild",
+              "regionId": "redmist",
+              "x": 250,
+              "y": 200,
+              "danger": 5,
+              "description": "辐射尘雾常年不散，地上的苔藓会微微发光，辐射晶石半埋在土里。防化装备最多撑四小时。"
+            },
+            {
+              "id": "radiation",
+              "name": "辐射区",
+              "kind": "wild",
+              "regionId": "redmist",
+              "x": 305,
+              "y": 268,
+              "danger": 5,
+              "description": "剂量计在这里会持续尖叫。地上的积水呈现出一种不属于任何雨水的颜色。"
+            },
+            {
+              "id": "ruins",
+              "name": "旧世界废墟",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 700,
+              "y": 330,
+              "danger": 3,
+              "description": "街区被整片掀翻，公交车的骨架卡在二层楼里，招牌只剩铁框。"
+            },
+            {
+              "id": "school",
+              "name": "旧世界学校",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 762,
+              "y": 302,
+              "danger": 3,
+              "services": [
+                "supply"
+              ],
+              "description": "走廊墙上还留着值日表，体育馆的木地板烂成一片，能拆的金属早就被拆光了。"
+            },
+            {
+              "id": "housing",
+              "name": "旧世界住宅",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 640,
+              "y": 252,
+              "danger": 2,
+              "description": "一整片塌掉的居民楼。有些门还锁着，里面可能还有东西——也可能有别的。"
+            },
+            {
+              "id": "supermarket",
+              "name": "旧世界超市",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 690,
+              "y": 272,
+              "danger": 3,
+              "services": [
+                "supply"
+              ],
+              "description": "货架被翻过好几轮，但角落里的罐头总还能再找出两个。"
+            },
+            {
+              "id": "hospital",
+              "name": "旧世界医院",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 732,
+              "y": 380,
+              "danger": 3,
+              "services": [
+                "heal"
+              ],
+              "description": "老白最初的诊所基地，药房的门锁被人用霰弹枪打开了。"
+            },
+            {
+              "id": "factory",
+              "name": "旧世界工厂",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 772,
+              "y": 432,
+              "danger": 3,
+              "description": "机床还在，只是没有电。这里是废土上唯一能加工零件的地方。"
+            },
+            {
+              "id": "library",
+              "name": "旧世界图书馆",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 806,
+              "y": 360,
+              "danger": 2,
+              "description": "屋顶塌了一角，雨水顺着书架往下淌。有人在这留下过一本手写的种植笔记。"
+            },
+            {
+              "id": "substation",
+              "name": "旧世界发电站",
+              "kind": "ruin",
+              "regionId": "oldcity",
+              "x": 858,
+              "y": 292,
+              "danger": 4,
+              "description": "变压器还在嗡嗡作响，没人知道它在给什么供电。靠近的人说掌心会发麻。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "awakening",
+                    "packId": "world:wasteland_apocalypse:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "oldmetro",
+              "name": "旧世界地铁站",
+              "kind": "station",
+              "regionId": "oldcity",
+              "x": 604,
+              "y": 392,
+              "danger": 2,
+              "description": "被沙土半埋的入口，站厅里的自动售票机还亮着不动的一行字。"
+            },
+            {
+              "id": "mforest",
+              "name": "变异森林",
+              "kind": "wild",
+              "regionId": "mutant",
+              "x": 620,
+              "y": 600,
+              "danger": 4,
+              "description": "发光真菌把整个林子照成淡绿色，紫色和蓝色的树叶底下藏着变异兽。孢子雾吸进去会开始看见不该看见的人。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "mutant_fight",
+                    "packId": "world:wasteland_apocalypse:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "nest",
+              "name": "变异兽巢穴",
+              "kind": "cave",
+              "regionId": "mutant",
+              "x": 655,
+              "y": 645,
+              "danger": 5,
+              "description": "旧地铁隧道的通风井坍塌后露出的洞。里面住着一只被人叫作「地铁吞噬者」的巨型变异蜈蚣。"
+            },
+            {
+              "id": "base",
+              "name": "旧军事基地",
+              "kind": "fortress",
+              "regionId": "military",
+              "x": 832,
+              "y": 178,
+              "danger": 5,
+              "description": "旧费城军械库，现在插着钢铁黎明的旗。铁丝网新换过，围墙上有规整的射击孔。",
+              "links": {
+                "events": [
+                  {
+                    "eventId": "raider_ambush",
+                    "packId": "world:wasteland_apocalypse:events"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "slavemarket",
+              "name": "奴隶市场",
+              "kind": "market",
+              "regionId": "rusttown",
+              "x": 330,
+              "y": 472,
+              "danger": 4,
+              "description": "血狼帮的主要收入来源。铁笼子按成色分三排，看守腰间挂着能通电的项圈遥控器。"
+            }
+          ],
+          "routes": [
+            {
+              "from": "rusttown",
+              "to": "tavern",
+              "kind": "trail",
+              "name": "镇中街"
+            },
+            {
+              "from": "rusttown",
+              "to": "purify",
+              "kind": "road",
+              "name": "净水塔下"
+            },
+            {
+              "from": "rusttown",
+              "to": "line13",
+              "kind": "road",
+              "name": "地铁口"
+            },
+            {
+              "from": "line13",
+              "to": "rustmarket",
+              "kind": "rail",
+              "name": "七号站方向",
+              "danger": 2
+            },
+            {
+              "from": "line13",
+              "to": "clinic",
+              "kind": "rail",
+              "name": "三号站方向",
+              "danger": 2
+            },
+            {
+              "from": "line13",
+              "to": "oldmetro",
+              "kind": "rail",
+              "name": "塌方隧道",
+              "danger": 3
+            },
+            {
+              "from": "rusttown",
+              "to": "redmist",
+              "kind": "trail",
+              "name": "风蚀沟",
+              "danger": 4
+            },
+            {
+              "from": "redmist",
+              "to": "radiation",
+              "kind": "trail",
+              "danger": 5
+            },
+            {
+              "from": "redmist",
+              "to": "base",
+              "kind": "trail",
+              "name": "军械库外沿",
+              "danger": 4
+            },
+            {
+              "from": "base",
+              "to": "substation",
+              "kind": "trail",
+              "danger": 4
+            },
+            {
+              "from": "rusttown",
+              "to": "slavemarket",
+              "kind": "trail",
+              "name": "废车场",
+              "danger": 3
+            },
+            {
+              "from": "rusttown",
+              "to": "ruins",
+              "kind": "road",
+              "name": "旧国道",
+              "danger": 2
+            },
+            {
+              "from": "ruins",
+              "to": "school",
+              "kind": "road"
+            },
+            {
+              "from": "ruins",
+              "to": "housing",
+              "kind": "trail"
+            },
+            {
+              "from": "ruins",
+              "to": "factory",
+              "kind": "road",
+              "name": "厂区大道"
+            },
+            {
+              "from": "factory",
+              "to": "library",
+              "kind": "trail"
+            },
+            {
+              "from": "library",
+              "to": "substation",
+              "kind": "trail",
+              "danger": 3
+            },
+            {
+              "from": "ruins",
+              "to": "supermarket",
+              "kind": "trail"
+            },
+            {
+              "from": "supermarket",
+              "to": "housing",
+              "kind": "trail"
+            },
+            {
+              "from": "ruins",
+              "to": "hospital",
+              "kind": "road"
+            },
+            {
+              "from": "hospital",
+              "to": "oldmetro",
+              "kind": "trail",
+              "danger": 2
+            },
+            {
+              "from": "rusttown",
+              "to": "mforest",
+              "kind": "trail",
+              "name": "林缘",
+              "danger": 3
+            },
+            {
+              "from": "mforest",
+              "to": "nest",
+              "kind": "trail",
+              "danger": 5
+            },
+            {
+              "from": "mforest",
+              "to": "housing",
+              "kind": "trail",
+              "danger": 3
+            }
+          ]
+        }
       }
     ],
     "eventPacks": [
@@ -8046,6 +9825,506 @@
             "allowCreateResources": false
           }
         }
+      },
+      {
+        "moduleId": "map",
+        "name": "世界地图",
+        "description": "飞机失事后困住你们的那座无名岛：新月滩营地、青藤谷与淡水溪流、火山望崖，以及南面的珊瑚礁与东岸的海底洞穴。哪个点能取到什么，图上标着。",
+        "enabled": true,
+        "moduleConfig": {
+          "version": 1,
+          "title": "无名岛海图",
+          "theme": "modern",
+          "landform": "island",
+          "scale": "region",
+          "seed": 20190712,
+          "width": 1000,
+          "height": 700,
+          "fog": true,
+          "startLocationId": "crescent",
+          "travel": {
+            "minutesPerUnit": 0.6
+          },
+          "regions": [
+            {
+              "id": "volcano",
+              "name": "火山锥",
+              "terrain": "mountains",
+              "x": 500,
+              "y": 172,
+              "radius": 168,
+              "danger": 2,
+              "color": "#d64f6a",
+              "description": "岛北的休眠火山，坡面是黑色的火山灰与碎裂的玄武岩。",
+              "effects": [
+                {
+                  "target": "map.travel.time",
+                  "mode": "mult",
+                  "value": 1.35,
+                  "label": "火山坡陡"
+                }
+              ]
+            },
+            {
+              "id": "jungle",
+              "name": "丛林腹地",
+              "terrain": "forest",
+              "x": 470,
+              "y": 382,
+              "radius": 218,
+              "danger": 1,
+              "color": "#2f9e6f",
+              "description": "密不透风的雨林，藤蔓垂到膝盖，看不见天。"
+            },
+            {
+              "id": "beach",
+              "name": "新月滩",
+              "terrain": "plains",
+              "x": 492,
+              "y": 578,
+              "radius": 192,
+              "danger": 0,
+              "color": "#d9822b",
+              "description": "岛南的弧形沙滩，两百米长，六棵椰树。西侧的石灰岩下有淡水泉眼。"
+            },
+            {
+              "id": "reef",
+              "name": "东岸礁区",
+              "terrain": "sea",
+              "x": 792,
+              "y": 512,
+              "radius": 190,
+              "danger": 3,
+              "color": "#2aa3b8",
+              "description": "退潮时露出成片的礁盘，脚下是滑的，浪会在你想不到的时候打上来。"
+            },
+            {
+              "id": "westwood",
+              "name": "西岸林缘",
+              "terrain": "forest",
+              "x": 232,
+              "y": 470,
+              "radius": 172,
+              "danger": 2,
+              "color": "#7a8a3a",
+              "description": "岛的西侧，树林一直长到水边，椰子和浮木被冲上沙滩。"
+            }
+          ],
+          "locations": [
+            {
+              "id": "crescent",
+              "name": "新月滩",
+              "kind": "camp",
+              "regionId": "beach",
+              "x": 492,
+              "y": 578,
+              "known": true,
+              "services": [
+                "rest",
+                "supply"
+              ],
+              "description": "初期营地。弧形沙滩两百米长，六棵椰树遮出一片阴凉，西侧八十米处的石灰岩下有淡水泉眼，东侧是一片礁石区。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "food",
+                    "bonus": 1.1
+                  },
+                  {
+                    "id": "water",
+                    "bonus": 1.2
+                  },
+                  {
+                    "id": "wood",
+                    "bonus": 1.2
+                  }
+                ]
+              }
+            },
+            {
+              "id": "palm",
+              "name": "椰林",
+              "kind": "landmark",
+              "regionId": "beach",
+              "x": 586,
+              "y": 546,
+              "description": "新月滩东侧的椰林，落果砸在沙上会留下一个坑。枯叶是很好的引火物。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "food",
+                    "bonus": 1.5
+                  },
+                  {
+                    "id": "wood",
+                    "bonus": 1.3
+                  }
+                ]
+              }
+            },
+            {
+              "id": "eastbeach",
+              "name": "海滩东侧",
+              "kind": "landmark",
+              "regionId": "beach",
+              "x": 690,
+              "y": 520,
+              "description": "沙滩在这里变窄，礁石开始出现。退潮后石缝里能摸到螺和蟹。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "food",
+                    "bonus": 1.3
+                  },
+                  {
+                    "id": "stone",
+                    "bonus": 1.2
+                  }
+                ]
+              }
+            },
+            {
+              "id": "westbeach",
+              "name": "海滩西侧",
+              "kind": "landmark",
+              "regionId": "westwood",
+              "x": 300,
+              "y": 542,
+              "description": "浮木和塑料碎片被洋流推上来的地方，偶尔能捡到还能用的东西。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "wood",
+                    "bonus": 1.6
+                  },
+                  {
+                    "id": "cloth",
+                    "bonus": 1.4
+                  }
+                ]
+              }
+            },
+            {
+              "id": "coral",
+              "name": "珊瑚礁",
+              "kind": "landmark",
+              "regionId": "reef",
+              "x": 760,
+              "y": 586,
+              "danger": 2,
+              "description": "岛南的天然防波堤，水很浅很清。礁盘边缘有鱼，但走过去要踩着滑腻的珊瑚。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "food",
+                    "bonus": 1.6
+                  }
+                ]
+              }
+            },
+            {
+              "id": "stream",
+              "name": "淡水溪流",
+              "kind": "landmark",
+              "regionId": "jungle",
+              "x": 432,
+              "y": 332,
+              "description": "从火山坡流下来的溪水，清澈见底。接水的地方最好选在瀑布上游。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "water",
+                    "bonus": 1.7
+                  }
+                ]
+              }
+            },
+            {
+              "id": "edge",
+              "name": "丛林边缘",
+              "kind": "wild",
+              "regionId": "jungle",
+              "x": 392,
+              "y": 470,
+              "danger": 1,
+              "description": "沙滩往内走十几步就是密林，光在这里断掉。地上的枯枝是最好捡的柴。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "wood",
+                    "bonus": 1.4
+                  }
+                ]
+              }
+            },
+            {
+              "id": "valley",
+              "name": "青藤谷",
+              "kind": "camp",
+              "regionId": "jungle",
+              "x": 456,
+              "y": 376,
+              "danger": 1,
+              "services": [
+                "rest"
+              ],
+              "description": "新月滩向北走一小时，翻过一道低矮山脊就是。东西走向的河谷，溪流每小时能接一桶水，倒下的枯木够烧很久。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "water",
+                    "bonus": 1.4
+                  },
+                  {
+                    "id": "wood",
+                    "bonus": 1.5
+                  }
+                ]
+              }
+            },
+            {
+              "id": "jungle",
+              "name": "丛林深处",
+              "kind": "wild",
+              "regionId": "jungle",
+              "x": 522,
+              "y": 330,
+              "danger": 3,
+              "description": "藤蔓下面几乎看不到地面，能听见什么东西在树冠层移动。药草长在背阴的石头缝里。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "food",
+                    "bonus": 1.4
+                  },
+                  {
+                    "id": "herb",
+                    "bonus": 1.6
+                  }
+                ]
+              }
+            },
+            {
+              "id": "slope",
+              "name": "火山坡",
+              "kind": "wild",
+              "regionId": "volcano",
+              "x": 546,
+              "y": 216,
+              "danger": 3,
+              "description": "松散的火山渣，往上走三步滑下来一步。黑曜石碎片散在坡面上，边缘锋利得能当刀。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "stone",
+                    "bonus": 1.7
+                  }
+                ]
+              }
+            },
+            {
+              "id": "cliff",
+              "name": "火山望崖",
+              "kind": "landmark",
+              "regionId": "volcano",
+              "x": 474,
+              "y": 166,
+              "danger": 2,
+              "description": "制高点。从新月滩爬升四百米，正常要走两三个小时，从崖上能望出方圆四十公里的海面。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "stone",
+                    "bonus": 1.4
+                  }
+                ]
+              }
+            },
+            {
+              "id": "crater",
+              "name": "火山口",
+              "kind": "landmark",
+              "regionId": "volcano",
+              "x": 522,
+              "y": 138,
+              "danger": 3,
+              "description": "直径五十米的火山口，是个小湖。水很清，但湖底一直在冒细小的气泡。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "water",
+                    "bonus": 1.3
+                  }
+                ]
+              }
+            },
+            {
+              "id": "seacave",
+              "name": "海底洞穴",
+              "kind": "cave",
+              "regionId": "reef",
+              "x": 754,
+              "y": 468,
+              "danger": 3,
+              "description": "退潮时洞口才露出来，洞里的地下泉眼是整座岛最好的水源。涨潮时会被淹没，进去前一定要看潮汐。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "water",
+                    "bonus": 2
+                  }
+                ]
+              }
+            },
+            {
+              "id": "wreck",
+              "name": "飞机残骸",
+              "kind": "ruin",
+              "regionId": "beach",
+              "x": 546,
+              "y": 620,
+              "danger": 1,
+              "description": "机身前段断成两截，海水灌满了后半段。机尾的应急电台还能修，需要五单位金属零件和两天时间。",
+              "links": {
+                "gather": [
+                  {
+                    "id": "stone",
+                    "bonus": 1.2
+                  },
+                  {
+                    "id": "cloth",
+                    "bonus": 1.4
+                  }
+                ],
+                "events": [
+                  {
+                    "eventId": "rescue_signal",
+                    "packId": "world:stranded_island:events"
+                  }
+                ]
+              }
+            }
+          ],
+          "routes": [
+            {
+              "from": "crescent",
+              "to": "palm",
+              "kind": "trail",
+              "name": "沙滩东段"
+            },
+            {
+              "from": "crescent",
+              "to": "westbeach",
+              "kind": "trail",
+              "name": "沙滩西段"
+            },
+            {
+              "from": "crescent",
+              "to": "wreck",
+              "kind": "trail",
+              "name": "残骸下"
+            },
+            {
+              "from": "crescent",
+              "to": "edge",
+              "kind": "trail",
+              "name": "林口"
+            },
+            {
+              "from": "crescent",
+              "to": "coral",
+              "kind": "trail",
+              "name": "礁盘小径",
+              "danger": 2
+            },
+            {
+              "from": "palm",
+              "to": "eastbeach",
+              "kind": "trail"
+            },
+            {
+              "from": "eastbeach",
+              "to": "coral",
+              "kind": "trail",
+              "danger": 1
+            },
+            {
+              "from": "eastbeach",
+              "to": "seacave",
+              "kind": "trail",
+              "name": "退潮礁道",
+              "danger": 3
+            },
+            {
+              "from": "westbeach",
+              "to": "edge",
+              "kind": "trail"
+            },
+            {
+              "from": "edge",
+              "to": "valley",
+              "kind": "trail",
+              "name": "翻山小径",
+              "danger": 1
+            },
+            {
+              "from": "valley",
+              "to": "stream",
+              "kind": "trail"
+            },
+            {
+              "from": "valley",
+              "to": "jungle",
+              "kind": "trail",
+              "name": "藤蔓道",
+              "danger": 2
+            },
+            {
+              "from": "jungle",
+              "to": "slope",
+              "kind": "mountain",
+              "name": "火山渣坡",
+              "danger": 3,
+              "cost": {
+                "resources": {
+                  "water": 1
+                }
+              }
+            },
+            {
+              "from": "slope",
+              "to": "cliff",
+              "kind": "trail",
+              "danger": 2
+            },
+            {
+              "from": "cliff",
+              "to": "crater",
+              "kind": "trail",
+              "name": "火山口缘",
+              "danger": 2
+            },
+            {
+              "from": "jungle",
+              "to": "crater",
+              "kind": "mountain",
+              "name": "火山背坡",
+              "danger": 4,
+              "cost": {
+                "resources": {
+                  "water": 1.5
+                }
+              }
+            },
+            {
+              "from": "crescent",
+              "to": "valley",
+              "kind": "trail",
+              "name": "山脊捷径",
+              "danger": 1
+            }
+          ]
+        }
       }
     ],
     "eventPacks": [
@@ -9928,6 +12207,360 @@
             "setAllowedVars": [],
             "allowCreateResources": false
           }
+        }
+      },
+      {
+        "moduleId": "map",
+        "name": "世界地图",
+        "description": "九〇年代绥芬河口岸地图：青云市场、边贸一条街、火车站与货场，过境公路再到对岸的格罗迭科沃。哪些点能吃差价，图上标得清楚。",
+        "enabled": true,
+        "moduleConfig": {
+          "version": 1,
+          "title": "绥芬河口岸图",
+          "theme": "modern",
+          "landform": "coast",
+          "scale": "region",
+          "seed": 19911225,
+          "width": 1000,
+          "height": 700,
+          "fog": false,
+          "startLocationId": "qingyun",
+          "travel": {
+            "minutesPerUnit": 0.6
+          },
+          "regions": [
+            {
+              "id": "port",
+              "name": "口岸区",
+              "terrain": "urban",
+              "x": 560,
+              "y": 340,
+              "radius": 190,
+              "danger": 0,
+              "color": "#3a7bd5",
+              "description": "关检、货场与旅社挤在一处，俄方大车排队能排到街尾。"
+            },
+            {
+              "id": "marketzone",
+              "name": "青云市场商圈",
+              "terrain": "urban",
+              "x": 590,
+              "y": 450,
+              "radius": 185,
+              "danger": 1,
+              "color": "#d9822b",
+              "description": "整片都是摊位与倒爷，羽绒服和暖水瓶一箱一箱往车上搬。"
+            },
+            {
+              "id": "railyard",
+              "name": "铁路区",
+              "terrain": "urban",
+              "x": 680,
+              "y": 320,
+              "radius": 160,
+              "danger": 0,
+              "color": "#2f9e6f",
+              "description": "小站、仓库与露天货场，凌晨有哈尔滨来的车进站。"
+            },
+            {
+              "id": "grod",
+              "name": "格罗迭科沃",
+              "terrain": "urban",
+              "x": 310,
+              "y": 360,
+              "radius": 180,
+              "danger": 2,
+              "color": "#8e5bd8",
+              "description": "绥芬河对面那座俄罗斯小城，街上的中国货比本地货多。"
+            },
+            {
+              "id": "river",
+              "name": "绥芬河",
+              "terrain": "sea",
+              "x": 150,
+              "y": 360,
+              "radius": 220,
+              "danger": 1,
+              "color": "#2aa3b8",
+              "description": "界河。冬天的冰面上曾经有人试着走过去，没走成的更多。"
+            },
+            {
+              "id": "forest",
+              "name": "郊区林场",
+              "terrain": "forest",
+              "x": 830,
+              "y": 545,
+              "radius": 190,
+              "danger": 1,
+              "color": "#7a8a3a",
+              "description": "城外的针叶林，夏天能捡蘑菇，冬天雪深到膝。"
+            }
+          ],
+          "locations": [
+            {
+              "id": "qingyun",
+              "name": "绥芬河青云市场",
+              "kind": "market",
+              "regionId": "marketzone",
+              "x": 560,
+              "y": 400,
+              "known": true,
+              "danger": 0,
+              "services": [
+                "trade",
+                "supply"
+              ],
+              "description": "边贸市场。羽绒服、运动鞋、方便面、白酒、暖水瓶，什么都能在这儿换成卢布。摊主报的价永远有两套。",
+              "links": {
+                "markets": [
+                  "local"
+                ]
+              }
+            },
+            {
+              "id": "checkpoint",
+              "name": "口岸联检大厅",
+              "kind": "station",
+              "regionId": "port",
+              "x": 520,
+              "y": 340,
+              "services": [
+                "supply"
+              ],
+              "description": "公路口岸早上八点开关。海关翻检得很细，俄方的大卡车一辆接一辆地过。"
+            },
+            {
+              "id": "street",
+              "name": "边贸一条街",
+              "kind": "market",
+              "regionId": "marketzone",
+              "x": 604,
+              "y": 462,
+              "services": [
+                "trade",
+                "rest"
+              ],
+              "restPrice": 15,
+              "description": "报关行、翻译社、旅馆、饭店、商店、录像厅挤满一条街，「中俄友好饭店」的招牌最亮。",
+              "links": {
+                "markets": [
+                  "local"
+                ]
+              }
+            },
+            {
+              "id": "railstation",
+              "name": "绥芬河火车站",
+              "kind": "station",
+              "regionId": "railyard",
+              "x": 662,
+              "y": 300,
+              "description": "小站，哈尔滨来的车凌晨到站。站前停着一排面包车，喊着去青云市场。"
+            },
+            {
+              "id": "warehouse",
+              "name": "仓库",
+              "kind": "home",
+              "regionId": "railyard",
+              "x": 702,
+              "y": 392,
+              "services": [
+                "supply"
+              ],
+              "description": "口岸附近的简易铁皮房，按天算钱，一天几十块。下雨的时候铁皮响得像有人在上面走。"
+            },
+            {
+              "id": "bank",
+              "name": "银行",
+              "kind": "city",
+              "regionId": "port",
+              "x": 622,
+              "y": 362,
+              "services": [
+                "trade"
+              ],
+              "description": "换汇的地方。牌价是一回事，黑市汇率是另一回事，后者总更划算。"
+            },
+            {
+              "id": "restaurant",
+              "name": "饭店",
+              "kind": "town",
+              "regionId": "marketzone",
+              "x": 642,
+              "y": 420,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 20,
+              "description": "谈生意必喝酒，锅包肉是硬菜。后厨的排风扇一年四季都在响。"
+            },
+            {
+              "id": "post",
+              "name": "邮局",
+              "kind": "town",
+              "regionId": "marketzone",
+              "x": 690,
+              "y": 446,
+              "services": [
+                "trade"
+              ],
+              "description": "汇款、寄包裹。柜台后面的人永远在数单据。"
+            },
+            {
+              "id": "barbershop",
+              "name": "理发店与澡堂",
+              "kind": "town",
+              "regionId": "marketzone",
+              "x": 576,
+              "y": 506,
+              "services": [
+                "rest"
+              ],
+              "restPrice": 10,
+              "description": "理发、按摩、刮脸十块钱。澡堂是本地最实在的社交场，生意常在雾气里谈成。"
+            },
+            {
+              "id": "blackmarket",
+              "name": "黑市换汇巷",
+              "kind": "market",
+              "regionId": "marketzone",
+              "x": 726,
+              "y": 486,
+              "danger": 2,
+              "services": [
+                "trade"
+              ],
+              "description": "巷子里站着几个人，手插在袖子里，看你的眼神像在估价。汇率确实好，钱也确实可能不翼而飞。"
+            },
+            {
+              "id": "grod",
+              "name": "格罗迭科沃",
+              "kind": "city",
+              "regionId": "grod",
+              "x": 306,
+              "y": 356,
+              "danger": 2,
+              "services": [
+                "rest",
+                "supply"
+              ],
+              "restPrice": 12,
+              "description": "绥芬河对面的俄罗斯小城。中国货在这儿很好卖，倒爷们住在小旅馆里，一住就是半个月。"
+            },
+            {
+              "id": "grodmarket",
+              "name": "格罗迭科沃市场",
+              "kind": "market",
+              "regionId": "grod",
+              "x": 336,
+              "y": 400,
+              "danger": 1,
+              "services": [
+                "trade"
+              ],
+              "description": "露天的集市，摊位是木板钉的。同样的羽绒服在这儿能多卖三成。",
+              "links": {
+                "markets": [
+                  "local"
+                ]
+              }
+            }
+          ],
+          "routes": [
+            {
+              "from": "qingyun",
+              "to": "street",
+              "kind": "trail",
+              "name": "市场后街"
+            },
+            {
+              "from": "qingyun",
+              "to": "checkpoint",
+              "kind": "road",
+              "name": "口岸大道"
+            },
+            {
+              "from": "qingyun",
+              "to": "bank",
+              "kind": "road",
+              "name": "工商街"
+            },
+            {
+              "from": "bank",
+              "to": "restaurant",
+              "kind": "trail",
+              "name": "饭店胡同"
+            },
+            {
+              "from": "restaurant",
+              "to": "post",
+              "kind": "trail"
+            },
+            {
+              "from": "qingyun",
+              "to": "barbershop",
+              "kind": "trail",
+              "name": "澡堂巷"
+            },
+            {
+              "from": "street",
+              "to": "barbershop",
+              "kind": "trail"
+            },
+            {
+              "from": "street",
+              "to": "warehouse",
+              "kind": "trail",
+              "name": "货场小道",
+              "danger": 1
+            },
+            {
+              "from": "checkpoint",
+              "to": "railstation",
+              "kind": "road",
+              "name": "站前路"
+            },
+            {
+              "from": "railstation",
+              "to": "warehouse",
+              "kind": "road",
+              "name": "铁路货场"
+            },
+            {
+              "from": "warehouse",
+              "to": "post",
+              "kind": "trail"
+            },
+            {
+              "from": "bank",
+              "to": "blackmarket",
+              "kind": "secret",
+              "name": "换汇后巷",
+              "hidden": true,
+              "danger": 2
+            },
+            {
+              "from": "checkpoint",
+              "to": "grod",
+              "kind": "highway",
+              "name": "过境公路",
+              "danger": 2,
+              "cost": {
+                "currency": 5
+              }
+            },
+            {
+              "from": "grod",
+              "to": "grodmarket",
+              "kind": "trail"
+            },
+            {
+              "from": "qingyun",
+              "to": "railstation",
+              "kind": "road",
+              "name": "站前街"
+            }
+          ]
         }
       }
     ],

@@ -396,11 +396,15 @@ export function validateCustomGameplayModule(input: unknown, source: 'import' | 
     }
   }
 
+  // 游戏里只有右栏放模块面板；left-panel 仍然可用（旧模块与已有存档不受影响），只是显示在右栏。
+  const warnings = module.view?.slot === 'left-panel'
+    ? [...normalized.warnings, { path: ['view', 'slot'], code: 'left-panel-shown-right', message: '游戏里没有左栏模块位，left-panel 的模块会显示在右栏', severity: 'warning' as const }]
+    : normalized.warnings;
   return {
     valid: errors.length === 0,
     normalized: errors.length === 0 ? module : undefined,
     errors,
-    warnings: normalized.warnings,
+    warnings,
   };
 }
 

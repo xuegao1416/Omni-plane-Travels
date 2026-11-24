@@ -107,10 +107,7 @@
 .business-drawer { position: absolute; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; width: clamp(300px, 50vw, 620px); }
 @media (max-width: 480px) { .business-drawer { width: 100%; max-width: 100%; } }
 
-/* Inventory: brass-studded slots */
-.inventory-grid > * { border-radius: 3px; }
-/* responsive.css drops .grid-fixed-6 to 3/2 columns on phones; the inventory keeps 4. */
-@media (max-width: 768px) { .inventory-grid.grid-fixed-6 { grid-template-columns: repeat(4, 1fr); gap: 6px; } }
+/* Inventory grids live in game-equipment.css (capacity-bound, auto-fill columns). */
 .profession-game-panel__formula { padding: 8px 12px; border-radius: 3px; color: rgb(var(--d-gold, 233, 207, 150)); font: 12px/1.6 ui-monospace, Consolas, monospace; background: var(--pk-well); box-shadow: var(--pk-well-edge); }
 
 @media (max-width: 520px) {

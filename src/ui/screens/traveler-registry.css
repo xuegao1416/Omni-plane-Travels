@@ -114,7 +114,7 @@
 }
 .registry-card-actions > button:hover, .registry-detail-actions > button:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 242, 212, 142), .85), inset 0 0 0 2px rgba(var(--d-shade, 10, 6, 0), calc(.8 * var(--d-shade-k, 1))), 0 6px 14px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1))); }
 .registry-card-actions > .registry-action-primary { color: #2a1a04; font-weight: 700; background: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 50%), var(--pk-brass-face); box-shadow: 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1))); }
-.registry-card-actions > .registry-action-danger { color: rgb(var(--d-redpale, 255, 194, 184)); box-shadow: inset 0 0 0 1px rgba(var(--d-red, 240, 120, 110), .5), inset 0 0 0 2px rgba(var(--d-shade, 10, 6, 0), calc(.8 * var(--d-shade-k, 1))), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1))); }
+.registry-card-actions > .registry-action-danger { color: rgb(var(--d-red, 240, 143, 134)); box-shadow: inset 0 0 0 1px rgba(var(--d-red, 240, 120, 110), .5), inset 0 0 0 2px rgba(var(--d-shade, 10, 6, 0), calc(.8 * var(--d-shade-k, 1))), 0 3px 8px rgba(var(--d-shade, 0, 0, 0), calc(.35 * var(--d-shade-k, 1))); }
 
 /* Workshop: upload bench, card meta, detail dialog */
 .registry-workshop-page { display: flex; flex-direction: column; gap: 16px; padding: 20px; }

@@ -40,7 +40,11 @@ kit 变量：`--pk-plate` `--pk-well` `--pk-well-edge` `--pk-lit` `--pk-brass-fa
 | `event-archive.css` | `EventArchiveWorkspace.tsx` |
 | `event-workbench.css` | `WorkflowEditor.tsx`、`CardEditor.tsx`、`AiEventGenerator.tsx`、`CardWorkflowEditor.tsx` |
 | `combat.css` | `CombatWireframe.tsx`、`CombatEncounterDecisionCard.tsx`、`AbilityProposalCard.tsx` |
+| `game-equipment.css` | `components/game/inventory/*`（星仪人偶纸娃娃、NPC 装备环、有容量的行囊格子、物品详情浮层） |
+| `game-npc.css` | `panels/characterGrid/NPCDetail.tsx`（人物卷宗，挂到 body 的居中卷宗 / 手机整屏卷宗） |
 | `module-workshop.css` | `CustomModulePanel.tsx`、`CustomModuleAgentWorkspace.tsx` |
+| `map.css` | `components/map/MapView.tsx`、`MapEditorWorkspace.tsx`、`panels/MapPanel.tsx`、`moduleEditors/MapModuleEditor.tsx`、`dev/MapPreview.tsx`（2D 三种画风的画布、3D 标签、视图外壳、游戏内地图卷宗与右栏小地图；画布里的颜色属于地图画风，不随界面主题变） |
+| `map-editor.css` | `MapEditorWorkspace.tsx`、`moduleEditors/MapModuleEditor.tsx`（地图编辑器三栏工作台、世界编辑里的「世界地图」卡；标题渐变字的晨雾版在 `dawn-kit.css`） |
 
 **仍在 `src/styles/` 的局部样式**：`profession-book.css`（`ProfessionBook.tsx`）、
 `profession-library.css`（`ProfessionTreePanel.tsx` / `ProfessionTreeCanvas.tsx`，末尾有夜色黄铜段）。

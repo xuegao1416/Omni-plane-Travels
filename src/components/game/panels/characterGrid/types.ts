@@ -1,6 +1,6 @@
 import type { ChronicleMergeOptions } from './chronicleActions';
 import type { LucideIcon } from 'lucide-react';
-import { User,FileText,Swords,Backpack } from 'lucide-react';
+import { User,FileText,Swords,Backpack,Shield } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
 import type { GameState } from '../../../../schema/variables';
 import type { KnownNPC } from '../../../../engine/playerKnowledge';
@@ -18,13 +18,14 @@ export interface CharacterGridProps {
   onDeleteNpc?: (npcId: string) => boolean | Promise<boolean>;
 }
 
-export type DetailTab = 'overview' | 'dossier' | 'skills' | 'items';
+export type DetailTab = 'overview' | 'dossier' | 'skills' | 'gear' | 'bag';
 
 export const DETAIL_TABS: { id: DetailTab; icon: LucideIcon; label: string }[] = [
   { id: 'overview', icon: User, label: '概览' },
   { id: 'dossier', icon: FileText, label: '档案' },
-  { id: 'skills', icon: Swords, label: '技能列表' },
-  { id: 'items', icon: Backpack, label: '物品列表' },
+  { id: 'skills', icon: Swords, label: '能力' },
+  { id: 'gear', icon: Shield, label: '装备' },
+  { id: 'bag', icon: Backpack, label: '行囊' },
 ];
 
 export function favorClass(v?: number) {
@@ -83,6 +84,14 @@ export function npcDataToCustomNpc(npc: KnownNPC): CustomNpc {
           itemsList[k] = { 数量: iv.数量 || 1, 类型: iv.类型 || '', 品质: iv.品质 || '普通', 备注: iv.备注 || '' };
         }
       }
+    }
+  }
+  // 剧情里增减的随身物品（物品栏）一并存进模板，同名以它为准。
+  if (ext.物品栏 && typeof ext.物品栏 === 'object' && !Array.isArray(ext.物品栏)) {
+    for (const [k, v] of Object.entries(ext.物品栏)) {
+      if (!v || typeof v !== 'object') continue;
+      const iv = v as any;
+      itemsList[k] = { 数量: iv.数量 || 1, 类型: iv.类型 || '', 品质: iv.品质 || '普通', 备注: iv.备注 || '' };
     }
   }
 

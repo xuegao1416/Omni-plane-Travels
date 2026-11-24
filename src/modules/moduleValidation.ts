@@ -8,6 +8,7 @@ import type { WorldDef } from '../data/worlds-schema';
 import { createDefaultGameState } from '../schema/variables';
 import { createGameplayHost } from '../core/registry';
 import type { RepairableIssue } from '../api/generateWithRepair';
+import { validateGeneratedMap } from '../domains/map/generation';
 
 export interface ModuleIssue extends RepairableIssue {
   /** 出问题的字段，如 resources[2].max。 */
@@ -15,7 +16,7 @@ export interface ModuleIssue extends RepairableIssue {
 }
 
 export const GENERATED_MODULE_LABELS: Record<string, string> = {
-  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', talent: '天赋与技能',
+  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', talent: '天赋与技能', map: '世界地图',
 };
 
 const ID = /^[A-Za-z][A-Za-z0-9_]*$/;
@@ -220,8 +221,15 @@ function validateTalent(data: Rec, out: Issues) {
   }
 }
 
+function validateMap(data: Rec, out: Issues) {
+  for (const issue of validateGeneratedMap(data)) {
+    if (issue.level === 'error') out.error(issue.path, issue.message);
+    else out.warn(issue.path, issue.message);
+  }
+}
+
 const VALIDATORS: Record<string, (data: Rec, out: Issues) => void> = {
-  stat: validateStat, progression: validateProgression, survival: validateSurvival, business: validateBusiness, talent: validateTalent,
+  stat: validateStat, progression: validateProgression, survival: validateSurvival, business: validateBusiness, talent: validateTalent, map: validateMap,
 };
 
 /** 把数据放进临时世界开一局：玩法宿主读不懂或开局报错时给出原因。 */

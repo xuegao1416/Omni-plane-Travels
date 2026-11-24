@@ -14,6 +14,9 @@ import ProfessionTreePanel from './panels/ProfessionTreePanel';
 import VariableSnapshotPanel from './panels/VariableSnapshotPanel';
 import WorldBookPanel from './panels/WorldBookPanel';
 import RightPanel from './panels/RightPanel';
+import MapPanel from './panels/MapPanel';
+import { buildMapViewModel } from '../../domains/map/viewModel';
+import { isMapModuleEnabled } from '../../domains/map/config';
 import EconomyLedger from './panels/EconomyLedger';
 import { buildEconomyViewModel } from '../../domains/economy/viewModel';
 import { useEconomyActions } from './gameScreen/hooks/useEconomyActions';
@@ -56,7 +59,7 @@ import { useSimulation } from './gameScreen/hooks/useSimulation';
 import { useResourceActions } from './gameScreen/hooks/useResourceActions';
 import JourneyDossierContent from './shared/JourneyDossierContent';
 import { DOSSIER_META,normalizeDossierPanel } from './shared/journeyDossierMeta';
-import { runCustomModulesForWorldAndCommit } from '../../custom-modules/engineBridge';
+import { runCustomModulesForWorldAndCommit,describeCustomModuleButtonOutcome } from '../../custom-modules/engineBridge';
 import { setCustomModuleActiveSave } from '../../custom-modules/saveApplication';
 import type { CustomModuleChoiceEvent } from '../../custom-modules/context';
 import { useMemoryStore } from '../../memory/memoryStore';
@@ -194,6 +197,7 @@ export default function GameScreen() {
   }, [gameState, savedPortraits, state.personalInfo?.portrait]);
   const hasBusinessModule = !!worldDef?.modules?.some(m => m.moduleId === 'business' && m.enabled);
   const hasProfessionModule = isProfessionModuleEnabled(worldDef);
+  const hasMapModule = isMapModuleEnabled(worldDef);
   const combatV3Enabled = isCombatFeatureEnabled(gameState);
   const readOnly = engine.isReadOnly;
   const pendingAbilityProposals = Object.values(gameState.v3?.pendingAbilityProposals ?? {});
@@ -528,7 +532,14 @@ export default function GameScreen() {
       autoSave: () => useSaveStore.getState().scheduleAutoSave(),
     }).then((result) => {
       if (result.warnings.length > 0) console.warn('[CustomModules] onButton warnings:', result.warnings);
-    }).catch((error) => console.warn('[CustomModules] onButton failed:', error));
+      // 失败原因（钱不够、物资不足、条件不满足）告诉玩家，不只写在控制台。
+      const name = engine.variableManager.getState().customModules?.[moduleId]?.definition?.name ?? moduleId;
+      const message = describeCustomModuleButtonOutcome(result, moduleId, name);
+      if (message) setNotification(message);
+    }).catch((error) => {
+      console.warn('[CustomModules] onButton failed:', error);
+      setNotification(`模块执行失败：${error instanceof Error ? error.message : String(error)}`);
+    });
   }, [engine, state.selectedWorld, bumpVersion]);
 
   // ── 事件目录：世界内置事件 + 本局启用的事件包（二级开关 sessionActivePacks 优先，否则用全局已启用列表） ──
@@ -592,6 +603,35 @@ export default function GameScreen() {
     bumpVersion();
   }, [engine, bumpVersion]);
   const economyActions = useEconomyActions(engine, worldDef, setNotification, bumpVersion);
+  // 人物档案里的装备、卸下、丢弃：交给装备 / 行囊模块结算，结果由档案面板就地提示。
+  const handleGearCommand = useCallback((command: string, args: Record<string, unknown>, label?: string) => {
+    const result = engine.dispatch(command, args, label);
+    if (result.ok) bumpVersion();
+    return result;
+  }, [engine, bumpVersion]);
+  // 地图：赶路与休整交给地图模块结算；到了之后把下一步行动放进输入框，正文会承接结算备注。
+  const handleMapTravel = useCallback((locationId: string, name: string) => {
+    const result = engine.dispatch('map.travel', { to: locationId }, `前往${name}`);
+    if (result.ok) {
+      bumpVersion();
+      setChatDraft({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: `我到了${name}，先四处看看。` });
+      setNotification(`${result.feedback}，下一步行动已放进输入框`);
+    }
+    return result;
+  }, [engine, bumpVersion]);
+  const handleMapRest = useCallback(() => {
+    const result = engine.dispatch('map.rest', { hours: 8 }, '休整');
+    if (result.ok) bumpVersion();
+    return result;
+  }, [engine, bumpVersion]);
+  const mapView = useMemo(() => hasMapModule ? buildMapViewModel(worldDef, gameState) : null,
+    // gameState 可能被原地修改，跟着 stateVersion 重新计算。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasMapModule, worldDef, gameState, stateVersion]);
+  const openMap = useCallback(() => {
+    if (isMobile) { setShowRightOverlay(false); setMobileActivePanel('map'); }
+    else setOverlay('map');
+  }, [isMobile]);
 
 
   const continueCombatNarration = useCallback(async () => {
@@ -832,7 +872,8 @@ export default function GameScreen() {
     const host = currentPlayerActionHost();
     const content = (() => {
       switch (panel) {
-        case 'profile': return <ProfilePanel gameState={gameState} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} variableManager={engine.variableManager} />;
+        case 'map': return <MapPanel world={worldDef} gameState={gameState} readOnly={readOnly} onTravel={readOnly ? undefined : handleMapTravel} onRest={readOnly ? undefined : handleMapRest} onGather={readOnly ? undefined : resourceActions.gather} />;
+        case 'profile': return <ProfilePanel gameState={gameState} world={worldDef} hasBusinessModule={hasBusinessModule} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} onCommand={readOnly ? undefined : handleGearCommand} />;
         case 'characters': return <CharacterGrid gameState={gameState} worldId={state.selectedWorld} onUpdateChronicles={handleUpdateChronicles} onMergeChronicles={handleMergeChronicles} onDeleteNpc={readOnly ? undefined : handleDeleteNpc} />;
         case 'tasks': return <TaskPanel gameState={gameState} professionConfig={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} />;
         case 'profession': return <ProfessionTreePanel config={worldSystem.职业体系 as import('../../modules/schema').ProfessionModuleSchema | undefined} statConfig={worldSystem.数值属性 as StatModuleSchema | undefined} gameState={gameState} currentTick={gameState.simulationRuntime?.tick ?? 0} onUnlock={id => applyProfessionAction('unlock', id)} onUse={id => applyProfessionAction('use', id)} />;
@@ -856,10 +897,10 @@ export default function GameScreen() {
     return DOSSIER_META[normalizeDossierPanel(panel)].title;
   };
   const getPanelMeta = (panel: OverlayPanel) => panel ? DOSSIER_META[normalizeDossierPanel(panel)] : undefined;
-  const activeNavButtons = useMemo(() => navButtons.filter(button => button.id !== 'profession' || hasProfessionModule), [hasProfessionModule]);
+  const activeNavButtons = useMemo(() => navButtons.filter(button => (button.id !== 'profession' || hasProfessionModule) && (button.id !== 'map' || hasMapModule)), [hasProfessionModule, hasMapModule]);
   const mobileNavItems = useMemo(() => buildMobileNavItems({
     navigate: handleNavigate, setShowLeftOverlay, setMobileActivePanel,
-  }).filter(item => item.id !== 'profession' || hasProfessionModule), [handleNavigate, hasProfessionModule]);
+  }).filter(item => (item.id !== 'profession' || hasProfessionModule) && (item.id !== 'map' || hasMapModule)), [handleNavigate, hasProfessionModule, hasMapModule]);
   // ── Shared elements ──
   const economyView = buildEconomyViewModel(gameState, worldDef, worldDef?.modules?.find(module => module.moduleId === 'business' && module.enabled)?.name);
 
@@ -876,6 +917,8 @@ export default function GameScreen() {
       economyView={economyView}
       onOpenEconomyLedger={() => setBusinessOverlayOpen(true)}
       eventsView={eventsView}
+      mapView={mapView}
+      onOpenMap={openMap}
       onSetEventPacing={readOnly ? undefined : level => {
         const result = setEventPacing(engine, worldDef, level);
         setNotification(result.feedback);

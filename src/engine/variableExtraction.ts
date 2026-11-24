@@ -131,10 +131,13 @@ export function createVariableExtractionSnapshot(state: GameState, narrativeText
       const mentioned = narrativeText.includes(id) || (name.length > 0 && narrativeText.includes(name));
       if (getNpcCategoryValue(npc) === '离场' && !mentioned) continue;
       const personal = npc.个人信息 ?? {} as GameState['人物档案'][string]['个人信息'];
-      // NPC 物品栏：非空时带上，供 AI 在 NPC 使用/消耗/交付道具时更新（含删除）
+      // NPC 物品栏 / 装备栏：非空时带上，供 AI 在 NPC 使用、交付道具或换装时更新（含删除）
+      const nonEmptyRecord = (value: unknown) => !!value && typeof value === 'object' && !Array.isArray(value)
+        && Object.keys(value as Record<string, unknown>).length > 0;
       const npcInventory = (npc as unknown as Record<string, unknown>).物品栏;
-      const hasInventory = !!npcInventory && typeof npcInventory === 'object' && !Array.isArray(npcInventory)
-        && Object.keys(npcInventory as Record<string, unknown>).length > 0;
+      const hasInventory = nonEmptyRecord(npcInventory);
+      const npcEquipment = (npc as unknown as Record<string, unknown>).装备栏;
+      const hasEquipment = nonEmptyRecord(npcEquipment);
       // 技能列表/物品列表/装备列表属静态定义，按既有约定不进提取快照（见 variableExtractionSnapshot.test.ts）
       const cleaned = Object.fromEntries(Object.entries({
         姓名: npc.姓名,
@@ -147,6 +150,7 @@ export function createVariableExtractionSnapshot(state: GameState, narrativeText
         社会身份: npc.社会身份,
         关系数据: npc.关系数据,
         ...(hasInventory ? { 物品栏: npcInventory } : {}),
+        ...(hasEquipment ? { 装备栏: npcEquipment } : {}),
         个人信息: Object.fromEntries(Object.entries({
           外貌: personal.外貌,
           表性格: personal.表性格,

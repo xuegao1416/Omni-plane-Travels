@@ -6,6 +6,7 @@ import { useConfigStore } from '@/stores/configStore';
 import { requestCompletionStream } from '@/api/client';
 import type { KnownNPC } from '@/engine/playerKnowledge';
 import type { ImageTaskOptions } from '@/api/imageTasks';
+import { readNpcEquipment } from '@/domains/equipment/slots';
 
 // ─── LLM 翻译 Prompt ───
 
@@ -58,11 +59,12 @@ function buildCharacterDescription(npc: KnownNPC): string {
   addLine(lines, '形象', ext.形象);
   addLine(lines, '身份', ext.身份);
 
-  // 装备
-  if (npc.装备列表 && typeof npc.装备列表 === 'object') {
-    const equips = Object.values(npc.装备列表).filter(v => !isPlaceholder(v));
-    if (equips.length) lines.push(`装备：${equips.join('、')}`);
-  }
+  // 装备：装备栏（剧情中穿戴的）优先，旧的装备列表补空位；对象值取名称，避免把 [object Object] 写进提示词。
+  const gear = readNpcEquipment(npc);
+  const equips = [...Object.values(gear.slots), ...gear.extras.map(extra => extra.item)]
+    .map(item => item.名称)
+    .filter(name => !isPlaceholder(name));
+  if (equips.length) lines.push(`装备：${equips.join('、')}`);
 
   return lines.join('\n');
 }

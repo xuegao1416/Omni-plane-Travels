@@ -37,7 +37,7 @@ const KIND_LABELS: Record<InstallTargetKind, string> = {
 
 const AFTER_INSTALL_HINTS: Partial<Record<string, string>> = {
   world_package: '新游戏时可以在世界列表里选择它。',
-  gameplay_module: '单独安装的模块需要在世界的玩法模块设置里启用。',
+  gameplay_module: '装好后到「已安装」里点「世界与存档」，选择要启用的世界；那里也能应用到已有存档。随世界包一起装的模块已在那个世界启用。',
   event_pack: '事件包装好后默认停用，可在「已安装」里一键启用。',
   workflow_pack: '工作流包装好后默认停用，可在「已安装」里一键启用。',
   adventure_pack: '冒险包作为事件卡出现，装好后默认停用，可在「已安装」里一键启用。',

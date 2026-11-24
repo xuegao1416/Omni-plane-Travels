@@ -117,7 +117,7 @@ export default function StartScreen() {
               onOpenCustomModules={() => setCustomModuleOpen(true)}
               onOpenSettings={() => leaveHallTo('settings')}
               onOpenUserCenter={() => leaveHallTo('user-center')}
-              onOpenEditor={(world, step = 1) => { h.setEditingWorld(world); h.setWorldEditorInitialStep(step); h.setWorldEditorOpen(true); }}
+              onOpenEditor={(world, step = 1, workspace) => { h.setEditingWorld(world); h.setWorldEditorInitialStep(step); h.setWorldEditorWorkspace(workspace); h.setWorldEditorOpen(true); }}
               onDeleteWorld={h.handleDeleteWorld}
               onImportWorld={h.handleImportWorld}
               onLoadSave={h.handleLoadSave}
@@ -158,6 +158,7 @@ export default function StartScreen() {
         <WorldEditorForm
           initialWorld={h.editingWorld}
           initialStep={h.worldEditorInitialStep}
+          initialWorkspace={h.worldEditorWorkspace}
           onSave={h.handleSaveWorld}
           onCancel={h.handleCancelWorldEditor}
           apiConfig={h.apiConfig}

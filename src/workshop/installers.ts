@@ -193,6 +193,10 @@ async function installModule(context: InstallContext): Promise<InstallOperation>
   const saved = await saveCustomGameplayModule({ ...source, id });
   try {
     if (context.worldId) await bindCustomGameplayModule(saved.module.id, context.worldId);
+    // 从工坊更新时，已经启用的世界一起换成新版本（之后新开的游戏用新版）；已有存档仍固定原版本，可在「已安装」里应用更新。
+    if (previous?.status === 'enabled') {
+      for (const worldId of previous.worldIds) if (worldId !== context.worldId) await bindCustomGameplayModule(saved.module.id, worldId);
+    }
   } catch (error) {
     if (previous) await restoreCustomGameplayModule(previous);
     else await deleteCustomGameplayModule(saved.module.id);

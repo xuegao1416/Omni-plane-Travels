@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════════
+   NPC dossier sheet (opened from 角色关系). Portaled to <body> so the
+   mobile sheet's transform animation can't shrink it; a centred folio on
+   desktop, an edge-to-edge sheet on phones. Material comes from
+   .game-journey__nested-panel (game-dossier.css); this sheet adds layout.
+   ═══════════════════════════════════════════════ */
+
+.npc-sheet-overlay { position: fixed; inset: 0; z-index: 1300; display: grid; place-items: center; padding: 16px; box-sizing: border-box; animation: pk-fade .2s ease-out both; }
+.npc-sheet.game-journey__nested-panel { display: flex; flex-direction: column; width: min(720px, 100%); height: min(86dvh, 800px); overflow: hidden; }
+
+/* ── Header: portrait medallion, name, chips, favour gauge ── */
+.npc-head {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 14px; flex: 0 0 auto; padding: 18px 18px 14px;
+  background: radial-gradient(ellipse 70% 130% at 0% 0%, rgba(var(--d-gold-bg, 227, 194, 126), .12), transparent 70%);
+}
+.npc-head::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .5), rgba(var(--d-gold-bg, 233, 207, 150), .12) 70%, transparent); }
+.npc-head__portrait { position: relative; width: 68px; height: 68px; }
+.npc-head__frame {
+  display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 50%; cursor: default;
+  background: radial-gradient(circle at 50% 36%, rgb(var(--d-raise-bg, 38, 48, 90)), rgb(var(--d-night-bg, 11, 16, 34)) 72%) padding-box, conic-gradient(from 210deg, rgb(var(--d-cream-bg, 255, 241, 200)), rgb(var(--d-bronze-bg, 138, 95, 36)), rgb(var(--d-gold-bg, 233, 201, 131)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-cream-bg, 255, 241, 200))) border-box;
+  box-shadow: 0 0 0 3px rgba(var(--d-night, 7, 10, 22), .9), 0 0 0 4px rgba(var(--d-brass, 184, 136, 63), .45), 0 6px 14px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1)));
+}
+.npc-head__frame[data-zoomable='true'] { cursor: zoom-in; }
+.npc-head__frame img { width: 100%; height: 100%; object-fit: cover; }
+.npc-head__frame > span { color: rgb(var(--d-gold, 242, 212, 142)); font: 700 24px/1 var(--pl-font-serif); }
+.npc-head__mini {
+  position: absolute; right: -5px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 2px solid rgb(var(--d-night-bg, 10, 14, 30)); border-radius: 50%; cursor: pointer;
+  color: rgb(var(--d-gold, 233, 207, 150)); background: rgb(var(--d-raise-bg, 30, 39, 72)); transition: transform .25s var(--pk-spring, ease-out);
+}
+.npc-head__mini:hover { transform: scale(1.1); }
+.npc-head__mini--generate { bottom: -3px; color: #2a1a04; background: var(--pk-brass-face); }
+.npc-head__mini--upload { top: -3px; }
+.npc-head__title { min-width: 0; }
+.npc-head__name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; color: rgb(var(--d-cream, 242, 227, 189)); font: 700 19px/1.3 var(--pl-font-serif); letter-spacing: .12em; overflow-wrap: anywhere; }
+.npc-head__name svg { flex: 0 0 auto; color: rgb(var(--d-warn, 240, 186, 96)); fill: currentColor; }
+.npc-head__chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.npc-chip { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; border-radius: 999px; white-space: nowrap; color: var(--text-secondary); font-size: 11px; background: var(--pk-well); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .22); }
+.npc-chip[data-tone='present'] { color: rgb(var(--d-ok, 126, 206, 156)); box-shadow: inset 0 0 0 1px rgba(var(--d-ok, 126, 206, 156), .55); }
+.npc-chip[data-tone='focus'] { color: rgb(var(--d-warn, 240, 186, 96)); box-shadow: inset 0 0 0 1px rgba(var(--d-warn, 240, 186, 96), .55); }
+.npc-chip[data-tone='away'] { color: var(--text-muted); }
+.npc-head__status { margin: 6px 0 0; font-size: 11.5px; line-height: 1.4; }
+.npc-head__status[data-tone='ok'] { color: rgb(var(--d-ok, 126, 206, 156)); }
+.npc-head__status[data-tone='error'] { color: rgb(var(--d-red, 232, 128, 112)); }
+.npc-head__status[data-tone='busy'] { color: rgb(var(--d-gold, 233, 207, 150)); }
+.npc-head__close { align-self: start; }
+.npc-icon-btn {
+  display: grid; place-items: center; flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 1.5px solid transparent; border-radius: 50%; cursor: pointer; color: rgb(var(--d-gold, 233, 207, 150));
+  background: radial-gradient(circle at 50% 38%, rgb(var(--d-raise-bg, 30, 39, 72)), rgb(var(--d-night-bg, 10, 15, 32)) 70%) padding-box, conic-gradient(from 210deg, rgb(var(--d-brass-bg, 201, 167, 102)), rgb(var(--d-bronze-bg, 77, 51, 15)), rgb(var(--d-brass-bg, 165, 120, 55)), rgb(var(--d-seat, 42, 26, 4)), rgb(var(--d-brass-bg, 201, 167, 102))) border-box;
+  transition: color .2s, transform .3s var(--pk-spring, ease-out), box-shadow .25s;
+}
+.npc-icon-btn:hover { color: rgb(var(--d-cream, 255, 243, 207)); box-shadow: 0 0 12px rgba(var(--d-gold, 242, 212, 142), .3); }
+.npc-icon-btn:disabled { opacity: .5; cursor: wait; }
+.npc-icon-btn--danger { color: rgb(var(--d-red, 232, 128, 112)); }
+.npc-icon-btn--close:hover { transform: rotate(90deg); }
+.npc-icon-btn--sm { width: 30px; height: 30px; }
+
+.npc-favor { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 12px; }
+.npc-favor > span:first-child { flex: 0 0 auto; color: var(--text-muted); letter-spacing: .1em; }
+.npc-favor__track { position: relative; flex: 1 1 auto; min-width: 60px; height: 8px; border-radius: 999px; background: rgb(var(--d-deep-bg, 5, 8, 19)); box-shadow: inset 0 1px 3px rgba(var(--d-shade, 0, 0, 0), calc(.9 * var(--d-shade-k, 1))), 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .24); }
+.npc-favor__track::before { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: rgba(var(--d-gold, 233, 207, 150), .55); }
+.npc-favor__fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--favor, rgb(var(--d-gold-bg, 242, 212, 142))); box-shadow: 0 0 8px var(--favor, rgba(var(--d-gold, 242, 212, 142), .5)); transition: left .5s var(--pk-ease, ease-out), width .5s var(--pk-ease, ease-out); }
+.npc-favor__value { flex: 0 1 auto; min-width: 0; overflow: hidden; color: rgb(var(--d-cream, 242, 227, 189)); text-overflow: ellipsis; white-space: nowrap; }
+.npc-favor__value b { color: var(--favor, rgb(var(--d-gold, 242, 212, 142))); font: 700 13px/1 var(--pl-font-display); }
+.npc-head__tools { display: flex; flex: 0 0 auto; gap: 6px; }
+
+/* ── Tabs (segmented, horizontal on every width) ── */
+.npc-tabs { display: grid; grid-template-columns: repeat(var(--npc-tabs, 5), minmax(0, 1fr)); flex: 0 0 auto; gap: 3px; margin: 12px 18px 0; padding: 3px; border-radius: 4px; background: var(--pk-well); box-shadow: var(--pk-well-edge); }
+.npc-tab {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 36px; padding: 0 6px; border: 0; border-radius: 3px; cursor: pointer;
+  color: var(--text-muted); font: 500 13px/1.1 var(--pl-font-serif); letter-spacing: .08em; background: transparent; transition: color .2s, background .25s;
+}
+.npc-tab > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.npc-tab > svg { flex: 0 0 auto; }
+.npc-tab:hover { color: rgb(var(--d-cream, 242, 227, 189)); }
+.npc-tab[aria-selected='true'] { color: #2a1a04; font-weight: 700; background: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 50%), var(--pk-brass-face); box-shadow: 0 2px 6px rgba(var(--d-shade, 0, 0, 0), calc(.5 * var(--d-shade-k, 1))); }
+
+/* ── Reader view toggle (幕后内容) ── */
+.npc-reader { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; margin: 10px 18px 0; color: var(--text-muted); font-size: 11.5px; line-height: 1.45; }
+.npc-reader > span { flex: 1 1 auto; min-width: 0; }
+.npc-reader__switch {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 28px; padding: 0 11px; border: 0; border-radius: 999px; cursor: pointer; color: var(--text-muted); font: 500 11.5px/1 var(--pl-font-ui);
+  background: var(--pk-well); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .3); transition: color .2s, box-shadow .2s;
+}
+.npc-reader__switch:hover { color: rgb(var(--d-cream, 242, 227, 189)); }
+.npc-reader__switch[aria-pressed='true'] { color: rgb(var(--d-warn, 240, 186, 96)); box-shadow: inset 0 0 0 1px rgba(var(--d-warn, 240, 186, 96), .7), 0 0 10px rgba(var(--d-warn, 240, 186, 96), .2); }
+
+/* ── Body ── */
+.npc-sheet__body { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 14px 18px 20px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(var(--d-gold, 233, 207, 150), .25) transparent; line-height: 1.6; }
+.npc-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; align-items: start; }
+.npc-block { position: relative; min-width: 0; padding: 12px 14px; border-radius: 4px; background: var(--pk-plate); box-shadow: var(--pk-plate-edge); }
+.npc-stack { display: grid; gap: 12px; min-width: 0; }
+.npc-block__title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: rgb(var(--d-gold, 233, 207, 150)); font: 600 11.5px/1.2 var(--pl-font-display); letter-spacing: .22em; }
+.npc-block__title svg { flex: 0 0 auto; color: rgb(var(--d-gold, 242, 212, 142)); }
+.npc-block__title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(var(--d-gold-bg, 233, 207, 150), .35), transparent); }
+.npc-text { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.npc-deeds {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 42px; padding: 0 14px; border: 0; border-radius: 3px; cursor: pointer;
+  color: rgb(var(--d-cream, 242, 227, 189)); font: inherit; font-size: 13px; background: var(--pk-well); box-shadow: inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .3); transition: box-shadow .2s;
+}
+.npc-deeds:hover { box-shadow: inset 0 0 0 1px rgb(var(--d-gold, 233, 207, 150)), 0 0 12px rgba(var(--d-gold, 242, 212, 142), .2); }
+.npc-deeds > span { display: inline-flex; align-items: center; gap: 6px; }
+.npc-deeds > small { color: var(--text-muted); font-size: 11.5px; }
+
+/* NPC stats (能力 tab) */
+.npc-vitals { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 14px; }
+.npc-vital { display: grid; gap: 4px; min-width: 0; font-size: 11.5px; }
+.npc-vital > div { display: flex; justify-content: space-between; gap: 6px; color: var(--text-muted); }
+.npc-vital b { color: rgb(var(--d-cream, 242, 227, 189)); font: 600 12px/1 var(--pl-font-display); }
+.npc-vital__bar { height: 6px; overflow: hidden; border-radius: 999px; background: rgb(var(--d-deep-bg, 5, 8, 19)); box-shadow: 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .2); }
+.npc-vital__bar > i { display: block; height: 100%; border-radius: inherit; background: var(--bar, rgb(var(--d-red-bg, 214, 112, 98))); }
+.npc-dims { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 130px), 1fr)); gap: 6px 14px; margin-top: 10px; }
+.npc-dim { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; padding: 3px 0; font-size: 12px; box-shadow: inset 0 -1px 0 rgba(var(--d-gold, 233, 207, 150), .08); }
+.npc-dim > span { min-width: 0; overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.npc-dim b { color: rgb(var(--d-cream, 242, 227, 189)); font: 600 12.5px/1 var(--pl-font-display); white-space: nowrap; }
+.npc-dim small { margin-left: 3px; font: 700 10px/1 var(--pl-font-display); }
+.npc-dim small[data-sign='up'] { color: rgb(var(--d-ok, 126, 206, 156)); }
+.npc-dim small[data-sign='down'] { color: rgb(var(--d-red, 232, 128, 112)); }
+/* 技能卡片网格用局部的卡片宽度，不吃全局 --grid-card-min（360px 会在手机上撑破右侧） */
+.npc-sheet .grid-responsive { --grid-card-min: 150px; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--grid-card-min)), 1fr)); }
+
+/* Portrait zoom + deeds overlay */
+.npc-portrait-zoom { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 16px; cursor: zoom-out; background: rgba(var(--d-deep-bg, 2, 3, 8), .86); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: pk-fade .2s ease-out both; }
+.npc-portrait-zoom img { max-width: min(92vw, 720px); max-height: 90dvh; border-radius: 6px; object-fit: contain; box-shadow: 0 0 0 1px rgb(var(--d-seat, 42, 26, 4)), 0 0 0 4px rgb(var(--d-rail, 184, 136, 63)), 0 30px 80px rgba(var(--d-shade, 0, 0, 0), calc(.65 * var(--d-shade-k, 1))); }
+.npc-deeds-overlay { position: fixed; inset: 0; z-index: 1350; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
+
+@media (max-width: 640px) {
+  .npc-sheet-overlay { place-items: stretch; padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+  .npc-sheet.game-journey__nested-panel { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
+  .npc-head { gap: 10px 12px; padding: 14px 14px 12px; }
+  .npc-head::after { left: 14px; right: 14px; }
+  .npc-head__portrait { width: 56px; height: 56px; }
+  .npc-head__name { font-size: 17px; letter-spacing: .08em; }
+  .npc-tabs { margin: 10px 12px 0; }
+  .npc-tab { flex-direction: column; gap: 3px; min-height: 46px; padding: 4px 2px; font-size: 11.5px; letter-spacing: .02em; }
+  .npc-reader { margin: 8px 12px 0; }
+  .npc-reader > span { display: none; }
+  .npc-reader__switch { width: 100%; justify-content: center; }
+  .npc-sheet__body { padding: 12px 12px 18px; }
+  .npc-block { padding: 11px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .npc-sheet-overlay, .npc-portrait-zoom { animation: none; }
+}

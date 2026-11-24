@@ -236,7 +236,7 @@ ${selectionSummary}
 /** 模块ID到中文名称的映射 */
 const MODULE_ID_TO_KEY: Record<string, string> = {
   stat: '数值属性', progression: '成长体系', survival: '生存资源',
-  business: '经营资产', dice: '骰子检定', talent: '天赋体系', profession: '职业体系',
+  business: '经营资产', dice: '骰子检定', talent: '天赋体系', profession: '职业体系', map: '世界地图',
 };
 
 /**
@@ -246,10 +246,13 @@ export async function generateModuleEntries(
   worldDesc: string,
   selectedModules: string[],
   callAI: CallAI,
+  /** 世界地图用的种子：上一步生成的地点、势力与标签。 */
+  mapSeed?: import('../../modules/buildContext').BuildContext['mapSeed'],
 ): Promise<{ modules: WorldModule[]; worldBookEntries: WorldBookEntryDef[] }> {
   if (selectedModules.length === 0) return { modules: [], worldBookEntries: [] };
 
   const buildCtx = createBuildContext(worldDesc, selectedModules);
+  if (mapSeed) buildCtx.mapSeed = mapSeed;
 
   try {
     await executeBuildPipeline(buildCtx, {

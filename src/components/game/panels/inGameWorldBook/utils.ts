@@ -1,5 +1,5 @@
 import type { WorldBookEntryDef,WorldDef } from '../../../../data/worlds-schema';
-import { findWorldDef } from '../../../../data/worldLoader';
+import { compactBuiltinCopy, findWorldDef } from '../../../../data/worldLoader';
 import { STORAGE_KEYS } from '../../../../config/storageKeys';
 import { safeSetItem } from '../../../../storage/safeStorage';
 
@@ -8,10 +8,11 @@ export function persistWorldToStorage(updatedWorld: WorldDef) {
   try {
     const stored: WorldDef[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
     const idx = stored.findIndex(w => w.id === updatedWorld.id);
+    const compact = compactBuiltinCopy(updatedWorld);
     if (idx >= 0) {
-      stored[idx] = updatedWorld;
+      stored[idx] = compact;
     } else {
-      stored.push(updatedWorld);
+      stored.push(compact);
     }
     safeSetItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(stored));
   } catch (err) {

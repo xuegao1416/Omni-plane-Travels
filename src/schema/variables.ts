@@ -49,6 +49,17 @@ export interface InventoryItem {
     类型: 'heal' | 'resource' | 'damage' | 'cleanse' | 'buff';
     目标?: 'self' | 'ally' | 'enemy';
   };
+  /** 可穿戴装备的部位（武器/头部/手部/胸部/腿部/脚部/饰品）；缺省时按 类型 与名称推断。 */
+  装备部位?: string;
+  /** 穿戴时的属性加成：属性 id（dim1、attrA…）或属性名 → 数值，负数表示代价。 */
+  属性加成?: Record<string, number>;
+  /** 背包类物品提供的额外格数；缺省时背包按品质给 4~12 格。 */
+  扩容?: number;
+}
+
+/** 穿在身上的一件装备：物品数据 + 名称（装备栏按部位存放，键不是物品名）。 */
+export interface EquippedItem extends Partial<InventoryItem> {
+  名称: string;
 }
 
 // ═══════════════════════════════════════════
@@ -268,6 +279,11 @@ export interface PlayerState {
     主货币: { 名称: string; 数量: number };
   };
   物品栏: Record<string, InventoryItem>;
+  /**
+   * 装备栏：部位（武器/头部/手部/胸部/腿部/脚部/饰品一/饰品二）→ 穿戴中的装备。
+   * 只由装备模块的命令改写（domains/equipment），穿上的物品离开物品栏、卸下时放回。
+   */
+  装备栏?: Record<string, EquippedItem>;
   /** 纪事系统 — 统一情报板（危机/机遇/线索/情报/承诺等） */
   纪事系统?: ChronicleSystem;
   /** 动态任务系统 — 与物品/属性/资源/技能/NPC深度联动 */
@@ -376,6 +392,10 @@ export interface NPCData {
   技能列表?: string[] | Record<string, unknown>;
   物品列表?: string[] | Record<string, unknown>;
   装备列表?: Record<string, unknown>;
+  /** 剧情中会增减的随身物品（AI 维护）；与静态 物品列表 一起占用行囊格子。 */
+  物品栏?: Record<string, InventoryItem>;
+  /** 穿戴中的装备，部位 → 物品（结构同 玩家.装备栏）。 */
+  装备栏?: Record<string, EquippedItem>;
 }
 
 export interface GameState {
@@ -419,6 +439,8 @@ export interface GameState {
   flags?: Record<string, unknown>;
   /** 事件导演：待处理的事件卡、触发记录、随机事件节奏。随叙事文档保存。 */
   eventDirector?: import('../events/types').EventDirectorState;
+  /** 世界地图：当前位置、已知与到过的地点、游戏中新出现的地点（domains/map）。 */
+  map?: import('../domains/map/types').MapRuntimeState;
 }
 
 // 默认空状态

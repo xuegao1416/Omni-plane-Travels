@@ -57,6 +57,8 @@ export const DEFAULT_XP_POLICY: Record<string, number> = {
   'quest.completed': 0.1,
   'economy.contractFulfilled': 0.05,
   'resources.crafted': 0.02,
+  'map.discovered': 0.01,
+  'map.firstVisit': 0.03,
 };
 
 /** 领域事件每回合最多给出的经验比例（行动经验与命令发放不计入）。 */
@@ -169,6 +171,9 @@ const XP_EVENTS: Record<string, (event: DomainEvent) => [string, string] | undef
   'quest.completed': event => ['quest.completed', `完成任务「${String(event.payload.name ?? '')}」`],
   'economy.contractFulfilled': () => ['economy.contractFulfilled', '交付订单'],
   'resources.crafted': () => ['resources.crafted', '制作物品'],
+  // 地图：发现新地点（含听说、望见）与初到某地。
+  'map.discovered': event => event.payload.source === 'nearby' ? undefined : ['map.discovered', `发现「${String(event.payload.name ?? '')}」`],
+  'map.arrived': event => event.payload.firstVisit ? ['map.firstVisit', `初到「${String(event.payload.name ?? '')}」`] : undefined,
   // 默认不给经验；世界在 xpPolicy 里写 'combat.victory' 才生效。
   'combat.ended': event => event.payload.status === 'victory' ? ['combat.victory', '战斗胜利'] : undefined,
 };

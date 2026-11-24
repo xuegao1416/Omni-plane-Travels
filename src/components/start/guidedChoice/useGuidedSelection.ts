@@ -269,7 +269,12 @@ ${customSubtitle.trim() ? `- 描述：${customSubtitle.trim()}` : ''}
       let modules: WorldModule[] = [];
       let moduleWorldBookEntries: WorldBookEntryDef[] = [];
       if (selectedModules.length > 0) {
-        const result = await generateModuleEntries(worldDef.description || userDesc, selectedModules, callAI);
+        const result = await generateModuleEntries(worldDef.description || userDesc, selectedModules, callAI, {
+          worldName: worldDef.name,
+          tags: worldDef.tags ?? [],
+          locations: worldBookEntries.filter(entry => entry.entryType === 'lore').map(entry => ({ name: entry.comment, description: entry.content })),
+          factions: worldBookEntries.filter(entry => entry.entryType === 'factions').map(entry => ({ name: entry.comment, description: entry.content })),
+        });
         modules = result.modules;
         moduleWorldBookEntries = result.worldBookEntries;
       }

@@ -157,9 +157,11 @@ registerNodeExecutor('conditions.check_inventory', (_inputs, ctx, wv) => {
   const itemName = (wv?.item_name as string) ?? '';
   const op = (wv?.op as string) ?? '>=';
   const threshold = (wv?.threshold as number) ?? 1;
-  const inventory = getPath(ctx.gameState as Record<string, unknown>, '玩家.物品栏') as Record<string, unknown>[] | undefined;
-  const item = inventory?.find((i) => (i as Record<string, unknown>).name === itemName);
-  const count = item ? ((item as Record<string, unknown>).数量 as number ?? 0) : 0;
+  // 物品栏是「物品名 → 物品」的对象（旧实现当成数组调用 .find，永远找不到物品）。
+  const inventory = getPath(ctx.gameState as Record<string, unknown>, '玩家.物品栏') as Record<string, { 数量?: unknown } | undefined> | undefined;
+  const raw = inventory && typeof inventory === 'object' && !Array.isArray(inventory) ? inventory[itemName] : undefined;
+  const quantity = Number(raw?.数量 ?? 0);
+  const count = Number.isFinite(quantity) ? quantity : 0;
   return { outputs: { flow_out: compare(op, count, threshold), count_out: count } };
 });
 

@@ -483,6 +483,10 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
   const hasStatModule = !!moduleData.数值属性;
   const statModule = hasStatModule ? moduleData.数值属性 as any : undefined;
   const hasBusinessModule = !!moduleData.经营资产;
+  // 装备体系随数值属性启用（属性配置 equipment.enabled = false 关闭）；宿主说明里有装备模块时以宿主为准。
+  const hasEquipmentModule = gameplay
+    ? gameplay.summaries.some(item => item.moduleId === 'equipment')
+    : hasStatModule && statModule?.equipment?.enabled !== false;
   const npcStatExample = statModule
     ? JSON.stringify(materializeNpcSurvivalStats(undefined, statModule))
     : '';
@@ -536,7 +540,7 @@ export function buildVariableExtractionPrompt(worldSystem?: Record<string, unkno
 4. 用角色姓名作key即可，系统自动匹配
 
 【创建新NPC - 必须包含以下全部字段】
-创建时使用 set 意图，路径为 人物档案.角色名，value 为完整 NPC 对象。value 必须包含姓名、种族、性别、年龄、人物分类、背景（2~3 句出身经历与动机）、社会身份（职业与社会地位都要填）、关系数据、个人信息、人物事迹、当前行动、短期目标和长期目标；并按角色身份填入 技能列表（1~3 项）与 物品列表（随身物品，确实一无所有时填空对象）、装备列表；启用数值/成长模块时再填入对应模块字段。这些字段即使玩家当下看不全也必须生成，系统只对玩家侧做隐藏。
+创建时使用 set 意图，路径为 人物档案.角色名，value 为完整 NPC 对象。value 必须包含姓名、种族、性别、年龄、人物分类、背景（2~3 句出身经历与动机）、社会身份（职业与社会地位都要填）、关系数据、个人信息、人物事迹、当前行动、短期目标和长期目标；并按角色身份填入 技能列表（1~3 项）、物品栏（随身物品，物品名 → 完整物品对象，不超过 8 件；确实一无所有时填空对象）与 装备栏（身上穿戴的装备，部位 → 物品对象，部位只用 武器/头部/手部/胸部/腿部/脚部/饰品一/饰品二，对象里写 名称、品质${hasEquipmentModule ? '，可带 属性加成' : ''}；没有就填空对象）；启用数值/成长模块时再填入对应模块字段。这些字段即使玩家当下看不全也必须生成，系统只对玩家侧做隐藏。
 ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 生存状态；字段路径为 人物档案.角色名.生存状态。按角色特点在世界范围内填写，结构示例：${npcStatExample}` : ''}
 
 【更新已有NPC - ★ 每轮必须输出，不可省略 ★】
@@ -552,6 +556,8 @@ ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 
 - NPC 获得新道具（拾取/被赠予/抢夺）：set 意图 写入 人物档案.角色名.物品栏.物品名，value 为完整物品对象
 - NPC 把道具交给玩家：NPC 侧扣减/删除 + 玩家侧获得，两条意图同轮输出，保持物物守恒
 - 快照未携带该 NPC 的 物品栏 说明其为空，确有剧情事实时可用 set 创建首个条目
+- NPC 的行囊格数有限（随身 8 格，背包类物品扩容）；行囊满了的人收不下新物品，见下方「行囊」模块说明
+- NPC 换装：set 人物档案.角色名.装备栏.部位 写入完整物品对象（含 名称、品质${hasEquipmentModule ? '，可带 属性加成' : ''}）；脱下、损毁或被夺走用 remove 删除该部位，脱下的装备若还带在身上，同轮 set 进其 物品栏
 
 【离场规则】
 1. NPC未在当前场景出现 → 人物分类设为"离场"，仅更新此字段
@@ -576,7 +582,7 @@ ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 
 更新在场NPC时，若以下字段为空或"未知"，必须根据上下文推断补全：
 - 职业、外貌、表性格、里性格、当前状态、当前穿着 → 不可为空，必须填入合理值
 - 短期目标、长期目标 → 不可为空，根据角色背景推断
-- 年龄、社会身份.社会地位、技能列表、物品列表、装备列表 → 为空或缺失时按角色身份推断补全，不允许长期留空
+- 年龄、社会身份.社会地位、技能列表 → 为空或缺失时按角色身份推断补全，不允许长期留空；随身物品与装备分别写进 物品栏、装备栏
 - 背景 → 为空或缺失时按角色身份与处境推断补全（2~3 句），不允许留空
 
 ═══════════════════════════════════════
@@ -590,6 +596,8 @@ ${hasStatModule ? `数值模块已启用：新 NPC 的 value 必须包含完整 
    - 玩家消耗/使用/失去若干数量：add 意图 写 玩家.物品栏.物品名.数量，delta 为负数并带 min:0
    - 玩家彻底失去整件物品（丢弃/损毁/赠出最后一件/任务物品被收走）：remove 意图 删除 玩家.物品栏.物品名，不要只写 数量:0 留空壳
    - 数量被扣到 0 的条目系统会自动清理，但优先用 remove 表达"彻底消失"语义
+   - 行囊格数有限（见下方「行囊」模块说明）：满了就别再 set 新物品；获得背包（类型写「背包」，可写 扩容）会扩充格数${hasEquipmentModule ? `
+   - 能穿戴的物品（兵器、护甲、衣帽鞋履、饰品）在物品对象里写 装备部位 与 属性加成；穿上/卸下用 equipment.* 命令，不要直接写 玩家.装备栏` : ''}
    ${hasBusinessModule || gameplay?.summaries.some(item => item.moduleId === 'economy')
     ? '- ★ 钱只有一处：玩家.货币资源.主货币.数量（经营收支也在这里）；不要写 玩家.经营资产.资金。买卖货物用 economy.sell / economy.buy 命令，不要自己算钱。'
     : '- 货币资源：玩家获得/花费货币时更新数量，名称仅在首次或变化时设置'}

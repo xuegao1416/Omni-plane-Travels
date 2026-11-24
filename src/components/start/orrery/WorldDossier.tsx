@@ -3,14 +3,18 @@ import type { LucideIcon } from 'lucide-react';
 import {
 BookOpen,Map,Flag,Users,Landmark,Scale,Layers,ChevronDown,MapPin,Clock,Cloud,Compass,Swords,
 Sparkles,Coins,CalendarDays,Hourglass,HeartHandshake,Zap,Network,Dices,Gauge,TrendingUp,Briefcase,
-Package,Activity,Puzzle,ShieldAlert,Ban,Timer,
+Package,Activity,Puzzle,ShieldAlert,Ban,Timer,MapPinned,
 } from 'lucide-react';
 import type { WorldDef,WorldBookEntryDef,WorldModule } from '../../../data/worlds-schema';
 import PlanarFrame from '../../../ui/planar/PlanarFrame';
 import { resourceGlyph } from '../../game/panels/resourceGlyph';
+import { buildMapViewModel } from '../../../domains/map/viewModel';
+import { mapConfigOf } from '../../../domains/map/config';
+import { LANDFORM_LABELS, THEME_LABELS } from '../../../domains/map/types';
+import MapView from '../../map/MapView';
 import '../../../ui/screens/world-dossier.css';
 
-type ChapterKey = 'overview' | 'lore' | 'factions' | 'npcs' | 'culture' | 'laws' | 'systems';
+type ChapterKey = 'overview' | 'lore' | 'map' | 'factions' | 'npcs' | 'culture' | 'laws' | 'systems';
 interface Chapter { key: ChapterKey; label: string; icon: LucideIcon; count?: number; render: () => ReactNode }
 
 const byType = (world: WorldDef, type: string) => (world.worldBookEntries ?? []).filter(entry => entry.entryType === type && !entry.disable);
@@ -28,11 +32,11 @@ const ALIGNMENT_TONE: Record<string, string> = { 友善: 'is-ally', 友好: 'is-
 
 const MODULE_ICON: Record<string, LucideIcon> = {
   stat: Gauge, progression: TrendingUp, survival: Package, business: Briefcase, dice: Dices,
-  talent: Sparkles, profession: Swords, combat: Swords, simulation: Activity,
+  talent: Sparkles, profession: Swords, combat: Swords, simulation: Activity, map: MapPinned,
 };
 const MODULE_FALLBACK: Record<string, string> = {
   stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定',
-  talent: '天赋体系', profession: '职业体系', combat: '图形化战斗', simulation: '世界动态',
+  talent: '天赋体系', profession: '职业体系', combat: '图形化战斗', simulation: '世界动态', map: '世界地图',
 };
 
 /** A titled section inside a chapter. */
@@ -258,6 +262,11 @@ function moduleFigures(module: WorldModule): ReactNode {
       </div>
     );
   }
+  if (module.moduleId === 'map') {
+    const locations = Array.isArray(config.locations) ? config.locations.length : 0;
+    const regions = Array.isArray(config.regions) ? config.regions.length : 0;
+    return locations ? <p className="wd-note">{regions} 个地区 · {locations} 个地点 · 赶路消耗时间与补给</p> : null;
+  }
   if (module.moduleId === 'business') {
     const goods: Array<{ name: string }> = config.market?.items ?? [];
     return (
@@ -268,6 +277,19 @@ function moduleFigures(module: WorldModule): ReactNode {
     );
   }
   return null;
+}
+
+/** 地图章节：整张地图（全部已知），可切 2D / 3D 与缩放，不能编辑。 */
+function MapChapter({ world }: { world: WorldDef }) {
+  const view = useMemo(() => buildMapViewModel(world, null, { atlas: true }), [world]);
+  if (!view) return null;
+  const start = view.config.locations.find(location => location.id === view.config.startLocationId);
+  return (
+    <div className="wd-map">
+      <div className="wd-map__stage"><MapView view={view} focusCurrent={false} allowFullscreen={false} /></div>
+      <p className="wd-note">{view.title} · {THEME_LABELS[view.theme]} · {LANDFORM_LABELS[view.config.landform]} · {view.config.regions.length} 个地区、{view.config.locations.length} 个地点{start ? ` · 开局在「${start.name}」` : ''}</p>
+    </div>
+  );
 }
 
 function SystemsChapter({ modules }: { modules: WorldModule[] }) {
@@ -300,9 +322,11 @@ export default function WorldDossier({ world }: { world: WorldDef }) {
     const modules = (world.modules ?? []).filter(module => module.enabled);
     const hasOverview = count('setting') > 0 || count('highlights') > 0;
     const hasLaws = ['rules', 'economy', 'events', 'relationships'].some(type => count(type) > 0);
+    const mapLocations = mapConfigOf(world)?.locations.length ?? 0;
     const list: Array<Chapter | false> = [
       hasOverview && { key: 'overview', label: '概览', icon: BookOpen, render: () => <OverviewChapter world={world} /> },
       lore.length > 0 && { key: 'lore', label: '地理', icon: Map, count: lore.length, render: () => <Folios entries={asFolios(lore, '地点')} /> },
+      mapLocations > 0 && { key: 'map', label: '地图', icon: MapPinned, count: mapLocations, render: () => <MapChapter world={world} /> },
       factions > 0 && { key: 'factions', label: '势力', icon: Flag, count: factions, render: () => <FactionsChapter world={world} /> },
       npcs > 0 && { key: 'npcs', label: '人物', icon: Users, count: npcs, render: () => <NpcsChapter world={world} /> },
       (count('culture') + count('items')) > 0 && { key: 'culture', label: '风物', icon: Landmark, count: count('culture') + count('items'), render: () => <CultureChapter world={world} /> },

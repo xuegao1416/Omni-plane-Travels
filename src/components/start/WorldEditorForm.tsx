@@ -1,4 +1,4 @@
-import { useState,useEffect,useRef } from 'react';
+import { useState,useEffect,useMemo,useRef } from 'react';
 import { useDialog } from '../shared/Dialog';
 import type { ChangeEvent } from 'react';
 import type { WorldDef,WorldBookEntryDef } from '../../data/worlds-schema';
@@ -18,13 +18,22 @@ import type { Message } from '../../api/types';
 import { clampPointScale } from '../../gameplay/creation/creationPoints';
 import { buildProfessionPackGenerationPrompt,isProfessionBinding,parseGeneratedProfessionPack } from '../../data/professions';
 import ProfessionLibraryWorkspace from '../profession/ProfessionLibraryWorkspace';
+import MapEditorWorkspace from '../map/MapEditorWorkspace';
+import { MapModuleEditor } from './moduleEditors/MapModuleEditor';
+import { createDefaultMapModule, normalizeMapConfig } from '../../domains/map/config';
+import { mapLinkOptions } from '../../domains/map/links';
+import {
+  buildMapGenerationPrompt, buildMapPlacementPrompt, buildMapRepairPrompt, finalizeGeneratedMap, mergePlacements, parseMapJson, pendingLocations,
+  validateGeneratedMap, type MapGenerationInput,
+} from '../../domains/map/generation';
+import type { MapModuleSchema } from '../../domains/map/types';
 import GuidedChoiceOverlay from './GuidedChoiceOverlay';
 import { ManualEditForm,type ManualEditSection } from './worldEditorForm/ManualEditForm';
 import {
 type FormState,defaultForm,worldToForm,formToWorldDef,injectModuleRuleEntries,
 DEFAULT_MODULE_FACTORIES,MODULE_NAME_MAP,MUTEX,
 } from './worldEditorForm/types';
-import { X,Cpu,Pencil,Sparkles,Download,Save,Check,ChevronLeft,ChevronRight,AlertTriangle,Map,ScrollText,Flag,User,BarChart3,Upload,Dices } from 'lucide-react';
+import { X,Cpu,Pencil,Sparkles,Download,Save,Check,ChevronLeft,ChevronRight,AlertTriangle,Map,MapPinned,ScrollText,Flag,User,BarChart3,Upload,Dices } from 'lucide-react';
 import { PACING_LABELS,PACING_LEVELS } from '../../events/state';
 import DawnFrameV4 from '../shared/dawn/DawnFrameV4';
 import DirectorAuthorEditor from './worldEditorForm/DirectorAuthorEditor';
@@ -44,10 +53,12 @@ interface WorldEditorFormProps {
   onCancel: () => void;
   apiConfig: any;
   initialStep?: number;
+  /** 打开时直接进入的工作台：'map' = 大厅「编辑地图」，打开即进地图编辑器，「保存地图」直接保存世界。 */
+  initialWorkspace?: 'map';
   previewMode?: 'create' | 'edit';
 }
 
-export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiConfig, initialStep, previewMode }: WorldEditorFormProps) {
+export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiConfig, initialStep, initialWorkspace, previewMode }: WorldEditorFormProps) {
   const t = useConfigStore(s => s.t);
   const [form, setForm] = useState<FormState>(() => editorFormForWorld(initialWorld));
   const [directorWorkspaceId] = useState(() => initialWorld?.id ?? `custom_${crypto.randomUUID()}`);
@@ -74,6 +85,8 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
   const aiAbortRef = useRef<AbortController | null>(null);
   const [showGuidedChoice, setShowGuidedChoice] = useState(false);
   const [professionLibraryOpen, setProfessionLibraryOpen] = useState(false);
+  const [mapEditorOpen, setMapEditorOpen] = useState(initialWorkspace === 'map');
+  const [generatingMap, setGeneratingMap] = useState<'map' | 'place' | null>(null);
   const [weaveStep, setWeaveStep] = useState(() => clampWeaveStep(initialStep ?? 1));
   const [weaveValidation, setWeaveValidation] = useState('');
 
@@ -226,6 +239,10 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       if (moduleId === 'progression' && moduleConfig) {
         moduleConfig = normalizeProgressionConfig(moduleConfig as unknown as import('../../modules/schema').ProgressionModuleSchema);
       }
+      // 地图在编辑器里原样保存，落盘前整理一遍（去掉空名字、修正越界坐标与断掉的路线）。
+      if (moduleId === 'map' && moduleConfig) {
+        moduleConfig = normalizeMapConfig(moduleConfig) as unknown as Record<string, unknown>;
+      }
       return {
         ...source,
         moduleId,
@@ -370,6 +387,102 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
     return parseGeneratedProfessionPack(result.text);
   };
 
+  // ─── 世界地图 ───
+  const mapModuleConfig = form.modules?.find(module => module.moduleId === 'map')?.moduleConfig;
+  // 编辑中的地图原样保存（清空名字重打、输入空格时不能被规范化吃掉），只在载入旧数据或 AI 结果时规范化；保存世界时再整理一遍。
+  const mapConfig = useMemo<MapModuleSchema>(() => {
+    if (!mapModuleConfig) return createDefaultMapModule();
+    const raw = mapModuleConfig as Partial<MapModuleSchema>;
+    const editable = Array.isArray(raw.locations) && Array.isArray(raw.regions) && Array.isArray(raw.routes) && typeof raw.seed === 'number' && typeof raw.width === 'number' && typeof raw.height === 'number';
+    return editable ? raw as MapModuleSchema : normalizeMapConfig(mapModuleConfig);
+  }, [mapModuleConfig]);
+  const mapEnabled = selectedModules.has('map');
+  const formTags = form.tags ? form.tags.split(/[,，]/).map(tag => tag.trim()).filter(Boolean) : [];
+  const mapWorld = { name: form.name, description: form.description || form.overview, tags: formTags, modules: form.modules };
+  const mapLinks = useMemo(() => mapLinkOptions(
+    { modules: form.modules, worldBookEntries: refinedEntries.length ? refinedEntries : initialWorld?.worldBookEntries, eventPacks: initialWorld?.eventPacks },
+    form.factions.map(faction => faction.name.trim()).filter(Boolean),
+  ), [form.modules, form.factions, refinedEntries, initialWorld]);
+  const mapPending = useMemo(() => pendingLocations(mapConfig, form.locations
+    .filter(item => item.name.trim())
+    .map(item => ({ name: item.name.trim(), description: item.description }))), [mapConfig, form.locations]);
+  const mapOnly = initialWorkspace === 'map';
+
+  // 大厅「添加地图」：世界还没启用地图模块时先启用（放在重置表单的 effect 之后，避免被覆盖）。
+  useEffect(() => {
+    if (initialWorkspace === 'map' && !initialWorld?.modules?.some(module => module.moduleId === 'map' && module.enabled)) toggleModule('map');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const updateMap = (next: MapModuleSchema) => updateModuleDataByModuleId('map', next as unknown as Record<string, unknown>);
+  const openMapEditor = () => {
+    if (!selectedModules.has('map')) toggleModule('map');
+    setMapEditorOpen(true);
+  };
+  const mapRequest = async (messages: Message[]) => (await requestStreamWithRetry(apiConfig, messages, { signal: new AbortController().signal, onDelta: () => {} })).text;
+
+  const handleMapAiGenerate = async () => {
+    if (!apiConfig) { await dialog.alert('尚未配置可用的 API：请先到「设置」中填写接口后再试。'); return; }
+    if (mapConfig.locations.length && !(await dialog.confirm('AI 会重新画一整张地图，替换现在的地区、地点和路线（地图编辑器里可以撤销）。继续吗？', { confirmText: '重新生成', cancelText: '取消' }))) return;
+    if (!selectedModules.has('map')) toggleModule('map');
+    setGeneratingMap('map');
+    let failure = '';
+    try {
+      const seeds = form.locations.filter(item => item.name.trim()).map(item => ({ name: item.name.trim(), description: item.description }));
+      const input: MapGenerationInput = {
+        worldName: form.name.trim() || undefined,
+        description: [form.description, form.overview].filter(text => text.trim()).join('\n') || worldIntentPrompt || '一个等待探索的世界',
+        timePeriod: form.timePeriod.trim() || undefined,
+        atmosphere: form.atmosphere.trim() || undefined,
+        tags: formTags,
+        locations: seeds,
+        factions: form.factions.filter(faction => faction.name.trim()).map(faction => ({ name: faction.name.trim(), description: faction.description })),
+        theme: mapConfig.theme,
+        links: mapLinks,
+      };
+      const result = await generateWithRepair({
+        messages: [{ role: 'user', content: buildMapGenerationPrompt(input) }],
+        request: mapRequest,
+        parse: text => parseMapJson(text),
+        validate: value => validateGeneratedMap(value, seeds.map(item => item.name)),
+        repairPrompt: issues => buildMapRepairPrompt(issues),
+      });
+      updateMap(finalizeGeneratedMap(result.value, input, { seed: mapConfig.seed, fog: mapConfig.fog }));
+    } catch (err: unknown) {
+      failure = err instanceof Error ? err.message : String(err);
+      console.warn('[地图AI生成] 失败:', failure);
+    } finally { setGeneratingMap(null); }
+    if (failure) await dialog.alert(`地图生成失败：${failure}`);
+  };
+
+  const handleMapAiPlace = async () => {
+    if (!apiConfig) { await dialog.alert('尚未配置可用的 API：请先到「设置」中填写接口后再试。'); return; }
+    if (!mapPending.length || !mapConfig.locations.length) return;
+    const pending = mapPending;
+    setGeneratingMap('place');
+    let failure = '';
+    try {
+      const result = await generateWithRepair({
+        messages: [{ role: 'user', content: buildMapPlacementPrompt(mapConfig, pending, { worldName: form.name, description: form.description || form.overview }) }],
+        request: mapRequest,
+        parse: text => parseMapJson(text),
+        validate: value => validateGeneratedMap(value, pending.map(item => item.name), { placement: true }),
+        repairPrompt: issues => buildMapRepairPrompt(issues),
+      });
+      // 等待期间作者可能还在编辑器里改动，合并到最新的地图上。
+      setForm(previous => ({
+        ...previous,
+        modules: previous.modules?.map(module => module.moduleId === 'map'
+          ? { ...module, moduleConfig: mergePlacements(normalizeMapConfig(module.moduleConfig ?? {}), result.value) as unknown as Record<string, unknown> }
+          : module),
+      }));
+    } catch (err: unknown) {
+      failure = err instanceof Error ? err.message : String(err);
+      console.warn('[地图AI补坐标] 失败:', failure);
+    } finally { setGeneratingMap(null); }
+    if (failure) await dialog.alert(`补全坐标失败：${failure}`);
+  };
+
   const handleSave = () => {
     if (!form.name.trim()) {
       setWeaveValidation('请先填写世界名称，再创建世界。');
@@ -438,6 +551,7 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
       updateModuleData={updateModuleData} onTalentAiGenerate={handleTalentAiGenerate} isGeneratingTalent={isGeneratingTalent}
       onModuleAiFill={handleModuleAiFill} generatingModule={generatingModule}
       onOpenProfessionLibrary={openProfessionLibrary}
+      mapSummary={<MapModuleEditor summary data={mapConfig} world={mapWorld} pendingCount={mapPending.length} generating={generatingMap} aiAvailable={Boolean(apiConfig)} onOpenEditor={openMapEditor} />}
       addFaction={addFaction} removeFaction={removeFaction} updateFaction={updateFaction}
       addNPC={addNPC} removeNPC={removeNPC} updateNPC={updateNPC}
       addLocation={addLocation} removeLocation={removeLocation} updateLocation={updateLocation}
@@ -525,6 +639,20 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
             <details className="world-weave-accordion" open>
               <summary><Map size={16} /><span>地理与世界观</span><em>{chronicleCounts.geography} 项已填写</em><ChevronRight size={15} /></summary>
               <div className="world-weave-accordion-body">{renderManualSections(['geography'])}</div>
+            </details>
+            <details className="world-weave-accordion world-weave-accordion--map" open={mapEnabled}>
+              <summary><MapPinned size={16} /><span>世界地图</span><em>{mapEnabled ? (mapConfig.locations.length ? `${mapConfig.locations.length} 个地点` : '尚未绘制') : '未启用'}</em><ChevronRight size={15} /></summary>
+              <div className="world-weave-accordion-body">
+                {mapEnabled ? (
+                  <MapModuleEditor data={mapConfig} world={mapWorld} pendingCount={mapPending.length} generating={generatingMap} aiAvailable={Boolean(apiConfig)}
+                    onOpenEditor={openMapEditor} onAiGenerate={() => void handleMapAiGenerate()} onAiPlace={() => void handleMapAiPlace()} />
+                ) : (
+                  <div className="world-weave-map-enable">
+                    <p>给这个世界配一张能赶路的地图：古卷、测绘、星图三种画风，2D 与 3D 切换，标出当前位置；路程会消耗时间、体力与补给，危险路段会掷骰检定或遇伏。</p>
+                    <button type="button" className="btn-secondary btn-sm" onClick={openMapEditor}><MapPinned size={14} />启用并绘制地图</button>
+                  </div>
+                )}
+              </div>
             </details>
             <details className="world-weave-accordion">
               <summary><Flag size={16} /><span>阵营与历史</span><em>{chronicleCounts.history} 项已填写</em><ChevronRight size={15} /></summary>
@@ -639,6 +767,21 @@ export default function WorldEditorForm({ initialWorld, onSave, onCancel, apiCon
           onBindingChange={next => updateModuleDataByModuleId('profession', next as unknown as Record<string, unknown>)}
           onGenerate={generateProfessionPack}
           onClose={() => setProfessionLibraryOpen(false)}
+        />
+      )}
+      {mapEditorOpen && (
+        <MapEditorWorkspace
+          map={mapConfig}
+          onChange={updateMap}
+          onClose={() => setMapEditorOpen(false)}
+          {...(mapOnly ? { doneLabel: '保存地图', onDone: () => { setMapEditorOpen(false); handleSave(); } } : {})}
+          world={mapWorld}
+          links={mapLinks}
+          pending={mapPending}
+          generating={generatingMap}
+          aiAvailable={Boolean(apiConfig)}
+          onAiGenerate={() => void handleMapAiGenerate()}
+          onAiPlace={() => void handleMapAiPlace()}
         />
       )}
     </>

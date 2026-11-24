@@ -1,7 +1,7 @@
 /**
  * index.ts — Hono 应用装配：中间件 + 全部 API 路由。
  */
-import { Hono, Context, Next } from 'hono';
+import { Hono, Context, type Next } from 'hono';
 import type { Bindings, SessionData, WorkshopItemType } from './types';
 import { extractToken, getSession, destroySession, buildClearCookie } from './session';
 import { handleSendCode, handleRegister, handleLogin, handleResetPassword } from './email-auth';

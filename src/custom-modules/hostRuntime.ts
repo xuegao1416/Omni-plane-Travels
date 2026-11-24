@@ -6,7 +6,7 @@ import type { GameplayCost } from '../gameplay/types';
 import { executeCustomModuleActions } from './actionExecutor';
 import { buildCustomModuleHostContext, type CustomModuleHostContext } from './context';
 import { buildV2Operands, evaluateV2Condition, type CustomModuleLifecycle } from './runtime';
-import type { CustomGameplayModuleDefinition, CustomModuleHostAction, V2Action } from './schema';
+import type { CustomGameplayModuleDefinition, CustomModuleHostAction, V2Action, ViewComponent } from './schema';
 import { createInitialCustomModuleState } from './stateStore';
 import { validateCustomGameplayModule } from './validator';
 
@@ -18,6 +18,25 @@ export interface CustomModuleGameExecutionOptions {
   ruleId?: string;
 }
 export interface CustomModuleGameExecutionResult { gameState: GameState; applied: number; warnings: string[] }
+
+/** 视图里所有按钮（含卡片上的按钮）的事件名。 */
+export function customModuleButtonEvents(components: readonly ViewComponent[] | undefined, out = new Set<string>()): Set<string> {
+  for (const component of components ?? []) {
+    if (component.type === 'button') out.add(component.event);
+    if (component.type === 'card') for (const action of component.actions ?? []) out.add(action.event);
+    if ('children' in component && Array.isArray(component.children)) customModuleButtonEvents(component.children, out);
+  }
+  return out;
+}
+
+/**
+ * 点按钮时执行哪些规则：id 和视图里某个按钮同名的规则只在点这个按钮时执行；
+ * 其余规则每次点按钮都执行（旧行为，作者可用 event.button.event 条件区分）。
+ */
+export function rulesForButton<R extends { id: string }>(rules: readonly R[], view: { components: readonly ViewComponent[] } | undefined, event: string | undefined): R[] {
+  const buttons = customModuleButtonEvents(view?.components);
+  return rules.filter(rule => !buttons.has(rule.id) || rule.id === event);
+}
 
 /** 宿主能力在这里落成效果；模型给出的路径不会直接进入事务。 */
 export function executeCustomModuleInGame(
@@ -41,7 +60,9 @@ export function executeCustomModuleInGame(
   const warnings: string[] = [];
   let applied = 0;
   let remaining = 128;
-  const rules = options.ruleId ? module.logic[lifecycle].filter(rule => rule.id === options.ruleId) : module.logic[lifecycle];
+  const rules = options.ruleId ? module.logic[lifecycle].filter(rule => rule.id === options.ruleId)
+    : lifecycle === 'onButton' ? rulesForButton(module.logic.onButton, module.view, options.context?.event.button?.event)
+    : module.logic[lifecycle];
   if (options.ruleId && rules.length !== 1) return { gameState: source, applied: 0, warnings: ['指定规则不存在'] };
   for (const rule of rules) {
     const runtimeState = gameState.customModules![module.id];
@@ -94,7 +115,10 @@ export function executeCustomModuleInGame(
         }
       } else path = '玩家.货币资源.主货币.数量';
       if (action.type.endsWith('.consume')) {
-        const cost = costs.get(path) ?? { path, amount: 0 };
+        const label = 'itemId' in action ? module.items[action.itemId]?.name
+          : 'resourceId' in action ? action.resourceId
+          : gameState.玩家.货币资源?.主货币?.名称 || '钱';
+        const cost = costs.get(path) ?? { path, amount: 0, ...(label ? { label } : {}) };
         cost.amount += action.amount;
         costs.set(path, cost);
       } else {

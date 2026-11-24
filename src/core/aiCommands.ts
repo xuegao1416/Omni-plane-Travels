@@ -23,6 +23,11 @@ export const AI_COMMANDS: readonly AiCommandSpec[] = [
   { command: 'resources.discover', description: '正文里第一次出现一种新物资', args: '{id, name, amount, description}', example: { id: 'coconut', name: '椰子', amount: 2, description: '可以解渴充饥' } },
   { command: 'resources.applyStatus', description: '正文里明确陷入某种已定义的状态（如受伤、缺水）', args: '{id, days}', example: { id: 'wounded', days: 3 } },
   { command: 'resources.clearStatus', description: '正文里状态得到处理', args: '{id}', example: { id: 'wounded' } },
+  { command: 'equipment.equip', description: '正文里主角穿上/拿起行囊里的装备（物品须已在 玩家.物品栏；同部位旧装备自动放回行囊）', args: '{item, slot?}', example: { item: '铁盔' } },
+  { command: 'equipment.unequip', description: '正文里主角卸下某个部位的装备（放回行囊，行囊满时不会执行）', args: '{slot}', example: { slot: '头部' } },
+  { command: 'equipment.break', description: '正文里主角身上的装备损毁或被夺走（直接消失，不回行囊）', args: '{slot, reason}', example: { slot: '胸部', reason: '被利爪撕碎' } },
+  { command: 'map.travel', description: '正文里主角到了地图上的另一个地点（写地图上的地名；本地只移动位置标记，不再扣时间）', args: '{to}', example: { to: '临江渡' } },
+  { command: 'map.discover', description: '正文里出现了地图上没有的新地点，或主角打听到了某处的位置（写在哪个已知地点附近、什么方向）', args: '{name, near?, direction?, kind?, description?}', example: { name: '断崖古庙', near: '青石镇', direction: '西北', kind: 'temple', description: '崖边荒废的小庙' } },
 ];
 
 const ALLOWED = new Set(AI_COMMANDS.map(item => item.command));

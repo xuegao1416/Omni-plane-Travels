@@ -22,7 +22,7 @@ import { sanitizeForContext } from './contextManager';
 import type { GameSave, PlayerProfile } from '../storage/db';
 import { optimizeSnapshots } from '../storage/db';
 import { loadWorldBook, applyWorld } from './worldPersonality';
-import { findWorldDef } from '../data/worldLoader';
+import { compactBuiltinCopy, findWorldDef, withBuiltinUpdates } from '../data/worldLoader';
 import { isProfessionModuleEnabled } from '../gameplay/profession/featureGate';
 import type { WorldDef } from '../data/worlds-schema';
 import type { GameState } from '../schema/variables';
@@ -637,14 +637,16 @@ export function useGameEngine(
       simulationState: save.simulationState
         ? { ...save.simulationState, snapshots: shareSnapshotHistory(save.simulationState.snapshots ?? []) } : save.simulationState,
     });
-    const saveWorldDef = (save.customWorld as WorldDef | undefined) ?? findWorldDef(save.worldId);
+    // 内置世界的存档带着开局时的世界快照：换上内置定义的最新地图（旧存档开局时还没有地图）。
+    const saveWorldDef = withBuiltinUpdates(save.customWorld as WorldDef | undefined) ?? findWorldDef(save.worldId);
     const restoredManager = restoreGameplayManager(save, saveWorldDef);
     if (save.customWorld) {
       try {
         const customs: Record<string, unknown>[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
         const customIndex = customs.findIndex((world: any) => world?.id === save.worldId);
-        if (customIndex >= 0) customs[customIndex] = save.customWorld;
-        else customs.push(save.customWorld);
+        const stored = compactBuiltinCopy(save.customWorld);
+        if (customIndex >= 0) customs[customIndex] = stored;
+        else customs.push(stored);
         localStorage.setItem(STORAGE_KEYS.CUSTOM_WORLDS, JSON.stringify(customs));
       } catch { /* localStorage 不可用时仍保留本次存档内的迁移结果 */ }
     }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { FormState } from './types';
 import { inferWorldClockConfig,type WorldClockConfig,type WorldClockDate } from '../../../time/worldClock';
 import { ALL_WORLD_ICONS } from '@/components/shared/worldIcons';
@@ -28,6 +29,8 @@ interface ManualEditFormProps {
   onModuleAiFill: (moduleId: string) => void;
   generatingModule: string | null;
   onOpenProfessionLibrary?: () => void;
+  /** 「世界地图」模块在模块数据列表里的一行概况（入口在 WorldEditorForm 的「世界地图」一栏）。 */
+  mapSummary?: ReactNode;
   addFaction: () => void;
   removeFaction: (i: number) => void;
   updateFaction: (i: number, patch: Partial<FormState['factions'][0]>) => void;
@@ -42,7 +45,7 @@ interface ManualEditFormProps {
 
 export function ManualEditForm({
   form, update, selectedModules, onToggleModule, disabledByConflict,
-  updateModuleData, onTalentAiGenerate, isGeneratingTalent, onModuleAiFill, generatingModule, onOpenProfessionLibrary,
+  updateModuleData, onTalentAiGenerate, isGeneratingTalent, onModuleAiFill, generatingModule, onOpenProfessionLibrary, mapSummary,
   addFaction, removeFaction, updateFaction, addNPC, removeNPC, updateNPC, addLocation, removeLocation, updateLocation,
   sections,
 }: ManualEditFormProps) {
@@ -250,7 +253,8 @@ export function ManualEditForm({
                 {mod.moduleId === 'talent' && <TalentModuleEditor data={(modData as any) || { categories: [] }} onChange={(d) => updateModuleData(modIdx, d)} onAiGenerate={onTalentAiGenerate} isGenerating={isGeneratingTalent} />}
                 {mod.moduleId === 'profession' && <ProfessionModuleEditor data={(modData as any) || { packIds: [] }} onChange={(d) => updateModuleData(modIdx, d)} onOpenLibrary={onOpenProfessionLibrary} />}
                 {mod.moduleId === 'combat' && <CombatModuleEditor data={(modData as any) || { rulesetId: 'narrative' }} onChange={(d) => updateModuleData(modIdx, d as unknown as Record<string, unknown>)} />}
-                {!modData && mod.moduleId !== 'dice' && mod.moduleId !== 'talent' && mod.moduleId !== 'profession' && (
+                {mod.moduleId === 'map' && mapSummary}
+                {!modData && mod.moduleId !== 'dice' && mod.moduleId !== 'talent' && mod.moduleId !== 'profession' && mod.moduleId !== 'map' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>暂无数据</span>
                     <button className="btn-ghost" onClick={() => onModuleAiFill(mod.moduleId)} disabled={generatingModule === mod.moduleId} style={{ fontSize: 'var(--font-size-xs)', padding: '3px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>

@@ -1,6 +1,5 @@
-import { useState,useEffect,useRef,useCallback } from 'react';
+import { useState,useEffect,useRef,useCallback, type CSSProperties } from 'react';
 import { Star,X,ImageIcon,Upload,Save,Trash2 } from 'lucide-react';
-import Avatar from '../../../shared/Avatar';
 import { useDialog } from '../../../shared/Dialog';
 import { useCharacterPortrait,buildPortraitPrompt,translatePromptWithLLM } from '../../../../hooks/useCharacterPortrait';
 import { imageDb } from '../../../../storage/imageDb';
@@ -8,12 +7,25 @@ import { saveNpcTemplate } from '../../../../storage/templateStore';
 import { useStoredImageUrl } from '../../../../hooks/useStoredImageUrl';
 import { useSaveStore } from '../../../../stores/saveStore';
 import type { KnownNPC } from '../../../../engine/playerKnowledge';
-import { categoryStyle,npcDataToCustomNpc } from './types';
+import { favorClass,npcDataToCustomNpc } from './types';
 import { useUISettings } from '../../../../context/UISettingsContext';
 import { confirmNpcDeletion } from './confirmNpcDeletion';
 
-export function PortraitHeader({ npc, npcId, onClose, onDelete }: {
+const CATEGORY_TONE: Record<string, string> = { 在场: 'present', 重点: 'focus', 离场: 'away' };
+
+function statusTone(text: string): 'ok' | 'error' | 'busy' {
+  if (text.includes('失败') || text.includes('错误')) return 'error';
+  return text.includes('成功') || text.includes('已保存') || text.includes('已恢复') ? 'ok' : 'busy';
+}
+
+/**
+ * 人物卷宗的抬头：头像（生成 / 上传 / 放大）、姓名与标签、好感刻度，以及保存模板、删除、关闭。
+ * 生成与上传的流程沿用原实现：生成前先翻译提示词并允许编辑，结果按 portrait-<id> 存进图片库。
+ */
+export function PortraitHeader({ npc, npcId, titleId, onClose, onDelete }: {
   npc: KnownNPC; npcId: string; onClose: () => void;
+  /** 标题元素 id（给外层对话框的 aria-labelledby）。 */
+  titleId?: string;
   /** 提供时，标题栏会出现一个删除按钮；点击后弹出二次确认。 */
   onDelete?: () => void | Promise<void>;
 }) {
@@ -34,7 +46,11 @@ export function PortraitHeader({ npc, npcId, onClose, onDelete }: {
     portraitOwner.current.mounted = true;
     return () => { portraitOwner.current.mounted = false; };
   }, []);
-  const cat = categoryStyle(npc.人物分类);
+  const name = npc.姓名 || npcId;
+  const category = npc.人物分类 ?? '';
+  const favor = npc.关系数据?.好感度;
+  const favorTone = favorClass(favor);
+  const favorValue = typeof favor === 'number' ? Math.max(-100, Math.min(100, favor)) : undefined;
 
   const handleGeneratePortrait = async () => {
     const saveId = useSaveStore.getState().currentSaveId;
@@ -97,10 +113,10 @@ export function PortraitHeader({ npc, npcId, onClose, onDelete }: {
   }, [npcId, ext, npc, portraitIdentity]);
 
   const handleSaveTemplate = async () => {
-    const name = await dlgPrompt('请输入NPC模板名称：', { defaultValue: npc.姓名 || 'NPC模板', title: '保存NPC模板' });
-    if (!name?.trim()) return;
-    saveNpcTemplate(name.trim(), npcDataToCustomNpc(npc));
-    await dlgAlert(`NPC模板「${name.trim()}」已保存 ✓`);
+    const templateName = await dlgPrompt('请输入NPC模板名称：', { defaultValue: npc.姓名 || 'NPC模板', title: '保存NPC模板' });
+    if (!templateName?.trim()) return;
+    saveNpcTemplate(templateName.trim(), npcDataToCustomNpc(npc));
+    await dlgAlert(`NPC模板「${templateName.trim()}」已保存 ✓`);
   };
 
   const handleDeleteConfirm = async () => {
@@ -123,80 +139,74 @@ export function PortraitHeader({ npc, npcId, onClose, onDelete }: {
     );
   };
 
+  const recoverable = findRecoverableImage(`portrait-${npcId}`);
   return (
     <>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-        <div style={{ position: 'relative' }}>
-          <div onClick={() => portraitUrl && setShowPortraitZoom(true)} style={{ cursor: portraitUrl ? 'pointer' : 'default' }} title={portraitUrl ? '点击放大' : ''}>
-            <Avatar name={npc.姓名 || npcId} size="lg" imageSrc={portraitUrl} />
-          </div>
-          <button onClick={handleGeneratePortrait} title={findRecoverableImage(`portrait-${npcId}`) ? '保存并使用已生成的画像（无需重新生成）' : portraitUrl ? '重新生成画像' : '生成画像'} style={{
-            position: 'absolute', bottom: -2, right: -2, width: '20px', height: '20px', borderRadius: 'var(--radius-md)',
-            background: 'var(--accent)', border: '2px solid var(--bg-secondary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
-          }}>
-            <ImageIcon size={10} color="#2a1a04" />
+      <header className="npc-head">
+        <div className="npc-head__portrait">
+          <button
+            type="button"
+            className="npc-head__frame"
+            data-zoomable={Boolean(portraitUrl) || undefined}
+            onClick={() => portraitUrl && setShowPortraitZoom(true)}
+            title={portraitUrl ? '点击放大' : undefined}
+            aria-label={portraitUrl ? `放大${name}的画像` : `${name}的画像`}
+          >
+            {portraitUrl ? <img src={portraitUrl} alt="" /> : <span>{name.trim()[0] ?? '?'}</span>}
           </button>
-          <button onClick={() => fileInputRef.current?.click()} title="上传自定义头像" style={{
-            position: 'absolute', top: -2, right: -2, width: '20px', height: '20px', borderRadius: 'var(--radius-md)',
-            background: 'var(--bg-tertiary)', border: '2px solid var(--bg-secondary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
-          }}>
-            <Upload size={10} color="var(--text-secondary)" />
+          <button type="button" className="npc-head__mini npc-head__mini--generate" onClick={handleGeneratePortrait}
+            title={recoverable ? '保存并使用已生成的画像（无需重新生成）' : portraitUrl ? '重新生成画像' : '生成画像'} aria-label="生成画像">
+            <ImageIcon size={11} />
           </button>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUploadPortrait} style={{ display: 'none' }} />
+          <button type="button" className="npc-head__mini npc-head__mini--upload" onClick={() => fileInputRef.current?.click()} title="上传自定义头像" aria-label="上传自定义头像">
+            <Upload size={11} />
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUploadPortrait} hidden />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: '600', fontSize: 'var(--font-size-lg)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            {npc.重要NPC && <Star size={14} fill="var(--warning)" color="var(--warning)" />}
-            <span>{npc.姓名 || npcId}</span>
-            <span style={{ fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '10px', background: cat.bg, color: cat.color, fontWeight: '500' }}>{cat.label}</span>
+
+        <div className="npc-head__title">
+          <h2 className="npc-head__name" id={titleId}>
+            {npc.重要NPC && <Star size={14} aria-label="重要人物" />}
+            <span>{name}</span>
+          </h2>
+          <div className="npc-head__chips">
+            <span className="npc-chip" data-tone={CATEGORY_TONE[category]}>{category || '状态未知'}</span>
+            <span className="npc-chip">{npc.种族 || '未知种族'}</span>
+            {npc.性别 && <span className="npc-chip">{npc.性别}</span>}
+            {npc.年龄 !== undefined && npc.年龄 !== '' && <span className="npc-chip">{npc.年龄}{typeof npc.年龄 === 'number' || /^\d+$/.test(String(npc.年龄)) ? '岁' : ''}</span>}
+            {npc.社会身份?.职业 && <span className="npc-chip">{npc.社会身份.职业}</span>}
           </div>
-          <div style={{ display: 'flex', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 'var(--font-size-xs)', padding: '1px 7px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>{npc.种族 || '未知种族'}</span>
-            <span style={{ fontSize: 'var(--font-size-xs)', padding: '1px 7px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>{npc.性别}</span>
-            <span style={{ fontSize: 'var(--font-size-xs)', padding: '1px 7px', borderRadius: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>{npc.年龄}岁</span>
-          </div>
-          {portraitStatus && (
-            <div style={{ fontSize: 'var(--font-size-xs)', color: portraitStatus.includes('成功') ? 'var(--success)' : portraitStatus.includes('失败') || portraitStatus.includes('错误') ? 'var(--danger)' : 'var(--accent)', marginTop: '2px' }}>
-              {portraitStatus}
-            </div>
-          )}
+          {portraitStatus && <p className="npc-head__status" data-tone={statusTone(portraitStatus)} role="status">{portraitStatus}</p>}
         </div>
-        {onDelete && (
-          <button type="button" onClick={handleDeleteConfirm} disabled={deleting} title={t('npc.delete.button')} style={{
-            border: 'none', background: 'var(--bg-tertiary)', width: '28px', height: '28px',
-            borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--danger)',
-            flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: deleting ? 0.55 : 1,
-          }}>
-            <Trash2 size={14} />
-          </button>
-        )}
-        <button onClick={handleSaveTemplate} title="保存为NPC模板" style={{
-          border: 'none', background: 'var(--bg-tertiary)', width: '28px', height: '28px',
-          borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--accent)',
-          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Save size={14} />
-        </button>
-        <button onClick={onClose} style={{
-          border: 'none', background: 'var(--bg-tertiary)', width: '28px', height: '28px',
-          borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--text-muted)',
-          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><X size={14} /></button>
-      </div>
+
+        <button type="button" className="npc-icon-btn npc-icon-btn--close npc-head__close" onClick={onClose} aria-label="关闭人物卷宗"><X size={16} /></button>
+
+        <div className="npc-favor">
+          <span>好感</span>
+          <div className="npc-favor__track" style={{ '--favor': favorTone.color } as CSSProperties} aria-hidden="true">
+            {favorValue !== undefined && (
+              <i className="npc-favor__fill" style={favorValue >= 0
+                ? { left: '50%', width: `${favorValue / 2}%` }
+                : { left: `${50 + favorValue / 2}%`, width: `${-favorValue / 2}%` }} />
+            )}
+          </div>
+          <span className="npc-favor__value" style={{ '--favor': favorTone.color } as CSSProperties}>
+            <b>{favorValue ?? '未知'}</b>{npc.关系数据?.关系类型 ? ` · ${npc.关系数据.关系类型}` : ''}
+          </span>
+          <span className="npc-head__tools">
+            <button type="button" className="npc-icon-btn npc-icon-btn--sm" onClick={handleSaveTemplate} title="保存为NPC模板" aria-label="保存为NPC模板"><Save size={14} /></button>
+            {onDelete && (
+              <button type="button" className="npc-icon-btn npc-icon-btn--sm npc-icon-btn--danger" onClick={handleDeleteConfirm} disabled={deleting} title={t('npc.delete.button')} aria-label={t('npc.delete.button')}>
+                <Trash2 size={14} />
+              </button>
+            )}
+          </span>
+        </div>
+      </header>
 
       {showPortraitZoom && portraitUrl && (
-        <div onClick={() => setShowPortraitZoom(false)} style={{
-          position: 'fixed', inset: 0, zIndex: 1100,
-          background: 'rgba(0,0,0,0.8)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}>
-          <img src={portraitUrl} alt={npc.姓名 || '头像'} style={{
-            maxWidth: '90vw', maxHeight: '90vh',
-            borderRadius: 'var(--radius-md)', objectFit: 'contain',
-          }} />
+        <div className="npc-portrait-zoom" role="presentation" onClick={() => setShowPortraitZoom(false)}>
+          <img src={portraitUrl} alt={npc.姓名 || '头像'} />
         </div>
       )}
       {DialogUI}

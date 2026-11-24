@@ -29,6 +29,8 @@ import { canRollbackCombat, normalizeCombatEncounterProposal, normalizeCombatEnc
 import { getGameplayPath, setGameplayPath } from '../core/state';
 import { commitTransaction } from '../core/transaction';
 import { gameplayEffectToOp } from '../core/legacy';
+import { equipmentStatBonus } from '../domains/equipment/bonus';
+import { readEquipment } from '../domains/equipment/slots';
 
 export interface CombatStatRanges {
   attrA?: [number, number];
@@ -172,6 +174,19 @@ function normalizedStats(stats: SurvivalStats | undefined, ranges: CombatStatRan
   const result: Record<string, number> = {};
   for (const key of ['attrA', 'attrB', 'dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'] as const) {
     result[key] = normalizeWorldAttribute(statValue(stats, key), ranges[key] ?? [0, 20]);
+  }
+  return result;
+}
+
+/** 穿戴中的装备把六维加成带进战斗（加成键已由装备模块统一成 dim1~dim6；生命/体力只影响上限，不改战斗血量）。 */
+function withEquipment(stats: SurvivalStats | undefined, equipment: unknown, ranges: CombatStatRanges): SurvivalStats | undefined {
+  if (!stats) return stats;
+  const slots = readEquipment(equipment).slots;
+  if (Object.keys(slots).length === 0) return stats;
+  const result: SurvivalStats = { ...stats };
+  for (const key of ['dim1', 'dim2', 'dim3', 'dim4', 'dim5', 'dim6'] as const) {
+    const bonus = equipmentStatBonus(slots, { id: key, field: key, name: key, kind: 'dimension', range: ranges[key] ?? [0, 20] });
+    if (bonus) result[key] = Number(result[key] ?? 0) + bonus;
   }
   return result;
 }
@@ -433,7 +448,7 @@ function npcUnit(id: string, npc: NPCData, ranges: CombatStatRanges, source: 'al
     inventoryPath: npc.物品列表 && typeof npc.物品列表 === 'object' && !Array.isArray(npc.物品列表) ? `人物档案.${id}.物品列表` : undefined,
     injuryPath: `人物档案.${id}.战斗状态`,
   }, npc.物品列表);
-  const unit = participant(id, npc.姓名 || id, source, source, identityStats(npcCombatStats(npc.生存状态, ranges), ranges, multiplier), false, {}, {}, binding);
+  const unit = participant(id, npc.姓名 || id, source, source, identityStats(withEquipment(npcCombatStats(npc.生存状态, ranges), npc.装备栏, ranges), ranges, multiplier), false, {}, {}, binding);
   unit.itemQuantities = clone(binding.originalItemQuantities);
   return unit;
 }
@@ -451,7 +466,7 @@ export function buildValidatedCombatRoster(state: GameState, proposalInput: Comb
   const errors: string[] = [];
   const pool: CombatRosterUnit[] = [];
   if (Number(state.玩家.生存状态.血量 ?? 0) <= 0) return { ok: false, errors: ['玩家当前无法战斗'] };
-  const playerStats = identityStats(state.玩家.生存状态, ranges);
+  const playerStats = identityStats(withEquipment(state.玩家.生存状态, state.玩家.装备栏, ranges), ranges);
   const playerDefinitions = Object.fromEntries(Object.entries(maps.definitions).filter(([id]) => (maps.instances[id]?.runtime.rank ?? 0) > 0));
   const playerBinding = worldBinding('player', 'player', state.玩家.生存状态, {
     hpPath: '玩家.生存状态.血量',

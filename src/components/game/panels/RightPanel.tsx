@@ -7,12 +7,16 @@ import type { ResourcesViewModel } from '../../../domains/resources/viewModel';
 import { BaseStatsCard,SixDimCard,ProgressionCard,TalentCard } from './modules';
 import ResourcesCard from './modules/ResourcesCard';
 import EventsCard from './modules/EventsCard';
+import MapCard from './modules/MapCard';
+import type { MapViewModel } from '../../../domains/map/viewModel';
 import type { EventsPanelView } from '../../../events/viewModel';
 import type { PacingLevel } from '../../../events/types';
 import { findWorldDef } from '../../../data/worldLoader';
 import { CustomModulePanel } from './CustomModulePanel';
 import { formatWorldClock,getTimeSystemFromWorld } from '../../../time/worldClock';
 import { toDisplayText } from '../../../utils/displayText';
+import { findStat, statCap } from '../../../domains/stats/module';
+import { buildPlayerEquipmentView, statsConfigFor } from '../../../domains/equipment/viewModel';
 
 const COMBAT_RISK_LABELS = { easy: '简单', normal: '普通', hard: '困难', inferno: '炼狱' } as const;
 
@@ -31,6 +35,9 @@ interface Props {
   onOpenEconomyLedger?: () => void;
   /** 事件：节奏、待处理与最近结果（世界没有任何事件时为空） */
   eventsView?: EventsPanelView | null;
+  /** 地图：小地图卡（未启用地图模块时为空） */
+  mapView?: MapViewModel | null;
+  onOpenMap?: () => void;
   onSetEventPacing?: (level: PacingLevel) => void;
   onOpenEventCard?: () => void;
   /** 物资：打开账本抽屉 */
@@ -76,7 +83,7 @@ function GaugeBar({ label, value, max, color, icon }: { label: string; value: nu
   );
 }
 
-export default function RightPanel({ gameState, worldId, resourcesView, onResourceGather, onResourceGenerateRecipe, onResourceCancelRecipeGeneration, isGeneratingRecipe, economyView, onOpenEconomyLedger, eventsView, onSetEventPacing, onOpenEventCard, onOpenResourcesLedger, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
+export default function RightPanel({ gameState, worldId, resourcesView, onResourceGather, onResourceGenerateRecipe, onResourceCancelRecipeGeneration, isGeneratingRecipe, economyView, onOpenEconomyLedger, eventsView, mapView, onOpenMap, onSetEventPacing, onOpenEventCard, onOpenResourcesLedger, onAllocateStat, onBreakthrough, onUnlockTalent, onLearnSkill, onUseSkill, onAwakenAbility, onRespecAbilities, onEquipAbility, onUnequipAbility, onCustomModuleButton, combatV3Enabled = false }: Props) {
   const world = gameState.世界;
   const player = gameState.玩家;
   const worldDef = worldId ? findWorldDef(worldId) : null;
@@ -165,6 +172,8 @@ export default function RightPanel({ gameState, worldId, resourcesView, onResour
         </div>
       </div>
 
+      {mapView && <MapCard view={mapView} onOpen={onOpenMap} />}
+
       {/* 当前目标 */}
       {toDisplayText(player.当前目标) && (
         <div className="surface-card game-journey__status-card">
@@ -202,9 +211,17 @@ export default function RightPanel({ gameState, worldId, resourcesView, onResour
           range: sp.range || [0, 100],
           description: sp.description || '',
         }));
+        // 上限按属性模块的规则算（成长段位 + 装备加成），六维与特色属性标出装备加成。
+        const statsConfig = worldDef ? statsConfigFor(worldDef, gameState) : undefined;
+        const vitalCap = (id: 'attrA' | 'attrB', fallback: number) => {
+          const def = statsConfig ? findStat(statsConfig.stat, id) : undefined;
+          return statsConfig && def ? statCap(statsConfig, gameState, def) : fallback;
+        };
+        const gearTotals = buildPlayerEquipmentView(gameState, worldDef ?? undefined)?.totals ?? [];
+        const gearBonuses = Object.fromEntries(gearTotals.filter(total => total.bonus !== 0).map(total => [total.id, total.bonus]));
         const mergedData = {
-          attrA: { name: cfg?.attrA?.name || '生命', current: ss.血量, max: statModData?.attrA?.max ?? 100 },
-          attrB: { name: cfg?.attrB?.name || '能量', current: ss.体力值, max: statModData?.attrB?.max ?? 100 },
+          attrA: { name: cfg?.attrA?.name || '生命', current: ss.血量, max: vitalCap('attrA', statModData?.attrA?.max ?? 100) },
+          attrB: { name: cfg?.attrB?.name || '能量', current: ss.体力值, max: vitalCap('attrB', statModData?.attrB?.max ?? 100) },
           dim1: { name: cfg?.dim1?.name || '属性1', value: getVal('dim1', 50), range: statModData?.dim1?.range ?? [0, 100] },
           dim2: { name: cfg?.dim2?.name || '属性2', value: getVal('dim2', 50), range: statModData?.dim2?.range ?? [0, 100] },
           dim3: { name: cfg?.dim3?.name || '属性3', value: getVal('dim3', 50), range: statModData?.dim3?.range ?? [0, 100] },
@@ -215,8 +232,8 @@ export default function RightPanel({ gameState, worldId, resourcesView, onResour
         };
         return (
           <>
-            <BaseStatsCard data={mergedData as any} title={moduleNames?.['数值属性']} derived={statDerived} modifiers={statModifiers} availablePoints={player.可用属性点 ?? 0} onAllocate={onAllocateStat} />
-            <SixDimCard data={mergedData as any} title={moduleNames?.['数值属性'] ? moduleNames['数值属性'] + ' · 六维' : undefined} />
+            <BaseStatsCard data={mergedData as any} title={moduleNames?.['数值属性']} derived={statDerived} modifiers={statModifiers} availablePoints={player.可用属性点 ?? 0} onAllocate={onAllocateStat} vitalBonuses={{ attrA: gearBonuses.attrA, attrB: gearBonuses.attrB }} />
+            <SixDimCard data={mergedData as any} title={moduleNames?.['数值属性'] ? moduleNames['数值属性'] + ' · 六维' : undefined} bonuses={gearBonuses} />
           </>
         );
       })()}

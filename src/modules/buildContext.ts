@@ -152,6 +152,9 @@ export interface BuildContext {
   combatData?: CombatModuleSchema;
   /** 阶段4生成的世界书条目 */
   worldBookEntries?: WorldBookEntryDef[];
+  /** 世界地图（domains/map）：生成结果与生成时用的种子（世界书里的地点、势力）。 */
+  mapData?: import('../domains/map/types').MapModuleSchema;
+  mapSeed?: Pick<import('../domains/map/generation').MapGenerationInput, 'worldName' | 'locations' | 'factions' | 'tags' | 'timePeriod' | 'atmosphere' | 'theme'>;
 
   // ── 分离的配置和状态 ──
   /** 数值属性配置 */

@@ -6,6 +6,7 @@ import { normalizeCustomGameplayModule } from './normalize';
 import { createInitialCustomModuleState, migrateCustomModuleState } from './stateStore';
 import type { CustomGameplayModuleV3 } from './schema';
 import { revertTransaction } from '../core/transaction';
+import { buildCustomModuleHostContext } from './context';
 
 export const craftingModule: CustomGameplayModuleV3 = {
   kind: 'custom-gameplay-module', schemaVersion: 3, id: 'crafting-demo', name: '工坊', version: '1.0.0', author: 'test', scope: 'world',
@@ -172,11 +173,66 @@ describe('自创模块与资源/经营模块', () => {
     expect(result.gameState.玩家.货币资源.主货币.数量).toBe(5);
   });
 
-  test('经营资金已并入钱袋：自创模块读到的 business.funds 就是钱袋', async () => {
-    const { buildCustomModuleHostContext } = await import('./context');
+  test('经营资金已并入钱袋：自创模块读到的 business.funds 就是钱袋', () => {
     const game = state();
     game.economy = { version: 2, holdings: { stall: {} } } as never;
     const context = buildCustomModuleHostContext(game);
     expect(context.player.business).toEqual({ funds: 30, assetCount: 1 });
+  });
+});
+
+describe('按钮规则', () => {
+  const bench: CustomGameplayModuleV3 = {
+    kind: 'custom-gameplay-module', schemaVersion: 3, id: 'forge-bench', name: '铁匠台', version: '1.0.0', author: 'test', scope: 'world',
+    inputs: {}, capabilities: ['currency'], items: {},
+    state: { crafted: { type: 'number', default: 0, min: 0 }, repaired: { type: 'number', default: 0, min: 0 }, clicks: { type: 'number', default: 0, min: 0 } },
+    permissions: { read: [], write: 'own-state-only' },
+    logic: { onGameStart: [], onTurnEnd: [], onTick: [], onChoice: [], onButton: [
+      { id: 'forge', actions: [{ type: 'currency.consume', amount: 10 }, { type: 'add', path: 'crafted', value: 1 }] },
+      { id: 'repair', actions: [{ type: 'add', path: 'repaired', value: 1 }] },
+      { id: 'count-clicks', actions: [{ type: 'add', path: 'clicks', value: 1 }] },
+    ] },
+    view: { slot: 'right-panel', components: [
+      { type: 'button', label: '锻造', event: 'forge' },
+      { type: 'card', title: '维护', actions: [{ type: 'button', label: '修理', event: 'repair' }] },
+    ] },
+  };
+
+  function press(game: ReturnType<typeof createDefaultGameState>, event: string, id: string) {
+    return executeCustomModuleInGame(game, bench, 'onButton', {
+      eventId: `button:${id}`, context: { ...buildCustomModuleHostContext(game), event: { button: { type: 'button', moduleId: bench.id, event } } },
+    });
+  }
+
+  test('每个按钮只执行同名规则；不对应按钮的规则每次都执行', () => {
+    const game = createDefaultGameState();
+    game.玩家.货币资源.主货币 = { 名称: '铜钱', 数量: 25 };
+    game.customModules = { [bench.id]: createInitialCustomModuleState(bench) };
+    const repaired = press(game, 'repair', '1');
+    expect(repaired.gameState.customModules![bench.id].values).toEqual({ crafted: 0, repaired: 1, clicks: 1 });
+    expect(repaired.gameState.玩家.货币资源.主货币.数量).toBe(25);
+    const forged = press(repaired.gameState, 'forge', '2');
+    expect(forged.gameState.customModules![bench.id].values).toEqual({ crafted: 1, repaired: 1, clicks: 2 });
+    expect(forged.gameState.玩家.货币资源.主货币.数量).toBe(15);
+  });
+
+  test('付不起时原因用货币名称说明', () => {
+    const game = createDefaultGameState();
+    game.玩家.货币资源.主货币 = { 名称: '铜钱', 数量: 5 };
+    game.customModules = { [bench.id]: createInitialCustomModuleState(bench) };
+    const result = press(game, 'forge', '1');
+    expect(result.warnings).toContain('铜钱不足');
+    expect(result.gameState.customModules![bench.id].values.crafted).toBe(0);
+  });
+
+  test('没有按钮同名规则的旧模块保持原来的行为（所有按钮规则按条件执行）', () => {
+    const legacy: CustomGameplayModuleV3 = { ...bench, view: { slot: 'right-panel', components: [{ type: 'button', label: '随便点', event: 'tap' }] } };
+    const game = createDefaultGameState();
+    game.玩家.货币资源.主货币 = { 名称: '铜钱', 数量: 25 };
+    game.customModules = { [legacy.id]: createInitialCustomModuleState(legacy) };
+    const result = executeCustomModuleInGame(game, legacy, 'onButton', {
+      eventId: 'button:x', context: { ...buildCustomModuleHostContext(game), event: { button: { type: 'button', moduleId: legacy.id, event: 'tap' } } },
+    });
+    expect(result.gameState.customModules![legacy.id].values).toEqual({ crafted: 1, repaired: 1, clicks: 1 });
   });
 });

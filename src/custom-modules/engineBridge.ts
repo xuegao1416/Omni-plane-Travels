@@ -77,6 +77,18 @@ export function runCustomModulesForWorldAndCommit(
   return result;
 }
 
+/**
+ * 玩家点模块按钮后的提示：失败时说明原因，什么都没发生时也告诉玩家；成功时不打扰（面板数值会直接变化）。
+ * 返回空表示不需要提示。
+ */
+export function describeCustomModuleButtonOutcome(result: CustomModuleBridgeResult, moduleId: string, moduleName: string): string | undefined {
+  const prefix = `${moduleId}: `;
+  const reasons = [...new Set(result.warnings.map(warning => (warning.startsWith(prefix) ? warning.slice(prefix.length) : warning).trim()).filter(Boolean))];
+  if (reasons.length) return `「${moduleName}」：${reasons.slice(0, 2).join('；')}`;
+  if (result.applied === 0) return `「${moduleName}」：现在条件不满足，这次没有发生变化。`;
+  return undefined;
+}
+
 /** The engine has already accepted the mechanical clock before dispatching these lifecycles. */
 export async function runCustomModuleTurnLifecycles(
   gameState: GameState, worldId: string,

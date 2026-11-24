@@ -38,6 +38,10 @@ export default function JourneyDossierDrawer({
   }, []);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // 卷宗里打开的浮层（人物详情、物品详情、对话框）挂在 body 上，按键仍会经 React 树冒泡到这里；
+    // 那一层的 Escape 交给它自己（OverlayPortal 的 Escape 栈），不要连卷宗一起关掉。
+    const fromNestedOverlay = event.target instanceof Node && !dialogRef.current?.contains(event.target);
+    if (fromNestedOverlay) return;
     if (event.key === 'Escape') {
       event.stopPropagation();
       onClose();

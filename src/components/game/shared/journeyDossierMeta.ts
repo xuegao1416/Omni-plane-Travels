@@ -1,10 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
-import { UserRound,Users,Target,Swords,ScrollText,Variable,LibraryBig,Clapperboard,Brain,Puzzle,Settings2,FileQuestion,TriangleAlert } from 'lucide-react';
+import { UserRound,Users,Target,Swords,ScrollText,Variable,LibraryBig,Clapperboard,Brain,Puzzle,Settings2,FileQuestion,TriangleAlert,Map as MapIcon } from 'lucide-react';
 
 export type DossierPanelId =
   | 'profile' | 'relations' | 'tasks' | 'chronicle' | 'variables'
   | 'worldbook' | 'dynamics' | 'memory' | 'modules' | 'settings'
-  | 'profession'
+  | 'profession' | 'map'
   | 'empty' | 'error';
 
 export interface DossierPanelMeta {
@@ -15,6 +15,7 @@ export interface DossierPanelMeta {
 
 export const DOSSIER_META: Record<DossierPanelId, DossierPanelMeta> = {
   profile: { title: '人物档案', subtitle: '身份、能力与随身行囊', icon: UserRound },
+  map: { title: '世界舆图', subtitle: '当前位置、已知地点与赶路路线', icon: MapIcon },
   relations: { title: '角色关系', subtitle: '同行者、阵营与互动记录', icon: Users },
   tasks: { title: '任务卷宗', subtitle: '目标、阶段与可领取回报', icon: Target },
   profession: { title: '职业', subtitle: '按四阶道路查看前置关系与已掌握能力', icon: Swords },

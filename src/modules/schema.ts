@@ -78,6 +78,11 @@ export interface StatModuleSchema {
   special: SpecialStat[];
   derived?: DerivedStatDefinition[];
   modifiers?: StatModifierDefinition[];
+  /**
+   * 装备体系（随数值属性启用）：武器、头、手、胸、腿、脚与两件饰品，穿戴时的加成计入属性。
+   * 缺省即启用；`enabled: false` 关闭（物品栏容量与背包不受影响）。
+   */
+  equipment?: { enabled?: boolean };
 }
 
 // ─── 成长体系模块 ───

@@ -1,6 +1,7 @@
 import { useState,useEffect,useRef } from 'react';
 import { ScrollText,X,Edit3,Trash2,Plus } from 'lucide-react';
 import EmptyState from '../../../shared/EmptyState';
+import OverlayPortal from '../../../shared/OverlayPortal';
 import type { ChronicleMergeOptions } from './chronicleActions';
 
 export function DeedsModal({ npcId, chronicles: initialChronicles, onClose, onUpdate, onMerge }: {
@@ -74,13 +75,10 @@ export function DeedsModal({ npcId, chronicles: initialChronicles, onClose, onUp
   };
 
   return (
-    <div className="game-journey__nested-overlay" style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1100, animation: 'fadeIn 0.15s ease',
-    }} onClick={close}>
-      <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
-        width: '90%', maxWidth: '520px', maxHeight: '75vh',
+    // 挂到 body 上并进 Escape 栈：Escape 只关事迹，不连人物卷宗一起关。
+    <OverlayPortal className="game-journey__nested-overlay npc-deeds-overlay" ariaLabel="人物事迹" onClose={close}>
+      <div className="game-journey__nested-panel" style={{
+        width: '100%', maxWidth: '520px', maxHeight: '75vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -188,6 +186,6 @@ export function DeedsModal({ npcId, chronicles: initialChronicles, onClose, onUp
           )}
         </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

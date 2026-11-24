@@ -50,3 +50,8 @@ export function isCombatPreview() {
 export function isWorkshopPreview() {
   return isLocalHost() && new URLSearchParams(window.location.search).get('plshot') === 'workshop';
 }
+
+/** `?plshot=map` renders the world-map harness with the template maps (localhost only). */
+export function isMapPreview() {
+  return isLocalHost() && new URLSearchParams(window.location.search).get('plshot') === 'map';
+}

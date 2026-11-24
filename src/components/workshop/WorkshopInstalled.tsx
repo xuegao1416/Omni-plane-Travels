@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ChevronRight, Loader, PackageCheck, Palette, Power, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Globe, Loader, PackageCheck, Palette, Power, RefreshCw, Trash2 } from 'lucide-react';
 import { getWebEvent } from '../../modules/eventDb';
 import { useWorkshopStore } from '../../stores/workshopStore';
 import { forgetLocalTarget } from '../../workshop/installs';
 import { WORKSHOP_STATUS_LABELS } from '../../workshop/protocol';
 import { executeInstall, previewInstall, previewUninstall, setInstalledEventsEnabled, uninstall, type InstalledEntry } from '../../workshop/service';
 import { VISUAL_THEME_CHANGED, activateVisualTheme, getActiveVisualThemeId } from '../../workshop/visualTheme';
+import { getModuleWorldStatus } from '../../workshop/moduleWorlds';
 import { EmptyState, FeedbackNotice, InlineConfirm, Notice, Spinner, formatDate, typeMeta, useWorkshopAction } from './shared';
+import WorkshopModuleWorlds from './WorkshopModuleWorlds';
 
 async function updateOne(itemId: string): Promise<string[]> {
   const preview = await previewInstall(itemId);
@@ -21,6 +23,9 @@ export default function WorkshopInstalled({ onOpen }: { onOpen: (id: string) => 
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [activeTheme, setActiveTheme] = useState<string | null>(() => getActiveVisualThemeId());
   const [confirming, setConfirming] = useState<string | null>(null);
+  /** 玩法模块：已在几个世界启用（undefined = 本机找不到模块）。 */
+  const [moduleWorlds, setModuleWorlds] = useState<Record<string, number | undefined>>({});
+  const [openModule, setOpenModule] = useState<string | null>(null);
   const { busy, feedback, setFeedback, run } = useWorkshopAction();
 
   useEffect(() => { void refreshInstalled(); }, [refreshInstalled]);
@@ -41,6 +46,17 @@ export default function WorkshopInstalled({ onOpen }: { onOpen: (id: string) => 
     setEnabled(next);
   }, [installed]);
   useEffect(() => { void loadEnabled(); }, [loadEnabled]);
+
+  const loadModuleWorlds = useCallback(async () => {
+    const next: Record<string, number | undefined> = {};
+    for (const entry of installed) {
+      const moduleId = entry.record.targets.find(target => target.kind === 'module')?.id;
+      if (entry.record.type !== 'gameplay_module' || !moduleId) continue;
+      next[entry.record.itemId] = (await getModuleWorldStatus(moduleId))?.enabled.length;
+    }
+    setModuleWorlds(next);
+  }, [installed]);
+  useEffect(() => { void loadModuleWorlds(); }, [loadModuleWorlds]);
 
   const updates = installed.filter(entry => entry.hasUpdate);
 
@@ -107,6 +123,9 @@ export default function WorkshopInstalled({ onOpen }: { onOpen: (id: string) => 
           const Icon = meta.icon;
           const hasEvents = record.targets.some(target => target.kind === 'event');
           const themeId = record.type === 'visual_theme' ? record.targets.find(target => target.kind === 'asset')?.id : undefined;
+          const moduleId = record.type === 'gameplay_module' ? record.targets.find(target => target.kind === 'module')?.id : undefined;
+          const moduleMissing = moduleId !== undefined && entry.missingTargets.some(target => target.kind === 'module' && target.id === moduleId);
+          const worldCount = moduleWorlds[record.itemId];
           const removal = confirming === record.itemId ? previewUninstall(record.itemId, installed.map(item => item.record)) : null;
           const gone = entry.remoteStatus && entry.remoteStatus !== 'published' && entry.remoteStatus !== 'unlisted';
           return (
@@ -119,6 +138,9 @@ export default function WorkshopInstalled({ onOpen }: { onOpen: (id: string) => 
               </div>
               {entry.hasUpdate && <span className="ws-installed has-update">可更新到 v{entry.latestVersion}</span>}
               {gone && <span className="ws-status is-archived">作者端：{WORKSHOP_STATUS_LABELS[entry.remoteStatus!]}</span>}
+              {moduleId && !moduleMissing && worldCount !== undefined && (worldCount > 0
+                ? <span className="ws-installed">已在 {worldCount} 个世界启用</span>
+                : <span className="ws-row__warn"><AlertTriangle size={13} aria-hidden="true" />还没有在任何世界启用，点「世界与存档」选择世界</span>)}
               {entry.missingTargets.length > 0 && (
                 <span className="ws-row__warn"><AlertTriangle size={13} aria-hidden="true" />本地已删除：{entry.missingTargets.map(target => target.label).join('、')}</span>
               )}
@@ -131,6 +153,11 @@ export default function WorkshopInstalled({ onOpen }: { onOpen: (id: string) => 
                 {hasEvents && (
                   <button type="button" aria-pressed={Boolean(enabled[record.itemId])} disabled={busy !== null} onClick={() => toggleEvents(entry)}>
                     <Power size={14} />{enabled[record.itemId] ? '已启用' : '启用'}
+                  </button>
+                )}
+                {moduleId && !moduleMissing && (
+                  <button type="button" aria-expanded={openModule === record.itemId} disabled={busy !== null} onClick={() => setOpenModule(current => (current === record.itemId ? null : record.itemId))}>
+                    <Globe size={14} />世界与存档
                   </button>
                 )}
                 {themeId && (
@@ -146,6 +173,7 @@ export default function WorkshopInstalled({ onOpen }: { onOpen: (id: string) => 
                   <button type="button" className="registry-action-danger" disabled={busy !== null} onClick={() => setConfirming(record.itemId)}><Trash2 size={14} />卸载</button>
                 )}
               </div>
+              {moduleId && !moduleMissing && openModule === record.itemId && <WorkshopModuleWorlds moduleId={moduleId} onChanged={() => void loadModuleWorlds()} />}
               {removal && (removal.blockedBy.length ? (
                 <Notice tone="error" onDismiss={() => setConfirming(null)}><p>「{removal.blockedBy.map(item => item.title).join('」「')}」依赖它，请先卸载它们。</p></Notice>
               ) : (

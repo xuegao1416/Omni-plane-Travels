@@ -1,6 +1,7 @@
 import { Plus,Trash2 } from 'lucide-react';
 import type { PlayerProfile,InventoryItem } from './types';
 import { QUALITY_OPTIONS } from './types';
+import { playerInventoryLayout } from '../../../domains/inventory/capacity';
 
 interface ItemsTabProps {
   personalInfo: PlayerProfile;
@@ -8,7 +9,11 @@ interface ItemsTabProps {
 }
 
 export default function ItemsTab({ personalInfo, set }: ItemsTabProps) {
+  // 开局行囊与游戏内同一套容量：随身 12 格，带上背包类物品才能多装。
+  const layout = playerInventoryLayout(personalInfo.initialItems);
+  const full = layout.used >= layout.capacity;
   const addItem = () => {
+    if (full) return;
     const name = `物品${Object.keys(personalInfo.initialItems).length + 1}`;
     set('initialItems', { ...personalInfo.initialItems, [name]: { 数量: 1, 类型: '', 品质: '普通', 备注: '' } });
   };
@@ -48,7 +53,11 @@ export default function ItemsTab({ personalInfo, set }: ItemsTabProps) {
           <button onClick={() => removeItem(name)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '4px', flexShrink: 0, alignSelf: 'flex-end' }}><Trash2 size={14} /></button>
         </div>
       ))}
-      <button className="btn-ghost" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-base)', marginTop: '4px' }}><Plus size={14} /> 添加物品</button>
+      <div style={{ fontSize: 'var(--font-size-sm)', color: layout.overflow > 0 ? 'var(--danger)' : 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+        行囊 {layout.used}/{layout.capacity} 格{layout.bags.length ? `（含背包 ${layout.bags.map(bag => `${bag.name}+${bag.size}`).join('、')}）` : ''}
+        {full ? '：已装满。类型写「背包」的物品会扩充格数，旅途中拿到背包也能多带。' : '：每种物品占一格，同名物品叠放不占新格。'}
+      </div>
+      <button className="btn-ghost" onClick={addItem} disabled={full} title={full ? '行囊已满' : undefined} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-base)', marginTop: '4px' }}><Plus size={14} /> 添加物品</button>
     </div>
   );
 }

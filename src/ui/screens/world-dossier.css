@@ -160,6 +160,14 @@
 .wd-empty p { margin: 6px 0 0; color: var(--pk-text-2); font-size: 13.5px; }
 .wd-empty small { color: var(--pk-text-3); font-size: 12px; }
 
+/* Map chapter: the world map, read-only (2D / 3D, zoom) */
+.wd-map { display: grid; gap: 10px; min-width: 0; }
+.wd-map__stage {
+  position: relative; height: clamp(260px, 42vh, 420px); min-width: 0; overflow: hidden; border-radius: 4px;
+  box-shadow: 0 0 0 1px rgb(var(--d-seat, 42, 26, 4)), 0 0 0 3px rgba(var(--d-rail, 184, 136, 63), .7), 0 0 0 4px rgb(var(--d-rail-lo, 77, 51, 15)), 0 10px 26px rgba(var(--d-shade, 0, 0, 0), calc(.45 * var(--d-shade-k, 1)));
+}
+.wd-map__stage .map-view { min-height: 0; border-radius: 4px; }
+
 @keyframes wd-slide { from { opacity: 0; transform: translateX(30px); } }
 @keyframes wd-fade { from { opacity: 0; } }
 @keyframes wd-rise { from { opacity: 0; transform: translateY(6px); } }

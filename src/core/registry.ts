@@ -12,9 +12,12 @@ import { statsModule } from '../domains/stats/module';
 import { progressionModule } from '../domains/progression/module';
 import { diceModule } from '../domains/dice/module';
 import { abilitiesModule } from '../domains/abilities/module';
+import { inventoryModule } from '../domains/inventory/module';
+import { equipmentModule } from '../domains/equipment/module';
+import { mapModule } from '../domains/map/module';
 
 export const BUILTIN_GAMEPLAY_MODULES: readonly GameplayModule<any>[] = [
-  coreModule, statsModule, progressionModule, diceModule, abilitiesModule, resourcesModule, economyModule, eventsModule,
+  coreModule, inventoryModule, statsModule, equipmentModule, progressionModule, diceModule, abilitiesModule, resourcesModule, economyModule, mapModule, eventsModule,
 ];
 
 export function createGameplayHost(world: WorldDef | undefined, state: GameState, modules: readonly GameplayModule<any>[] = BUILTIN_GAMEPLAY_MODULES): GameplayHost {

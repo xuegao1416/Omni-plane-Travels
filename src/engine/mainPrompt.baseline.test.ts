@@ -24,6 +24,19 @@ const SUPERSEDED_MODULE_LINE = /^> (生存|经营):/;
  */
 const PURSE_LINE = /^> 主货币:/;
 const BUSINESS_LINE = /^> 经营:/;
+/**
+ * 地图模块接管了 `世界.空间定位.当前位置` 之后，变量快照的世界状态行末尾会追加 `| 地点:<地区 · 地点>`。
+ * 这是玩法宿主带来的预期新增内容，但只放行这一处：时间、已流逝分钟、历法必须与基线逐字相同，
+ * 去掉地理后缀后文本不等就照常判为 unexpected。
+ */
+const WORLD_STATE_LINE = /^> 权威时间:/;
+const LOCATION_SUFFIX = /(?: \| 地点:[^|]+)+$/;
+
+function sameWorldStateIgnoringLocation(newLine: string, oldLine: string): boolean {
+  if (!WORLD_STATE_LINE.test(oldLine)) return false;
+  const stripped = newLine.replace(LOCATION_SUFFIX, '');
+  return stripped !== newLine && stripped === oldLine;
+}
 
 type Messages = Array<{ role: string; content: string }>;
 
@@ -45,6 +58,11 @@ function compare(oldText: string, newText: string): { lost: string[]; unexpected
   let oldIndex = 0;
   for (const line of newLines) {
     if (oldIndex < oldLines.length && line === oldLines[oldIndex]) {
+      oldIndex += 1;
+      continue;
+    }
+    // 世界状态行多出 `| 地点:` 后缀：去掉后缀后仍须与基线该行完全相同，才吃掉这一行。
+    if (oldIndex < oldLines.length && sameWorldStateIgnoringLocation(line, oldLines[oldIndex]!)) {
       oldIndex += 1;
       continue;
     }

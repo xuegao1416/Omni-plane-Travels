@@ -5,7 +5,7 @@
 import {
 Swords,Shield,Wrench,Beaker,Wheat,Gem,BookOpen,ScrollText,
 Crosshair,Crown,Shirt,Package,FlaskConical,Fish,Compass,Key,
-CircleDot,type LucideIcon,
+CircleDot,Pill,Award,Map as MapIcon,Flame,type LucideIcon,
 } from 'lucide-react';
 
 // ─── 物品类型 → Lucide 图标映射 ───
@@ -33,6 +33,13 @@ export const ITEM_TYPE_ICON: Record<string, LucideIcon> = {
   '鱼获': Fish,
   '钥匙': Key,
   '导航': Compass,
+  '消耗品': Pill,
+  '丹药': Pill,
+  '信物': Award,
+  '令牌': Award,
+  '杂物': Package,
+  '地图': MapIcon,
+  '燃料': Flame,
 };
 
 /**

@@ -729,23 +729,6 @@ export class VariableManager {
   }
 
   /**
-   * 从主角物品栏中彻底删除一件物品（整条删除，含全部数量）。
-   * - itemKey: 物品的名称（Record 的 key，即物品名）
-   * - 若物品不存在或 key 为空，返回 false。
-   * - 真删除：不留数量递减、不留空壳条目，下一回合快照中不再出现。
-   * - 撤销途径：回滚到删除前的历史快照即可找回（快照包含 玩家.物品栏）。
-   * - 调用方负责做好后续的 bumpVersion / scheduleAutoSave。
-   */
-  removeInventoryItem(itemKey: string): boolean {
-    if (!itemKey) return false;
-    const items = (this.state.玩家 as unknown as Record<string, unknown>)?.物品栏 as Record<string, unknown> | undefined;
-    if (!items || !Object.prototype.hasOwnProperty.call(items, itemKey)) return false;
-
-    delete items[itemKey];
-    return true;
-  }
-
-  /**
    * 应用世界状态更新（泛化结构）
    * 按"轴名 → 字段 → 新值"写入
    *

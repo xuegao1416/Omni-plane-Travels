@@ -220,9 +220,40 @@
 .ws-row__warn { display: inline-flex; align-items: center; gap: 6px; color: rgb(var(--d-warn, 226, 180, 96)); font-size: 12px; line-height: 1.5; }
 .ws-row__note { margin: 0; padding: 6px 10px; border-radius: 3px; color: var(--pk-text-2); font-size: 12.5px; line-height: 1.6; background: rgba(var(--d-gold-bg, 233, 207, 150), .05); white-space: pre-wrap; }
 .ws-row__actions { align-items: center; }
+/* 行里的状态徽章按内容宽度显示，不撑满整行。 */
+.ws-row > .ws-installed, .ws-row > .ws-status, .ws-row > .ws-row__warn { justify-self: start; }
 .ws-row__actions button[aria-pressed='true'] { color: rgb(var(--d-ok, 150, 210, 160)); box-shadow: inset 0 0 0 1px rgba(var(--d-ok, 138, 200, 150), .6); }
 .ws-row__input { flex: 1 1 160px; min-width: 120px; height: 32px; }
 .ws-status-select .pk-input { height: 32px; padding-top: 0; padding-bottom: 0; font-size: 12.5px; }
+
+/* —— 已安装：玩法模块的世界与存档 —— */
+.ws-module-worlds {
+  display: grid; gap: 12px; padding: 12px 14px; border-radius: 4px;
+  background: var(--pk-well); box-shadow: var(--pk-well-edge), inset 0 0 0 1px rgba(var(--d-gold, 233, 207, 150), .2); animation: ws-rise .25s var(--pk-ease) both;
+}
+.ws-module-worlds__block { display: grid; gap: 8px; min-width: 0; }
+.ws-module-worlds__block h5 { margin: 0; color: rgb(var(--d-cream, 242, 227, 189)); font: 600 13px/1.4 var(--pl-font-serif); letter-spacing: .06em; }
+.ws-module-worlds__hint { margin: 0; color: var(--pk-text-2); font-size: 12.5px; line-height: 1.6; }
+.ws-module-worlds__chips, .ws-module-worlds__recoveries { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ws-module-worlds__chips li {
+  display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 10px; border-radius: 999px;
+  color: var(--pk-text); font-size: 12.5px; background: rgba(var(--d-ok, 138, 200, 150), .1); box-shadow: inset 0 0 0 1px rgba(var(--d-ok, 138, 200, 150), .45);
+}
+.ws-module-worlds__chips button, .ws-module-worlds__recoveries button {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border: 0; border-radius: 999px;
+  color: var(--pk-text-2); font: inherit; font-size: 12px; background: rgba(var(--d-gold-bg, 233, 207, 150), .1); cursor: pointer;
+}
+.ws-module-worlds__chips button:hover:not(:disabled), .ws-module-worlds__recoveries button:hover:not(:disabled) { color: var(--pk-text); background: rgba(var(--d-gold-bg, 233, 207, 150), .2); }
+.ws-module-worlds__chips button:disabled, .ws-module-worlds__recoveries button:disabled { cursor: default; opacity: .55; }
+.ws-module-worlds .ws-inline-input { flex-wrap: wrap; }
+.ws-module-worlds .ws-inline-input .pk-input { flex: 1 1 200px; height: 32px; padding-top: 0; padding-bottom: 0; font-size: 12.5px; }
+.ws-module-worlds__preview { display: grid; gap: 8px; padding: 10px 12px; border-radius: 3px; background: rgba(var(--d-gold-bg, 233, 207, 150), .06); }
+.ws-module-worlds__preview p { margin: 0; color: var(--pk-text); font-size: 12.5px; }
+.ws-module-worlds__preview ul { margin: 0; padding-left: 18px; color: var(--pk-text-2); font-size: 12.5px; line-height: 1.6; }
+.ws-module-worlds__recoveries { flex-direction: column; }
+.ws-module-worlds__recoveries li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--pk-text-2); font-size: 12.5px; }
+.ws-module-worlds__recoveries li > .ws-confirm { flex: 1 1 100%; }
+.ws-module-worlds__recoveries small { color: var(--pk-text-3); }
 
 /* —— 我的发布 —— */
 .ws-author { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
@@ -258,7 +289,7 @@
 @keyframes ws-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ws-card, .ws-row, .ws-confirm, .ws-report, .ws-form { animation: none; }
+  .ws-card, .ws-row, .ws-confirm, .ws-report, .ws-form, .ws-module-worlds { animation: none; }
   .ws-card:hover, .ws-card:focus-within { transform: none; }
 }
 

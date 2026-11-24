@@ -167,6 +167,9 @@ function consumeMaterials(state: GameState, context: Ctx, materials: Record<stri
 
 function marketAccess(state: GameState, context: Ctx, market: MarketDef): string | null {
   if (market.locations.length === 0) return null;
+  // 地图模块：当前所在地点挂接了这个市场就能交易（未启用地图时读不到，按地名关键词判断）。
+  const here = context.facts.read(state, 'map.here.markets');
+  if (Array.isArray(here) && here.includes(market.id)) return null;
   const location = String(context.facts.read(state, 'world.location') ?? '');
   return market.locations.some(keyword => location.includes(keyword)) ? null : `${market.name}只能在${market.locations.join('、')}一带交易（当前：${location || '未知'}）`;
 }

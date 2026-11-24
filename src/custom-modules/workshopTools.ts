@@ -91,7 +91,7 @@ export function executeWorkshopTool(session: WorkshopSession, name: WorkshopTool
       return { session, output: {
         ...buildCustomModuleCapabilityCatalog(session.world), world: session.world,
         moduleSchemaJson: moduleAuthoringSchemaJson,
-        protocol: 'V3：每条规则使用稳定 id；宿主消耗与奖励在同一规则原子结算。inputs 别名指向能力目录路径；物品动作使用 items 的 itemId。',
+        protocol: 'V3：每条规则使用稳定 id；宿主消耗与奖励在同一规则原子结算。inputs 别名指向能力目录路径；物品动作使用 items 的 itemId。按钮：onButton 规则的 id 写成按钮的 event，点这个按钮只执行这条规则；id 不对应任何按钮的规则每次点按钮都会执行。view.slot 用 right-panel（left-panel 目前也显示在右栏）。',
         authoring: '先理解目标，再创建草稿；修改使用 patchDraft。创建或修改后校验并模拟，最终说明结果及需要用户决定的问题。',
       } };
     case 'readDraft':

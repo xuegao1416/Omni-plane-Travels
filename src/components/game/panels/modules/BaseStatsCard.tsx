@@ -12,6 +12,8 @@ interface BaseStatsCardProps {
   modifiers?: Array<{ id: string; statId: string; delta: number; mode?: 'flat' | 'percent'; source?: string; expiresAtTick?: number }>;
   availablePoints?: number;
   onAllocate?: (statId: string) => void;
+  /** 装备提高的生命 / 体力上限（已含在 data.attrA.max / attrB.max 里，这里只用于标注）。 */
+  vitalBonuses?: { attrA?: number; attrB?: number };
 }
 
 function visibleSystemLabel(value: string | undefined, fallback: string): string {
@@ -19,7 +21,7 @@ function visibleSystemLabel(value: string | undefined, fallback: string): string
   return /[A-Za-z]/.test(value) ? fallback : value;
 }
 
-export default memo(function BaseStatsCard({ data, title, derived = [], modifiers = [], availablePoints = 0, onAllocate }: BaseStatsCardProps) {
+export default memo(function BaseStatsCard({ data, title, derived = [], modifiers = [], availablePoints = 0, onAllocate, vitalBonuses }: BaseStatsCardProps) {
   return (
     <Collapsible icon={<Heart size={15} />} title={title || (data.attrA.name + ' / ' + data.attrB.name)} defaultOpen={true}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -29,6 +31,7 @@ export default memo(function BaseStatsCard({ data, title, derived = [], modifier
           value={data.attrA.current}
           max={data.attrA.max}
           color="var(--danger)"
+          gear={vitalBonuses?.attrA}
         />
         <GaugeBar
           icon={<Zap size={11} color="#7f9cd6" />}
@@ -36,6 +39,7 @@ export default memo(function BaseStatsCard({ data, title, derived = [], modifier
           value={data.attrB.current}
           max={data.attrB.max}
           color="#7f9cd6"
+          gear={vitalBonuses?.attrB}
         />
       </div>
       {derived.length > 0 && (
@@ -73,12 +77,14 @@ export default memo(function BaseStatsCard({ data, title, derived = [], modifier
   );
 });
 
-function GaugeBar({ icon, label, value, max, color }: {
+function GaugeBar({ icon, label, value, max, color, gear }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   max: number;
   color: string;
+  /** 装备带来的上限加成（标注用）。 */
+  gear?: number;
 }) {
   // 防御：确保 value 和 max 是有效数字
   const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
@@ -91,7 +97,10 @@ function GaugeBar({ icon, label, value, max, color }: {
       <div className="game-status-meter game-status-meter--module">
         <div style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: '999px', transition: 'width 0.3s' }} />
       </div>
-      <span style={{ fontSize: 'var(--font-size-xs)', textAlign: 'right', color: 'var(--text-secondary)', minWidth: '60px' }}>{safeValue}/{safeMax}</span>
+      <span style={{ fontSize: 'var(--font-size-xs)', textAlign: 'right', color: 'var(--text-secondary)', minWidth: '60px', whiteSpace: 'nowrap' }} title={gear ? `上限含装备 ${gear > 0 ? '+' : ''}${gear}` : undefined}>
+        {safeValue}/{safeMax}
+        {gear ? <small style={{ marginLeft: 3, fontSize: 9.5, fontWeight: 700, color: gear > 0 ? 'var(--success)' : 'var(--danger)' }}>{gear > 0 ? '▲' : '▼'}{Math.abs(gear)}</small> : null}
+      </span>
     </div>
   );
 }

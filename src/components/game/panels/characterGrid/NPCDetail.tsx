@@ -1,172 +1,166 @@
 import type { ChronicleMergeOptions } from './chronicleActions';
-import { useCallback,useState } from 'react';
+import { useCallback, useId, useState, type CSSProperties, type ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import {
-User,BarChart3,Briefcase,MapPin,Sparkles,BookOpen,Brain,Dna,
-Zap,Star,Shield,Swords,Backpack,ScrollText,Eye,EyeOff
+  User, BarChart3, Briefcase, MapPin, Sparkles, BookOpen, Brain, Dna, Zap, Star, Swords, ScrollText, Eye, EyeOff,
 } from 'lucide-react';
+import OverlayPortal from '../../../shared/OverlayPortal';
 import { ExcelRow } from '../../../shared/ExcelRow';
 import EmptyState from '../../../shared/EmptyState';
 import type { KnownNPC } from '../../../../engine/playerKnowledge';
-import type { NPCData } from '../../../../schema/variables';
-import { DETAIL_TABS,favorClass } from './types';
+import type { GameState, NPCData } from '../../../../schema/variables';
+import type { WorldDef } from '../../../../data/worlds-schema';
+import type { StatModuleSchema } from '../../../../modules/schema';
+import { findWorldDef } from '../../../../data/worldLoader';
+import { statDefinitions } from '../../../../domains/stats/module';
+import { equipmentStatBonus } from '../../../../domains/equipment/bonus';
+import { readNpcEquipment, itemSlotKind, SLOT_KIND_LABEL } from '../../../../domains/equipment/slots';
+import { buildNpcEquipmentView, buildPlayerEquipmentView, itemBonusChips, statsConfigFor } from '../../../../domains/equipment/viewModel';
+import { bagSize, npcInventoryLayout, type BagView, type InventoryCell } from '../../../../domains/inventory/capacity';
+import { useStoredImageUrl } from '../../../../hooks/useStoredImageUrl';
+import { DETAIL_TABS } from './types';
 import type { DetailTab } from './types';
-import { GaugeBar } from './NPCCard';
 import { RevealRow } from './RevealRow';
 import { FogPanel, hasBlockContent } from './FogPanel';
-import { TagList,RecordGrid,Section } from './SharedUI';
+import { TagList } from './SharedUI';
 import { ListOrRecord } from './ListOrRecord';
-import { InventoryGrid } from './InventoryGrid';
 import { DeedsModal } from './DeedsModal';
 import { PortraitHeader } from './PortraitHeader';
+import { NpcGearRing } from '../../inventory/NpcGearRing';
+import { InventoryPack } from '../../inventory/InventoryPack';
+import { ItemSheet, SheetBlock, SheetRows } from '../../inventory/ItemSheet';
+import { BonusChips, ItemGlyph, qualityStyle } from '../../inventory/ItemGlyph';
+import '../../../../ui/screens/game-equipment.css';
+import '../../../../ui/screens/game-npc.css';
 
-/** 生存状态显示组件（主属性 + dim1-6 + 特色属性） */
-function SurvivalStatsDisplay({ stats, worldId }: { stats: Record<string, number>; worldId?: string }) {
+type Rec = Record<string, any>;
+
+function Block({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
+  return (
+    <section className="npc-block">
+      <h4 className="npc-block__title"><Icon size={14} strokeWidth={1.6} aria-hidden="true" />{title}</h4>
+      {children}
+    </section>
+  );
+}
+
+function statConfigOf(world: WorldDef | undefined): StatModuleSchema | undefined {
+  return world?.modules?.find(module => module.moduleId === 'stat' && module.enabled)?.moduleConfig as StatModuleSchema | undefined;
+}
+
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/** 生命/体力条 + 六维 + 特色属性；穿戴装备的加成标在旁边（生命/体力的加成算在上限里）。 */
+function NpcStats({ data, world }: { data: Rec; world?: WorldDef }) {
+  const stats = data.生存状态 as Record<string, number> | undefined;
   if (!stats || Object.keys(stats).length === 0) return null;
-
-  // 从世界定义获取属性名称
-  const { findWorldDef } = require('../../../../data/worldLoader');
-  const worldDef = worldId ? findWorldDef(worldId) : null;
-  const statMod = worldDef?.modules?.find((m: any) => m.moduleId === 'stat' && m.enabled);
-  const statConfig = statMod?.moduleConfig as any;
-
-  // 获取主属性名称和上限
-  const attrAName = statConfig?.attrA?.name || '血量';
-  const attrBName = statConfig?.attrB?.name || '体力值';
-  const attrAMax = statConfig?.attrA?.max || 100;
-  const attrBMax = statConfig?.attrB?.max || 100;
-
-  // 分类属性
-  const mainStats: Array<{ key: string; name: string; value: number; max: number }> = [];
-  const dims: Array<{ key: string; name: string; value: number }> = [];
-  const specials: Array<{ key: string; name: string; value: number }> = [];
-
-  for (const [k, v] of Object.entries(stats)) {
-    if (k === '血量' || k === 'attrA') {
-      mainStats.push({ key: k, name: attrAName, value: v as number, max: attrAMax });
-    } else if (k === '体力值' || k === 'attrB') {
-      mainStats.push({ key: k, name: attrBName, value: v as number, max: attrBMax });
-    } else if (k.startsWith('dim')) {
-      const dimIndex = parseInt(k.replace('dim', ''));
-      const dimName = statConfig?.[`dim${dimIndex}`]?.name || k;
-      dims.push({ key: k, name: dimName, value: v as number });
-    } else {
-      specials.push({ key: k, name: k, value: v as number });
-    }
-  }
-
+  const config = statConfigOf(world);
+  const defs = config ? statDefinitions(config) : [];
+  const gear = readNpcEquipment(data).slots;
+  const bonusOf = (field: string) => {
+    const def = defs.find(item => item.field === field || item.id === field);
+    return def && config?.equipment?.enabled !== false ? equipmentStatBonus(gear, def) : 0;
+  };
+  const vitals = [
+    { key: '血量', name: config?.attrA?.name || '血量', max: Number(config?.attrA?.max) || 100, color: 'rgb(var(--d-red-bg, 214, 112, 98))' },
+    { key: '体力值', name: config?.attrB?.name || '体力值', max: Number(config?.attrB?.max) || 100, color: 'rgb(var(--d-warn-bg, 240, 186, 96))' },
+  ].filter(vital => typeof stats[vital.key] === 'number');
+  const rest = Object.entries(stats).filter(([key, value]) => key !== '血量' && key !== '体力值' && typeof value === 'number');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {/* 主属性（血量/体力值） */}
-      {mainStats.length > 0 && (
-        <div style={{ display: 'flex', gap: '12px' }}>
-          {mainStats.map(({ key, name, value, max }) => (
-            <div key={key} style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{name}</span>
-                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{value}/{max}</span>
+    <div>
+      {vitals.length > 0 && (
+        <div className="npc-vitals">
+          {vitals.map(vital => {
+            const max = Math.max(1, vital.max + bonusOf(vital.key));
+            const value = Number(stats[vital.key]);
+            return (
+              <div key={vital.key} className="npc-vital">
+                <div><span>{vital.name}</span><b>{value}/{max}</b></div>
+                <span className="npc-vital__bar"><i style={{ width: `${Math.max(0, Math.min(100, (value / max) * 100))}%`, '--bar': vital.color } as CSSProperties} /></span>
               </div>
-              <GaugeBar value={value} color={key === '血量' || key === 'attrA' ? 'var(--danger)' : 'var(--warning)'} max={max} />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-
-      {/* 六维属性（左三个右三个，占满） */}
-      {dims.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
-          {dims.map(({ key, name, value }) => (
-            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{name}</span>
-              <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--text-primary)' }}>{value}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 特色属性 */}
-      {specials.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {specials.map(({ key, name, value }) => (
-            <div
-              key={key}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '3px 8px', borderRadius: '10px',
-                background: 'color-mix(in srgb, var(--accent) 15%, transparent)', fontSize: 'var(--font-size-xs)',
-              }}
-            >
-              <span style={{ color: 'var(--text-muted)' }}>{name}</span>
-              <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{value}</span>
-            </div>
-          ))}
+      {rest.length > 0 && (
+        <div className="npc-dims">
+          {rest.map(([key, value]) => {
+            const def = defs.find(item => item.field === key || item.id === key);
+            const bonus = bonusOf(key);
+            return (
+              <div key={key} className="npc-dim" title={bonus ? `基础 ${value}，装备 ${bonus > 0 ? '+' : ''}${bonus}` : undefined}>
+                <span>{def?.name ?? key}</span>
+                <b>{round(value + bonus)}{bonus ? <small data-sign={bonus > 0 ? 'up' : 'down'}>{bonus > 0 ? '▲' : '▼'}{Math.abs(bonus)}</small> : null}</b>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-/** 技能页签内容块：可渲染玩家已知版本，也可渲染幕后真相版本（置于迷雾下）。 */
-function SkillsBlock({ data, worldId }: { data: Record<string, any>; worldId?: string }) {
+/** 能力页签：属性、成长、天赋与技能（已知版本直接显示，只有幕后版本时放进迷雾）。 */
+function SkillsBlock({ data, world }: { data: Rec; world?: WorldDef }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {data.特殊能力 && (
-        <Section icon={Sparkles} title="特殊能力">
-          <div style={{ padding: '8px 10px', background: 'var(--accent-dim)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-base)', lineHeight: '1.5' }}>{data.特殊能力}</div>
-        </Section>
-      )}
-      {data.生存状态 && Object.keys(data.生存状态).length > 0 && (
-        <Section icon={BarChart3} title="生存状态">
-          <SurvivalStatsDisplay stats={data.生存状态} worldId={worldId} />
-        </Section>
-      )}
+    <div className="npc-stack">
+      {data.特殊能力 && <Block icon={Sparkles} title="特殊能力"><p className="npc-text">{String(data.特殊能力)}</p></Block>}
+      {data.生存状态 && Object.keys(data.生存状态).length > 0 && <Block icon={BarChart3} title="属性"><NpcStats data={data} world={world} /></Block>}
       {data.成长状态 && (
-        <Section icon={Star} title="成长状态">
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {data.成长状态.当前段位索引 != null && (
-              <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
-                段位: <strong>{data.成长状态.当前段位索引}</strong>
-              </span>
-            )}
-            {data.成长状态.当前经验值 != null && (
-              <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'var(--bg-tertiary)', fontSize: 'var(--font-size-sm)' }}>
-                经验: <strong>{data.成长状态.当前经验值}</strong>
-              </span>
-            )}
-          </div>
-        </Section>
+        <Block icon={Star} title="成长状态">
+          <span className="eq-chips">
+            {data.成长状态.当前段位索引 != null && <span className="eq-chip">段位 <b>{data.成长状态.当前段位索引}</b></span>}
+            {data.成长状态.当前经验值 != null && <span className="eq-chip">经验 <b>{data.成长状态.当前经验值}</b></span>}
+          </span>
+        </Block>
       )}
-      {data.天赋 && data.天赋.length > 0 && (
-        <Section icon={Star} title="天赋"><TagList items={data.天赋} accent /></Section>
-      )}
-      {data.技能列表 && (
-        <Section icon={Zap} title="技能列表"><ListOrRecord data={data.技能列表} emptyText="暂无技能" /></Section>
-      )}
+      {Array.isArray(data.天赋) && data.天赋.length > 0 && <Block icon={Star} title="天赋"><TagList items={data.天赋} accent /></Block>}
+      {data.技能列表 && hasBlockContent(data.技能列表) && <Block icon={Zap} title="技能"><ListOrRecord data={data.技能列表} emptyText="暂无技能" /></Block>}
     </div>
   );
 }
 
-/** 物品页签内容块：同 SkillsBlock，可渲染已知或幕后版本。 */
-export function ItemsBlock({ data }: { data: Record<string, any> }) {
+function hasGear(data: unknown): boolean {
+  const reading = readNpcEquipment(data);
+  return Object.keys(reading.slots).length > 0 || reading.extras.length > 0;
+}
+
+function hasPack(data: unknown): boolean {
+  const layout = npcInventoryLayout(data);
+  return layout.cells.length > 0 || layout.bags.length > 0;
+}
+
+/** 行囊页签：物品栏与建档时的物品列表合成一个有容量的行囊。 */
+export function NpcPackBlock({ data, onSelect, onSelectBag }: { data: Rec; onSelect?: (cell: InventoryCell) => void; onSelectBag?: (bag: BagView) => void }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* 物品栏是剧情中会真正增减的那一栏（AI 通过 add/set/remove 维护），与静态的物品列表分开呈现 */}
-      {data.物品栏 && (
-        <Section icon={Backpack} title="随身物品栏"><InventoryGrid data={data.物品栏} /></Section>
-      )}
-      {data.物品列表 && (
-        <Section icon={Backpack} title="物品列表"><InventoryGrid data={data.物品列表} /></Section>
-      )}
-      {data.装备列表 && Object.keys(data.装备列表).length > 0 && (
-        <Section icon={Shield} title="装备列表"><RecordGrid data={data.装备列表} /></Section>
-      )}
+    <div className="npc-block">
+      <InventoryPack layout={npcInventoryLayout(data)} title="随身行囊" onSelect={onSelect} onSelectBag={onSelectBag} emptyNote="身上没有带东西。" />
     </div>
   );
 }
 
-export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onDeleted }: {
+/** 装备页签：装备环（装备栏 + 建档时的装备列表），与主角同部位比较。 */
+export function NpcGearBlock({ data, name, portrait, world, gameState }: { data: Rec; name: string; portrait: ReactNode; world?: WorldDef; gameState?: GameState }) {
+  const state = gameState ?? ({ 玩家: { 生存状态: {}, 物品栏: {} }, 人物档案: {} } as unknown as GameState);
+  const view = buildNpcEquipmentView(data, world, state);
+  const player = gameState ? buildPlayerEquipmentView(gameState, world) : undefined;
+  return (
+    <div className="npc-block">
+      <NpcGearRing view={view} portrait={portrait} name={name} player={player} />
+    </div>
+  );
+}
+
+type Inspect = { source: 'known' | 'truth'; key: string; bag?: boolean };
+
+export function NPCDetail({ npc, npcId, truth, gameState, onClose, onUpdateChronicles, onMergeChronicles, onDeleteNpc, worldId, onDeleted }: {
   npc: KnownNPC; npcId: string; onClose: () => void;
   /** 幕后真相：只用于读者点开眼睛查看，不会同步给玩家扮演的角色。 */
   truth?: NPCData;
+  /** 当前存档：装备页与主角同部位比较、读世界的属性名称。 */
+  gameState?: GameState;
   onUpdateChronicles?: (npcId: string, chronicles: string[], expectedChronicles?: string[]) => boolean | void;
   onMergeChronicles?: (npcId: string, startIndex: number, endIndex: number, options?: ChronicleMergeOptions) => Promise<boolean>;
   /** 删除该 NPC；返回 false 表示删除未生效。 */
@@ -179,15 +173,21 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
   const [showDeeds, setShowDeeds] = useState(false);
   /** 读者视角总开关：一键展开/收起本页全部幕后内容。 */
   const [readerView, setReaderView] = useState(false);
+  const [inspect, setInspect] = useState<Inspect | null>(null);
+  const titleId = useId();
+  const tabId = useId();
 
-  const ext = npc as any;
+  const ext = npc as Rec;
+  const world = worldId ? findWorldDef(worldId) ?? undefined : undefined;
+  const portraitUrl = useStoredImageUrl(ext.portraitBlobKey || `portrait-${npcId}`);
+  const name = npc.姓名 || npcId;
+  const portrait = portraitUrl ? <img src={portraitUrl} alt="" /> : <span>{name.trim()[0] ?? '?'}</span>;
+
   const handleDelete = useCallback(async () => {
     if (!onDeleteNpc) return;
     const ok = await onDeleteNpc(npcId);
-    if (ok) {
-      // 通知外层移除选中态；onDeleteNpc 内部已经做完存档 + 头像清理。
-      onDeleted?.();
-    }
+    // 通知外层移除选中态；onDeleteNpc 内部已经做完存档 + 头像清理。
+    if (ok) onDeleted?.();
   }, [onDeleteNpc, onDeleted, npcId]);
 
   const chronicles = (ext.人物事迹 as string[] | undefined) ?? [];
@@ -196,159 +196,166 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
   const pi = npc.个人信息 ?? { 外貌: '', 表性格: '', 里性格: '', 当前想法: '', 当前穿着: '', 当前位置: '', 当前状态: '', 备注: '' };
   // 眼睛按钮点开的是幕后真相：只给屏幕前的读者看，不写回玩家认知、不进提示词。
   const truthPi = truth?.个人信息;
-  const truthExt = truth as unknown as Record<string, any> | undefined;
-  // 技能/物品成块呈现：玩家已知就直出，只有幕后版本才压在迷雾下，两者皆空才显示暂无。
+  const truthExt = truth as unknown as Rec | undefined;
+  // 成块的内容：玩家已知就直出，只有幕后版本才压在迷雾下，两者皆空才显示暂无。
   const hasKnownSkills = hasBlockContent(ext.特殊能力, ext.生存状态, ext.成长状态, ext.天赋, ext.技能列表);
   const hasTruthSkills = hasBlockContent(truthExt?.特殊能力, truthExt?.生存状态, truthExt?.成长状态, truthExt?.天赋, truthExt?.技能列表);
-  const hasKnownItems = hasBlockContent(ext.物品栏, ext.物品列表, ext.装备列表);
-  const hasTruthItems = hasBlockContent(truthExt?.物品栏, truthExt?.物品列表, truthExt?.装备列表);
+  const knownGear = hasGear(ext);
+  const truthGear = truthExt ? hasGear(truthExt) : false;
+  const knownPack = hasPack(ext);
+  const truthPack = truthExt ? hasPack(truthExt) : false;
+
+  const inspectSource = inspect?.source === 'truth' ? truthExt : ext;
+  const inspectItem = inspect ? npcInventoryLayout(inspectSource).cells.find(cell => cell.key === inspect.key)?.item
+    ?? npcInventoryLayout(inspectSource).bags.find(bag => bag.key === inspect.key)?.item : undefined;
+
+  const packFor = (source: 'known' | 'truth', data: Rec) => (
+    <NpcPackBlock
+      data={data}
+      onSelect={cell => setInspect({ source, key: cell.key })}
+      onSelectBag={bag => setInspect({ source, key: bag.key, bag: true })}
+    />
+  );
 
   return (
-    <div className="game-journey__nested-overlay" style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000, animation: 'fadeIn 0.15s ease',
-    }} onClick={onClose}>
-      <div className="game-journey__nested-panel" onClick={e => e.stopPropagation()} style={{
-        width: '92%', maxWidth: '640px', height: '82vh',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        <PortraitHeader npc={npc} npcId={npcId} onClose={onClose} onDelete={onDeleteNpc ? () => handleDelete() : undefined} />
+    <OverlayPortal className="game-journey__nested-overlay npc-sheet-overlay" ariaLabelledBy={titleId} onClose={onClose}>
+      <section className="game-journey__nested-panel npc-sheet">
+        <PortraitHeader npc={npc} npcId={npcId} titleId={titleId} onClose={onClose} onDelete={onDeleteNpc ? () => handleDelete() : undefined} />
 
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <div style={{
-            width: '48px', flexShrink: 0, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', padding: '8px 0', gap: '2px',
-            borderRight: '1px solid var(--border)', background: 'var(--bg-primary)',
-          }}>
-            {DETAIL_TABS.map(t => {
-              const TabIcon = t.icon;
-              return (
-                <button key={t.id} onClick={() => setTab(t.id)} title={t.label} style={{
-                  width: '36px', height: '36px', border: 'none', borderRadius: 'var(--radius-md)',
-                  background: tab === t.id ? 'var(--accent-dim)' : 'transparent',
-                  color: tab === t.id ? 'var(--accent)' : 'var(--text-muted)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = 'var(--accent-dim)'; }}
-                onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <TabIcon size={16} strokeWidth={1.5} />
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ flex: 1, padding: '14px 18px', overflowY: 'auto', fontSize: 'var(--font-size-base)', lineHeight: '1.6' }}>
-            <button
-              type="button"
-              onClick={() => setReaderView(v => !v)}
-              title="查看角色尚不知情的幕后内容（仅屏幕前的你看得到）"
-              aria-pressed={readerView}
-              style={{
-                width: '100%', marginBottom: '12px', padding: '5px 10px',
-                border: `1px solid ${readerView ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)',
-                background: readerView ? 'var(--accent-dim)' : 'var(--bg-primary)',
-                color: readerView ? 'var(--accent)' : 'var(--text-muted)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                fontSize: 'var(--font-size-xs)', transition: 'all 0.15s',
-              }}
-            >
-              {readerView ? <EyeOff size={13} strokeWidth={1.5} /> : <Eye size={13} strokeWidth={1.5} />}
-              {readerView ? '收起幕后内容' : '查看幕后内容'}
-            </button>
-            {tab === 'overview' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <Section icon={User} title="基本信息">
-                  <ExcelRow label="姓名" value={npc.姓名 ?? '未知'} />
-                  <ExcelRow label="种族" value={npc.种族 ?? '未知'} />
-                  <ExcelRow label="性别" value={npc.性别 ?? '未知'} />
-                  <RevealRow label="年龄" known={npc.年龄} hidden={truth?.年龄} revealed={readerView} />
-                </Section>
-                <Section icon={BarChart3} title="关系数据">
-                  <div style={{ marginBottom: '8px' }}>
-                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '2px' }}>好感度 {rd.好感度 ?? '未知'}</div>
-                    {rd.好感度 !== undefined && <GaugeBar value={rd.好感度} color={favorClass(rd.好感度).color} min={-100} max={100} />}
-                  </div>
-                  <ExcelRow label="关系类型" value={rd.关系类型 ?? '未知'} />
-                </Section>
-                <Section icon={Briefcase} title="社会身份">
-                  <RevealRow label="职业" known={sj.职业} hidden={truth?.社会身份?.职业} revealed={readerView} />
-                  <RevealRow label="地位" known={sj.社会地位} hidden={truth?.社会身份?.社会地位} revealed={readerView} />
-                </Section>
-                <Section icon={MapPin} title="状态">
-                  <ExcelRow label="位置" value={pi.当前位置 ?? '未知'} />
-                  <ExcelRow label="状态" value={pi.当前状态 ?? '未知'} />
-                </Section>
-              </div>
-            )}
-
-            {tab === 'dossier' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <Section icon={Sparkles} title="外貌与性格">
-                  <ExcelRow label="外貌" value={pi.外貌 ?? '未知'} />
-                  <ExcelRow label="表性格" value={pi.表性格 ?? '未知'} />
-                  <RevealRow label="里性格" known={pi.里性格} hidden={truthPi?.里性格} revealed={readerView} />
-                  <ExcelRow label="穿着" value={pi.当前穿着 ?? '未知'} />
-                </Section>
-                <Section icon={BookOpen} title="背景">
-                  <RevealRow label="背景" known={ext.背景 || npc.背景} hidden={truth?.背景} revealed={readerView} />
-                </Section>
-                <Section icon={Brain} title="内心世界">
-                  <RevealRow label="当前想法" known={pi.当前想法 || ext.内心想法} hidden={truthPi?.当前想法 || truth?.内心想法} revealed={readerView} />
-                  <ExcelRow label="当前行动" value={ext.当前行动} />
-                  <RevealRow label="短期目标" known={ext.短期目标} hidden={truth?.短期目标} revealed={readerView} />
-                  <RevealRow label="长期目标" known={ext.长期目标} hidden={truth?.长期目标} revealed={readerView} />
-                </Section>
-                {(ext.种族描述 || ext.种族效果 || (ext.种族特性 && ext.种族特性.length > 0)) && (
-                  <Section icon={Dna} title="种族信息">
-                    <ExcelRow label="种族描述" value={ext.种族描述} />
-                    <ExcelRow label="种族效果" value={ext.种族效果} />
-                    {ext.种族特性 && ext.种族特性.length > 0 && (
-                      <div style={{ marginTop: '4px' }}>
-                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' }}>种族特性</div>
-                        <TagList items={ext.种族特性} />
-                      </div>
-                    )}
-                  </Section>
-                )}
-                <Section icon={BookOpen} title="备注">
-                  <RevealRow label="备注" known={pi.备注} hidden={truthPi?.备注} revealed={readerView} />
-                </Section>
-                <Section icon={ScrollText} title="人物事迹">
-                  <button onClick={() => setShowDeeds(true)} style={{
-                    width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer',
-                    fontSize: 'var(--font-size-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ScrollText size={14} />查看人物事迹</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>{chronicles.length > 0 ? `${chronicles.length} 条` : '暂无'}</span>
-                  </button>
-                </Section>
-              </div>
-            )}
-
-            {tab === 'skills' && (
-              hasKnownSkills
-                ? <SkillsBlock data={ext} worldId={worldId} />
-                : hasTruthSkills
-                  ? <FogPanel label="技能与状态（幕后）" revealed={readerView}><SkillsBlock data={truth as unknown as Record<string, any>} worldId={worldId} /></FogPanel>
-                  : <EmptyState icon={Swords} message="暂无技能数据" />
-            )}
-
-            {tab === 'items' && (
-              hasKnownItems
-                ? <ItemsBlock data={ext} />
-                : hasTruthItems
-                  ? <FogPanel label="随身物品（幕后）" revealed={readerView}><ItemsBlock data={truth as unknown as Record<string, any>} /></FogPanel>
-                  : <EmptyState icon={Backpack} message="暂无物品数据" />
-            )}
-          </div>
+        <div className="npc-tabs" role="tablist" aria-label="人物卷宗" style={{ '--npc-tabs': DETAIL_TABS.length } as CSSProperties}>
+          {DETAIL_TABS.map(item => {
+            const TabIcon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`${tabId}-${item.id}`}
+                className="npc-tab"
+                aria-selected={tab === item.id}
+                aria-controls={`${tabId}-panel`}
+                onClick={() => setTab(item.id)}
+              >
+                <TabIcon size={15} strokeWidth={1.6} aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
+
+        <div className="npc-reader">
+          <span>幕后内容只给屏幕前的你看，角色本人并不知道。</span>
+          <button type="button" className="npc-reader__switch" aria-pressed={readerView} onClick={() => setReaderView(value => !value)}
+            title="查看角色尚不知情的幕后内容（仅屏幕前的你看得到）">
+            {readerView ? <EyeOff size={13} strokeWidth={1.6} /> : <Eye size={13} strokeWidth={1.6} />}
+            {readerView ? '收起幕后内容' : '查看幕后内容'}
+          </button>
+        </div>
+
+        <div className="npc-sheet__body" role="tabpanel" id={`${tabId}-panel`} aria-labelledby={`${tabId}-${tab}`}>
+          {tab === 'overview' && (
+            <div className="npc-columns">
+              <Block icon={User} title="基本信息">
+                <ExcelRow label="姓名" value={npc.姓名 ?? '未知'} />
+                <ExcelRow label="种族" value={npc.种族 ?? '未知'} />
+                <ExcelRow label="性别" value={npc.性别 ?? '未知'} />
+                <RevealRow label="年龄" known={npc.年龄} hidden={truth?.年龄} revealed={readerView} />
+              </Block>
+              <Block icon={BarChart3} title="关系">
+                <ExcelRow label="好感度" value={rd.好感度 ?? '未知'} />
+                <ExcelRow label="关系类型" value={rd.关系类型 ?? '未知'} />
+              </Block>
+              <Block icon={Briefcase} title="社会身份">
+                <RevealRow label="职业" known={sj.职业} hidden={truth?.社会身份?.职业} revealed={readerView} />
+                <RevealRow label="地位" known={sj.社会地位} hidden={truth?.社会身份?.社会地位} revealed={readerView} />
+              </Block>
+              <Block icon={MapPin} title="状态">
+                <ExcelRow label="位置" value={pi.当前位置 ?? '未知'} />
+                <ExcelRow label="状态" value={pi.当前状态 ?? '未知'} />
+                <ExcelRow label="当前行动" value={ext.当前行动 ?? '未知'} />
+              </Block>
+            </div>
+          )}
+
+          {tab === 'dossier' && (
+            <div className="npc-columns">
+              <Block icon={Sparkles} title="外貌与性格">
+                <ExcelRow label="外貌" value={pi.外貌 ?? '未知'} />
+                <ExcelRow label="表性格" value={pi.表性格 ?? '未知'} />
+                <RevealRow label="里性格" known={pi.里性格} hidden={truthPi?.里性格} revealed={readerView} />
+                <ExcelRow label="穿着" value={pi.当前穿着 ?? '未知'} />
+              </Block>
+              <Block icon={Brain} title="内心世界">
+                <RevealRow label="当前想法" known={pi.当前想法 || ext.内心想法} hidden={truthPi?.当前想法 || truth?.内心想法} revealed={readerView} />
+                <RevealRow label="短期目标" known={ext.短期目标} hidden={truth?.短期目标} revealed={readerView} />
+                <RevealRow label="长期目标" known={ext.长期目标} hidden={truth?.长期目标} revealed={readerView} />
+              </Block>
+              <Block icon={BookOpen} title="背景与备注">
+                <RevealRow label="背景" known={ext.背景 || npc.背景} hidden={truth?.背景} revealed={readerView} />
+                <RevealRow label="备注" known={pi.备注} hidden={truthPi?.备注} revealed={readerView} />
+              </Block>
+              {(ext.种族描述 || ext.种族效果 || (ext.种族特性 && ext.种族特性.length > 0)) && (
+                <Block icon={Dna} title="种族">
+                  <ExcelRow label="种族描述" value={ext.种族描述} />
+                  <ExcelRow label="种族效果" value={ext.种族效果} />
+                  {ext.种族特性 && ext.种族特性.length > 0 && <div style={{ marginTop: 6 }}><TagList items={ext.种族特性} /></div>}
+                </Block>
+              )}
+              <Block icon={ScrollText} title="人物事迹">
+                <button type="button" className="npc-deeds" onClick={() => setShowDeeds(true)}>
+                  <span><ScrollText size={14} aria-hidden="true" />查看与整理人物事迹</span>
+                  <small>{chronicles.length > 0 ? `${chronicles.length} 条` : '暂无'}</small>
+                </button>
+              </Block>
+            </div>
+          )}
+
+          {tab === 'skills' && (
+            hasKnownSkills
+              ? <SkillsBlock data={ext} world={world} />
+              : hasTruthSkills
+                ? <FogPanel label="技能与状态（幕后）" revealed={readerView}><SkillsBlock data={truthExt!} world={world} /></FogPanel>
+                : <EmptyState icon={Swords} message="暂无技能数据" />
+          )}
+
+          {/* 装备与行囊：默认只给角色看得到的（已知的名称）；打开幕后内容时换成完整的真相（品质、加成、行囊）。 */}
+          {tab === 'gear' && (
+            truthGear && (readerView || !knownGear)
+              ? <FogPanel label="身上的装备（幕后）" revealed={readerView}><NpcGearBlock data={truthExt!} name={name} portrait={portrait} world={world} gameState={gameState} /></FogPanel>
+              : <NpcGearBlock data={ext} name={name} portrait={portrait} world={world} gameState={gameState} />
+          )}
+
+          {tab === 'bag' && (
+            truthPack && (readerView || !knownPack)
+              ? <FogPanel label="随身物品（幕后）" revealed={readerView}>{packFor('truth', truthExt!)}</FogPanel>
+              : packFor('known', ext)
+          )}
+        </div>
+      </section>
+
+      {inspect && inspectItem && (() => {
+        const kind = itemSlotKind(inspect.key, inspectItem);
+        const size = bagSize(inspect.key, inspectItem);
+        const bonuses = itemBonusChips(gameState ? statsConfigFor(world, gameState) : undefined, inspectItem);
+        return (
+          <ItemSheet
+            title={inspect.key}
+            quality={inspectItem.品质}
+            glyph={<ItemGlyph name={inspect.key} item={inspectItem} size="lg" />}
+            meta={<>
+              <span className="eq-chip eq-chip--quality" style={qualityStyle(inspectItem.品质)}>{inspectItem.品质 || '普通'}</span>
+              {inspectItem.类型 && <span className="eq-chip">{inspectItem.类型}</span>}
+              {kind && <span className="eq-chip">{SLOT_KIND_LABEL[kind]}装备</span>}
+              {size > 0 && <span className="eq-chip">背包 +{size} 格</span>}
+              {inspect.source === 'truth' && <span className="eq-chip">角色尚不知</span>}
+            </>}
+            onClose={() => setInspect(null)}
+          >
+            <SheetRows rows={[['数量', inspectItem.数量], ['备注', inspectItem.备注]]} />
+            {bonuses.length > 0 && <SheetBlock title="穿戴加成"><BonusChips chips={bonuses} /></SheetBlock>}
+          </ItemSheet>
+        );
+      })()}
 
       {showDeeds && (
         <DeedsModal
@@ -358,6 +365,6 @@ export function NPCDetail({ npc, npcId, truth, onClose, onUpdateChronicles, onMe
           onMerge={onMergeChronicles}
         />
       )}
-    </div>
+    </OverlayPortal>
   );
 }

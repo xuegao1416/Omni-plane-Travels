@@ -60,7 +60,8 @@
 
 /* Mobile sheets */
 .game-journey__overlay { position: fixed; inset: 0; z-index: 1100; overflow: hidden; background: rgba(var(--d-deep-bg, 2, 3, 8), .6); backdrop-filter: blur(2px); animation: pk-fade .2s ease-out both; overscroll-behavior: contain; }
-.mobile-overlay-panel.journey-dossier { top: max(10px, env(safe-area-inset-top)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(var(--game-journey-overlay-width, 344px), calc(100vw - 20px)); }
+/* max-width: none — responsive.css's legacy .mobile-overlay-panel { max-width: 80vw } squeezed the 420px dossier to ~300px on phones. */
+.mobile-overlay-panel.journey-dossier { top: max(10px, env(safe-area-inset-top)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(var(--game-journey-overlay-width, 344px), calc(100vw - 20px)); max-width: none; }
 .mobile-overlay-panel.journey-dossier.mobile-overlay-left { left: 10px; animation: pk-sheet-left .32s var(--pk-spring) both; }
 .mobile-overlay-panel.journey-dossier.mobile-overlay-right { right: 10px; animation: pk-sheet-right .32s var(--pk-spring) both; }
 .mobile-overlay-panel.journey-dossier .journey-dossier__content { padding: 16px 14px 12px; }

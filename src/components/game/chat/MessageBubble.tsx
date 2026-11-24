@@ -1,6 +1,7 @@
 import { useState,useRef,useCallback,useEffect,memo } from 'react';
 import { useMediaQuery } from '../../../hooks/useIsMobile';
 import ContextMenu from './ContextMenu';
+import type { ContextMenuSource } from './contextMenuPlacement';
 import type { Props } from './messageBubble/types';
 import { useRenderedContent,useDisplayScripts } from './messageBubble/renderPipeline';
 import EditMode from './messageBubble/EditMode';
@@ -8,7 +9,9 @@ import { useMenuItems } from './messageBubble/useMenuItems';
 import BubbleContent from './messageBubble/BubbleContent';
 
 export default memo(function MessageBubble({ message, onDelete, onEdit, onResend, onResendFromHere, onCopy, onOptionClick, worldSystem, onDiceRoll, readOnly = false }: Props) {
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; source: ContextMenuSource } | null>(null);
+  /** 最近一次按下用的是手指还是鼠标：安卓长按也会触发 contextmenu，要按触屏来摆菜单。 */
+  const lastPointerTypeRef = useRef<string>('mouse');
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const editingRef = useRef(false);
@@ -31,7 +34,17 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
       if (editingRef.current) return;
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY });
+      const pointerType = 'pointerType' in e && typeof e.pointerType === 'string' && e.pointerType ? e.pointerType : lastPointerTypeRef.current;
+      const source: ContextMenuSource = pointerType === 'touch' ? 'touch' : 'mouse';
+      if (source === 'touch') {
+        // 安卓的长按：和下面的长按计时器是同一次操作，用手指按下的位置，只打开一次。
+        const start = longPressStartRef.current;
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        setContextMenu(current => current ?? { x: start?.x ?? e.clientX, y: start?.y ?? e.clientY, source });
+        return;
+      }
+      setContextMenu({ x: e.clientX, y: e.clientY, source });
     };
     el.addEventListener('contextmenu', handler);
     return () => {
@@ -47,13 +60,14 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    lastPointerTypeRef.current = e.pointerType;
     if (e.pointerType !== 'touch' || editingRef.current) return;
     cancelLongPress();
     const point = { x: e.clientX, y: e.clientY };
     longPressStartRef.current = point;
     longPressTimerRef.current = setTimeout(() => {
       longPressTimerRef.current = null;
-      setContextMenu(point);
+      setContextMenu({ ...point, source: 'touch' });
     }, 520);
   }, [cancelLongPress]);
 
@@ -121,6 +135,7 @@ export default memo(function MessageBubble({ message, onDelete, onEdit, onResend
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
+          source={contextMenu.source}
           items={menuItems}
           onClose={() => setContextMenu(null)}
         />

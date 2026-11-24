@@ -46,7 +46,7 @@ interface WorldHallViewProps {
   onOpenCustomModules: () => void;
   onOpenSettings: () => void;
   onOpenUserCenter: () => void;
-  onOpenEditor: (world: WorldDef | null, step?: number) => void;
+  onOpenEditor: (world: WorldDef | null, step?: number, workspace?: 'map') => void;
   onDeleteWorld: (worldId: string) => void | Promise<{ ok: boolean }>;
   onImportWorld: (world: WorldDef) => void;
   onLoadSave: (saveId: string) => Promise<void>;
@@ -447,6 +447,7 @@ export default function WorldHallView({
           onClose={() => { playHallSound('back'); setDetail(null); }}
           onStart={() => { playHallSound('confirm'); onStartWizard(); }}
           onEdit={() => onOpenEditor(detail.world, 4)}
+          onEditMap={() => onOpenEditor(detail.world, 3, 'map')}
           onDelete={() => void handleDeleteCustomWorld(detail.world.id)}
         />
       )}

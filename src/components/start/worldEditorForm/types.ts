@@ -1,4 +1,5 @@
 import type { WorldArtwork,WorldDef,WorldBookEntryDef } from '../../../data/worlds-schema';
+import { createDefaultMapModule, normalizeMapConfig } from '../../../domains/map/config';
 import {
 createDefaultStatModule,createDefaultProgressionModule,createDefaultSurvivalModule,
 createDefaultBusinessModule,createDefaultDiceModule,createDefaultTalentModule,
@@ -47,10 +48,11 @@ export const DEFAULT_MODULE_FACTORIES: Record<string, () => unknown> = {
   dice: createDefaultDiceModule, talent: createDefaultTalentModule,
   profession: createDefaultProfessionBinding,
   combat: createDefaultCombatBinding,
+  map: createDefaultMapModule,
 };
 
 export const MODULE_NAME_MAP: Record<string, string> = {
-  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', profession: '职业体系', combat: '战斗系统',
+  stat: '数值属性', progression: '成长体系', survival: '生存资源', business: '经营资产', dice: '骰子检定', talent: '天赋体系', profession: '职业体系', combat: '战斗系统', map: '世界地图',
 };
 
 /**
@@ -256,6 +258,7 @@ export function injectModuleRuleEntries(world: WorldDef, form: FormState, _refin
       if (mod.moduleId === 'business') buildCtx.businessData = mc;
       if (mod.moduleId === 'talent') buildCtx.talentData = mc;
       if (mod.moduleId === 'profession') buildCtx.professionData = resolveProfessionBinding(mc);
+      if (mod.moduleId === 'map') buildCtx.mapData = normalizeMapConfig(mc);
     }
     buildCtx.worldBookEntries = generateWorldBookEntries(buildCtx);
     if (buildCtx.worldBookEntries?.length) {

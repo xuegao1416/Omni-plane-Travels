@@ -33,6 +33,13 @@ import { MemorySettingsOverlay } from '../components/settings/memory/MemorySetti
 import EventConfigPanel from '../components/event/EventConfigPanel';
 import { findWorldDef } from '../data/worldLoader';
 import { resolveProfessionBinding } from '../data/professions/professionLibrary';
+import { createGameplayHost } from '../core/registry';
+import MapPanel from '../components/game/panels/MapPanel';
+import { MAP_TEMPLATES } from '../domains/map/templates';
+import { mapConfigOf } from '../domains/map/config';
+import { buildMapViewModel } from '../domains/map/viewModel';
+import type { MapTheme } from '../domains/map/types';
+import type { WorldDef } from '../data/worlds-schema';
 import '../ui/screens/game.css';
 import '../ui/screens/game-story.css';
 import '../ui/screens/game-dossier.css';
@@ -144,11 +151,35 @@ export default function GameShellPreview() {
     </div>
   );
 
-  const [sample] = useState(() => createSampleGameState());
+  // `&map=ancient|modern|scifi` mounts a template map on the preview world (`&panel=map` defaults to ancient).
+  // A world that ships its own map (worlds.json) always keeps it — the template is only a fallback.
+  const mapTheme = (params.get('map') ?? (params.get('panel') === 'map' ? 'ancient' : '')) as MapTheme | '';
+  const baseWorld = findWorldDef(params.get('world') ?? 'wuxia_world');
+  const [previewWorld] = useState<WorldDef | undefined>(() => baseWorld && mapTheme && MAP_TEMPLATES[mapTheme] && !mapConfigOf(baseWorld)
+    ? { ...baseWorld, modules: [...(baseWorld.modules ?? []), { moduleId: 'map', name: '世界地图', enabled: true, moduleConfig: MAP_TEMPLATES[mapTheme].build() as unknown as Record<string, unknown> }] }
+    : baseWorld);
+  const [sample, setSample] = useState(() => {
+    const state = createSampleGameState();
+    // `&overflow=1` stuffs the pack past its capacity to check the overloaded strip.
+    if (mapTheme) state.世界.空间定位.当前位置 = '';
+    if (params.get('overflow')) {
+      for (const name of ['麻绳', '铜锁', '旧地图', '火石', '针线包', '酒囊', '油纸伞', '木梳', '竹笛', '药碾']) state.玩家.物品栏[name] = { 数量: 1, 类型: '杂物', 品质: '普通', 备注: '' };
+    }
+    return createGameplayHost(previewWorld, state).prepare(state);
+  });
   const [varMgr] = useState(() => new VariableManager(sample));
+  // 人物档案里的装备 / 卸下 / 丢弃在内存里的样例存档上真实结算，便于截图检查交互。
+  const runPreviewCommand = (command: string, args: Record<string, unknown>, label?: string) => {
+    const host = createGameplayHost(previewWorld, sample);
+    const outcome = host.dispatch(host.prepare(sample), command, args, { source: 'player', label: label ?? command });
+    if (outcome.status !== 'applied') return { ok: false, feedback: outcome.reason ?? '当前条件不满足' };
+    setSample(outcome.state);
+    return { ok: true, feedback: outcome.messages.join('；') || label || '已完成' };
+  };
   const livePanel = (panel: OverlayPanel) => {
     switch (panel) {
-      case 'profile': return <ProfilePanel gameState={sample} hasBusinessModule={false} variableManager={varMgr} />;
+      case 'profile': return <ProfilePanel gameState={sample} world={previewWorld} hasBusinessModule={false} onCommand={params.get('readonly') ? undefined : runPreviewCommand} />;
+      case 'map': return <MapPanel world={previewWorld} gameState={sample} onTravel={(to, name) => runPreviewCommand('map.travel', { to }, `前往${name}`)} onRest={() => runPreviewCommand('map.rest', { hours: 8 }, '休整')} />;
       case 'characters': return <CharacterGrid gameState={sample} worldId={params.get('world') ?? 'wuxia_world'} />;
       case 'tasks': return <TaskPanel gameState={sample} />;
       case 'notebook': return <NotebookPanel gameState={sample} />;
@@ -199,7 +230,7 @@ export default function GameShellPreview() {
           mobileActivePanel={mobilePanel} onMobileActivePanelChange={setMobilePanel}
           panelTitle={meta(mobilePanel)?.title ?? ''} panelSubtitle={meta(mobilePanel)?.subtitle} panelIcon={meta(mobilePanel)?.icon}
           panelContent={panelBody(mobilePanel)}
-          rightPanel={params.get('ledger') === 'mock' ? ledger : <RightPanel gameState={sample} worldId={params.get('world') ?? 'wuxia_world'} />}
+          rightPanel={params.get('ledger') === 'mock' ? ledger : <RightPanel gameState={sample} worldId={params.get('world') ?? 'wuxia_world'} mapView={previewWorld && mapTheme ? buildMapViewModel(previewWorld, sample) : null} onOpenMap={() => { setOverlay('map'); setMobilePanel('map'); }} />}
         >{chat}</MobileLayout>
       ) : (
         <DesktopLayout
@@ -208,7 +239,7 @@ export default function GameShellPreview() {
           drawerTitle={meta(overlay)?.title ?? ''} drawerSubtitle={meta(overlay)?.subtitle} drawerIcon={meta(overlay)?.icon}
           drawerContent={panelBody(overlay)}
           rightCollapsed={rightCollapsed} onToggleRightPanel={() => setRightCollapsed(value => !value)}
-          rightPanel={params.get('ledger') === 'mock' ? ledger : <RightPanel gameState={sample} worldId={params.get('world') ?? 'wuxia_world'} />}
+          rightPanel={params.get('ledger') === 'mock' ? ledger : <RightPanel gameState={sample} worldId={params.get('world') ?? 'wuxia_world'} mapView={previewWorld && mapTheme ? buildMapViewModel(previewWorld, sample) : null} onOpenMap={() => { setOverlay('map'); setMobilePanel('map'); }} />}
         >{chat}</DesktopLayout>
       )}
       {params.get('overlay') === 'business' && economyPreview && <EconomyLedger open view={economyPreview} onClose={noop} />}

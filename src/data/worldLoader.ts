@@ -1,5 +1,6 @@
 // 世界数据加载器 —— 从 worlds.json 加载内置世界定义
-import type { WorldDef, WorldBookEntryDef } from './worlds-schema';
+import type { WorldDef, WorldBookEntryDef, WorldModule } from './worlds-schema';
+import { BUILTIN_WORLD_MAPS } from './worldMaps';
 import { STORAGE_KEYS } from '../config/storageKeys';
 import { safeSetItem } from '../storage/safeStorage';
 import { normalizeModules } from '../modules/normalizeModule';
@@ -17,11 +18,65 @@ export type {
   WorldBookEntryDef,
 } from './worlds-schema';
 
-/** 全部内置世界定义（从 worlds.json 加载） */
-export const WORLDS: WorldDef[] = (worldsData as WorldDef[]).map(world => ({
-  ...world,
-  ...(world.modules ? { modules: normalizeModules(world.modules) } : {}),
-}));
+function builtinMapModule(worldId: string): WorldModule | undefined {
+  const entry = BUILTIN_WORLD_MAPS[worldId];
+  if (!entry) return undefined;
+  return { moduleId: 'map', name: '世界地图', description: entry.description, enabled: true, moduleConfig: entry.build() as unknown as Record<string, unknown> };
+}
+
+/** 全部内置世界定义（从 worlds.json 加载；地图来自 worldMaps/） */
+export const WORLDS: WorldDef[] = (worldsData as WorldDef[]).map(world => {
+  const modules = world.modules ? normalizeModules(world.modules) : undefined;
+  const map = builtinMapModule(world.id);
+  if (!map) return { ...world, ...(modules ? { modules } : {}) };
+  return { ...world, modules: [...(modules ?? []).filter(module => module.moduleId !== 'map'), map] };
+});
+
+const BUILTIN_BY_ID = new Map(WORLDS.map(world => [world.id, world] as const));
+
+export function isBuiltinWorldId(id: string | undefined): boolean {
+  return Boolean(id && BUILTIN_BY_ID.has(id));
+}
+
+/**
+ * 内置世界的副本（存档里的世界快照、改过职业绑定或世界书后存下的副本）跟上内置定义的更新：
+ * 地图总是换成内置的最新版（内置世界的地图在界面里改不了），副本里没有的内置模块补上。
+ * 不是内置 id 的世界原样返回。
+ */
+export function withBuiltinUpdates<T extends WorldDef | undefined>(world: T): T {
+  if (!world) return world;
+  const builtin = BUILTIN_BY_ID.get(world.id);
+  if (!builtin?.modules?.length || builtin === world) return world;
+  const own = world.modules ?? [];
+  const builtinMap = builtin.modules.find(module => module.moduleId === 'map');
+  let changed = false;
+  const modules = own.map(module => {
+    if (module.moduleId !== 'map' || !builtinMap || module.moduleConfig === builtinMap.moduleConfig) return module;
+    changed = true;
+    return { ...builtinMap, enabled: module.enabled !== false };
+  });
+  const ids = new Set(own.map(module => module.moduleId));
+  for (const module of builtin.modules) {
+    if (ids.has(module.moduleId)) continue;
+    modules.push(module);
+    changed = true;
+  }
+  return (changed ? { ...world, modules } : world) as T;
+}
+
+/** 写进 localStorage 前去掉内置副本里的地图数据（读出来时由 withBuiltinUpdates 换回最新版），免得每份副本都存一整张地图。 */
+export function compactBuiltinCopy<T extends WorldDef | Record<string, unknown>>(world: T): T {
+  const id = (world as { id?: unknown }).id;
+  const modules = (world as { modules?: unknown }).modules;
+  if (typeof id !== 'string' || !BUILTIN_BY_ID.has(id) || !Array.isArray(modules)) return world;
+  if (!modules.some(module => module && (module as WorldModule).moduleId === 'map' && (module as WorldModule).moduleConfig)) return world;
+  return {
+    ...world,
+    modules: modules.map(module => module && (module as WorldModule).moduleId === 'map'
+      ? (({ moduleConfig: _drop, ...rest }) => rest)(module as WorldModule)
+      : module),
+  } as T;
+}
 
 /** 按 id 查找世界（仅内置） */
 export function getWorldById(id: string): WorldDef | undefined {
@@ -35,7 +90,7 @@ export function getAllWorlds(): WorldDef[] {
     const raw: WorldDef[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.CUSTOM_WORLDS) || '[]');
     for (const w of raw) {
       if (w.modules) w.modules = normalizeModules(w.modules);
-      customs.push(w);
+      customs.push(withBuiltinUpdates(w));
     }
   } catch { /* ignore */ }
   const builtin = WORLDS.filter(w => !customs.some(c => c.id === w.id));
@@ -50,7 +105,7 @@ export function findWorldDef(worldId: string): WorldDef | undefined {
     const found = custom.find((w: WorldDef) => w.id === worldId);
     if (found) {
       if (found.modules) found.modules = normalizeModules(found.modules);
-      return found;
+      return withBuiltinUpdates(found);
     }
   } catch { /* ignore */ }
   // 兜底：内置世界

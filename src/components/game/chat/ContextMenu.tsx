@@ -1,4 +1,6 @@
-import { useEffect,useRef,useCallback } from 'react';
+import { useEffect,useLayoutEffect,useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { placeContextMenu,visibleBounds,type ContextMenuSource } from './contextMenuPlacement';
 
 export interface ContextMenuItem {
   label: string;
@@ -11,29 +13,42 @@ export interface ContextMenuItem {
 interface Props {
   x: number;
   y: number;
+  /** 右键（鼠标）还是长按（触屏），决定菜单放在光标旁还是手指上方。 */
+  source?: ContextMenuSource;
   items: ContextMenuItem[];
   onClose: () => void;
 }
 
-export default function ContextMenu({ x, y, items, onClose }: Props) {
+/**
+ * 消息的右键 / 长按菜单。挂到 document.body：消息行带入场动画（transform），
+ * 留在行内时 position: fixed 会以消息行为参照，菜单就偏到别处，还会跟着列表滚走。
+ */
+export default function ContextMenu({ x, y, source = 'mouse', items, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // 点击外部关闭
+  // 在外面按下、滚轮、窗口尺寸变化、切走页面时关闭。菜单固定在屏幕上，内容滚动后就对不上消息了。
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+    const close = () => onCloseRef.current();
+    const handlePointerDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) close();
     };
-    // 延迟注册，避免触发右键的 mouseup 立即关闭
+    // 延迟注册，避免打开菜单的那次按下立即把它关掉
     const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handler);
+      document.addEventListener('pointerdown', handlePointerDown, true);
+      document.addEventListener('wheel', close, { passive: true });
     }, 0);
+    window.addEventListener('resize', close);
+    window.addEventListener('blur', close);
     return () => {
       clearTimeout(timer);
-      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('wheel', close);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('blur', close);
     };
-  }, [onClose]);
+  }, []);
 
   // ESC 关闭
   useEffect(() => {
@@ -44,27 +59,19 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  // 确保菜单不超出视口
-  const adjustPosition = useCallback(() => {
-    if (!menuRef.current) return;
-    const rect = menuRef.current.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+  // 量出菜单尺寸后定位，在绘制之前完成，不会先在错的位置闪一下。
+  useLayoutEffect(() => {
     const el = menuRef.current;
+    if (!el) return;
+    const placement = placeContextMenu({ x, y }, { width: el.offsetWidth, height: el.offsetHeight }, visibleBounds(), source);
+    el.style.left = `${placement.left}px`;
+    el.style.top = `${placement.top}px`;
+    el.style.transformOrigin = placement.transformOrigin;
+    el.style.visibility = 'visible';
+  }, [x, y, source, items.length]);
 
-    if (x + rect.width > vw - 8) {
-      el.style.left = `${vw - rect.width - 8}px`;
-    }
-    if (y + rect.height > vh - 8) {
-      el.style.top = `${vh - rect.height - 8}px`;
-    }
-  }, [x, y]);
-
-  useEffect(() => {
-    adjustPosition();
-  }, [adjustPosition]);
-
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
       ref={menuRef}
       className="context-menu"
@@ -72,8 +79,9 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
       aria-label="上下文菜单"
       style={{
         position: 'fixed',
-        left: x,
-        top: y,
+        left: 0,
+        top: 0,
+        visibility: 'hidden',
         zIndex: 10000,
         minWidth: '160px',
         animation: 'contextMenuIn 0.12s ease-out',
@@ -123,6 +131,7 @@ export default function ContextMenu({ x, y, items, onClose }: Props) {
           <span>{item.label}</span>
         </div>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,10 +1,11 @@
-import { Compass,UserRound,Users,Target,Swords,ScrollText,Variable,LibraryBig,Clapperboard,Brain,Puzzle,Settings2 } from 'lucide-react';
+import { Compass,UserRound,Users,Target,Swords,ScrollText,Variable,LibraryBig,Clapperboard,Brain,Puzzle,Settings2,Map as MapIcon } from 'lucide-react';
 import type { NavButton,OverlayPanel } from './types';
 
 /** Instrument rail: one entry per dossier, plus the way back to the orrery. */
 export const navButtons: NavButton[] = [
   { id: 'home', icon: Compass, labelKey: 'nav.home' },
   { id: 'profile', icon: UserRound, labelKey: 'nav.profile' },
+  { id: 'map', icon: MapIcon, labelKey: 'nav.map' },
   { id: 'characters', icon: Users, labelKey: 'nav.characters' },
   { id: 'tasks', icon: Target, labelKey: 'nav.tasks' },
   { id: 'profession', icon: Swords, labelKey: 'nav.profession' },
@@ -19,6 +20,7 @@ export const navButtons: NavButton[] = [
 const NAV_LABELS: Record<string, string> = {
   home: '返回星图',
   profile: '人物档案',
+  map: '地图',
   characters: '角色关系',
   tasks: '任务',
   profession: '职业',

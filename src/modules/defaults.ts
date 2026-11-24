@@ -18,6 +18,7 @@ import type {
   WorldDynamics,
 } from './schema';
 import { resolveProfessionBinding } from '../data/professions';
+import { createDefaultMapModule } from '../domains/map/config';
 import { createDefaultCombatBinding as createCombatBinding, resolveCombatRuleset } from '../gameplay/combatRulesets';
 
 /** 数值属性模块默认值 */
@@ -238,6 +239,8 @@ export function createFallbackModule(moduleId: string, name: string): import('..
       return { ...base, moduleConfig: createDefaultCombatBinding() as unknown as Record<string, unknown> };
     case 'simulation':
       return { ...base, moduleConfig: createDefaultWorldDynamics() as unknown as Record<string, unknown> };
+    case 'map':
+      return { ...base, moduleConfig: createDefaultMapModule() as unknown as Record<string, unknown> };
     default:
       return base;
   }

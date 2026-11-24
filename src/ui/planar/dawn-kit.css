@@ -164,6 +164,7 @@
 :root[data-ui-theme='dawn'] .cb-result.is-defeat .cb-result__card h2,
 :root[data-ui-theme='dawn'] .combat-decision h2,
 :root[data-ui-theme='dawn'] .profession-library__title h2,
+:root[data-ui-theme='dawn'] .map-editor__heading h2,
 :root[data-ui-theme='dawn'] .event-archive-heading h1,
 :root[data-ui-theme='dawn'] .event-archive-detail-heading h2,
 :root[data-ui-theme='dawn'] .pk-workbench__title,

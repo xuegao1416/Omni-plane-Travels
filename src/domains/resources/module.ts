@@ -5,7 +5,7 @@
  * - 采集、制作、解锁配方是玩家命令，会消耗体力与时间；事件和 AI 通过变量增减。
  * - 状态通过统一加成影响骰子、属性等其他模块；变化记入账本，告急/耗尽/恢复发出领域事件。
  */
-import type { GameState } from '../../schema/variables';
+import type { GameState, InventoryItem } from '../../schema/variables';
 import type { WorldDef } from '../../data/worlds-schema';
 import type { SurvivalModuleSchema } from '../../modules/schema';
 import type { FactSpec, WriteSource } from '../../core/facts';
@@ -15,6 +15,7 @@ import type { CycleTick } from '../../core/cycles';
 import { MAX_STEPPED_DAYS } from '../../core/cycles';
 import { evaluateCondition } from '../../core/conditions';
 import { advanceStateClock } from '../../core/clock';
+import { makesOverflowWorse, playerInventoryLayout } from '../inventory/capacity';
 import { normalizeRecipe, normalizeResourcesConfig, type RecipeDef, type ResourceDef, type ResourcesConfig, type StatusDef } from './config';
 import {
   LEDGER_LIMIT,
@@ -416,6 +417,22 @@ export const resourcesModule: GameplayModule<ResourcesModuleConfig> = {
       for (const key of Object.keys(recipe.outputs)) {
         if (!key.startsWith('item:') && !resourceDef(config, state, key)) return { ok: false, reason: `配方产物「${key}」不是已知物资` };
       }
+      // 产物是物品时先看行囊放不放得下，免得材料扣了、成品却被退回。
+      const nextItems: Record<string, InventoryItem> = { ...(state.玩家.物品栏 ?? {}) };
+      for (const [key, amount] of Object.entries(recipe.inputs)) {
+        if (!key.startsWith('item:')) continue;
+        const name = key.slice(5);
+        const left = Number(nextItems[name]?.数量 ?? 0) - amount;
+        if (left > 0) nextItems[name] = { ...nextItems[name]!, 数量: left };
+        else delete nextItems[name];
+      }
+      for (const [key, amount] of Object.entries(recipe.outputs)) {
+        if (!key.startsWith('item:')) continue;
+        const name = key.slice(5);
+        nextItems[name] = nextItems[name] ? { ...nextItems[name]!, 数量: Number(nextItems[name]!.数量) + amount } : { 数量: amount, 类型: '杂物', 品质: '普通', 备注: '' };
+      }
+      const packed = playerInventoryLayout(nextItems);
+      if (makesOverflowWorse(playerInventoryLayout(state.玩家.物品栏), packed)) return { ok: false, reason: `行囊已满（${packed.capacity} 格），放不下「${recipe.name}」的成品，先腾出空位` };
       const changes: Array<{ id: string; delta: number; after: number }> = [];
       for (const [key, amount] of Object.entries(recipe.inputs)) {
         if (key.startsWith('item:')) context.apply([{ op: 'add', path: `player.items.${key.slice(5)}`, value: -amount }], 'system');

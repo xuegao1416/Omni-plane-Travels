@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { getDevScreenshotTarget } from '../dev/screenshotPreset';
 import { getCreationDraftOwner } from './creationDraftOwner';
-import { WORLDS, type WorldDef } from '../data/worldLoader';
+import { WORLDS, compactBuiltinCopy, withBuiltinUpdates, type WorldDef } from '../data/worldLoader';
 import type { PlayerProfile } from '../storage/db';
 import type { WorldBookEntry } from '../worldbook/index';
 import { STORAGE_KEYS } from '@/config/storageKeys';
@@ -49,7 +49,8 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
       for (const w of worlds) {
         if (w.modules) w.modules = normalizeModules(w.modules);
       }
-      return worlds;
+      // 内置世界的本地副本换上内置定义的最新地图、补上新增模块。
+      return worlds.map(world => withBuiltinUpdates(world));
     } catch { return []; }
   });
   // createdWorlds 优先去重：过滤掉 WORLDS 中已存在于 createdWorlds 的同 ID 世界
@@ -64,6 +65,7 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
   const [worldEditorOpen, setWorldEditorOpen] = useState(() => getDevScreenshotTarget() === 'editor');
   const [editingWorld, setEditingWorld] = useState<WorldDef | null>(null);
   const [worldEditorInitialStep, setWorldEditorInitialStep] = useState<number | undefined>(undefined);
+  const [worldEditorWorkspace, setWorldEditorWorkspace] = useState<'map' | undefined>(undefined);
 
   // The world entry is a projection of the selected definition, so a previous world's
   // asynchronous load cannot supply a prompt after a selection change.
@@ -83,7 +85,7 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
   // 自建世界带有完整世界书，体积可观：配额耗尽时只跳过本次落盘，
   // 不能让同步异常冒泡掀翻整个界面（内存态仍然有效）。
   useEffect(() => {
-    trySetItem(CREATED_WORLDS_KEY, JSON.stringify(createdWorlds));
+    trySetItem(CREATED_WORLDS_KEY, JSON.stringify(createdWorlds.map(world => compactBuiltinCopy(world))));
   }, [createdWorlds]);
 
   // ─── 世界编辑器操作 ───
@@ -97,6 +99,7 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
     setWorldEditorOpen(false);
     setEditingWorld(null);
     setWorldEditorInitialStep(undefined);
+    setWorldEditorWorkspace(undefined);
   };
 
   const handleDeleteWorld = (worldId: string, referencedWorldIds: ReadonlySet<string> = new Set()): CustomWorldDeleteResult => {
@@ -111,6 +114,7 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
     setWorldEditorOpen(false);
     setEditingWorld(null);
     setWorldEditorInitialStep(undefined);
+    setWorldEditorWorkspace(undefined);
   };
 
   const handleImportWorld = (world: WorldDef) => {
@@ -142,6 +146,7 @@ export function useWizard({ initialWorld = 'default' }: UseWizardOptions = {}) {
     worldEditorOpen, setWorldEditorOpen,
     editingWorld, setEditingWorld,
     worldEditorInitialStep, setWorldEditorInitialStep,
+    worldEditorWorkspace, setWorldEditorWorkspace,
     handleSaveWorld,
     handleDeleteWorld,
     handleCancelWorldEditor,
