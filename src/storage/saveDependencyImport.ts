@@ -126,6 +126,29 @@ function eventStamp(record: StoredEvent): string {
   const files = Object.fromEntries(Object.entries(record.files).map(([path, value]) => [path, value instanceof Blob ? { type: value.type, size: value.size } : value]));
   return stableDependencyText({ manifest: record.manifest, files, enabled: record.enabled, status: record.status, installedAt: record.installedAt, builtin: record.builtin });
 }
+/** Packs the save can use at runtime (global or bound to its world) plus their dependency closure. */
+function relevantEventIds(inputs: RecordValue[], worldId: string): Set<string> {
+  const byId = new Map(inputs.map(input => [input.id as string, input]));
+  const boundWorld = (input: RecordValue) => {
+    const manifest = input.manifest as RecordValue;
+    const bound = manifest.worldId ?? input.worldId;
+    return typeof bound === 'string' && bound ? bound : undefined;
+  };
+  const result = new Set<string>();
+  const visit = (id: string) => {
+    if (result.has(id)) return;
+    const input = byId.get(id);
+    if (!input) return; // 缺失的依赖由后续依赖检查报错（或由本机已有包满足）
+    result.add(id);
+    const dependencies = (input.manifest as RecordValue).dependencies;
+    if (Array.isArray(dependencies)) for (const dependency of dependencies) if (typeof dependency === 'string') visit(dependency);
+  };
+  for (const input of inputs) {
+    const bound = boundWorld(input);
+    if (!bound || bound === worldId) visit(input.id as string);
+  }
+  return result;
+}
 export async function prepareSaveDependencies(save: GameSave, directorInput: unknown, eventInput: unknown, owner: string): Promise<SaveDependencyPlan> {
   const world = await prepareWorld(save, owner), references = directorDependencyReferences(save), definitions = new Map<string, DirectorDefinition>();
   if (directorInput !== undefined && !Array.isArray(directorInput)) throw new Error('剧情依赖格式无效');
@@ -141,10 +164,18 @@ export async function prepareSaveDependencies(save: GameSave, directorInput: unk
     if (!definitions.has(key) && !await db.get('director_definitions', key)) throw new Error(`导入缺少剧情版本：${reference.definitionId} / ${reference.version}；请使用完整备份。`);
   }
   if (eventInput !== undefined && !Array.isArray(eventInput)) throw new Error('事件包依赖格式无效');
-  const events: EventPlan[] = [], ids = new Set<string>();
-  for (const input of eventInput as unknown[] ?? []) {
+  const inputs = eventInput as unknown[] ?? [], inputIds = new Set<string>();
+  for (const input of inputs) {
     if (!plain(input) || typeof input.id !== 'string' || !plain(input.manifest) || !plain(input.files)) throw new Error('事件包备份格式无效');
-    if (ids.has(input.id)) throw new Error('备份中存在重复事件包，请重新导出。'); ids.add(input.id);
+    if (inputIds.has(input.id)) throw new Error('备份中存在重复事件包，请重新导出。'); inputIds.add(input.id);
+  }
+  const relevant = relevantEventIds(inputs as RecordValue[], save.worldId || 'default');
+  const events: EventPlan[] = [], ids = new Set<string>();
+  for (const input of inputs as RecordValue[]) {
+    // 旧版导出会把所有世界的已启用包都带上；绑定其他世界的包与本存档无关，直接跳过。
+    if (!relevant.has(input.id as string)) continue;
+    if (!plain(input.manifest) || !plain(input.files) || typeof input.id !== 'string') throw new Error('事件包备份格式无效');
+    ids.add(input.id);
     const rawManifest = { ...input.manifest };
     if (typeof input.worldId === 'string' && !rawManifest.worldId) rawManifest.worldId = input.worldId;
     if (rawManifest.worldId === save.worldId) rawManifest.worldId = world.worldId;
@@ -163,7 +194,11 @@ export async function prepareSaveDependencies(save: GameSave, directorInput: unk
     const value: WebEventRecord = { id: input.id, manifest, files, enabled, status: enabled ? 'enabled' : 'disabled', installedAt: new Date().toISOString(), builtin: typeof input.builtin === 'boolean' ? input.builtin : undefined };
     const stored = await (await getEventDB()).get('events', value.id) as (StoredEvent & { worldId?: string }) | undefined;
     const existing = stored && { ...stored, manifest: stored.worldId && !stored.manifest.worldId ? { ...stored.manifest, worldId: stored.worldId } : stored.manifest };
-    if (existing && await eventContent(existing) !== await eventContent(value)) throw new Error(`事件包「${manifest.name}」与本机同 ID 内容冲突，请先为导入包另存新标识；本机版本已保留。`);
+    if (existing && await eventContent(existing) !== await eventContent(value)) {
+      // 内置包由 App 按自身版本从世界定义生成，不同设备/版本内容不同属正常；保留本机版本即可。
+      if (existing.builtin === true && value.builtin === true) continue;
+      throw new Error(`事件包「${manifest.name}」与本机同 ID 内容冲突，请先为导入包另存新标识；本机版本已保留。`);
+    }
     events.push({ value, ...(stored ? { existing: { revision: stored._writeRevision, stamp: eventStamp(stored) } } : {}) });
   }
   for (const { value } of events) {

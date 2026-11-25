@@ -1033,7 +1033,7 @@ const PREVIOUS_SAVE_EXPORT_VERSION = '1.0';
 
 /** 导出存档为 JSON Blob（不包含 API 配置，API 是应用级设置）
  *  注意：导出全量消息，不走 loadGame 的 200 条限制
- *  事件包：导出全局已启用的事件包完整内容（排重用）。
+ *  事件包：导出本存档世界可用（全局或绑定本世界）且已启用的事件包完整内容及其依赖闭包（排重用）。
  */
 export async function exportSave(saveId: string): Promise<Blob> {
   const record = await loadGame(saveId);
@@ -1045,10 +1045,15 @@ export async function exportSave(saveId: string): Promise<Blob> {
 export async function exportSaveCapture(capture: GameSave): Promise<Blob> {
   const record = structuredClone(capture);
 
-  // 收集全局已启用的事件包完整内容（供导入时排重恢复）
+  // 收集本存档世界会用到的已启用事件包完整内容（供导入时排重恢复）。
+  // 与运行时 selectRuntimePacksForWorld 同口径：只带全局包和绑定本世界的包，
+  // 其他世界的包（如未游玩世界的内置事件包）不属于这份存档，带上只会在别的设备上制造无关冲突。
   const { allWebEvents } = await import('../modules/eventDb');
+  const saveWorldId = record.worldId || 'default';
   const availableEvents = await allWebEvents(), byId = new Map(availableEvents.map(event => [event.id, event]));
-  const selectedEvents = new Map(availableEvents.filter(event => event.enabled).map(event => [event.id, event]));
+  const selectedEvents = new Map(availableEvents
+    .filter(event => event.enabled && (!event.manifest.worldId || event.manifest.worldId === saveWorldId))
+    .map(event => [event.id, event]));
   // Disabled dependencies still belong to the backup's content closure.
   const visitEvent = (id: string, visiting = new Set<string>()) => {
     if (visiting.has(id)) return;
